@@ -13,6 +13,8 @@ void schedule_summary_dependency_graph(PHY_GRAPH *phy_graph) {
   if (oag_debug & TOTAL_ORDER) {
     printf("Scheduling order for %s\n",decl_name(phy_graph->phylum));
   }
+  for (i=0; i < n; ++i)
+    phy_graph->summary_schedule[i] = 0;
   while (done < n) {
     ++phase; local_done = 0;
     /* find inherited instances for the phase. */
@@ -67,9 +69,48 @@ void schedule_summary_dependency_graph(PHY_GRAPH *phy_graph) {
 	}
       }
     }
-      if (local_done == 0)
-	fatal_error("Cycle detected when scheduling phase %d for %s",
-		    phase,decl_name(phy_graph->phylum));
+    if (local_done == 0) {
+      if (cycle_debug & PRINT_CYCLE) {
+	for (i=0; i <n; ++i) {
+	  INSTANCE *in = &phy_graph->instances.array[i];
+	  int s = phy_graph->summary_schedule[i];
+	  print_instance(in,stdout);
+	  switch (instance_direction(in)) {
+	  case instance_local:
+	    printf(" (a local attribute!) ");
+	    break;
+	  case instance_inward:
+	    printf(" inherited ");
+	    break;
+	  case instance_outward:
+	    printf(" synthesized ");
+	    break;
+	  default:
+	    printf(" (garbage direction!) ");
+	    break;
+	  }
+	  if (s != 0) {
+	    if (s < 0) printf(": phase -%d\n",-s);
+	    else printf(":phase +%d\n",s);
+	  } else {
+	    printf(" depends on ");
+	    for (j=0; j < n; ++j) {
+	      if (phy_graph->summary_schedule[j] == 0 &&
+		  phy_graph->mingraph[j*n+i] != no_dependency) {
+		INSTANCE *in2 = &phy_graph->instances.array[j];
+		print_instance(in2,stdout);
+		if (phy_graph->mingraph[j*n+i] == fiber_dependency)
+		  printf("(?)");
+		putc(' ',stdout);
+	      }
+	    }
+	    putc('\n',stdout);
+	  }
+	}
+      }
+      fatal_error("Cycle detected when scheduling phase %d for %s",
+		  phase,decl_name(phy_graph->phylum));
+    }
   }
 }
 
