@@ -20,7 +20,7 @@ int callset_AI(Declaration module, STATE *s) { return 0; }
 static char* argv0 = "apscpp";
 void usage() {
   fprintf(stderr,"%s: usage: %s [-SVG] [-D...] <file.aps>\n",argv0,argv0);
-  fprintf(stderr,"             compile APS to Java\n");
+  fprintf(stderr,"             compile APS to C++\n");
   /*fprintf(stderr,"    -I    generate an incremental implementation\n");*/
   fprintf(stderr,"    -S    generate a scheduled implementation\n");
   fprintf(stderr,"    -D... turn on indicated debugging flags\n");
