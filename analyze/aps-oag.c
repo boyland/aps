@@ -337,13 +337,22 @@ void compute_oag(Declaration module, STATE *s) {
   {
     int saved_analysis_debug = analysis_debug;
     int j;
-    analysis_debug |= -1;
-  
-    for (j=0; j < s->match_rules.length; ++j) {
-      printf("OAG closing rule %s\n",aug_graph_name(&s->aug_graphs[j]));
-      (void)close_augmented_dependency_graph(&s->aug_graphs[j]);
+
+    if (oag_debug & TYPE_3_DEBUG) {
+      analysis_debug |= TWO_EDGE_CYCLE;
     }
-    (void)close_augmented_dependency_graph(&s->global_dependencies);
+
+    if (analysis_debug & DNC_ITERATE) {
+      printf("\n**** After introduction of OAG schedule:\n\n");
+    }
+
+    for (j=0; j < s->match_rules.length; ++j) {
+      printf("Checking rule %d\n",j);
+      assert_closed(&s->aug_graphs[j]);
+    }
+
+    dnc_close(s);
+
     analysis_debug = saved_analysis_debug;
   }
 
