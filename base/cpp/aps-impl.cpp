@@ -1,3 +1,5 @@
+#include <iostream>
+#include <fstream>
 #include "aps-impl.h"
 #include "basic.h"
 
@@ -7,8 +9,8 @@ int Debug::depth = 0;
 
 static ostream* make_null_output()
 {
-  return &cout;
-  // return new ofstream("/dev/null");
+  // return &cout;
+  return new ofstream("/dev/null");
 }
 
 ostream* Debug::output = make_null_output();
@@ -44,18 +46,7 @@ ostream& Debug::out(ostream& new_stream) {
   return *old;
 }
 
-Node::Node(Constructor*c)
-  : type(c->get_type()), cons(c), index(type->install(this))
-{}
-
-string Node::to_string() {
-  if (dynamic_cast<Phylum*>(cons->get_type()))
-    return cons->get_name() + "#" + t_Integer->v_string(index);
-  else
-    return cons->get_name();
-}
-
-ostream& operator<<(ostream&os,Node*n)
+ostream& operator<<(ostream&os,C_NULL_TYPE::Node*n)
 {
   if (n) {
     os << n->to_string();
@@ -65,60 +56,106 @@ ostream& operator<<(ostream&os,Node*n)
   return os;
 }
 
-string operator+(const string&s,Node*n)
+string operator+(const string&s,C_NULL_TYPE::Node*n)
 {
   if (n == 0) return s + "<null>";
   return s + n->to_string();
 }
 
-Module::Module() : complete(false), name("<anonymous>"), t_Result(this) {}
-Module::Module(string n) : complete(false), name(n), t_Result(this) {}
+Module::Module() : complete(false) {}
 
-static print_depth = 1;
+void Module::finish() { complete = true; }
+
+static int print_depth = 1;
 class Depth {
 public:
   Depth() { --print_depth; }
   ~Depth() { ++print_depth; }
-  get() { return print_depth; }
+  int get() { return print_depth; }
 };
 
-string Module::v_string(Node *n) {
+template <>
+std::string s_string<int>(int n) 
+{
+  return t_Integer->v_string(n);
+}
+
+template <>
+std::string s_string<bool>(bool b) 
+{
+  return t_Boolean->v_string(b);
+}
+
+template <>
+std::string s_string<std::string>(std::string s) 
+{
+  return s;
+}
+
+template <>
+std::string s_string<C_NULL_TYPE::Node *>(C_NULL_TYPE::Node* n) 
+{
   if (!n) return "<null>";
   Depth d;
   if (d.get() < 0) return ("#");
   return n->to_string();
 }
+
+template <>
+std::string s_string<C_NULL_PHYLUM::Node *>(C_NULL_PHYLUM::Node* n)
+{
+  if (!n) return "<null>";
+  Depth d;
+  if (d.get() < 0) return ("#");
+  return n->to_string();
+}
+
+C_NULL_TYPE::Node::Node(Constructor*c)
+  : type(c->get_type()), cons(c)
+{}
+
+T_String C_NULL_TYPE::Node::to_string() {
+  return cons->get_name();
+}
+
+Type* C_NULL_TYPE::get_type() {
+  if (type == 0) {
+    // cout << (int)this << ": Creating Type" << endl;
+    type = new Type();
+  }
+  return type;
+}
+
+T_String C_NULL_TYPE::v_string(Node *n) {
+  return s_string<Node*>(n);
+}
   
-void Module::finish() { complete = true; }
+C_NULL_PHYLUM::Node::Node(Constructor*c)
+  : C_NULL_TYPE::Node(c), index(((Phylum*)type)->install(this)) {}
 
-Type::Type() : name("anonymous") {}
+T_String C_NULL_PHYLUM::Node::to_string() {
+  return cons->get_name() + "#" + t_Integer->v_string(index);
+}
 
-Type::Type(string s) : name(s) {}
+Phylum* C_NULL_PHYLUM::get_phylum() {
+  if (phylum == 0) phylum = new Phylum();
+  return phylum;
+}
 
-string Type::get_name() const { return name; }
+T_String C_NULL_PHYLUM::v_string(Node *n) {
+  return s_string<Node*>(n);
+}
+  
+Type::Type() {}
 
 int Type::install(Constructor* c)
 {
+  // cout << (int)this << ": Installing " << c->get_name() << " at " << constructors.size() << endl;
   constructors.push_back(c);
   return constructors.size()-1;
 }
 
-int Type::install(Node* n)
-{
-  return 0; // always
-}
-
-void Type::finish() {}
-
-int Type::size()
-{
-  throw domain_error("types not not keep track of nodes");
-}
-
 Phylum::Phylum() : complete(false) {}
-
-Phylum::Phylum(string s) : Type(s), complete(false) {}
-
 
 int Phylum::install(Node* n)
 {
@@ -138,7 +175,7 @@ int Phylum::size()
   return nodes.size();
 }
 
-Node* Phylum::node(int i) const
+C_NULL_PHYLUM::Node* Phylum::node(int i) const
 {
   if (i < 0) throw invalid_argument("negative index to Phylum::node(int)");
   if (i >= int(nodes.size())) throw out_of_range("index too large to Phylum::node(int)");
@@ -155,6 +192,7 @@ Constructor::Constructor(Type *t, string n, int tag)
 string Constructor::get_name() const { return name; }
 int Constructor::get_index() const { return index; }
 Type* Constructor::get_type() const { return type; }
+
 
 
 
