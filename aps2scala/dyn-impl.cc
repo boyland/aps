@@ -112,11 +112,13 @@ static void dump_context_open(void *c, ostream& os) {
       case KEYtop_level_match:
 	{
 	  Type ty = infer_pattern_type(matcher_pat(top_level_match_m(decl)));
-	  os << indent() << "Phylum* phy = "
+	  static int unique = 0;
+	  int i = ++unique;
+	  os << indent() << "Phylum* phy" << i << " = "
 	     << as_val(ty) << "->get_phylum();\n";
-	  os << indent() << "for (int i=phy->size(); i >= 0; --i) {\n";
+	  os << indent() << "for (int i=phy" << i << "->size()-1; i >= 0; --i) {\n";
 	  ++nesting_level;
-	  os << indent() << ty << " anchor = phy->node(i);\n";
+	  os << indent() << ty << " anchor = phy" << i << "->node(i);\n";
 	  os << indent() << ty << " node = anchor;\n";
 	  os << indent() << "Constructor* cons = node->cons;\n";
 	}
@@ -202,8 +204,9 @@ static void dump_attr_assign(void *vdecl, Declaration ass, ostream& os)
     dir = value_decl_direction(decl);
     def = value_decl_default(decl);
     activate_attr_context(os);
-    if (Declaration_info(decl)->decl_flags & VAR_VALUE_DECL_FLAG) {
-      os << indent() << "s_ " << decl_name(decl) << " = EVALUATED;\n";
+    if (Declaration_info(decl)->decl_flags & VAR_VALUE_DECL_FLAG &&
+	!direction_is_collection(dir)) {
+      os << indent() << "s_" << decl_name(decl) << " = EVALUATED;\n";
     }
     os << indent();
     break;
@@ -522,12 +525,15 @@ void implement_var_value_decls(const vector<Declaration>& vvds,
        << "return v_" << name << ";\n";
     bs << indent() << "if (s_" << name << " == CYCLE) "
        << "throw CyclicAttributeException(\"" << name << "\");\n";
+    if (debug) {
+      bs << indent() << "Debug debug(\"" << name << "\");\n";
+    }
     bs << indent() << "s_" << name << " = CYCLE;\n";
     if (is_col) {
       bs << "\n"
 	 << indent() << vt << " collection = ";
       dump_vd_Default(vvd,bs);
-      bs << "\n";
+      bs << ";\n";
     }
     for (vector<Declaration>::const_iterator i = tlms.begin();
 	 i != tlms.end(); ++i) {
@@ -538,6 +544,13 @@ void implement_var_value_decls(const vector<Declaration>& vvds,
       dump_Block(body,dump_attr_assign,vvd,bs);
       pop_attr_context(bs);
       pop_attr_context(bs);
+    }
+    if (is_col) {
+      if (debug) {
+	bs << indent() << "debug.returns(" << as_val(vt)
+	   << "->v_string(collection));\n";
+      }
+      bs << indent() << "v_" << name << " = collection;\n";
     }
     bs << indent() << "s_" << name << " = EVALUATED;\n";
     dump_default_return(value_decl_default(vvd),
