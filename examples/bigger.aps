@@ -35,7 +35,7 @@ module BIGGER[] begin
   constructor array_ref(array,index : Expr) : Expr;
   constructor intconstant(i : Integer) : Expr;
   constructor strconstant(s : String) : Expr;
-  constructor boolconstant(s : String) : Expr;
+  constructor boolconstant(s : Boolean) : Expr;
   constructor variable(id : String) : Expr;
 end;
   
