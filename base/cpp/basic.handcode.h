@@ -244,7 +244,7 @@ struct COLL {
   }
 };
 
-// We have to define nth and friends on BAG becaus
+// We have to define nth and friends on BAG because
 // of the way pattern matching works:
 template <class C_E>
 struct C__basic_16<C_E,C_BAG<C_E> > {
@@ -260,6 +260,22 @@ struct C__basic_16<C_E,C_BAG<C_E> > {
     return COLL<C_T,C_E>::nth_from_end(0,v_x);
   }
   C__basic_16(C_E *_t_E,C_T *_t_T) : t_E(_t_E),
+    t_T(_t_T)  {}
+};
+template <class C_E>
+struct C__basic_17<C_E,C_BAG<C_E> > {
+  typedef C_BAG<C_E> C_T;
+  typedef typename C_E::T_Result T_E;
+  typedef typename C_T::T_Result T_T;
+  C_E *t_E;
+  C_T *t_T;
+  T_E v_butfirst(T_T v_x){
+    return COLL<C_T,C_E>::butsubseq(v_x,0,1);
+  }
+  T_E v_butlast(T_T v_x){
+    return COLL<C_T,C_E>::butsubseq_from_end(v_x,0,1);
+  }
+  C__basic_17(C_E *_t_E,C_T *_t_T) : t_E(_t_E),
     t_T(_t_T)  {}
 };
  
@@ -509,6 +525,41 @@ inline typename C_SET<E>::T_Result C_SET<E>::v_difference(T_Result s1, T_Result 
   }
 }
 
+// We have to define nth and friends on SET because
+// of the way pattern matching works:
+template <class C_E>
+struct C__basic_16<C_E,C_SET<C_E> > {
+  typedef C_SET<C_E> C_T;
+  typedef typename C_E::T_Result T_E;
+  typedef typename C_T::T_Result T_T;
+  C_E *t_E;
+  C_T *t_T;
+  T_E v_first(T_T v_x){
+    return COLL<C_T,C_E>::nth(0,v_x);
+  }
+  T_E v_last(T_T v_x){
+    return COLL<C_T,C_E>::nth_from_end(0,v_x);
+  }
+  C__basic_16(C_E *_t_E,C_T *_t_T) : t_E(_t_E),
+    t_T(_t_T)  {}
+};
+template <class C_E>
+struct C__basic_17<C_E,C_SET<C_E> > {
+  typedef C_SET<C_E> C_T;
+  typedef typename C_E::T_Result T_E;
+  typedef typename C_T::T_Result T_T;
+  C_E *t_E;
+  C_T *t_T;
+  T_E v_butfirst(T_T v_x){
+    return COLL<C_T,C_E>::butsubseq(v_x,0,1);
+  }
+  T_E v_butlast(T_T v_x){
+    return COLL<C_T,C_E>::butsubseq_from_end(v_x,0,1);
+  }
+  C__basic_17(C_E *_t_E,C_T *_t_T) : t_E(_t_E),
+    t_T(_t_T)  {}
+};
+ 
 template <class E, class T>
 class C__basic_22 {
  public:
