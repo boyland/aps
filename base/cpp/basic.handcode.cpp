@@ -7,7 +7,11 @@ T_String C_TYPE::v_string(Node *n)
 
 bool v_true = true;
 bool v_false = false;
-C_BOOLEAN* t_Boolean = new C_BOOLEAN;
+C_BOOLEAN* t_Boolean = get_Boolean();
+C_BOOLEAN* get_Boolean() {
+  static C_BOOLEAN* t_Boolean = new C_BOOLEAN();
+  return t_Boolean;
+}
 
 T_String C_INTEGER::v_string(int x)
 {
@@ -50,4 +54,8 @@ string C_STRING::v_butsubseq_from_end(string l, int start, int finish) {
   return l.substr(0,n-finish-1) + l.substr(n-start-1,n);
 }
 
-C_STRING* t_String = new C_STRING();
+C_STRING* t_String = get_String();
+C_STRING* get_String() {
+  static C_STRING *t_String = new C_STRING();
+  return t_String;
+}
