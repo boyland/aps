@@ -385,7 +385,6 @@ static void add_up_down_attributes(STATE *s) {
 	    break;
 	  }
 	  array[k].fibered_attr.fiber = NULL;
-	  array[k].fibered_attr.fiber_is_reverse = FALSE;
 	}
       }
       if (found > 0) {
@@ -466,7 +465,6 @@ static void add_up_down_attributes(STATE *s) {
 	    default: break;
 	    }
 	    array[k].fibered_attr.fiber = NULL;
-	    array[k].fibered_attr.fiber_is_reverse = FALSE;
 	  }
 	}
 	if (found != 2)
@@ -538,7 +536,6 @@ static void add_up_down_attributes(STATE *s) {
 		}
 	    }
 	    array[k].fibered_attr.fiber = NULL;
-	    array[k].fibered_attr.fiber_is_reverse = FALSE;
 	  }
 	}
 	if (found > 0) {
