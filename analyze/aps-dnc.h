@@ -8,7 +8,6 @@ typedef struct attrset {
 typedef struct fibered_attribute {
   Declaration attr; /* attribute_decl or local */
   FIBER fiber;
-  BOOL fiber_is_reverse;
 } FIBERED_ATTRIBUTE;
 
 extern BOOL fibered_attr_equal(FIBERED_ATTRIBUTE*,FIBERED_ATTRIBUTE*);
@@ -92,6 +91,7 @@ typedef struct analysis_state {
   PHY_GRAPH *phy_graphs;
   Declaration start_phylum;
   AUG_GRAPH global_dependencies;
+  VECTOR(FIBER) fibers;
   CYCLES cycles;
 } STATE;
 
@@ -103,7 +103,7 @@ extern Declaration proc_call_p(Expression);
 extern int if_rule_p(void*);
 extern int if_rule_index(void*);
 
-extern INSTANCE *get_instance(Declaration attr, FIBER fiber, BOOL frev,
+extern INSTANCE *get_instance(Declaration attr, FIBER fiber,
 			      Declaration node, AUG_GRAPH *aug_graph);
 
 extern void assert_closed(AUG_GRAPH*);
@@ -117,6 +117,7 @@ extern DEPENDENCY analysis_state_cycle(STATE *);
 
 extern void print_instance(INSTANCE *, FILE *);
 extern void print_edge(EDGESET, FILE *);
+extern void print_edge_helper(DEPENDENCY, CONDITION *, FILE*);
 extern void print_edgeset(EDGESET, FILE *);
 extern void print_analysis_state(STATE *, FILE *);
 extern void print_cycles(STATE *, FILE *);
