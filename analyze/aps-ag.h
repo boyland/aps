@@ -16,6 +16,7 @@
 #include "aps-cycle.h"
 #include "aps-oag.h"
 #include "aps-analyze.h"
+#include "aps-debug.h"
 
 extern char *aps_yyfilename;
 extern void aps_error(void *tnode, char *fmt, ...);
