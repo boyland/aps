@@ -1,7 +1,7 @@
 CC= gcc
 AR= ar
 RANLIB= ar -qs
-PROJECT-DIR=/afs/cs.uwm.edu/project/aps
+PROJECT-DIR=../aps
 APSAGOBJS= aps-bind.o aps-read.o aps-info.o aps-ag-util.o \
 	  aps-fiber.o aps-cond.o aps-dnc.o aps-cycle.o aps-oag.o \
 	  aps-analyze.o aps-debug.o aps-type.o table.o alist.o
