@@ -11,6 +11,8 @@ static Type Char_Type;
 static Type String_Type;
 static Type error_type;
 
+int remote_type_p(Type ty);
+
 Type function_type_return_type(Type ft)
 {
   return value_decl_type(first_Declaration(function_type_return_values(ft)));
@@ -77,8 +79,24 @@ static void* do_typechecking(void* ignore, void*node) {
 	break;
 	  
 	/* no need for multi_call since they don't exist yet */
-
-      case KEYassign:
+	
+      case KEYnormal_assign:
+	{
+	  Expression lhs = normal_assign_lhs(decl);
+	  switch (Expression_KEY(lhs)) {
+	  case KEYfuncall:
+	    { 
+	      Expression n = first_Actual(funcall_actuals(lhs));
+	      Type ty = infer_expr_type(n);
+	      if (remote_type_p(ty)) {
+		aps_error(decl,"assigning normal attribute of remote node");
+	      }
+	    }
+	    break;
+	  }
+	}
+	/* FALL THROUGH */
+      case KEYcollect_assign:
 	check_expr_type(assign_rhs(decl),infer_expr_type(assign_lhs(decl)));
 	return 0;
 	break;
@@ -1559,6 +1577,41 @@ Type base_type(Type ty)
     break;
   }
   return ty;
+}
+
+int remote_type_p(Type ty)
+{
+  switch (Type_KEY(ty)) {
+  case KEYfunction_type:
+  case KEYprivate_type:
+  case KEYtype_inst:
+  case KEYno_type:
+    return FALSE;
+    break;
+  case KEYremote_type:
+    return TRUE;
+    break;
+  case KEYtype_use:
+    {
+      Use u = type_use_use(ty);
+      Declaration tdecl = USE_DECL(u);
+      if (tdecl) switch (Declaration_KEY(tdecl)) {
+      case KEYtype_formal:
+	return TRUE;
+      case KEYphylum_formal:
+	return FALSE;
+      case KEYtype_renaming:
+	return remote_type_p(type_renaming_old(tdecl));
+	break;
+      case KEYsome_type_decl:
+	return remote_type_p(some_type_decl_type(tdecl));
+      default:
+	aps_error(tdecl,"unknown type decl");
+      }
+    }
+    break;
+  }
+  return FALSE;
 }
 
 static int declarations_type_equal(Declarations ds1, Declarations ds2)
