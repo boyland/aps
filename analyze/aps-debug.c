@@ -59,8 +59,8 @@ static void list_debug_flags() {
   fprintf(stderr,"\tD  DNC_FINAL\n");
   fprintf(stderr,"\tI  DNC_ITERATE\n");
   fprintf(stderr,"\tC  PRINT_CYCLE\n");
-  fprintf(stderr,"\tu  DEBUG_UP_DOWN\n);
-  fprintf(stderr,"\tU  PRINT_UP_DOWN\n);
+  fprintf(stderr,"\tu  DEBUG_UP_DOWN\n");
+  fprintf(stderr,"\tU  PRINT_UP_DOWN\n");
   fprintf(stderr,"\to  DEBUG_ORDER\n");
   fprintf(stderr,"\tO  TOTAL_ORDER\n");
   fprintf(stderr,"\tT  PROD_ORDER\n");
