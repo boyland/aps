@@ -105,6 +105,8 @@ extern int if_rule_index(void*);
 extern INSTANCE *get_instance(Declaration attr, FIBER fiber, BOOL frev,
 			      Declaration node, AUG_GRAPH *aug_graph);
 
+extern void assert_closed(AUG_GRAPH*);
+extern void dnc_close(STATE *);
 extern STATE *compute_dnc(Declaration module);
 
 /* The following routines return TRUE if a change occurs. */
@@ -127,3 +129,5 @@ extern int analysis_debug;
 #define WORKLIST_CHANGES 512
 #define DNC_FINAL 1024
 #define DNC_ITERATE (1<<11)
+#define TWO_EDGE_CYCLE (1<<12)
+#define ASSERT_CLOSED (1<<13)
