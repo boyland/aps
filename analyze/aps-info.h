@@ -48,6 +48,7 @@ extern struct Declaration_info {
 #define START_PHYLUM_FLAG (1<<13)
 #define FIELD_DECL_UNTRACKED_FLAG (1<<14)
 #define SELF_MANAGED_FLAG (1<<15)
+#define UP_DOWN_FLAG (1<<16)
 } *Declaration_info(Declaration);
 
 #define DECL_NEXT(decl) (Declaration_info(decl)->next_decl)
@@ -83,6 +84,8 @@ extern struct Declaration_info {
   (Declaration_info(decl)->decl_flags&FIELD_DECL_REVERSE_FLAG)
 #define ATTR_DECL_IS_SHARED_INFO(decl) \
   (Declaration_info(decl)->decl_flags&SHARED_INFO_FLAG)
+#define ATTR_DECL_IS_UP_DOWN(decl) \
+  (Declaration_info(decl)->decl_flags&UP_DOWN_FLAG)
 #define DECL_IS_SHARED(decl) \
   (Declaration_info(decl)->decl_flags&SHARED_DECL_FLAG)
 #define DECL_IS_START_PHYLUM(decl) \
