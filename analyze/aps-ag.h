@@ -1,6 +1,6 @@
-#include <jbb.h>
-#include "alist.h"
-#include "table.h"
+#include "jbb.h"
+#include "jbb-alist.h"
+#include "jbb-table.h"
 #include "aps-tree.h"
 #include "aps-traverse.h"
 #include "aps-util.h"
