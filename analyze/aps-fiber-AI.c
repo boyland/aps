@@ -42,7 +42,7 @@ int callset_AI(Declaration module, STATE *s) {
 }
 
 
-/* wrap up the use of CALLSITE_SET */
+/* wrap up the manipulations of CALLSITE_SET */
 int callsite_set_empty_p(CALLSITE_SET css) {
   return (css==0);
 }
@@ -66,6 +66,7 @@ int assign_sets(CALLSITE_SET site, void* node, CALLSITE_SET source) {
   return dirty;
 }
   
+/* go through all assigments iteratively */
 void* traverser(void *changed, void *node) {
   int * dirty_sign = (int*)changed;
   switch (ABSTRACT_APS_tnode_phylum(node)) {
@@ -127,6 +128,7 @@ void* traverser(void *changed, void *node) {
   return changed;
 }
 
+/* find the location of call_sites storage, not used for fields */
 void* locater(void *node) {
   Expression expr = (Expression)node;
   Declaration attr_ref = attr_ref_p(expr);
@@ -142,6 +144,7 @@ void* locater(void *node) {
   return NULL;
 }
 
+/* main interpetation function */
 CALLSITE_SET interpret(void *node) {
   switch (ABSTRACT_APS_tnode_phylum(node)) {
   /* only inspect RHS expressions */
@@ -201,7 +204,6 @@ CALLSITE_SET interpret(void *node) {
             else
               {
               INCLUDE(pFormalSites, ActualSites);
-//              if(*pFormalSites != old_sites) *dirty_sign = 1;
               }
             }
             
@@ -210,12 +212,6 @@ CALLSITE_SET interpret(void *node) {
         }
       
       switch(Expression_KEY(expr)) {
-/* 
-      case KEYinteger_const:
-      case KEYreal_const:
-      case KEYstring_const:
-      case KEYchar_const:
-*/
       default:
         return NULL;
       case KEYfuncall:
@@ -223,18 +219,6 @@ CALLSITE_SET interpret(void *node) {
           Actuals actuals = funcall_actuals(expr);
           Expression actual;
           switch (Expression_KEY(func)) {
-          case KEYfuncall:
-            {
-              CALLSITE_SET tmp_set = 0;
-              for (actual = first_Actual(actuals);
-                 actual != NULL;
-                 actual = Expression_info(actual)->next_actual)
-                {
-                INCLUDE(&tmp_set, interpret(actual)); 
-                }
-              return tmp_set;
-            }
-            break;
           case KEYvalue_use:
             { 
               Declaration attr = USE_DECL(value_use_use(func));
@@ -242,6 +226,7 @@ CALLSITE_SET interpret(void *node) {
               if(attr != NULL)  DEBUG_INFO("func is %s\n", decl_name(attr));
               if (attr == NULL) aps_error(func,"unbound function");
               else if (DECL_IS_LOCAL(attr) && FIELD_DECL_P(attr)) 
+              /* field selection : e.f */
   	      {
                 if(actual == NULL)
                 {
@@ -251,16 +236,16 @@ CALLSITE_SET interpret(void *node) {
                 else
                 {
 	          CALLSITE_SET sites = interpret(actual);
-                  CALLSITE_SET* array = 
-                      Declaration_info(attr)->call_sites;
+                  VECTOR(CALLSITE_SET)* pCS = Declaration_info(attr)->call_sites;
                   int i, dist;
                   CALLSITE_SET newSites = 0;
                   for(i = 1, dist=0; i<next_cs; i<<=1,dist++)
-                    if(sites&i) newSites |= array[dist];
+                    if(sites&i) newSites |= pCS->array[dist];
                   return newSites;
 	        }
-	      } /* else if : e.f */
+	      } 
 	      else
+	      /* func call : f(e1,...,en) */
 	      {
                 CALLSITE_SET tmp_set = 0;
                 for (actual = first_Actual(actuals);
@@ -284,13 +269,23 @@ CALLSITE_SET interpret(void *node) {
   return NULL;
 }
 
+/* preparation phase, count callsites, etc, in order to allocate mem */
 void *count_things(void *ref_num, void *node) {
   int * num = (int*)ref_num;
   switch (ABSTRACT_APS_tnode_phylum(node)) {
   case KEYDeclaration:
     { Declaration decl = (Declaration)node;
       Declaration cdecl = object_decl_p(decl);
-      if(cdecl != NULL ) CallSiteNum++;
+      if(cdecl != NULL ) 
+        { int base = 1;
+          CallSiteNum++;
+          if(CallSiteNum > MAX_CALLSITE ) {
+            printf("Can't handle more than %d callsites! Abort.\n", MAX_CALLSITE);
+            exit(0);
+            }
+          printf("[%d]\tCallsite #0x%x\t: %s\n", 
+                 tnode_line_number(decl), base<<(CallSiteNum-1), decl_name(cdecl));
+        }   
       
       switch (Declaration_KEY(decl)) {
       default: break;
@@ -308,6 +303,10 @@ void *count_things(void *ref_num, void *node) {
   return ref_num;
 }
 
+/* initialize memory for storing callsites info
+ * each field is associated with a vector of length #callsites
+ * others just one CALLSITE_SET cell from a global vector
+ */
 void *init_things(void *dist, void *node) {
   int *loc = (int*)dist;
   switch (ABSTRACT_APS_tnode_phylum(node)) {
@@ -431,30 +430,9 @@ Declaration sth_use_p(Expression expr) {
 }
 
 
-
-/*      
-Declaration procedure_call_p(Expression expr) {
-  switch (Expression_KEY(expr)) {
-  case KEYfuncall:
-    { Expression func = funcall_f(expr);
-      switch (Expression_KEY(func)) {
-      case KEYvalue_use:
-	{ Declaration decl = USE_DECL(value_use_use(func));
-	  if (decl == NULL) aps_error(func,"unbound function");
-	  else if (DECL_IS_LOCAL(decl) && !FIELD_DECL_P(decl)) {
-	    switch (Declaration_KEY(decl)) {
-	    case KEYprocedure_decl:
-	      return decl;
-	    }
-	  }
-	}
-      }
-    }
-  }
-  return NULL;
-}
-*/
-
+/* 
+ * following are a bunch of debug fuctions
+ */
 void *check_all_decls(void *nouse, void * node) {
   switch (ABSTRACT_APS_tnode_phylum(node)) {
   case KEYDeclaration:
