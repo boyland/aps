@@ -1,11 +1,13 @@
+CC= gcc
+PROJECT-DIR=/afs/cs.uwm.edu/project/aps
 APSCOBJS= apsc.o aps-bind.o aps-read.o aps-info.o aps-ag-util.o \
 	  aps-fiber.o aps-cond.o aps-dnc.o aps-cycle.o aps-oag.o aps-analyze.o
-APSCLIB= ${HOME}/work/aps/aps-lib.o
+APSCLIB= ${PROJECT-DIR}/aps/aps-lib.o
 APSCUSE= table.o alist.o
 
-CFLAGS= -I${HOME}/src -I${HOME}/work/aps -g
+CFLAGS= -I${PROJECT-DIR}/aps -g
 apsc : ${APSCOBJS} ${APSCLIB} ${APSCUSE}
-	cc ${CFLAGS} -o apsc ${APSCOBJS} ${APSCLIB} ${APSCUSE}
+	${CC} ${CFLAGS} -o apsc ${APSCOBJS} ${APSCLIB} ${APSCUSE}
 
 aps-info.o aps-bind.o aps-ag-util.o aps-fiber.o \
 aps-dnc.o aps-cycle.o aps-oag.o : aps-info.h
