@@ -1,0 +1,694 @@
+--# start* basic
+--# on basic
+--- basic definitions
+--- to be included in every APS program
+
+--# off basic
+[T] begin type U=T; end; -- needed for type inference
+--# on basic
+
+class NULL[];
+
+class BASIC[] :: NULL[] begin
+  function equal(_,_ : Result) : Boolean;
+end;
+
+-- The function's = and /= are defined polymorphically using equal
+[T :: BASIC[]] begin
+  (=) = T$equal;
+  function (/=)(x,y : T) : Boolean := not T$equal(x,y);
+end;
+
+class PRINTABLE[] begin
+  function string(_ : Result) : String;
+end;
+
+class COMPARABLE[] :: BASIC[] begin
+  function less(_,_ : Result) : Boolean;
+  function less_equal(_,_ : Result) : Boolean;
+end;
+
+[T :: COMPARABLE[]] begin
+  (<) = T$less;
+  (<=) = T$less_equal;
+  function (>)(x,y : T) : Boolean := T$less(y,x);
+  function (>=)(x,y : T) : Boolean := T$less_equal(y,x);
+end;
+
+-- for two elements of an ordered type,
+-- they are equal or one is less than the other.
+-- Integers are ORDERED, sets are not.
+class ORDERED[] :: COMPARABLE[];
+
+class NUMERIC[] :: BASIC[] begin
+  zero : Result;
+  one : Result;
+  function plus(_,_ : Result) : Result;
+  function minus(_,_ : Result) : Result;
+  function times(_,_ : Result) : Result;
+  function divide(_,_ : Result) : Result;
+  -- unary operators:
+  function unary_plus(_ : Result) : Result;
+  function unary_minus(_ : Result) : Result;
+  function unary_times(_ : Result) : Result;
+  function unary_divide(_ : Result) : Result;
+end;
+
+-- define infix operations polymorphically:
+[T :: NUMERIC[]] begin
+  (+) = T$plus;
+  (-) = T$minus;
+  (*) = T$times;
+  (/) = T$divide;
+  (#+) = T$unary_plus;
+  (#-) = T$unary_minus;
+  (#*) = T$unary_times;
+  (#/) = T$unary_divide;
+end;
+
+[T :: NUMERIC[],ORDERED[]] function abs(x : T) : T begin
+  if x < T$zero then
+    result := -x;
+  else
+    result := x;
+  endif;
+end;
+
+
+--- Normal objects
+
+private module NULL_TYPE[] :: NULL[];
+
+-- this module must be ready to be instantiated when this file is loaded.
+module TYPE[] :: BASIC[], PRINTABLE[] extends NULL_TYPE[] begin
+  function assert(_ : Result);
+  function equal(x,y : Result) : Boolean := node_equivalent(x,y);
+  function node_equivalent(x,y : Result) : Boolean;
+  function string(_ : Result) : String;
+end;
+
+private type SampleType := TYPE[];
+
+
+--- Concrete Types
+
+-- Boolean is a very special predefined type
+private module BOOLEAN[] :: BASIC[],PRINTABLE[] begin
+  function assert(_:Result);
+  function equal(x,y : Result) : Boolean;
+  function string(x : Result) : String;
+end;
+
+type Boolean :: BASIC[],PRINTABLE[] := BOOLEAN[];
+
+true : Boolean;
+false : Boolean;
+
+function (and)(_,_ : Boolean) : Boolean;
+function (or)(_,_ : Boolean) : Boolean;
+function (not)(_ : Boolean) : Boolean;
+
+
+private module INTEGER[] :: NUMERIC[],ORDERED[],PRINTABLE[] begin
+  function assert(_:Result);
+  zero : Result;
+  one : Result;
+  function equal(x,y : Result) : Boolean;
+  function less(x,y : Result) : Boolean;
+  function less_equal(x,y : Result) : Boolean;
+  function plus(x,y : Result) : Result;
+  function minus(x,y : Result) : Result;
+  function times(x,y : Result) : Result;
+  function divide(x,y : Result) : Result;
+  function unary_plus(x : Result) : Result := x;
+  function unary_minus(x : Result) : Result;
+  function unary_times(x : Result) : Result := x;
+  function unary_divide(x : Result) : Result;
+  function string(x : Result) : String;
+end;
+  
+type Integer :: NUMERIC[],ORDERED[],PRINTABLE[] := INTEGER[];
+
+-- some useful functions:
+function lognot(x : Integer) : Integer;
+function logior(x,y : Integer) : Integer;
+function logand(x,y : Integer) : Integer;
+function logandc2(x,y : Integer) : Integer;
+function logxor(x,y : Integer) : Integer;
+function logbitp(index,set : Integer) : Integer;
+function ash(n,count : Integer) : Integer;
+function odd(_ : Integer) : Boolean;
+		 
+[T :: NUMERIC[]] function (^)(x : T; y : Integer) : T begin
+  if y = 0 then
+    result := T$one;
+  elsif y = 1 then
+    result := x;
+  elsif odd(y) then
+    result := x * (x ^ (y - 1));
+  else
+    result := (x*x)^(y/2);
+  endif;
+end;
+
+
+class REAL[] :: NUMERIC[],ORDERED[] begin
+  function from_integer(_ : Integer) : Result;
+  function to_integer(_ : Result) : Integer;
+end;
+
+private module IEEE[] :: REAL[],PRINTABLE[] begin
+  function assert(_:Result);
+  zero : Result;
+  one : Result;
+  max : Result; -- maximum positive value
+  min : Result; -- minimum positive value
+  function equal(x,y : Result) : Boolean;
+  function less(x,y : Result) : Boolean;
+  function less_equal(x,y : Result) : Boolean;
+  function plus(x,y : Result) : Result;
+  function minus(x,y : Result) : Result;
+  function times(x,y : Result) : Result;
+  function divide(x,y : Result) : Result;
+  function unary_plus(x : Result) : Result := x;
+  function unary_minus(x : Result) : Result;
+  function unary_times(x : Result) : Result := x;
+  function unary_divide(x : Result) : Result;
+  function from_integer(y : Integer) : Result;
+  function to_integer(x : Result) : Integer;
+  function string(x : Result) : String;
+end;
+
+type IEEEdouble := IEEE[];
+type IEEEsingle := IEEE[];
+function IEEEwiden(x : IEEEsingle) : IEEEdouble;
+function IEEEnarrow(x : IEEEdouble) : IEEEsingle;
+
+type Real = IEEEdouble; -- a pseudonym
+
+private module CHARACTER[] :: ORDERED[],PRINTABLE[] begin
+  function assert(_ : Result);
+  function equal(x,y : Result) : Boolean;
+  function less(x,y : Result) : Boolean;
+  function less_equal(x,y : Result) : Boolean;
+  function string(x : Result) : String;
+end;
+
+type Character :: ORDERED[],PRINTABLE[] := CHARACTER[];
+
+function char_code(x : Character) : Integer;
+function int_char(x : Integer) : Character;
+tab : Character := int_char(9);
+newline : Character := int_char(10);
+
+
+--- Phylum objects
+
+private module NULL_PHYLUM[] :: NULL[] phylum;
+
+module PHYLUM[] :: BASIC[], PRINTABLE[] phylum extends NULL_PHYLUM[] begin
+  -- the version for TYPE is superseded
+  function assert(_ : Result);
+  --- primitive functions for comparing objects
+  ---   (object identity is used.)
+  function identical(_,_ : Result) : Boolean;
+  equal = identical;
+  function string(_:Result) : String;
+  -- every object has an identity as an integer
+  function object_id(_:Result) : Integer;
+  function object_id_less(_,_:Result) : Boolean;
+
+  -- comparisons are possible between nodes of different phyla:
+  [phylum Other] begin
+    -- in order to handle <<, we need to implicitly  define an attribute
+    -- threaded through everything.  Therefore they are "var function"s
+    var function precedes(x : Result; y : Other) : Boolean;
+    var function precedes_equal(x : Result; y : Other) : Boolean;
+    pragma dynamic(precedes,precedes_equal);
+
+    -- the general parent pattern:
+    pattern parent(y : Other) : Result;
+    -- matches the result or any descendant
+    pattern ancestor(y : Other) : Result;
+
+    -- this function is true if x is an ancestor of y but not equal
+    function ancestor(x : Result; y : Other) : Boolean;
+    -- this function is true if x is an ancestor of y
+    function ancestor_equal(x : Result; y : Other) : Boolean;
+  end;
+  
+  nil : remote Result;
+end;
+
+[T :: PHYLUM[]] begin
+  -- the contents of PHYLUM are hand exported:
+  (==) = T$identical;
+  (##) = T$object_id;
+  (<#) = T$object_id_less;
+  [phylum Other] begin
+    pattern parent = T$parent : function(_:Other) : T;
+    pattern ancestor = T$ancestor : function(_:Other) : T;
+    (^^) = (T$ancestor : function (_:T;_:Other) : Boolean);
+    (^^=) = (T$ancestor_equal : function (_:T;_:Other) : Boolean);
+  end;
+  nil = T$nil;
+
+  -- some variants are defined:
+  function (/==)(x,y : T) : Boolean := not T$identical(x,y);
+end;
+
+[T,U :: var PHYLUM[]] begin
+  function (<<)(x : T; y : U) : Boolean := T$precedes(x,y);
+  function (<<=)(x : T; y : U) : Boolean := T$precedes_equal(x,y);
+  function (>>)(x : T; y : U) : Boolean := U$precedes(y,x);
+  function (>>=)(x : T; y : U) : Boolean := U$precedes_equal(y,x);
+end;
+
+private phylum SamplePhylum := PHYLUM[];
+
+
+--- COMBINABLE, COMPLETE_PARTIAL_ORDER, and LATTICE
+--- used for collection, circular and
+--- circular collection attributes respectively.
+
+class COMBINABLE[] begin
+  initial : Result;
+  function combine(_,_ : Result) : Result;
+end;
+
+class COMPLETE_PARTIAL_ORDER[] :: BASIC[] begin
+  bottom : Result;
+  function compare(_,_ : Result) : Boolean;
+  function compare_equal(_,_ : Result) : Boolean;
+end;
+
+-- Sometimes the ordering relations coincides with
+-- the natural <, <= relations, but sometimes, it goes
+-- in the reverse order, so we use a different name and
+-- different symbols.
+
+[T :: COMPLETE_PARTIAL_ORDER[]] begin
+  (|<|) = T$compare;
+  (|<=|) = T$compare_equal;
+  function (|>|)(x,y : T) : Boolean := T$compare(y,x);
+  function (|>=|)(x,y : T) : Boolean := T$compare_equal(y,x);
+end;
+
+class LATTICE[] :: COMPLETE_PARTIAL_ORDER[] begin
+  function join(_,_ : Result) : Result;
+  function meet(_,_ : Result) : Result; -- not strictly necessary
+end;
+
+[T :: LATTICE[]] begin
+  (|\/|) = T$join;
+  (|/\|) = T$meet;
+end;
+
+module MAKE_LATTICE[L :: BASIC[]](default : L;
+				  comparef,compare_equalf 
+				      : function(_,_:L) : Boolean;
+				  joinf,meetf : function (_,_:L) : L)
+    :: COMBINABLE[], LATTICE[] Lattice extends L
+begin
+  -- Lattices are also convenient as types for collection attributes:
+  initial = default;
+  combine = joinf;
+  
+  bottom = default;
+  compare = comparef;
+  compare_equal = compare_equalf;
+  join = joinf;
+  meet = meetf;
+end;
+
+private function cand(x,y : Boolean) : Boolean := (not x and y);
+private function implies(x,y : Boolean) : Boolean := (not x or y);
+private function andc(x,y : Boolean) : Boolean := (x and not y);
+private function revimplies(x,y : Boolean) : Boolean := (x or not y);
+
+type OrLattice := MAKE_LATTICE[Boolean](false,cand,implies,(or),(and));
+type AndLattice := MAKE_LATTICE[Boolean](true,andc,revimplies,(and),(or));
+
+[T :: ORDERED[]] begin
+  function max(x,y : T) : T begin
+    if x > y then
+      result := x;
+    else
+      result := y;
+    endif;
+  end;
+  function min(x,y : T) : T begin
+    if x < y then
+      result := x;
+    else
+      result := y;
+    endif;
+  end;
+end;
+
+module MAX_LATTICE[TO :: ORDERED[]](min_element : TO)
+    MaxLattice := MAKE_LATTICE[TO](min_element,(<),(<=),max,min);
+module MIN_LATTICE[T :: ORDERED[]](max_element : T)
+    MinLattice := MAKE_LATTICE[T](max_element,(>),(>=),min,max);
+
+--- various types of collections:
+
+class READ_ONLY_COLLECTION[ElemType] begin
+  procedure {.}(_ : ElemType...) : Result;
+  pattern {.}(_ : ElemType...) : Result;
+  pattern append(_,_ : Result) : Result;
+  pattern single(_ : ElemType) : Result;
+  pattern none() : Result;
+  function member(x : ElemType; l : Result) : Boolean;
+end;
+
+class COLLECTION[ElemType] :: READ_ONLY_COLLECTION[ElemType] begin
+  function append(l1,l2 : Result) : Result;
+  function single(x : ElemType) : Result;
+  function none() : Result;
+  -- eventually the following declaration will go:
+  function {.}(_ : ElemType...) : Result;
+end;
+
+[ElemType; T :: READ_ONLY_COLLECTION[ElemType]] begin
+  pattern {.} = T${.};
+  member = T$member;
+  -- alternate formulation as an infix operator:
+  (in) = T$member;
+end;
+
+[ElemType; T :: COLLECTION[ElemType]] begin
+  {.} = T${.};
+end;
+
+
+class READ_ONLY_ORDERED_COLLECTION[ElemType] 
+    :: READ_ONLY_COLLECTION[ElemType]
+begin
+  function nth(_ : Integer; _ : Result) : ElemType; -- starting at zero
+  function nth_from_end(_ : Integer; _ : Result) : ElemType;
+  function position(_ : ElemType; _ : Result) : Integer;
+  function position_from_end(_ : ElemType; _ : Result) : Integer;
+end;
+
+class ORDERED_COLLECTION[ElemType]
+    :: READ_ONLY_ORDERED_COLLECTION[ElemType], COLLECTION[ElemType]
+begin
+  function subseq(_ : Result; _,_ : Integer) : Result;
+  function subseq_from_end(_ : Result; _,_ : Integer) : Result;
+  function butsubseq(_ : Result; _,_ : Integer) : Result;
+  function butsubseq_from_end(_ : Result; _,_ : Integer) : Result;
+end;
+
+[E;T :: READ_ONLY_ORDERED_COLLECTION[E]] begin
+  nth = T$nth;
+  nth_from_end = T$nth_from_end;
+  position = T$position;
+  position_from_end = T$position_from_end;
+  function first(x : T) : E := T$nth(0,x);
+  function last(x : T) : E := T$nth_from_end(0,x);
+end;
+[E;T :: ORDERED_COLLECTION[E]] begin
+  subseq = T$subseq;
+  subseq_from_end = T$subseq_from_end;
+  butsubseq = T$butsubseq;
+  butsubseq_from_end = T$butsubseq_from_end;
+  function firstn(n : Integer; x : T) : T := T$subseq(x,0,n);
+  function lastn(n : Integer; x : T) : T := T$subseq_from_end(x,0,n);
+  function butfirst(x : T) : T := T$butsubseq(x,0,1);
+  function butlast(x : T) : T := T$butsubseq_from_end(x,0,1);
+  function butfirstn(n : Integer; x : T) : T := T$butsubseq(x,0,n);
+  function butlastn(n : Integer; x : T) : T := T$butsubseq_from_end(x,0,n);
+  function butnth(n : Integer; x : T) : T := T$butsubseq(x,n,n+1);
+  function butnth_from_end(n : Integer; x : T) : T := 
+      T$butsubseq_from_end(x,n,n+1);
+end;
+
+-- Sequences may be balanced.
+-- They are not COMBINABLE because they are ordered.
+module SEQUENCE[phylum ElemType :: input PHYLUM[], BASIC[]] 
+    :: READ_ONLY_ORDERED_COLLECTION[ElemType]
+    phylum
+begin
+  -- the version for PHYLUM is superseded
+  function assert(_ : Result);
+  procedure {.}(l : ElemType...) : Result;
+  pragma modifies({.},type Result);
+  pattern {.}(l : ElemType...) : Result;
+  function nth(i : Integer; l : Result) : ElemType;
+  function nth_from_end(i : Integer; l : Result) : ElemType;
+  function position(x : ElemType; l : Result) : Integer;
+  function position_from_end(x : ElemType; l : Result) : Integer;
+  function member(x : ElemType; l : Result) : Boolean;
+  -- NB: the following are used in aps-boot-compiler:
+  constructor append(l1,l2 : Result) : Result;
+  constructor single(x : ElemType) : Result;
+  constructor none() : Result;
+end;
+
+-- Bags may be in any order whatsoever
+module BAG[ElemType :: BASIC[]] :: COLLECTION[ElemType],COMBINABLE[] begin
+  -- the version for TYPE is superseded
+  function assert(_ : Result);
+  function {.}(l : ElemType...) : Result;
+  pattern {.}(l : ElemType...) : Result;
+  function member(e : ElemType; l : Result) : Boolean begin
+    case l begin
+      match none() begin
+	result := false;
+      end;
+      match single(?v) begin
+	result := v = e;
+      end;
+      match append(?l1,?l2) begin
+	result := member(e,l1) or member(e,l2);
+      end;
+    end;
+  end;
+  constructor append(l1,l2 : Result) : Result;
+  constructor single(x : ElemType) : Result;
+  constructor none() : Result;
+  initial : Result := none();
+  function combine(l1,l2 : Result) : Result := append(l1,l2);
+end;
+
+class CONCATENATING[] begin
+  function concatenate(_,_ : Result) : Result;
+end;
+[T :: CONCATENATING[]] (++) = T$concatenate;
+  
+module LIST[ElemType :: BASIC[]] :: BASIC[],CONCATENATING[],
+                                    ORDERED_COLLECTION[ElemType] 
+begin
+  -- function assert(_ : Result);
+  function cons(x : ElemType; l : Result) : Result := append(single(x),l);
+  constructor single(x : ElemType) : Result;
+  constructor append(l1,l2 : Result) : Result;
+  constructor none() : Result;
+
+  function equal(l1,l2 : Result) : Boolean;
+  concatenate = append;
+  function member(x : ElemType; l : Result) : Boolean;
+
+  function nth(i : Integer; l : Result) : ElemType;
+  function nth_from_end(i : Integer; l : Result) : ElemType;
+  function position(x : ElemType; l : Result) : Integer;
+  function position_from_end(x : ElemType; l : Result) : Integer;
+  function subseq(l : Result; start,finish : Integer) : Result;
+  function subseq_from_end(l : Result; start,finish : Integer) : Result;
+  function butsubseq(l : Result; start,finish : Integer) : Result;
+  function butsubseq_from_end(l : Result; start,finish : Integer) : Result;
+
+  function {.}(l : ElemType...) : Result;
+  pattern {.}(l : ElemType...) : Result;
+end;
+
+class ABSTRACT_SET[ElemType] 
+begin
+  function member(x : ElemType; l : Result) : Boolean;
+
+  function union(_,_ : Result) : Result;
+  function intersect(_,_ : Result) : Result;
+  function difference(_,_ : Result) : Result;
+end;
+[E;T :: ABSTRACT_SET[E]] begin
+  (\/) = T$union;
+  (/\) = T$intersect;
+  (/\~) = T$difference;
+end;
+[E;T :: ABSTRACT_SET[E],COLLECTION[E]] begin
+  function (\)(x : T; elem : E) : T := T$difference(x,T${elem});
+end;
+
+module SET[ElemType :: BASIC[]](test : function(x,y : ElemType) : Boolean)
+    :: BASIC[], COMPARABLE[], COLLECTION[ElemType], ABSTRACT_SET[ElemType], 
+       COMBINABLE[]
+    := private BAG[ElemType] 
+begin
+  function equal(_,_ : Result) : Boolean;
+  function less(_,_ : Result) : Boolean;
+  function less_equal(_,_ : Result) : Boolean;
+  
+  function none() : Result;
+  function single(_:ElemType) : Result;
+  append = union;
+
+  function {.}(_ : ElemType...) : Result;
+  pattern {.}(_ : ElemType...) : Result;
+  function member(x : ElemType; l : Result) : Boolean;
+
+  function union(_,_ : Result) : Result;
+  function intersect(_,_ : Result) : Result;
+  function difference(_,_ : Result) : Result;
+  
+  -- for collection attributes (use a different method than BAG)
+  function combine(x,y : Result) : Result := union(x,y);
+end;
+
+module MULTISET[ElemType :: BASIC[]]
+    (test : function(x,y : ElemType) : Boolean)
+    :: BASIC[], COMPARABLE[], COLLECTION[ElemType], ABSTRACT_SET[ElemType], 
+       COMBINABLE[]
+    -- NB: MULTISETs are not useful for circular attributes
+    := private BAG[ElemType] 
+begin
+  function equal(_,_ : Result) : Boolean;
+  function less(_,_ : Result) : Boolean;
+  function less_equal(_,_ : Result) : Boolean;
+
+  function {.}(_ : ElemType...) : Result;
+  pattern {.}(_ : ElemType...) : Result;
+  function member(x : ElemType; l : Result) : Boolean;
+  function count(x : ElemType; l : Result) : Integer;
+
+  function union(_,_ : Result) : Result;
+  function intersect(_,_ : Result) : Result;
+  function difference(_,_ : Result) : Result;
+  
+  -- for collection attributes (use a different method than BAG)
+  function combine(x,y : Result) : Result := union(x,y);
+end;
+
+module ORDERED_SET[ElemType :: BASIC[]]
+    (test : function(x,y : ElemType) : Boolean;
+     compare : function(x,y : ElemType) : Boolean)
+    :: ORDERED_COLLECTION[ElemType] -- and SET[ElemType] too
+    := private SET[ElemType](test)
+begin
+  -- equality can be checked cheaper than for SET
+  function equal(_,_ : Result) : Boolean;
+  function less(_,_ : Result) : Boolean;
+  function less_equal(_,_ : Result) : Boolean;
+
+  -- combined differently than for unordered SET's
+  function {.}(_ : ElemType...) : Result;
+  -- member can be inherited
+
+  -- new operation functions:
+  function union(_,_ : Result) : Result;
+  function intersect(_,_ : Result) : Result;
+  function difference(_,_ : Result) : Result;
+
+  -- can be used for collection attributes:
+  function combine(x,y : Result) : Result := union(x,y);
+
+  -- ORDERED_SETs have ordering functions:
+  function nth(i : Integer; l : Result) : ElemType;
+  function nth_from_end(i : Integer; l : Result) : ElemType;
+  function position(x : ElemType; l : Result) : Integer;
+  function position_from_end(x : ElemType; l : Result) : Integer;
+  function subseq(l : Result; start,finish : Integer) : Result;
+  function subseq_from_end(l : Result; start,finish : Integer) : Result;
+  function butsubseq(l : Result; start,finish : Integer) : Result;
+  function butsubseq_from_end(l : Result; start,finish : Integer) : Result;
+end;
+
+module ORDERED_MULTISET[ElemType :: BASIC[]]
+    (test : function(x,y : ElemType) : Boolean;
+     compare : function(x,y : ElemType) : Boolean)
+    :: ORDERED_COLLECTION[ElemType] -- and ABSTRACT_SET[ElemType] too
+    := private MULTISET[ElemType](test)
+begin
+  -- equality can be checked cheaper than for MULTISET
+  function equal(_,_ : Result) : Boolean;
+  function less(_,_ : Result) : Boolean;
+  function less_equal(_,_ : Result) : Boolean;
+
+  -- combined differently than for unordered SET's
+  function {.}(_ : ElemType...) : Result;
+  -- member and count can be inherited
+
+  -- new operation functions:
+  function union(_,_ : Result) : Result;
+  function intersect(_,_ : Result) : Result;
+  function difference(_,_ : Result) : Result;
+
+  -- can be used for collection attributes:
+  function combine(x,y : Result) : Result := union(x,y);
+
+  -- ORDERED_MULTISETs have ordering functions:
+  function nth(i : Integer; l : Result) : ElemType;
+  function nth_from_end(i : Integer; l : Result) : ElemType;
+  function position(x : ElemType; l : Result) : Integer;
+  function position_from_end(x : ElemType; l : Result) : Integer;
+  function subseq(l : Result; start,finish : Integer) : Result;
+  function subseq_from_end(l : Result; start,finish : Integer) : Result;
+  function butsubseq(l : Result; start,finish : Integer) : Result;
+  function butsubseq_from_end(l : Result; start,finish : Integer) : Result;
+end;
+
+module UNION_LATTICE[ElemType;ST :: SET[ElemType]]
+    UnionLattice := MAKE_LATTICE[ST]({},(<),(<=),(\/),(/\));
+module INTERSECTION_LATTICE[ElemType;ST :: SET[ElemType]](universe : ST)
+    IntersectionLattice := MAKE_LATTICE[ST](universe,(>),(>=),(/\),(\/));
+
+--- I may add a primitive pair constructor that
+--- is structurally typed.
+module PAIR[T1,T2 :: BASIC[]] begin
+  constructor pair(x:T1;y:T2) : Result;
+  function fst(p : Result) : T1 begin
+    case p begin
+      match pair(?x,?) begin
+	result := x;
+      end;
+    end;
+  end;
+  function snd(p : Result) : T2 begin
+    case p begin
+      match pair(?,?y) begin
+	result := y;
+      end;
+    end;
+  end;
+end;
+
+module STRING[] :: ORDERED[], PRINTABLE[] := LIST[Character] begin
+  function less(x,y : Result) : Boolean;
+  function less_equal(x,y : Result) : Boolean;
+  function string(x : Result) : String;
+end;
+
+type String := STRING[];
+
+[T,U :: PRINTABLE[]] function (||)(x : T; y : U) : String 
+    := T$string(x) ++ U$string(y);
+
+type Range := LIST[Integer];
+function (..)(x,y : Integer) : Range begin
+  if x = y then
+    result := {x};
+  elsif x > y then
+    result := {};
+  else
+    mid : Integer := (x+y)/2;
+    result := (x..mid) ++ ((mid+1)..y);
+  endif;
+end;
+
+[ElemType; T :: READ_ONLY_COLLECTION[ElemType]] begin
+  function length(l : T) : Integer := 0+(1 for _ in l);
+end;
+--# off basic
+
+-- for debugging, no guarantee on what gets printed.
+[T] function debug_output(x : T) : String;
