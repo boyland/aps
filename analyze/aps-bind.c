@@ -306,6 +306,9 @@ static SCOPE type_services(Type t)
      */
     {
       Declaration tdecl = USE_DECL(type_use_use(t));
+      if (tdecl == 0) {
+	return 0;
+      }
       switch (Declaration_KEY(tdecl)) {
       case KEYtype_decl:
 	{
