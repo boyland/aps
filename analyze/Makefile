@@ -4,16 +4,15 @@ RANLIB= ar -qs
 PROJECT-DIR=/afs/cs.uwm.edu/project/aps
 APSAGOBJS= aps-bind.o aps-read.o aps-info.o aps-ag-util.o \
 	  aps-fiber.o aps-cond.o aps-dnc.o aps-cycle.o aps-oag.o \
-	  aps-analyze.o aps-type.o
+	  aps-analyze.o aps-type.o table.o alist.o
 APSCOBJS= apsc.o ${APSAGOBJS} aps-fiber-callsite.o
 APSCLIB= ${PROJECT-DIR}/aps/aps-lib.o
-APSCUSE= table.o alist.o
 
 all : apsc aps-ag.a
 
 CFLAGS= -I${PROJECT-DIR}/aps -g
-apsc : ${APSCOBJS} ${APSCLIB} ${APSCUSE}
-	${CC} ${CFLAGS} -o apsc ${APSCOBJS} ${APSCLIB} ${APSCUSE}
+apsc : ${APSCOBJS} ${APSCLIB}
+	${CC} ${CFLAGS} -o apsc ${APSCOBJS} ${APSCLIB}
 
 aps-ag.a : ${APSAGOBJS}
 	${AR} -cr aps-ag.a ${APSAGOBJS}
