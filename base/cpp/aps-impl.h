@@ -263,7 +263,7 @@ class CollectionAttribute : public Attribute<C_P,C_V> {
 
  public:
   CollectionAttribute(C_P*nt, C_V*vt, std::string n, value_type init)
-    : Attribute<C_P,C_V>(nt,vt,name), initial(init) {}
+    : Attribute<C_P,C_V>(nt,vt,n), initial(init) {}
 
   virtual void set(node_type n, value_type v) {
     Attribute<C_P,C_V>::set(n,combine(get(n),v));
@@ -307,10 +307,12 @@ typedef C_STRING C_String;
 // already mentioned above:
 // typedef std::string T_String;
 extern C_STRING *t_String;
+extern C_STRING *get_String();
 
 typedef class C_BOOLEAN C_Boolean;
 typedef bool T_Boolean;
 extern C_Boolean *t_Boolean;
+extern C_Boolean *get_Boolean();
 
 template <class T_T>
 std::string s_string(T_T n);
