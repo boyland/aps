@@ -564,7 +564,7 @@ void init_field_decls(Declaration module, STATE *s) {
   aps_yylineno = tnode_line_number(module);
   MODULE_SHARED_INFO_PHYLUM(module) =
     shared_info_phylum =
-      phylum_decl(def(intern_symbol("GlobalInfo"),TRUE,TRUE),
+      phylum_decl(def(intern_symbol("__GlobalInfo"),TRUE,TRUE),
 		  no_sig(),no_type());
 
   { Declaration tf = type_formal(def(intern_symbol("P"),TRUE,FALSE),
@@ -572,7 +572,7 @@ void init_field_decls(Declaration module, STATE *s) {
     Use u = use(find_symbol("P"));
     Declaration formal = normal_formal(def(intern_symbol("_"),TRUE,FALSE),
 				       type_use(u));
-    Use gipu = use(find_symbol("GlobalInfo"));
+    Use gipu = use(find_symbol("__GlobalInfo"));
     Declaration rd = value_decl(def(intern_symbol("_"),TRUE,FALSE),
 				remote_type(type_use(gipu)),
 				direction(FALSE,FALSE,FALSE),
@@ -601,7 +601,7 @@ void init_field_decls(Declaration module, STATE *s) {
       Use u = use(def_name(declaration_def(p)));
       Declaration formal = normal_formal(def(intern_symbol("_"),TRUE,FALSE),
 				       type_use(u));
-      Use gipu = use(find_symbol("GlobalInfo"));
+      Use gipu = use(find_symbol("__GlobalInfo"));
       Declaration rd = value_decl(def(intern_symbol("_"),TRUE,FALSE),
 				  remote_type(type_use(gipu)),
 				  direction(FALSE,FALSE,FALSE),
@@ -609,6 +609,7 @@ void init_field_decls(Declaration module, STATE *s) {
       char name[80];
       Declaration attr;
       Declaration shared_info_instance;
+      Symbol new_sym;
 
       /* printf("Creating shared info for %s\n",decl_name(p)); */
       
@@ -616,8 +617,10 @@ void init_field_decls(Declaration module, STATE *s) {
       USE_DECL(u) = p;
       USE_DECL(gipu) = shared_info_phylum;
       sprintf(name,"G[%s]'shared_info",decl_name(p));
+      new_sym = intern_symbol(name);
+      set_code_name(new_sym,make_string("__shared_info"));
       attr = 
-	attribute_decl(def(intern_symbol(name),FALSE,TRUE),
+	attribute_decl(def(new_sym,FALSE,TRUE),
 		       function_type(list_Formals(formal),
 				     list_Declarations(rd)),
 		       direction(FALSE,FALSE,FALSE),
