@@ -4,9 +4,8 @@
 #include "aps-ag.h"
 
 static void usage() {
-  fprintf(stderr,"apsc: usage: apsc file...\n");
-  fprintf(stderr,"             compile APS files\n");
-  fprintf(stderr,"*** IN PROGRESS: parsing and (simple) name binding done.\n");
+  fprintf(stderr,"apsc: usage: apssched file...\n");
+  fprintf(stderr,"             schedule APS files\n");
   exit(1);
 }
 
@@ -57,6 +56,7 @@ main(int argc,char **argv) {
 	    case 'D': analysis_debug |= DNC_FINAL; break;
 	    case 'I': analysis_debug |= DNC_ITERATE; break;
 	    case 'C': cycle_debug |= PRINT_CYCLE; break;
+	    case 'o': oag_debug |= DEBUG_ORDER; break;
 	    case 'O': oag_debug |= TOTAL_ORDER; break;
 	    }
 	  } while (*options != '\0');
@@ -64,7 +64,9 @@ main(int argc,char **argv) {
 	break;
       } while (*options != '\0');
     } else {
-      bind_Program(find_Program(make_string(argv[i])));
+      Program p = find_Program(make_string(argv[i]));
+      bind_Program(p);
+      type_Program(p);
     }
   }
 
