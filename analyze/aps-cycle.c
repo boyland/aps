@@ -366,9 +366,9 @@ static void add_up_down_attributes(STATE *s) {
 		       no_type(), /* sloppy */
 		       direction(FALSE,FALSE,FALSE),no_default());
       Declaration_info(upattr)->decl_flags =
-	ATTR_DECL_SYN_FLAG|DECL_LOCAL_FLAG|SHARED_DECL_FLAG;
+	ATTR_DECL_SYN_FLAG|DECL_LOCAL_FLAG|SHARED_DECL_FLAG|UP_DOWN_FLAG;
       Declaration_info(downattr)->decl_flags =
-	ATTR_DECL_INH_FLAG|DECL_LOCAL_FLAG|SHARED_DECL_FLAG;
+	ATTR_DECL_INH_FLAG|DECL_LOCAL_FLAG|SHARED_DECL_FLAG|UP_DOWN_FLAG;
       for (k=0; k < n; ++k) {
 	if (parent_index[k+phylum_index] == cyc->internal_info) {
 	  switch (++found) {
