@@ -7,13 +7,17 @@
 extern struct Program_info {
   unsigned program_flags;
 #define PROGRAM_BOUND_FLAG 1
+#define PROGRAM_TYPED_FLAG 2
 } *Program_info(Program);
 #define PROGRAM_IS_BOUND(p) (Program_info(p)->program_flags&PROGRAM_BOUND_FLAG)
+#define PROGRAM_IS_TYPED(p) (Program_info(p)->program_flags&PROGRAM_TYPED_FLAG)
 
 extern struct Use_info {
   Declaration use_decl;
+  TypeEnvironment use_type_env;
 } *Use_info(Use);
 #define USE_DECL(u) (Use_info(u)->use_decl)
+#define USE_TYPE_ENV(u) (Use_info(u)->use_type_env)
 
 extern struct Declaration_info {
   Declaration next_decl; /* in a sequence of Declarations */
@@ -82,6 +86,16 @@ extern struct Declaration_info {
 #define fibersets_for(decl) (Declaration_info(decl)->decl_fibersets)
 #define fiberset_for(decl,fstype) (fibersets_index(fibersets_for(decl),fstype))
 
+extern struct Match_info {
+  Declaration header; /* for, case or top-level-match */
+  Match next_match;
+  int if_index; /* count of if_stmt within a top-level match */
+  CONDITION match_cond; /* condition that must be satisfied to take effect */
+  Expression match_test; /* last expression that must be evaluated,
+			   expr_next points to previous, back to first */
+} *Match_info(Match);
+#define MATCH_NEXT(m) Match_info(m)->next_match
+  
 extern struct Expression_info {
   Expression next_actual; /* in a sequence of args to a function call */
 #define next_expr next_actual
@@ -92,6 +106,7 @@ extern struct Expression_info {
 #define EXPR_LHS_FLAG 1
 #define EXPR_RHS_FLAG 2
 } *Expression_info(Expression);
+#define EXPR_NEXT(expr) (Expression_info(expr)->next_expr)
 #define EXPR_IS_LHS(expr) (Expression_info(expr)->expr_flags&EXPR_LHS_FLAG)
 #define EXPR_IS_RHS(expr) (Expression_info(expr)->expr_flags&EXPR_RHS_FLAG)
 
@@ -103,6 +118,18 @@ extern struct Pattern_info {
   Pattern next_pattern_actual; /* in a sequence of args to a pattern call */
   Type pat_type;
 } *Pattern_info(Pattern);
+#define PAT_NEXT(pat) (Pattern_info(pat)->next_pattern_actual)
+
+extern struct Type_info {
+  Type next_type_actual; /* in a series of type actuals */
+  void *binding_temporary;
+  char *impl_type;
+} *Type_info(Type);
+#define TYPE_NEXT(type) (Type_info(type)->next_type_actual)
+
+extern struct Signature_info {
+  void *binding_temporary;
+} *Signature_info(Signature);
 
 extern void set_tnode_parent(Program p);
 
