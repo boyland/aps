@@ -629,27 +629,17 @@ public:
       INDEFINITION;
       bs << " {\n";
       ++nesting_level;
+      //? not sure how to do this:
+      //? we don't want to force these to finish in the wrong order.
       for (Declaration d = first_Declaration(ds); d; d = DECL_NEXT(d)) {
-	char* kind = NULL;
 	switch(Declaration_KEY(d)) {
+	default:
+	  break;
 	case KEYvalue_decl:
 	  if (!def_is_constant(value_decl_def(d))) {
 	    bs << indent() << "(void)c_" << decl_name(d) << "();\n";
 	  }
 	  break;
-	case KEYphylum_decl:
-	case KEYtype_decl:
-	  kind = "t_";
-	  break;
-	case KEYattribute_decl:
-	  kind = "a_";
-	  break;
-	default:
-	  break;
-	}
-	if (kind != NULL) {
-	  char *n = decl_name(d);
-	  bs << indent() << kind << n << "->finish();\n";
 	}
       }
       --nesting_level;
