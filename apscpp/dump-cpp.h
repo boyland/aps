@@ -14,6 +14,7 @@ void impl_module(char *name, char *type);
 extern bool incremental;
 extern bool static_schedule;
 extern int verbose;
+extern int debug;
 
 class Implementation;
 
@@ -40,7 +41,7 @@ void dump_cpp_Declaration(Declaration,const output_streams&);
 
 static const int indent_multiple = 2;
 extern int nesting_level;
-string indent();
+string indent(int level = nesting_level);
 class InDefinition {
   int saved_nesting;
  public:
@@ -58,12 +59,15 @@ void dump_Typed_decl(Type,Declaration,char*prefix,ostream&);
 void dump_Expression(Expression,ostream&);
 void dump_Use(Use,char *prefix,ostream&);
 void dump_TypeEnvironment(TypeEnvironment,ostream&);
-void dump_Default(Default,ostream&);
+void dump_vd_Default(Declaration,ostream&);
+
+void dump_function_prototype(char*,Type ft, const output_streams& oss);
 
 // these two must always be called in pairs: the first
 // leaves information around for the second:
 void dump_Pattern_cond(Pattern p, string node, ostream&);
 void dump_Pattern_bindings(Pattern p, ostream&);
+string matcher_bindings(string node, Match m);
 
 // override <<
 ostream& operator<<(ostream&o,Symbol s);
@@ -78,12 +82,6 @@ inline ostream& operator<<(ostream&o,Expression e)
 inline ostream& operator<<(ostream&o,Type t)
 {
   dump_Type(t,o);
-  return o;
-}
-
-inline ostream& operator<<(ostream& o, Default d) 
-{
-  dump_Default(d,o);
   return o;
 }
 
@@ -108,5 +106,73 @@ inline ostream& operator<<(ostream& o, as_val tav)
   dump_Type_value(tav.type,o);
   return o;
 }
+
+// we have some debugging functions:
+extern void debug_Instance(INSTANCE*,ostream&);
+inline ostream& operator<<(ostream&os, INSTANCE*i) {
+  debug_Instance(i,os);
+  return os;
+}
+
+// sending to oss copies to cpps, ...
+template <class Any>
+inline const output_streams& operator<<(const output_streams& oss, Any x) {
+  oss.hs << x;
+  if (!inline_definitions) oss.cpps << x;
+  return oss;
+}
+
+// ... except for a header return type, ...
+// (null for constructors)
+template <class Type>
+struct header_return_type {
+  Type rt;
+  header_return_type(Type ty) : rt(ty) {}
+};
+template<>
+inline const output_streams& operator<< <header_return_type<Type> >
+(const output_streams& oss, header_return_type<Type> hrt) {
+  oss.hs << indent();
+  if (hrt.rt) oss.hs << hrt.rt;
+  if (!inline_definitions) {
+    oss.cpps << "\n";
+    if (hrt.rt) dump_Type_prefixed(hrt.rt,oss.cpps);
+  }
+  return oss;
+}
+template<>
+inline const output_streams& operator<< <header_return_type<string> >
+(const output_streams& oss, header_return_type<string> hrt) {
+  oss.hs << indent();
+  oss.hs << hrt.rt;
+  if (!inline_definitions) {
+    oss.cpps << "\n" << oss.prefix << hrt.rt;
+  }
+  return oss;
+}
+
+// ... and header name ...
+struct header_function_name {
+  std::string fname;
+  header_function_name(std::string fn) : fname(fn) {}
+};
+template<>
+inline const output_streams& operator<< <header_function_name>
+(const output_streams& oss, header_function_name hfn) {
+  oss.hs << hfn.fname;
+  if (!inline_definitions) oss.cpps << oss.prefix << hfn.fname;
+  return oss;
+}
+// ... and header end
+struct header_end {
+};
+template <>
+inline const output_streams& operator<< <header_end>
+(const output_streams& oss, header_end) {
+  if (!inline_definitions) oss.hs << ";\n";
+  return oss;
+}
+
+extern string operator+(string, int);
 
 #endif
