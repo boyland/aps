@@ -1,0 +1,383 @@
+with "symbol";
+--# start* aps-tree
+module ABSTRACT_APS[] begin
+  
+  -- the four basic structures
+  phylum Signature;
+  phylum Type;
+  phylum Expression;
+  phylum Pattern;
+  -- two related ones;
+  phylum Module;
+  phylum Class;
+  
+  -- Def's and Use's
+  phylum Def;
+  phylum Use;
+
+  -- structural phyla
+  phylum Program;
+  phylum Unit;
+  phylum Declaration;
+  phylum Block;
+  phylum Match;
+  phylum Direction;
+  phylum Default;
+
+  -- sequences
+  phylum Units:=SEQUENCE[Unit];
+  phylum Declarations:=SEQUENCE[Declaration];
+  phylum Matches:=SEQUENCE[Match];
+
+  phylum Types:=SEQUENCE[Type];
+  phylum Expressions:=SEQUENCE[Expression];
+  phylum Patterns:=SEQUENCE[Pattern];
+
+  phylum Actuals:=SEQUENCE[Expression];
+  phylum TypeActuals:=SEQUENCE[Type];
+  phylum PatternActuals:=SEQUENCE[Pattern];
+  
+  signature PHYLA := {Signature,Type,Expression,Pattern,Module,Class,Def,Use,
+		      Program,Unit,Declaration,Block,Match,Direction,Default,
+		      Units,Declarations,Matches,Types,Expressions,Patterns,
+		      Actuals,TypeActuals,PatternActuals}, var PHYLUM[];
+
+  -- The identifier _ is used specially.
+  underscore_symbol : Symbol := make_symbol("_");
+
+  constructor program(name : String; units : Units) : Program;
+
+  constructor no_unit() : Unit;
+  constructor with_unit(name : String) : Unit;
+  constructor decl_unit(decl : Declaration) : Unit;
+  
+  constructor no_decl() : Declaration;
+
+  -- a "begin" ... "end" block.
+  constructor block(body : Declarations) : Block;
+
+  constructor class_decl(def : Def;
+			 type_formals : Declarations;
+			 result_type : Declaration;
+			 parent : Signature;
+			 contents : Block) : Declaration;
+
+  constructor module_decl(def : Def;
+			  type_formals : Declarations;
+			  value_formals : Declarations;
+			  result_type : Declaration;
+			  parent : Signature;
+  			  contents : Block) : Declaration;
+
+  constructor signature_decl(def : Def;
+			     sig : Signature) : Declaration;
+
+  constructor phylum_decl(def : Def;
+			  sig : Signature;
+			  (type) : Type) : Declaration;
+  constructor type_decl(def : Def;
+			sig : Signature;
+			(type) : Type) : Declaration;
+
+  constructor value_decl(def : Def;
+			 (type) : Type;
+			 direction : Direction;
+			 default : Default) : Declaration;
+  constructor attribute_decl(def : Def;
+			     (type) : Type;
+			     direction : Direction;
+			     default : Default) : Declaration;
+
+  constructor function_decl(def : Def;
+			    (type) : Type;
+			    body : Block) : Declaration;
+  constructor procedure_decl(def : Def;
+			     (type) : Type;
+			     body : Block) : Declaration;
+  constructor constructor_decl(def : Def;
+			       (type) : Type) : Declaration;
+  constructor pattern_decl(def : Def;
+			   (type) : Type;
+			   choices : Pattern) : Declaration;
+
+  constructor inheritance(def : Def;
+			  used : Type;
+			  body : Block) : Declaration;
+
+  constructor polymorphic(def : Def;
+			  type_formals : Declarations;
+			  body : Block) : Declaration;
+
+  constructor pragma_call(name : Symbol; 
+			  parameters : Expressions) : Declaration;
+
+  constructor top_level_match(m : Match) : Declaration;
+
+  -- replacements can only occur in the body of an inheritance
+  -- and are renamings to take place in the scope of the inherited module:
+  -- NB: signature, class and module, replacements aren't implemented yet,
+  --     it can't be type checked
+  constructor class_replacement((class) : Class; as : Class) : Declaration;
+  constructor module_replacement((module) : Module; as : Module) : Declaration;
+  constructor signature_replacement(sig : Signature; as : Signature) 
+      : Declaration;
+  constructor type_replacement((type) : Type; as : Type) 
+      : Declaration;
+  constructor value_replacement(value : Expression; as : Expression) 
+      : Declaration;
+  constructor pattern_replacement((pattern) : Pattern; as : Pattern) 
+      : Declaration;
+
+  -- renaming can occur anywhere (in inheritance, they particularly useful)
+  constructor class_renaming(def : Def; old : Class) : Declaration;
+  constructor module_renaming(def : Def; old : Module) : Declaration;
+  constructor signature_renaming(def : Def; old : Signature) : Declaration;
+  constructor type_renaming(def : Def; old : Type) : Declaration;
+  constructor value_renaming(def : Def; old : Expression) : Declaration;
+  constructor pattern_renaming(def : Def; old : Pattern) : Declaration;
+  
+  [phylum T :: {Class,Module,Signature,Type,Expression,Pattern}] begin
+    pattern replacement(from,as : T) : Declaration :=
+	class_replacement(?from,?as),module_replacement(?from,?as),
+	signature_replacement(?from,?as),type_replacement(?from,?as),
+        value_replacement(?from,?as), pattern_replacement(?from,?as);
+    pattern renaming(def : Def; old : T) : Declaration :=
+	class_renaming(?def,?old),module_renaming(?def,?old),
+	signature_renaming(?def,?old),type_renaming(?def,?old),
+        value_renaming(?def,?old),pattern_renaming(?def,?old);
+    pattern some_use(u : Use) : T :=
+	class_use(?u) :? T, module_use(?u) :? T, sig_use(?u) :? T,
+        type_use(?u) :? T, value_use(?u) :? T, pattern_use(?u) :? T;
+  end;
+  
+  pattern some_replacement() : Declaration :=
+      class_replacement(?from,?as),module_replacement(?from,?as),
+      signature_replacement(?from,?as),type_replacement(?from,?as),
+      value_replacement(?from,?as), pattern_replacement(?from,?as);
+  pattern some_renaming(def : Def) : Declaration :=
+      class_renaming(?def,?old),module_renaming(?def,?old),
+      signature_renaming(?def,?old),type_renaming(?def,?old),
+      value_renaming(?def,?old),pattern_renaming(?def,?old);
+
+  -- directions for attributes
+  constructor direction(is_input : Boolean;
+			is_collection : Boolean;
+			is_circular : Boolean) : Direction;
+
+  -- different kinds of Default: a single value or a lattice or nothing
+  constructor simple(value : Expression) : Default;
+  constructor composite(initial : Expression;
+			combiner : Expression) : Default;
+  -- constructor lattice(bottom : Expression;
+  --		         join : Expression;
+  --		         equal : Expression) : Default;
+  constructor no_default() : Default;
+
+
+  -- formals:
+  constructor normal_formal(def : Def; (type) : Type) : Declaration;
+  constructor seq_formal(def : Def; (type) : Type) : Declaration;
+  pattern formal(def : Def; (type) : Type) : Declaration
+      := normal_formal(?def,?(type)), seq_formal(?def,?(type));
+
+  constructor type_formal(def : Def; sig : Signature) : Declaration;
+  constructor phylum_formal(def : Def; sig : Signature) : Declaration;
+  pattern some_type_formal(def : Def; sig : Signature) : Declaration :=
+      type_formal(?def,?sig),phylum_formal(?def,?sig);
+  
+  -- definition and use:
+  constructor def(name : Symbol; is_constant, is_public : Boolean) : Def;
+  constructor use(name : Symbol) : Use;
+  constructor qual_use(from : Type; name : Symbol) : Use;
+  
+  -- a useful pattern:
+  pattern declaration(def : Def) : Declaration
+      := class_decl(?def,...), class_renaming(?def,...),
+         module_decl(?def,...), module_renaming(?def,...),
+         signature_decl(?def,...), signature_renaming(?def,...),
+         phylum_decl(?def,...),
+         type_decl(?def,...),
+         type_renaming(?def,...),
+         type_formal(?def,...),
+         phylum_formal(?def,...),
+         pattern_decl(?def,...),
+         constructor_decl(?def,...),
+         pattern_renaming(?def,...),
+         value_decl(?def,...),
+         attribute_decl(?def,...),
+         function_decl(?def,...),
+         procedure_decl(?def,...),
+         value_renaming(?def,...),
+         formal(?def,...),
+         -- inheritance and polymorphic entities are implicitly named
+         inheritance(?def,...),
+         polymorphic(?def,...);
+
+  pattern some_class_decl(def : Def;
+			  type_formals : Declarations;
+			  result_type : Declaration;
+			  parent : Signature;
+			  contents : Block) : Declaration :=
+      class_decl(?def,?type_formals,?result_type,?parent,?contents),
+      module_decl(?def,?type_formals,?,?result_type,?parent,?contents);
+
+  pattern some_type_decl(def : Def; sig : Signature; (type) : Type) 
+      : Declaration
+      := type_decl(?def,?sig,?(type)), phylum_decl(?def,?sig,?(type));
+  
+  -- every type declaration or inherit gets a use attached to it:
+  
+  pattern type_decl_with_predefined_use(def : Def)
+      : Declaration
+      := type_renaming(?def,...),
+         some_type_decl(?def,...),
+         some_type_formal(?def,...),
+         inheritance(?def,...);
+
+  attribute Declaration.predefined_use : Type;
+  pragma source_transfer(predefined_use);
+
+  match ?td=type_decl_with_predefined_use(def(?name,...)) begin
+    td.predefined_use := type_use(use(name));
+  end;
+  
+
+  --- now various uses (only the simplest ones for now)
+  
+  constructor class_use(use : Use) : Class;
+  
+  constructor module_use(use : Use) : Module;
+
+  constructor type_use(use : Use) : Type;
+  constructor type_inst((module) : Module;
+			type_actuals : TypeActuals;
+			actuals : Actuals) : Type;
+  constructor no_type() : Type;
+
+  constructor value_use(use : Use) : Expression;
+  no_value = no_expr;
+  constructor typed_value(expr : Expression; (type) : Type) : Expression;
+
+  constructor sig_use(use : Use) : Signature;
+  constructor sig_inst(is_input,is_var : Boolean;
+		       (class) : Class;
+		       actuals : TypeActuals) : Signature;
+  constructor no_sig () : Signature;
+
+  constructor pattern_use(use : Use) : Pattern;
+  constructor no_pattern() : Pattern;
+  constructor typed_pattern(pat : Pattern; (type) : Type) : Pattern;
+  
+  -- a list of types: only these type satisfy
+  constructor fixed_sig(types : Types) : Signature;
+  -- two signatures:
+  constructor mult_sig(sig1,sig2 : Signature) : Signature;
+
+  -- types have a number of different forms:
+  constructor remote_type(nodetype : Type) : Type;
+  -- constructor void() : Type;
+
+  -- constructor internal_list_type(u : Type) : Type;
+  constructor function_type(formals : Declarations; 
+			    return_values : Declarations) : Type;
+  pattern function_typing(formals : Declarations;
+			  return_type : Type) : Type
+      := function_type(?formals,{value_decl((type):=?return_type)});
+  
+  -- wrapped around type parameters (for easier checking)
+  -- constructor type_actual((type) : Type) : Type;
+  constructor private_type(rep : Type) : Type;
+
+  -- patterns
+  constructor match_pattern(pat : Pattern; (type) : Type) : Pattern;
+  constructor pattern_call(func : Pattern;
+			   actuals : PatternActuals) : Pattern;
+  -- this is needed for named pattern arguments:
+  constructor pattern_actual(arg : Pattern;
+  			     formal : Expression) : Pattern;
+  --
+  -- the sugar pattern, e.g.: {?x,...,?y}
+  -- to remove and replaced with calls to special patterns
+  -- constructor sequence_pattern(actuals : Patterns; (type) : Type) : Pattern;
+  constructor rest_pattern(constraint : Pattern) : Pattern;
+  -- constructor append_pattern(s1,s2 : Pattern) : Pattern;
+  -- constructor single_pattern(elem : Pattern) : Pattern;
+  -- constructor nil_pattern() : Pattern;
+  constructor choice_pattern(choices : Patterns) : Pattern;
+  constructor and_pattern(p1,p2 : Pattern) : Pattern;
+  constructor pattern_var(formal : Declaration) : Pattern;
+  constructor condition(e : Expression) : Pattern;
+  constructor hole() : Pattern;
+  constructor pattern_function(formals : Declarations; body : Pattern) : Pattern;
+
+  -- statements
+  -- a begin ... end statement
+  constructor block_stmt(body : Block) : Declaration;
+  constructor effect(e : Expression) : Declaration;
+  -- procall's are added during a canonicalization
+  constructor multi_call(proc : Expression; 
+			 actuals : Actuals;
+			 results : Actuals) : Declaration;
+  procall = multi_call; -- old syntax
+  pattern procall = multi_call; -- old syntax
+  constructor normal_assign(lhs : Expression; rhs : Expression) : Declaration;
+  constructor collect_assign(lhs : Expression; rhs : Expression) : Declaration;
+  pattern assign(lhs : Expression; rhs : Expression) : Declaration :=
+      normal_assign(?lhs,?rhs),collect_assign(?lhs,?rhs);
+  -- replaced with value_decl
+  -- constructor local_decl(def : Def;
+  --			 direction : Direction;
+  --			 default : Default) : Declaration;
+  constructor if_stmt(cond : Expression; 
+		      if_true : Block; 
+		      if_false : Block) : Declaration;
+  constructor for_in_stmt(formal : Declaration;
+			  seq : Expression; 
+			  body : Block) : Declaration;
+  -- constructor for_on_stmt(formal : Def; 
+  --			  seq : Expression;
+  --			  body : Block) : Declaration;
+  constructor for_stmt(expr : Expression;
+		       matchers : Matches) : Declaration;
+  constructor case_stmt(expr : Expression;
+			matchers : Matches;
+			default : Block) : Declaration;
+  constructor matcher(pat : Pattern; 
+		      body : Block) : Match;
+			
+  -- expressions
+  -- (see var_name, too)
+  constructor integer_const(token : String) : Expression;
+  constructor real_const(token : String) : Expression;
+  constructor string_const(token : String) : Expression;
+  constructor char_const(token : String) : Expression;
+  constructor undefined() : Expression;
+  constructor no_expr() : Expression;
+  constructor funcall(f : Expression; actuals : Actuals) : Expression;
+  -- these are stuck in in the place of actuals.
+  -- constructor actual(e : Expression;
+  --		     formal : Expression) : Expression;
+  -- We use ... syntax now:
+  -- constructor reduce(f : Expression; 
+  --		        elems : Expressions) : Expression;
+  -- constructor sequence(elems : Expressions; (type) : Type) : Expression;
+  constructor append(s1,s2 : Expression) : Expression;
+  -- introduced for empty sequences.
+  constructor empty() : Expression;
+  -- sugar: the key returned for this constructor
+  -- constructor constructor_key(name : Expression) : Expression;
+  -- the following are only legal in pragma's
+  constructor class_value(c : Class) : Expression;
+  constructor module_value(m : Module) : Expression;
+  constructor signature_value(s : Signature) : Expression;
+  constructor type_value(t : Type) : Expression;
+  constructor pattern_value(p : Pattern) : Expression;
+  
+  -- used in set comprehensions
+  constructor repeat(expr : Expression) : Expression;
+  constructor guarded(expr : Expression; cond : Expression) : Expression;
+  constructor controlled(expr : Expression; 
+			 formal : Declaration;
+			 set : Expression) : Expression;
+end;
+--# off aps-tree
