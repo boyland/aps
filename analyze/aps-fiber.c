@@ -1939,10 +1939,12 @@ void *count_node(void *u, void *node)
       case KEYvalue_use: {
 	Declaration sdecl = USE_DECL(value_use_use(e));
 	if (DECL_IS_SHARED(sdecl)) {
-	  Declaration rsi = responsible_node_shared_info(e, mystate);
-	  if (rsi != NULL) {
-	    // node Qu, Qu-
-	    (void)id_expr_node(e);
+	  if (Declaration_KEY(sdecl) == KEYvalue_decl) {
+	    Declaration rsi = responsible_node_shared_info(e, mystate);
+	    if (rsi != NULL) {
+	      // node Qu, Qu-
+	      (void)id_expr_node(e);
+	    }
 	  }
 	}
       }; break;
@@ -2763,6 +2765,21 @@ WORKLIST add_to_DFA_worklist(WORKLIST wl, NODE_IN_TREE t) {
 	return new;	
 }
 
+/* Return true is this state is in the fiber set
+ * for some declaration or expression.
+ */
+BOOL is_reachable(NODE_IN_TREE n)
+{
+  NODESET ns, ns2;
+  for (ns = n->ns; ns; ns=ns->rest) {
+    int i = ns->node & ~1;
+    for (ns2 = ns->rest; ns2; ns2=ns2->rest) {
+      if ((ns2->node&~1) == i) return TRUE;
+    }
+  }
+  return FALSE;
+}
+
 NODE_IN_TREE check_transition(NODE_IN_TREE to, Declaration trans,
 			      NODE_IN_TREE from)
 {
@@ -2773,7 +2790,7 @@ NODE_IN_TREE check_transition(NODE_IN_TREE to, Declaration trans,
     if (old != NULL) {		// same node already exist. 
       DFA_tree[old->index][from->index] = trans;
     }
-    else { // this is a new node
+    else if (is_reachable(to)) { // this is a new node
       // create one node for DFA
       if (++DFA_node_number >= MAX_DFA_NUMBER) {
 	fatal_error("Cannot handle more than %d DFA nodes!",
@@ -3183,7 +3200,8 @@ void fiber_module(Declaration module, STATE *s) {
 	if (fiber_debug & ALL_FIBERSETS) {
 		printf("\nFSA is built: the graph is: \n");
 		print_FSA();
-		printf("the total edges is :%d\n", edge_num);
+		printf("the total edges is :%d (density = %g)\n", edge_num,
+		       ((double)edge_num)/(FSA_next_node_index*FSA_next_node_index));
 	}
 
 //	printf("the nodeset of OMIGA is:\n");
