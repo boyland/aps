@@ -33,11 +33,11 @@ Declaration match_lhs_decl(Match m) {
   }
 }
 
-Declaration top_level_match_constructor_decl(Declaration tlm) {
-  return match_constructor_decl(top_level_match_m(tlm));
+Use top_level_match_constructor_use(Declaration tlm) {
+  return match_constructor_use(top_level_match_m(tlm));
 }
 
-Declaration match_constructor_decl(Match m) {
+Use match_constructor_use(Match m) {
   Pattern pat=matcher_pat(m);
   switch (Pattern_KEY(pat)) {
   default: fatal_error("%d:improper match",
@@ -57,17 +57,24 @@ Declaration match_constructor_decl(Match m) {
       fatal_error("%d:unknown pattern function",tnode_line_number(pat));
       return NULL;
     case KEYpattern_use:
-      { Declaration decl =
-	  Use_info(pattern_use_use(pattern_call_func(pat)))->use_decl;
-      if (decl == NULL) fatal_error("%d:unbound pfunc",
-				    tnode_line_number(pat));
-      if (Declaration_KEY(decl) != KEYconstructor_decl)
-	fatal_error("%d: can only match on constructors directly",
-		    tnode_line_number(pat));
-      return decl;
-      }
+      return pattern_use_use(pattern_call_func(pat));
     }
   }
+}
+
+Declaration top_level_match_constructor_decl(Declaration tlm) {
+  return match_constructor_decl(top_level_match_m(tlm));
+}
+
+Declaration match_constructor_decl(Match m) {
+  Use u = match_constructor_use(m);
+  Declaration decl = Use_info(u)->use_decl;
+  if (decl == NULL) fatal_error("%d:unbound pfunc",
+				tnode_line_number(m));
+  if (Declaration_KEY(decl) != KEYconstructor_decl)
+    fatal_error("%d: can only match on constructors directly",
+		tnode_line_number(m));
+  return decl;
 }
 
 Declaration top_level_match_first_rhs_decl(Declaration tlm) {
