@@ -1,9 +1,9 @@
 #include "jbb.h"
-#include "alloc.h"
-#include "table.h"
+#include "jbb-alloc.h"
+#include "jbb-table.h"
 
 /* use simple, slow representation for now */
-#include "alist.h"
+#include "jbb-alist.h"
 
 struct table {
   ALIST alist;
