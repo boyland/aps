@@ -6,11 +6,16 @@ extern "C" {
 #include <iostream>
 #include <cctype>
 #include <stack>
+#include <map>
+#include <sstream>
+#include <vector>
 extern "C" {
 #include "aps-ag.h"
 String get_code_name(Symbol);
 }
 #include "dump-cpp.h"
+
+using namespace std;
 
 extern int aps_yylineno;
 
@@ -68,25 +73,28 @@ bool is_global(Type ty)
   }
 }
 
-#ifdef UNDEF
-static void *activate_pragmas(void *ignore, void *node) {
-  static Symbol code_symbol=NULL;
-  if (code_symbol == NULL) {
-    code_symbol=intern_symbol("code");
-  }
-  if (ABSTRACT_APS_tnode_phylum(node) == KEYDeclaration) {
-    Declaration decl=(Declaration)node;
-    switch (Declaration_KEY(decl)) {
-    case KEYpragma_call:
-      { Symbol pragma_sym = pragma_call_name(decl);
-        Expressions exprs = pragma_call_parameters(decl);
-        Expression expr = first_Expression(exprs);
-	if (pragma_sym == code_symbol) {
-	  ...
-	  for (; expr != NULL; expr=Expression_info(expr)->next_expr) {
-	    switch (Expression_KEY(expr)) {
-	    }}}}}}}
-#endif
+// parameterizations and options:
+
+static char* omitted[80];
+static int omitted_number = 0;
+
+void omit_declaration(char *n)
+{
+  omitted[omitted_number++] = n;
+}
+
+static char*impl[80];
+static int impl_number = 0;
+
+void impl_module(char *mname, char*type)
+{
+  impl[impl_number++] = mname;
+  impl[impl_number++] = type;
+}
+
+bool static_schedule = false;
+bool incremental = false; //! unused
+int verbose = 0;
 
 int inline_definitions = 0;
 
@@ -118,8 +126,18 @@ void dump_cpp_Units(Units us,std::ostream&hs,std::ostream&cpps)
   }
 }
 
+struct output_streams {
+  Declaration context;
+  ostream &hs, &cpps, &is;
+  output_streams(Declaration _c, ostream &_hs, ostream &_cpps, ostream &_is)
+    : context(_c), hs(_hs), cpps(_cpps), is(_is) {}
+};
+
+void dump_cpp_Declaration(Declaration,const output_streams&);
+
 void dump_cpp_Unit(Unit u,std::ostream&hs,std::ostream&cpps)
 {
+  ostringstream is;
   switch(Unit_KEY(u)) {
   case KEYno_unit: break;
   case KEYwith_unit:
@@ -133,7 +151,7 @@ void dump_cpp_Unit(Unit u,std::ostream&hs,std::ostream&cpps)
     }
     break;
   case KEYdecl_unit:
-    dump_cpp_Declaration(decl_unit_decl(u),NULL,hs,cpps);
+    dump_cpp_Declaration(decl_unit_decl(u),output_streams(NULL,hs,cpps,is));
     break;
   }
 }
@@ -153,6 +171,8 @@ void dump_formal(Declaration formal,char *prefix,ostream&s)
   if (KEYseq_formal == Declaration_KEY(formal)) s << ",...";
 }
 
+void dump_Type_prefixed(Type,ostream&);
+
 void dump_function_prototype(String prefix,char *name, Type ft, ostream&hs)
 {
   Declarations formals = function_type_formals(ft);
@@ -161,7 +181,11 @@ void dump_function_prototype(String prefix,char *name, Type ft, ostream&hs)
     hs << "void ";
   } else {
     Type return_type = value_decl_type(returndecl);
-    dump_Type(return_type,hs);
+    if (prefix != empty_string) {
+      dump_Type_prefixed(return_type,hs);
+    } else {
+      dump_Type(return_type,hs);
+    }
     if (DECL_NEXT(returndecl)) {
       aps_error(ft,"cannot handle multiple return values");
     }
@@ -233,7 +257,7 @@ static void dump_context_open(void *c, ostream& os) {
 	  os << " node = ";
 	  dump_Expression(case_stmt_expr(decl),os);
 	  os << ";\n";
-	  os << indent() << "Constructor* cons = node->cons;\n";
+	  os << indent() << "  Constructor* cons = node->cons;\n";
 	}
 	return;
       case KEYfor_stmt:
@@ -328,11 +352,9 @@ static void dump_context_open(void *c, ostream& os) {
       dump_Use(pfuse,"c_",os);
       os << ") {\n";
       os << indent() << "  ";
-      dump_TypeEnvironments(pfuse,os);
-      if (USE_TYPE_ENV(pfuse)) os << "::";
+      dump_TypeEnvironment(USE_TYPE_ENV(pfuse),os);
       os << "V_" << cname << "* n = (";
-      dump_TypeEnvironments(pfuse,os);
-      if (USE_TYPE_ENV(pfuse)) os << "::";
+      dump_TypeEnvironment(USE_TYPE_ENV(pfuse),os);
       os << "V_" << cname << "*)node;\n";
       Declaration ld = match_lhs_decl(m);
       if (ld != NULL && !streq(decl_name(ld),"_")) {
@@ -525,71 +547,24 @@ String get_prefix(Declaration decl)
   return prefix;
 }
 
-void dump_Class(Class cl,ostream&os)
-{
-  switch (Class_KEY(cl)) {
-  case KEYclass_use:
-    dump_Use(class_use_use(cl),"C_",os);
-    break;
-  }
-}
+/*
+ * We have three ways of expressing an APS type
+ * 1> As a "signature" or more properly, module type.
+ *    C_name
+ * 2> As a "type", the type of the values of the type
+ *    T_name == C_name::T_Result
+ * 3> As a "value", the instance of the module type:
+ *    C_name *t_name
+ */
 
-void dump_Signature(Type result,Signature sig,ostream&os)
-{
-  switch (Signature_KEY(sig)) {
-  case KEYsig_inst:
-    {
-      dump_Class(sig_inst_class(sig),os);
-      Declaration cdecl = USE_DECL(class_use_use(sig_inst_class(sig)));
-      TypeActuals tactuals = sig_inst_actuals(sig);
-      int started = false;
-      if (Declaration_KEY(cdecl) == KEYclass_decl) {
-	os << "< ";
-	dump_Type(result,os);
-	started = true;
-      }
-      FOR_SEQUENCE(Type, ty, TypeActuals, tactuals,
-		   if (started) os << ","; else os << "< ";
-		   started = true;
-		   dump_Type(ty,os));
-      if (started) os << " >";
-    }
-    break;
-  case KEYsig_use:
-    {
-      Use u = sig_use_use(sig);
-      Declaration sd = USE_DECL(u);
-      switch (Declaration_KEY(sd)) {
-      case KEYsignature_decl:
-	dump_Signature(result,signature_decl_sig(sd),os);
-	break;
-      case KEYsignature_renaming:
-	dump_Signature(result,signature_renaming_old(sd),os);
-	break;
-      default:
-	break;
-      }
-    }
-    break;
-  case KEYmult_sig:
-    dump_Signature(result,mult_sig_sig1(sig),os);
-    // dump_Signature(mult_sig_sig2(sig),os);
-    break;
-  case KEYno_sig:
-  case KEYfixed_sig:
-    os << "Module";
-    break;
-  }
-}
-
-void dump_Type_signature(Type extension, Type ty, ostream& os)
+void dump_Type_signature(Type ty, ostream& os)
 {
   switch (Type_KEY(ty)) {
   case KEYprivate_type:
-    dump_Type_signature(extension,private_type_rep(ty),os);
+    dump_Type_signature(private_type_rep(ty),os);
     break;
   case KEYremote_type:
-    dump_Type_signature(extension,remote_type_nodetype(ty),os);
+    dump_Type_signature(remote_type_nodetype(ty),os);
     break;
   case KEYno_type:
     if (Declaration_KEY((Declaration)tnode_parent(ty)) == KEYphylum_decl)
@@ -610,99 +585,44 @@ void dump_Type_signature(Type extension, Type ty, ostream& os)
 		     started = true;
 		     os << "< ";
 		   }
-		   dump_Type(ty,os));
+		   dump_Type_signature(ty,os));
       if (started) os << " >";
     }
     break;
   case KEYtype_use:
     {
-      Declaration decl = USE_DECL(type_use_use(ty));
-      switch (Declaration_KEY(decl)) {
-      case KEYsome_type_formal:
-	dump_Signature(extension,some_type_formal_sig(decl),os);
-	break;
-      case KEYsome_type_decl:
-	dump_Type_signature(extension,some_type_decl_type(decl),os);
-	break;
-      case KEYtype_renaming:
-	dump_Type_signature(extension,type_renaming_old(decl),os);
-	break;
-      default:
-	os << "Module";
-	break;
-      }
+      Use u = type_use_use(ty);
+      Declaration decl = USE_DECL(u);
+      dump_TypeEnvironment(USE_TYPE_ENV(u),os);
+      os << "C_" << decl_name(decl);
     }
     break;
   default:
-    os << "Module";
-    break;
-  }
-}
-
-void dump_Signature_superclass(Type extension, Signature sig,ostream&os)
-{
-  switch (Signature_KEY(sig)) {
-  case KEYsig_inst:
-    {
-      Declaration cdecl = USE_DECL(class_use_use(sig_inst_class(sig)));
-      os << ", virtual public ";
-      dump_Class(sig_inst_class(sig),os);
-      TypeActuals tactuals = sig_inst_actuals(sig);
-      bool started = false;
-      if (Declaration_KEY(cdecl) == KEYclass_decl) {
-	os << "< ";
-	if (char *impl_type = Type_info(extension)->impl_type)
-	  os << impl_type;
-	else
-	  dump_Type(extension,os);
-	started = true;
-      }
-      FOR_SEQUENCE(Type, ty, TypeActuals, tactuals,
-		   if (started) os << ","; else os << "< ";
-		   started = true;
-		   dump_Type(ty,os));
-      if (started) os << " >";
-    }
-    break;
-  case KEYsig_use:
-    {
-      Use u = sig_use_use(sig);
-      Declaration sd = USE_DECL(u);
-      switch (Declaration_KEY(sd)) {
-      case KEYsignature_decl:
-	dump_Signature_superclass(extension,signature_decl_sig(sd),os);
-	break;
-      case KEYsignature_renaming:
-	dump_Signature_superclass(extension,signature_renaming_old(sd),os);
-	break;
-      default:
-	break;
-      }
-    }
-    break;
-  case KEYmult_sig:
-    dump_Signature_superclass(extension,mult_sig_sig1(sig),os);
-    dump_Signature_superclass(extension,mult_sig_sig2(sig),os);
-    break;
-  case KEYno_sig:
-  case KEYfixed_sig:
+    os << "Module"; // covers for function_type
     break;
   }
 }
 
 void dump_Declaration_superclass(Type extension, Declaration decl, ostream& os);
 
-void dump_Type_superclass(Type extension, Type ty, ostream& os)
+void dump_Type_superclass(bool is_phylum, Type ty, ostream& os)
 {
   switch (Type_KEY(ty)) {
   case KEYprivate_type:
-    dump_Type_superclass(extension,private_type_rep(ty),os);
+    dump_Type_superclass(is_phylum,private_type_rep(ty),os);
+    break;
+  case KEYremote_type:
+    dump_Type_superclass(false,remote_type_nodetype(ty),os);
     break;
   case KEYno_type:
+    if (is_phylum) { 
+      os << "C_PHYLUM";
+    } else {
+      os << "C_TYPE";
+    }
     break;
   case KEYtype_inst:
     {
-      os << ", virtual public ";
       char *mname = symbol_name(use_name(module_use_use(type_inst_module(ty))));
       os << "C_" << mname;
       TypeActuals tactuals = type_inst_type_actuals(ty);
@@ -714,91 +634,33 @@ void dump_Type_superclass(Type extension, Type ty, ostream& os)
 		     started = true;
 		     os << "< ";
 		   }
-		   dump_Type(ty,os));
+		   dump_Type_signature(ty,os));
       if (started) os << " >";
     }
     break;
   case KEYtype_use:
-    dump_Declaration_superclass(extension,USE_DECL(type_use_use(ty)),os);
-    break;
-  default:
-    break;
-  }
-}
-
-void dump_Declaration_superclass(Type extension, Declaration decl, ostream& os)
-{
-  switch (Declaration_KEY(decl)) {
-  case KEYsome_type_formal:
-    //mixins!
-    //!!!! This doesn't work except for the primitive types
-    //os << ", virtual public TypeTraits<T_" << decl_name(decl)
-    //   << ">::ModuleType";
-    dump_Signature_superclass(extension,some_type_formal_sig(decl),os);
-    break;
-  case KEYsome_type_decl:
-    dump_Signature_superclass(extension,some_type_decl_sig(decl),os);
-    dump_Type_superclass(extension,some_type_decl_type(decl),os);
-    break;
-  default:
-    break;
-  }
-}
-
-
-void dump_Signature_superinit(Type extension, Signature sig,ostream&os)
-{
-  switch (Signature_KEY(sig)) {
-  case KEYsig_inst:
     {
-      Declaration cdecl = USE_DECL(class_use_use(sig_inst_class(sig)));
-      if (Declaration_KEY(cdecl) == KEYclass_decl)
+      Declaration td = USE_DECL(type_use_use(ty));
+      switch (Declaration_KEY(td)) {
+      case KEYsome_type_formal:
+	os << "C_" << decl_name(td);
 	return;
-      /* only modules need actual initialization */
-      os << ", ";
-      dump_Class(sig_inst_class(sig),os);
-      TypeActuals tactuals = sig_inst_actuals(sig);
-      bool started = false;
-      if (Declaration_KEY(cdecl) == KEYclass_decl) {
-	os << "< ";
-	if (char *impl_type = Type_info(extension)->impl_type)
-	  os << impl_type;
-	else
-	  dump_Type(extension,os);
-	started = true;
-      }
-      FOR_SEQUENCE(Type, ty, TypeActuals, tactuals,
-		   if (started) os << ","; else os << "< ";
-		   started = true;
-		   dump_Type(ty,os));
-      if (started) os << " >";
-      os << "(*_"; //! need to get formal before assigned!
-      dump_Type_value(extension,os);
-      os << ")";
-    }
-    break;
-  case KEYsig_use:
-    {
-      Use u = sig_use_use(sig);
-      Declaration sd = USE_DECL(u);
-      switch (Declaration_KEY(sd)) {
-      case KEYsignature_decl:
-	dump_Signature_superinit(extension,signature_decl_sig(sd),os);
-	break;
-      case KEYsignature_renaming:
-	dump_Signature_superinit(extension,signature_renaming_old(sd),os);
-	break;
+      case KEYtype_decl:
+	dump_Type_superclass(false,type_decl_type(td),os);
+	return;
+      case KEYphylum_decl:
+	dump_Type_superclass(true,phylum_decl_type(td),os);
+	return;
+      case KEYtype_renaming:
+	dump_Type_superclass(true,type_renaming_old(td),os);
+	return;
       default:
-	break;
+	break; // fall through 
       }
     }
-    break;
-  case KEYmult_sig:
-    dump_Signature_superinit(extension,mult_sig_sig1(sig),os);
-    dump_Signature_superinit(extension,mult_sig_sig2(sig),os);
-    break;
-  case KEYno_sig:
-  case KEYfixed_sig:
+    // fall through
+  default:
+    os << "Module";
     break;
   }
 }
@@ -819,24 +681,14 @@ void dump_type_inst_construct(Type t, ostream& o)
     (Type,tact,TypeActuals,tacts,
      if (started) o << ",";
      else { o << "<"; started = true; }
-     dump_Type(tact,o));
+     dump_Type_signature(tact,o));
   if (started) o << ">";
   o << "(";
   started = false;
-  TypeContour tc =
-  { 0, mdecl, tfs,
-    (Declaration)tnode_parent(t) /*? OK if not a decl? */ };
-  tc.u.type_actuals = tacts;
-  Use u = use(intern_symbol("_fake"));
-  USE_TYPE_ENV(u) = &tc;
   FOR_SEQUENCE
     (Type,tact,TypeActuals,tacts,
      if (started) o << ","; else started = true;
-     o << "(";
-     dump_Signature(tact,sig_subst(u,some_type_formal_sig(tf)),o);
-     o << "*)(";
      dump_Type_value(tact,o);
-     o << ")";
      tf = DECL_NEXT(tf));
   FOR_SEQUENCE
     (Expression, act, Actuals, type_inst_actuals(t),
@@ -846,68 +698,281 @@ void dump_type_inst_construct(Type t, ostream& o)
   o << ")";
 }
 
-void dump_Type_superinit(Type extension, Type ty, ostream& os)
+void dump_Type_superinit(bool is_phylum, Type ty, ostream& os)
 {
   switch (Type_KEY(ty)) {
   case KEYprivate_type:
-    dump_Type_superinit(extension,private_type_rep(ty),os);
+    dump_Type_superinit(is_phylum,private_type_rep(ty),os);
+    break;
+  case KEYremote_type:
+    dump_Type_superinit(is_phylum,remote_type_nodetype(ty),os);
     break;
   case KEYno_type:
+    if (is_phylum) {
+      os << "C_PHYLUM()";
+    } else {
+      os << "C_TYPE()";
+    }
     break;
   case KEYtype_inst:
     {
-      os << ", ";
       dump_type_inst_construct(ty,os);
     }
     break;
   case KEYtype_use:
-    dump_Declaration_superinit(extension,USE_DECL(type_use_use(ty)),os);
-    break;
+    {
+      Declaration td = USE_DECL(type_use_use(ty));
+      os << "C_" << decl_name(td) << "(*_t_" << decl_name(td) << ")";
+      break;
+#ifdef UNDEF
+      switch (Declaration_KEY(td)) {
+      case KEYtype_decl:
+	dump_Type_superinit(false,type_decl_type(td),os);
+	return;
+      case KEYphylum_decl:
+	dump_Type_superinit(true,phylum_decl_type(td),os);
+	return;
+      case KEYtype_renaming:
+	dump_Type_superinit(true,type_renaming_old(td),os);
+	return;
+      default:
+	break; // fall through 
+      }
+      // fall through
+#endif
+    }
   default:
+    os << "Module()";
     break;
   }
 }
 
-void dump_Declaration_superinit(Type extension, Declaration decl, ostream& os)
+// Currently inheritances does the transfer of values,
+// but we need this to do the transfer of types:
+
+class ServiceRecord : public map<Symbol,int> {
+public:
+  void add(Declaration d) {
+    int namespaces = decl_namespaces(d);
+    if (namespaces) {
+      (*this)[def_name(declaration_def(d))] |= namespaces;
+    }
+  }
+  int missing(Declaration d) {
+    if (int namespaces = decl_namespaces(d)) {
+      return namespaces & ~(*this)[def_name(declaration_def(d))];
+    }
+    return 0;
+  }
+};
+
+void dump_Signature_service_transfers(Type from, ServiceRecord& sr,
+				      Signature s, ostream& os, ostream& is)
 {
-  switch (Declaration_KEY(decl)) {
-  case KEYsome_type_formal:
-    //mixins!
-    //!!!! This doesn't work except for the primitive types
-    //os << ", virtual public TypeTraits<T_" << decl_name(decl)
-    //   << ">::ModuleType";
-    dump_Signature_superinit(extension,some_type_formal_sig(decl),os);
+  switch (Signature_KEY(s)) {
+  case KEYno_sig:
     break;
-  case KEYsome_type_decl:
-    dump_Signature_superinit(extension,some_type_decl_sig(decl),os);
-    dump_Type_superinit(extension,some_type_decl_type(decl),os);
+  case KEYsig_use:
+    {
+      Use u = sig_use_use(s);
+      Declaration d = USE_DECL(u);
+      switch (Declaration_KEY(d)) {
+      case KEYsignature_decl:
+	dump_Signature_service_transfers(from,sr,
+					 sig_subst(u,signature_decl_sig(d)),
+					 os,is);
+	break;
+      case KEYsignature_renaming:
+	s = signature_renaming_old(d);
+	dump_Signature_service_transfers(from,sr,sig_subst(u,s),os,is);
+      default:
+	// There shouldn't be any other possibilities
+	aps_error(d,"unexpected signature decl");
+      }
+    }
     break;
-  default:
+  case KEYfixed_sig:
+    break;
+  case KEYmult_sig:
+    dump_Signature_service_transfers(from,sr,mult_sig_sig1(s),os,is);
+    dump_Signature_service_transfers(from,sr,mult_sig_sig2(s),os,is);
+    break;
+  case KEYsig_inst:
+    {
+      Declaration cd = USE_DECL(some_use_u(sig_inst_class(s)));
+      dump_Signature_service_transfers(from,sr,some_class_decl_parent(cd),os,is);
+      Block b = some_class_decl_contents(cd);
+      TypeContour tc;
+      tc.outer = 0;
+      tc.source = cd;
+      tc.type_formals = some_class_decl_type_formals(cd);
+      tc.result = some_class_decl_result_type(cd);
+      tc.u.type_actuals = sig_inst_actuals(s);
+      static Symbol fake_sym = intern_symbol("*fake*");
+      static Use fake = use(fake_sym);
+      static struct Use_info* ui = Use_info(fake);
+      for (Declaration d = first_Declaration(block_body(b)); d;
+	   d = DECL_NEXT(d)) {
+	if (sr.missing(d)) {
+	  if (!def_is_public(declaration_def(d))) continue;
+	  char *name = decl_name(d);
+	  //int ns = decl_namespaces(d);
+	  ui->use_decl = d;
+	  ui->use_type_env = &tc;
+	  switch (Declaration_KEY(d)) {
+	  case KEYsome_type_decl:
+	  case KEYtype_renaming:
+	    os << "  typedef typename ";
+	    dump_Type_signature(from,os);
+	    os << "::C_" << name << " C_" << name << ";\n";
+	    os << "  typedef typename ";
+	    dump_Type_signature(from,os);
+	    os << "::T_" << name << " T_" << name << ";\n";
+#ifdef UNDEF
+	    //don't need to transfer values:
+	    os << "  C_" << name << " *t_" << name << ";\n";
+	    is << ",\n    t_" << name << "((";
+	    dump_Type_value(from,is);
+	    is << ")->t_" << name <<")";
+	    break;
+	  case KEYconstructor_decl:
+	  case KEYfunction_decl:
+	  case KEYprocedure_decl:
+	  case KEYattribute_decl:
+	    {
+	      Type ft = type_subst(fake,some_value_decl_type(d));
+	      Declarations formals = function_type_formals(ft);
+	      os << "  ";
+	      dump_function_prototype(empty_string,name,ft,os);
+	      os << "{\n    return (";
+	      dump_Type_value(from,os);
+	      os << ")->v_" << name << "(";
+	      for (Declaration formal = first_Declaration(formals);
+		   formal != NULL;
+		   formal = DECL_NEXT(formal)) {
+		if (formal != first_Declaration(formals))
+		  os << ",";
+		os << "v_" << decl_name(formal);
+	      }
+	      os << ");\n  }\n";
+	    }
+	    break;
+	  case KEYvalue_decl:
+	    {
+	      Type vt = type_subst(fake,some_value_decl_type(d));
+	      os << "  ";
+	      dump_Type(vt,os);
+	      os << " v_" << name << ";\n";
+	      is << ",\n    v_" << name << "((";
+	      dump_Type_value(from,os);
+	      os << ")->v_" << name << ")";
+	    }
+	    break;
+	  default:
+	    if (ns & NAME_VALUE || ns & NAME_PATTERN) {
+	      printf("unable to transfer service %s",
+		     decl_name(d));
+	    }
+#else
+	    break;
+	  default:
+#endif
+	    break;
+	  }
+	  sr.add(d);
+	}
+      }
+    }
+  }
+}
+
+// read this code while reading dump_Type_super{class,init}
+void dump_Type_service_transfers(ServiceRecord& sr,
+				 Type from,
+				 bool is_phylum,
+				 Type ty, ostream& os, ostream& is)
+{
+  static Type fake_no_type = no_type();
+  //static Symbol type_sym = intern_symbol("_type");
+  //static Symbol phylum_sym = intern_symbol("_phylum");
+  
+  switch (Type_KEY(ty)) {
+  case KEYno_type:
+    break;
+  case KEYremote_type:
+    // set is_phylum to true because we want nodes.
+    dump_Type_service_transfers(sr,from,true,remote_type_nodetype(ty),os,is);
+    break;
+  case KEYprivate_type:
+    dump_Type_service_transfers(sr,from,is_phylum,private_type_rep(ty),os,is);
+    break;
+  case KEYfunction_type:
+    // do nothing
+    break;
+  case KEYtype_inst:
+    // do nothing: handled by dump_Type_super{class,init}
+    break;
+  case KEYtype_use:
+    {
+      Use u = type_use_use(ty);
+      Type as = 0;
+      Declaration td = USE_DECL(u);
+      switch (Declaration_KEY(td)) {
+      case KEYtype_decl:
+	as = type_subst(u,type_decl_type(td));
+	dump_Type_service_transfers(sr,ty,false,as,os,is);
+	break;
+      case KEYphylum_decl:
+	as = type_subst(u,phylum_decl_type(td));
+	dump_Type_service_transfers(sr,ty,true,as,os,is);
+	break;
+      case KEYphylum_formal:
+	is_phylum = true;
+	// fall through
+      case KEYtype_formal:
+	as = fake_no_type;
+	{
+	  Signature sig = sig_subst(u,some_type_formal_sig(td));
+	  dump_Signature_service_transfers(ty,sr,sig,os,is);
+	}
+	break;
+      case KEYtype_renaming:
+	dump_Type_service_transfers(sr,ty,is_phylum,
+				    type_subst(u,type_renaming_old(td)),os,is);
+	break;
+      default:
+	aps_error(td,"What sort of type decl to get services from ?");
+      }
+#ifdef UNDEF
+      if (as) {
+	char* key;
+	Symbol sym;
+	if (is_phylum) {
+	  key = "Phylum";
+	  sym = phylum_sym;
+	} else {
+	  key = "Type";
+	  sym = type_sym;
+	}
+	if (!sr[sym]) {
+	  os << "  " << key << "* get" << sym << "() const { return (";
+	  dump_Type_value(ty,os);
+	  os << ")->get" << sym << "(); }\n";
+	  sr[sym] |= NAME_TYPE;
+	}
+      }
+#endif
+    }
     break;
   }
 }
 
-
-static char* omitted[80];
-static int omitted_number = 0;
-
-void omit_declaration(char *n)
+void dump_cpp_Declaration(Declaration decl,const output_streams& oss)
 {
-  omitted[omitted_number++] = n;
-}
-
-static char*impl[80];
-static int impl_number = 0;
-
-void impl_module(char *mname, char*type)
-{
-  impl[impl_number++] = mname;
-  impl[impl_number++] = type;
-}
-
-void dump_cpp_Declaration(Declaration decl,Declaration context,
-			  ostream&hs,ostream&cpps)
-{
+  ostream& hs = oss.hs;
+  ostream& cpps = oss.cpps;
+  ostream& is = oss.is;
+  Declaration context = oss.context;
   char *name = 0;
   switch (Declaration_KEY(decl)) {
   case KEYdeclaration:
@@ -921,52 +986,21 @@ void dump_cpp_Declaration(Declaration decl,Declaration context,
     for (int i=0; i < omitted_number; ++i)
       if (streq(omitted[i],name)) return;
   String prefix = get_prefix(decl);
+  ostream& bs = inline_definitions ? hs : cpps;
   switch (Declaration_KEY(decl)) {
   case KEYclass_decl:
+  case KEYsignature_decl:
+  case KEYclass_renaming:
+  case KEYsignature_renaming:
     {
-      Declaration rdecl = class_decl_result_type(decl);
-      hs << "template <class T_" << decl_name(rdecl);
-      for (Declaration tf=first_Declaration(class_decl_type_formals(decl));
-	   tf ; tf = DECL_NEXT(tf)) {
-	hs << ", class T_" << decl_name(tf);
-      }
-      hs << ">\n";
-      hs << "class C_" << name << ": virtual public Module";
-      dump_Signature_superclass(make_type_use(0,rdecl),class_decl_parent(decl),hs);
-      hs << " {\n public:\n";
-      for (Declaration d
-	   = first_Declaration(block_body(class_decl_contents(decl)));
-	   d != 0; d = DECL_NEXT(d)) {
-	switch (Declaration_KEY(d)) {
-	  //! for now only functions, so we do not need constructors:
-	default:
-          break;
-	case KEYfunction_decl:
-	  hs << "  virtual ";
-	  {
-	    Type ft = function_decl_type(d);
-	    Declaration rdecl =
-	      first_Declaration(function_type_return_values(ft));
-	    dump_Typed_decl(value_decl_type(rdecl),d,"v_",hs);
-	    hs << "(";
-	    bool started = false;
-	    for (Declaration f = first_Declaration(function_type_formals(ft));
-		 f ; f = DECL_NEXT(f)) {
-	      if (started) hs << ","; else started = true;
-	      dump_formal(f,"v_",hs);
-	    }
-	    hs << ") = 0;\n";
-	  }
-	  break;
-	}
-      }
-      hs << "};\n" << endl;
+      // do nothing (classes and signatures have no C++ significance)
     }
     break;
   case KEYmodule_decl:
     {
       Declarations body = block_body(module_decl_contents(decl));
       Declaration rdecl = module_decl_result_type(decl);
+      bool rdecl_is_phylum = (Declaration_KEY(rdecl) == KEYphylum_decl);
       DECL_NEXT(rdecl) = first_Declaration(body);
       Declaration first_decl = rdecl;
       bool is_template = template_decl_p(decl);
@@ -984,32 +1018,27 @@ void dump_cpp_Declaration(Declaration decl,Declaration context,
 	     tf ; tf = DECL_NEXT(tf)) {
 	  if (started) hs << ",";
 	  else started = true;
-	  hs << "class T_" << decl_name(tf);
+	  hs << "class C_" << decl_name(tf);
 	}
 	hs << ">\n";
       }
-      hs << "class C_" << name << " : virtual public Module";
+      hs << "class C_" << name << " : public ";
+      
       Type rut = some_type_decl_type(rdecl);
       if (impl_type) {
 	Type_info(rut)->impl_type = impl_type;
       }
-      if (!impl_type) {
-	if (Type_KEY(some_type_decl_type(rdecl)) == KEYno_type) {
-	  if (Declaration_KEY(rdecl) == KEYphylum_decl) {
-	    hs << ", virtual public C_PHYLUM";
-	  } else {
-	    hs << ", virtual public C_TYPE";
-	  }
-	} 
-	dump_Type_superclass(rut,some_type_decl_type(rdecl),hs);
-      }
-      dump_Signature_superclass(rut,module_decl_parent(decl),hs);
+      dump_Type_superclass(rdecl_is_phylum,rut,hs);
       hs << " {\n";
       for (Declaration tf=first_Declaration(module_decl_type_formals(decl));
 	   tf ; tf = DECL_NEXT(tf)) {
-	hs << "  ";
-	dump_Signature(make_type_use(0,tf),some_type_formal_sig(tf),hs);
-	hs << " *t_" << decl_name(tf) << ";\n";
+	hs << "  typedef typename C_" << decl_name(tf)
+	   << "::T_Result T_" << decl_name(tf) << ";\n";
+      }
+      for (Declaration tf=first_Declaration(module_decl_type_formals(decl));
+	   tf ; tf = DECL_NEXT(tf)) {
+	hs << "  C_" << decl_name(tf)
+	   << " *t_" << decl_name(tf) << ";\n";
       }
       for (Declaration vf=first_Declaration(module_decl_value_formals(decl));
 	   vf ; vf = DECL_NEXT(vf)) {
@@ -1017,13 +1046,43 @@ void dump_cpp_Declaration(Declaration decl,Declaration context,
 	dump_formal(vf,"v_",hs);
 	hs << ";\n";
       }
+      hs << " public:\n";
 
+      ostringstream is;
+      // is << "\n    /* starting transfers */";
+      is.flush();
+
+      // The Result type as signature:
+      hs << "  typedef C_" << name << " C_Result;\n";
+      // The Result type as C++ type:
       if (impl_type) {
-	hs << "  typedef " << impl_type << " T_" << decl_name(rdecl) << ";\n";
-	hs << "  C_" << name << " *t_" << decl_name(rdecl) << ";\n";
+	hs << "  typedef " << impl_type << " T_Result;\n";
+      } else {
+	hs << "  typedef ";
+	dump_Type(rut,hs);
+	hs << " T_Result;\n";
       }
+      // The Result type as value:
+      // This is silly but makes it easier to do things:
+      hs << "  C_Result* const t_Result;\n";
+      is << ",\n    t_Result(this)";
+
+      ServiceRecord sr;
+      // get "inherited" services:
+      // need to get typedefs which don't inherit
       for (Declaration d = first_decl; d ; d = DECL_NEXT(d)) {
-	dump_cpp_Declaration(d,decl,hs,bs);
+	sr.add(d);
+      }
+      dump_Type_service_transfers(sr,rut,rdecl_is_phylum,rut,hs,is);
+
+      // is << " /* transfers over */ ";
+
+      for (Declaration d = first_decl; d ; d = DECL_NEXT(d)) {
+	//if (decl_namespaces(d)) {
+	//  is << "\n    /* about to do " << decl_name(d) << " */";
+	//  is.flush();
+	//}
+	dump_cpp_Declaration(d,output_streams(decl,hs,bs,is));
 	// undefined simple variables mean the constructor must be native:
 	if (Declaration_KEY(d) == KEYvalue_decl) {
 	  Default def = value_decl_default(d);
@@ -1036,18 +1095,19 @@ void dump_cpp_Declaration(Declaration decl,Declaration context,
 	}
       }
 
+      is << "\n    /* body over */"; is.flush();
+
       first_decl = first_Declaration(body); // result is special
 
       // The normal default constructor header:
-      hs << "\n public:\n";
-      hs << "  C_" << name << "(";
+      hs << "\n  C_" << name << "(";
       {
 	bool started = false;
 	for (Declaration tf=first_Declaration(module_decl_type_formals(decl));
 	     tf ; tf = DECL_NEXT(tf)) {
 	  if (started) hs << ","; else started = true;
-	  dump_Signature(make_type_use(0,tf),some_type_formal_sig(tf),hs);
-	  hs << "* _t_" << decl_name(tf);
+	  hs << "C_" << decl_name(tf) 
+	     << "* _t_" << decl_name(tf);
 	}
 	for (Declaration vf=first_Declaration(module_decl_value_formals(decl));
 	     vf; vf = DECL_NEXT(vf)) {
@@ -1063,8 +1123,8 @@ void dump_cpp_Declaration(Declaration decl,Declaration context,
 	for (Declaration tf=first_Declaration(module_decl_type_formals(decl));
 	     tf ; tf = DECL_NEXT(tf)) {
 	  if (started) cpps << ","; else started = true;
-	  dump_Signature(make_type_use(0,tf),some_type_formal_sig(tf),cpps);
-	  cpps << "* _t_" << decl_name(tf);
+	  cpps << "C_" << decl_name(tf) 
+	       << "* _t_" << decl_name(tf);
 	}
 	for (Declaration vf=first_Declaration(module_decl_value_formals(decl));
 	     vf; vf = DECL_NEXT(vf)) {
@@ -1078,133 +1138,22 @@ void dump_cpp_Declaration(Declaration decl,Declaration context,
       if (constructor_is_native) {
 	hs << ";\n";
       } else {
-	bs << " :\n  Module(\"" << name << "\")";
-	if (!impl_type)
-	  dump_Type_superinit(rut,some_type_decl_type(rdecl),bs);
+	bs << " : ";
+	dump_Type_superinit(rdecl_is_phylum,rut,bs);
 	for (Declaration tf=first_Declaration(module_decl_type_formals(decl));
 	     tf ; tf = DECL_NEXT(tf)) {
-	  bs << ",\n  t_" << decl_name(tf) << "(_t_" << decl_name(tf) << ")";
+	  bs << ",\n    t_" << decl_name(tf) << "(_t_" << decl_name(tf) << ")";
 	}
 	for (Declaration vf=first_Declaration(module_decl_value_formals(decl));
 	     vf ; vf = DECL_NEXT(vf)) {
-	  bs << ",\n  v_" << decl_name(vf) << "(_v_" << decl_name(vf) << ")";
+	  bs << ",\n    v_" << decl_name(vf) << "(_v_" << decl_name(vf) << ")";
 	}
-	{
-	  char *n = decl_name(rdecl);
-	  bs << ",\n  t_" << n << "(this)";
-	}
-	for (Declaration d = first_decl; d; d = DECL_NEXT(d)) {
-	  switch(Declaration_KEY(d)) {
-	  case KEYsome_type_decl:
-	    bs << ",\n";
-	    bs << "  t_" << decl_name(d) << "(";
-	    dump_Type_value(some_type_decl_type(d),bs);
-	    bs << ")";
-	    break;
-	  case KEYtype_renaming:
-	    bs << ",\n";
-	    bs << "  t_" << decl_name(d) << "(";
-	    dump_Type_value(type_renaming_old(d),bs);
-	    bs << ")";
-	    break;	    
-	  case KEYvalue_decl:
-	    bs << ",\n";
-	    bs << "  v_" << decl_name(d) << "(";
-	    dump_Default(value_decl_default(d),bs);
-	    bs << ")";
-	    break;
-	  case KEYvalue_renaming:
-	    if (Type_KEY(infer_expr_type(value_renaming_old(d)))
-		== KEYfunction_type)
-	      break;
-	    bs << ",\n";
-	    bs << "  v_" << decl_name(d) << "(";
-	    dump_Expression(value_renaming_old(d),bs);
-	    bs << ")";
-	    break;	    
-	  case KEYattribute_decl:
-	    bs << ",\n";
-	    bs << "  a_" << decl_name(d) << "(new A_" << decl_name(d) << "(";
-	    bs << "this";
-	    bs << "))";
-	    break;
-	  case KEYconstructor_decl:
-	    bs << ",\n";
-	    bs << "  c_" << decl_name(d) << "(new C_" << decl_name(d) << "(";
-	    {
-	      Type cty = constructor_decl_type(d);
-	      Declarations rdecls = function_type_return_values(cty);
-	      Type rt = value_decl_type(first_Declaration(rdecls));
-	      dump_Type_value(rt,bs);
-	      bs << ",this))";
-	    }
-	    break;
-	  default:
-	    break;
-	  }
-	}
+	bs << is.str();
 	bs << " {}\n\n";
       }
 
-      // now the copy constructor
-      hs << "  C_" << name << "(const C_" << name << "& from)";
-      if (!inline_definitions) {
-	hs << ";\n";
-	cpps << "\n" << prefix << "C_" << name << "::C_" << name << "("
-	     << "const C_" << name << "& from)";	
-      }
-      {
-	bool at_start = true;
-	for (Declaration tf=first_Declaration(module_decl_type_formals(decl));
-	     tf ; tf = DECL_NEXT(tf)) {
-	  if (!at_start) bs << ","; else { bs << " :"; at_start = false; }
-	  bs << "\n  t_" << decl_name(tf) << "(from.t_" << decl_name(tf) << ")";
-	}
-	for (Declaration vf=first_Declaration(module_decl_value_formals(decl));
-	     vf ; vf = DECL_NEXT(vf)) {
-	  if (!at_start) bs << ","; else { bs << " :"; at_start = false; }
-	  bs << "\n  v_" << decl_name(vf) << "(from.v_" << decl_name(vf) << ")";
-	}
-	{
-	  char *n = decl_name(rdecl);
-	  if (at_start) bs << " :\n  "; else bs << ",\n  ";
-	  at_start = false;
-	  bs << "t_" << n << "(from.t_" << n << ")";
-	}
-	for (Declaration d = first_decl; d; d = DECL_NEXT(d)) {
-	  char* kind = NULL;
-	  switch(Declaration_KEY(d)) {
-	  case KEYsome_type_decl:
-	  case KEYtype_renaming:
-	    kind = "t_";
-	    break;
-	  case KEYvalue_renaming:
-	    if (Type_KEY(infer_expr_type(value_renaming_old(d)))
-		== KEYfunction_type)
-	      break;
-	    /* FALL THROUGH */
-	  case KEYvalue_decl:
-	    kind = "v_";
-	    break;
-	  case KEYattribute_decl:
-	    kind = "a_";
-	    break;
-	  case KEYconstructor_decl:
-	    kind = "c_";
-	    break;
-	  default:
-	    break;
-	  }
-	  if (kind != NULL) {
-	    char *n = decl_name(d);
-	    if (at_start) bs << " :\n  ";
-	    else bs << ",\n  ";
-	    at_start = false;
-	    bs << kind << n << "(from." << kind << n << ")";
-	  }
-	}
-	bs << " {}\n\n";
-      }
+      // we don't need to generate a copy constructor
+      // (use the default generated one)
 
       hs << "  void finish()";
       if (!inline_definitions) {
@@ -1239,72 +1188,72 @@ void dump_cpp_Declaration(Declaration decl,Declaration context,
   case KEYphylum_decl:
     {
       bool is_phylum = (KEYphylum_decl == Declaration_KEY(decl));
+      bool is_result = (context &&
+			Declaration_KEY(context) == KEYmodule_decl &&
+			module_decl_result_type(context) == decl) ;
       Declarations body = context ? block_body(module_decl_contents(context)) : 0;
-      if (context) hs << " public:\n";
       Type type = some_type_decl_type(decl);
       bool first = true;
       switch (Type_KEY(type)) {
       case KEYno_type:
-	if (!context) break;
-	for (Declaration d=first_Declaration(body); d; d=DECL_NEXT(d)) {
-	  if (KEYconstructor_decl == Declaration_KEY(d) &&
-	      constructor_decl_base_type_decl(d) == decl) {
-	    if (first) {
-	      hs << "  enum P_" << name << "{";
-	      first = false;
-	    } else hs << ",";
-	    hs << " p_" << decl_name(d);
+	if (context) {
+	  for (Declaration d=first_Declaration(body); d; d=DECL_NEXT(d)) {
+	    if (KEYconstructor_decl == Declaration_KEY(d) &&
+		constructor_decl_base_type_decl(d) == decl) {
+	      if (first) {
+		if (context) hs << "  ";
+		hs << "enum P_" << name << "{";
+		first = false;
+	      } else hs << ",";
+	      hs << " p_" << decl_name(d);
+	    }
 	  }
+	  if (!first) hs << " };\n";
 	}
-	if (!first) hs << " };\n";
-	if (first) {
-	  // no type declared
-	  hs << "  typedef void T_" << name << ";\n";
-	  if (context && Declaration_KEY(context) == KEYmodule_decl &&
-	      module_decl_result_type(context) == decl) {
-	    hs << "  C_" << decl_name(context) << "* t_" << name << ";\n";
-	  } else {
-	    hs << "  C_" << (is_phylum ? "PHYLUM" : "TYPE") << "* t_" << name << ";\n";
-	  }
-	  break;
-	}
-	hs << "  class C_" << name << " : public Node {\n   public:\n";
-	hs << "    C_" << name << "(Constructor*c)";
-	if (!inline_definitions) {
-	  hs << ";\n";
-	  cpps << prefix << "C_" << name << "::C_" << name
-	       << "(Constructor*c)";
-	}
-	cpps << " : Node(c) {};\n" << endl;
-	  
-	hs << "  };\n";
-	hs << "  typedef Node* T_" << name << ";\n";
-	//? We can't use C_name as the type of t_name
-	//? because of the signature.
-	hs << "  " << (is_phylum ? "C_PHYLUM" : "C_TYPE")
-	   << "* t_" << name << ";\n";
-	hs << endl;
 
+	// if it's a result decl, we don't define this, but otherwise
+	// we need definitions for C_name, T_name and t_Name
+	if (!is_result) {
+	  if (context) hs << "  ";
+	  hs << "typedef C_" << (is_phylum ? "PHYLUM" : "TYPE") << " "
+	     << "C_" << name << ";\n";
+	  if (context) hs << "  ";
+	  hs << "typedef C_" << (is_phylum ? "PHYLUM" : "TYPE")
+	     << "::T_Result " << "T_" << name << ";\n";
+	  if (context) hs << "  "; else hs << "extern ";
+	  hs << "C_" << name << " *t_" << name << ";\n";
+	  if (!context) {
+	    cpps << "C_" << name << " *t_" << name
+		 << " = new C_" << name << "();\n";
+	  }
+	  hs << endl;
+	}	  
 	break;
       default:
-	hs << "  typedef "; dump_Type(type,hs); hs << " T_" << name << ";\n";
-	if (context && Declaration_KEY(context) == KEYmodule_decl &&
-	    module_decl_result_type(context) == decl) {
-	  hs << "  C_" << decl_name(context) << "* t_" << name << ";\n";
-	} else {
-	  Type fake_use = make_type_use(0,decl);
-	  if (!context) hs << "extern "; else hs << "  ";
-	  dump_Type_signature(fake_use,type,hs);
+	if (!is_result) {
+	  if (context) hs << "  ";
+	  hs << "typedef ";
+	  dump_Type_signature(type,hs);
+	  hs << " C_" << name << ";\n";
+	  if (context) hs << "  ";
+	  hs << "typedef ";
+	  dump_Type(type,hs);
+	  hs << " T_" << name << ";\n";
+	  if (context) hs << "  "; else hs << "extern ";
+	  hs << "C_" << name << " *t_" << name << ";\n";
 	  if (!context) {
-	    dump_Type_signature(fake_use,type,cpps);
-	  }
-	  hs << "* t_" << name << ";\n";
-	  if (!context) {
-	    cpps << "* t_" << name << " = ";
+	    cpps << "C_" << name << " *t_" << name << " = ";
 	    dump_Type_value(type,cpps);
 	    cpps << ";\n";
 	  }
+	  hs << endl;
 	}
+	break;
+      }
+      if (!is_result && context) {
+	is << ",\n    t_" << name << "(";
+	dump_Type_value(type,is);
+	is << ")";
       }
     }
     break;
@@ -1313,8 +1262,10 @@ void dump_cpp_Declaration(Declaration decl,Declaration context,
       Type ft = constructor_decl_type(decl);
       Declarations formals = function_type_formals(ft);
       Declaration tdecl = constructor_decl_base_type_decl(decl);
+      Declarations rdecls = function_type_return_values(ft);
+      Type rt = value_decl_type(first_Declaration(rdecls));
       bool is_syntax = false;
-      char *base_type_name = decl_name(tdecl);
+      // char *base_type_name = decl_name(tdecl);
       switch (Declaration_KEY(tdecl)) {
       case KEYphylum_decl:
 	is_syntax = true;
@@ -1326,30 +1277,18 @@ void dump_cpp_Declaration(Declaration decl,Declaration context,
 	aps_error(decl,"constructor not built on type or phylum");
 	return;
       }
-      /* header file */
-      hs << " private:\n";
-      hs << "  class C_" << name << " : public Constructor {\n";
-      hs << "  public:\n";
-      hs << "    C_" << decl_name(context) << "* context;\n";
-      hs << "    C_" << name << (is_syntax ? "(Phylum*t,C_":"(Type*t,C_") ;
-      hs << decl_name(context) << "*c)";
-      if (!inline_definitions) {
-	hs << ";\n";
-	cpps << prefix << "C_" << name << "::C_" << name
-	     << (is_syntax ? "(Phylum *t,C_" : "(Type *t,C_");
-	cpps << decl_name(context) << "*c)\n";
+      if (!context) {
+	aps_error(decl,"constructor cannot be declared at top-level");
+	break;
       }
-      cpps << "  : Constructor(t,\""<< name << "\",p_" << name
-	   << "), context(c) {}\n";
-      hs << "  };\n";
-
-      hs << " public:\n";
-      hs << "  struct V_" << name << " : public C_" << base_type_name 
+      /* header file */
+      hs << "  struct V_" << name << " : public "
+	 << (is_syntax ? "C_PHYLUM::Node" : "C_TYPE::Node")
          << " {" << endl;
       for (Declaration f = first_Declaration(formals); f; f = DECL_NEXT(f)) {
 	hs << "    "; dump_formal(f,"v_",hs); hs << ";\n";
       }
-      hs << "    V_" << name << "(C_" << name << "*c";
+      hs << "    V_" << name << "(Constructor *c";
       for (Declaration f = first_Declaration(function_type_formals(ft));
 	   f != NULL; f = DECL_NEXT(f)) {
 	hs << ", ";
@@ -1360,7 +1299,7 @@ void dump_cpp_Declaration(Declaration decl,Declaration context,
       if (!inline_definitions) {
 	hs << ";\n";
 	cpps << prefix << "V_" << name << "::V_" << name
-	  << "(C_" << name << "* c";
+	  << "(Constructor * c";
 	for (Declaration f = first_Declaration(formals); f; f = DECL_NEXT(f)) {
 	  cpps << ", ";
 	  dump_Type(formal_type(f),cpps);
@@ -1368,11 +1307,12 @@ void dump_cpp_Declaration(Declaration decl,Declaration context,
 	}
 	cpps << ")";
       }
-      cpps << "\n  : C_" << base_type_name << "(c)";
+      bs << "\n  : "
+	   << (is_syntax ? "C_PHYLUM::Node" : "C_TYPE::Node") << "(c)";
       for (Declaration f = first_Declaration(formals); f; f = DECL_NEXT(f)) {
-	cpps << ", v_" << decl_name(f) << "(_" << decl_name(f) << ")";
+	bs << ", v_" << decl_name(f) << "(_" << decl_name(f) << ")";
       }
-      cpps << "{";
+      bs << "{";
       for (Declaration f = first_Declaration(formals); f; f = DECL_NEXT(f)) {
 	Type ft = formal_type(f);
 	switch (Type_KEY(ft)) {
@@ -1384,9 +1324,9 @@ void dump_cpp_Declaration(Declaration decl,Declaration context,
 	    case KEYphylum_decl:
 	    case KEYphylum_formal:
 	      /* syntactic parent */
-	      cpps << "\n";
+	      bs << "\n";
 	      if (inline_definitions) hs << "    ";
-	      cpps << "  _" << decl_name(f) << "->set_parent(this); ";
+	      bs << "  _" << decl_name(f) << "->set_parent(this); ";
 	      break;
 	    default:
 	      /*NOTHING*/
@@ -1399,73 +1339,62 @@ void dump_cpp_Declaration(Declaration decl,Declaration context,
 	  break;
 	}
       }
-      cpps << "}\n";
+      bs << "}\n";
 
       // a print function (defer to constructor context)
-      hs << "    string to_string()";
+      hs << "    std::string to_string()";
       if (!inline_definitions) {
 	hs << ";\n";
-	cpps << "\nstring " << prefix << "V_" << name << "::to_string()";
+	cpps << "\nstd::string " << prefix << "V_" << name << "::to_string()";
       }
-      cpps << " {\n";
+      bs << " {\n";
       if (inline_definitions) hs << "    ";
-      cpps << "  return ((C_" << name << "*)cons)->context->s_" << name << "(this);\n";
+      if (is_syntax) {
+        bs << "  return std::string(\"" << name
+	   << "#\")+t_Integer->v_string(index)+std::string(\"(\")";
+      } else {
+	bs << "  return std::string(\"" << name << "(\")";
+      }
+      bool started = false;
+      for (Declaration f = first_Declaration(formals); f; f = DECL_NEXT(f)) {
+	if (started) {
+	  bs << "+\",\"";
+	} else started = true;
+	bs << "\n      ";
+	if (inline_definitions) hs << "    ";
+	bs << "+s_string(v_" << decl_name(f) << ")";
+      }
+      bs << "+\")\";\n";
       if (inline_definitions) hs << "    ";
-      cpps << "}\n";
+      bs << "}\n";
       hs << "  };\n\n";
 
-      hs << "  C_" << name << "* c_" << name << ";\n  ";
+      hs << "  Constructor* c_" << name << ";\n  ";
+      is << ",\n    c_" << name << "(new Constructor(";
+      dump_Type_value(rt,is);
+      is << "->get_type(),\"" << name << "\",p_" << name << "))";
+
       dump_function_prototype(empty_string,name,ft,hs);
       if (!inline_definitions) {
 	hs << ";\n";
 	dump_function_prototype(prefix,name,constructor_decl_type(decl),cpps);
       }
-      cpps << " {\n";
+      bs << " {\n";
       if (inline_definitions) hs << "  ";
-      cpps << "  return new V_" << name << "(c_" << name;
+      bs << "  return new V_" << name << "(c_" << name;
       for (Declaration f = first_Declaration(function_type_formals(constructor_decl_type(decl)));
 	   f != NULL; f = DECL_NEXT(f)) {
-	cpps << ",v_" << decl_name(f);
+	bs << ",v_" << decl_name(f);
       }
-      cpps << ");\n";
+      bs << ");\n";
       if (inline_definitions) hs << "  ";
-      cpps << "}\n";
-
-      // the print function in the context:
-      hs << "  string s_" << name << "(V_" << name << "* node)";
-      if (!inline_definitions) {
-	hs << ";\n" << endl;
-	cpps << "\nstring " << prefix
-	     << "s_" << name << "(V_" << name << "* node)";
-      }
-      cpps << " {\n";
-      if (inline_definitions) hs << "  ";
-      if (is_syntax) {
-        cpps << "  return string(\"" << name
-	     << "#\")+t_Integer->v_string(node->index)+string(\"(\")";
-      } else {
-	cpps << "  return string(\"" << name << "(\")";
-      }
-      bool started = false;
-      for (Declaration f = first_Declaration(formals); f; f = DECL_NEXT(f)) {
-	if (started) {
-	  cpps << "+string(\",\")";
-	} else started = true;
-	cpps << "\n      ";
-	if (inline_definitions) hs << "  ";
-	cpps << "+";
-	dump_Type_value(formal_type(f),cpps);
-	cpps << "->v_string(node->v_" << decl_name(f) << ")";
-      }
-      cpps << "+string(\")\");\n";
-      if (inline_definitions) hs << "  ";
-      cpps << "}\n" << endl;
+      bs << "}\n";
     }
     break;
   case KEYvalue_decl:
     {
       if (context) 
-	hs << " public:\n  ";
+	hs << "  ";
       else
 	hs << "extern ";
       dump_Typed_decl(value_decl_type(decl),decl,"v_",hs);
@@ -1478,12 +1407,19 @@ void dump_cpp_Declaration(Declaration decl,Declaration context,
 	  dump_Expression(simple_value(value_decl_default(decl)),cpps);
 	  cpps << ";\n" << endl;
 	  break;
+	case KEYno_default:
+	  // native value
+	  break;
 	default:
-	  // must be done in handcode version.
+	  aps_error(decl,"Cannot generate code for this");
 	  break;
 	}
+      } else {
+	// in module
+	is << ",\n    v_" << name << "(";
+	dump_Default(value_decl_default(decl),is);
+	is << ")";
       }
-      // Otherwise initialization is done in the module
     }
     break;
   case KEYattribute_decl:
@@ -1498,27 +1434,31 @@ void dump_cpp_Declaration(Declaration decl,Declaration context,
       
       hs << " private:\n";
       hs << "  class A_" << name << " : public Attribute<";
-      dump_Type(at,hs);
+      dump_Type_signature(at,hs);
       hs << ",";
-      dump_Type(rt,hs);
+      dump_Type_signature(rt,hs);
       hs << "> {\n";
       hs << "    C_" << decl_name(context) << "* context;\n";
       hs << "  public:\n";
-      hs << "    A_" << name << "(C_" << decl_name(context) << "*c)";
+      hs << "    A_" << name << "(C_" << decl_name(context) << "*c,";
+      dump_Type_signature(at,hs);
+      hs << " *nt, ";
+      dump_Type_signature(rt,hs);
+      hs << " *vt)";
       if (!inline_definitions) {
 	hs << ";\n";
 	cpps << "\n" << prefix << "A_" << name << "::A_" << name
-	     << "(C_" << decl_name(context) << "*c)";
+	     << "(C_" << decl_name(context) << "*c,";
+	dump_Type_signature(at,cpps);
+	cpps << " *nt, ";
+	dump_Type_signature(rt,cpps);
+	cpps << " *vt)";
       }
       cpps << " : Attribute<";
-      dump_Type(at,cpps);
+      dump_Type_signature(at,cpps);
       cpps << ",";
-      dump_Type(rt,cpps);
-      cpps << ">(c->"; dump_Type_value(at,cpps); cpps << ",";
-      if (!is_global(rt)) cpps << "c->";
-      dump_Type_value(rt,cpps);
-      cpps << ",\"" << name << "\"), context(c) {}\n";
-
+      dump_Type_signature(rt,cpps);
+      cpps << ">(nt,vt,\"" << name << "\"), context(c) {}\n";
       hs << "    ";
       dump_Type(rt,hs);
       hs << " compute(";
@@ -1531,62 +1471,84 @@ void dump_cpp_Declaration(Declaration decl,Declaration context,
 	dump_Type(at,cpps);
 	cpps << " node)";
       }
-      cpps << "{ return context->c_" << name << "(node); }\n";
-      hs << "};\n public:\n";
+      if (static_schedule) {
+	cpps << "{\n";
+	if (inline_definitions) hs << "    ";
+	cpps << "  T_String ns = values->v_string(node);\n";
+	if (inline_definitions) hs << "    ";
+	cpps << "  throw UndefinedAttributeException(ns+\"."
+	     << name << "\");\n";
+	if (inline_definitions) hs << "    ";
+	cpps << "}\n";
+      } else {
+	cpps << "{ return context->c_" << name << "(node); }\n";
+	hs << "};\n public:\n";
+      }
 
       hs << "  A_" << name << " *a_" << name << ";\n";
+      
+      is << ",\n    a_" << name << "(new A_" << name << "(";
+      is << "this,";
+      dump_Type_value(at,is);
+      is << ",";
+      dump_Type_value(rt,is);
+      is << "))";
 
-      hs << "  "; dump_Type(rt,hs); hs << " c_" << name << "(";
-      dump_Type(at,hs);
-      hs << " anode)";
-      if (!inline_definitions) {
-	hs << ";\n";
-	dump_Type(rt,cpps);
-	cpps << " " << prefix << "c_" << name << "(";
-	dump_Type(at,cpps);
-	cpps << " anode)";
-      }
-      cpps << " {\n";
-      if (inh) {
-	cpps << "  Node* node=anode->parent;\n";
-	cpps << "  if (node != 0) {\n";
+      if (static_schedule) {
+	hs << "  };\n";
       } else {
-	cpps << "  Node* node = anode;\n";
-      }
-      cpps << "  Constructor* cons = node->cons;\n";
-      for (Declaration d=first_Declaration(block_body(module_decl_contents(context)));
-	   d != NULL; d = DECL_NEXT(d)) {
-	switch (Declaration_KEY(d)) {
-	case KEYtop_level_match:
-	  {
-	    Match m = top_level_match_m(d);
-	    push_attr_context(m);
-	    Block body = matcher_body(top_level_match_m(d));
-	    dump_Block(body,dump_attr_assign,decl,cpps);
-	    pop_attr_context(cpps);
+	hs << "  "; dump_Type(rt,hs); hs << " c_" << name << "(";
+	dump_Type(at,hs);
+	hs << " anode)";
+	if (!inline_definitions) {
+	  hs << ";\n";
+	  dump_Type(rt,cpps);
+	  cpps << " " << prefix << "c_" << name << "(";
+	  dump_Type(at,cpps);
+	  cpps << " anode)";
+	}
+	cpps << " {\n";
+	if (inh) {
+	  cpps << "  C_PHYLUM::Node* node=anode->parent;\n";
+	  cpps << "  if (node != 0) {\n";
+	} else {
+	  cpps << "  C_PHYLUM::Node* node = anode;\n";
+	}
+	cpps << "  Constructor* cons = node->cons;\n";
+	for (Declaration d=first_Declaration(block_body(module_decl_contents(context)));
+	     d != NULL; d = DECL_NEXT(d)) {
+	  switch (Declaration_KEY(d)) {
+	  case KEYtop_level_match:
+	    {
+	      Match m = top_level_match_m(d);
+	      push_attr_context(m);
+	      Block body = matcher_body(top_level_match_m(d));
+	      dump_Block(body,dump_attr_assign,decl,cpps);
+	      pop_attr_context(cpps);
+	    }
+	    break;
+	  default:
+	    break;
 	  }
-	  break;
+	}
+	if (inh) {
+	  cpps << "  }\n";
+	}
+	if (direction_is_collection(attribute_decl_direction(decl))) {
+	  cpps << "  return collection;\n";
+	} else switch (Default_KEY(attribute_decl_default(decl))) {
 	default:
+	  cpps << "  throw UndefinedAttributeException(std::string(\""
+	       << name << " of \")+anode);\n";
+	  break;
+	case KEYsimple:
+	  cpps << "  return ";
+	  dump_Expression(simple_value(attribute_decl_default(decl)),cpps);
+	  cpps << ";\n";
 	  break;
 	}
+	cpps << "}\n";
       }
-      if (inh) {
-	cpps << "  }\n";
-      }
-      if (direction_is_collection(attribute_decl_direction(decl))) {
-	cpps << "  return collection;\n";
-      } else switch (Default_KEY(attribute_decl_default(decl))) {
-      default:
-	cpps << "  throw UndefinedAttributeException(string(\""
-	     << name << " of \")+anode);\n";
-	break;
-      case KEYsimple:
-	cpps << "  return ";
-	dump_Expression(simple_value(attribute_decl_default(decl)),cpps);
-	cpps << ";\n";
-	break;
-      }
-      cpps << "}\n";
 
 
       hs << "  ";
@@ -1595,8 +1557,16 @@ void dump_cpp_Declaration(Declaration decl,Declaration context,
 	hs << ";\n" << endl; 
 	dump_function_prototype(prefix,name,attribute_decl_type(decl),cpps);
       }
-      cpps << " { return a_" << name << "->evaluate(v_";
-      cpps << decl_name(af) << "); }\n" << endl; 
+      cpps << " {\n";
+      if (static_schedule) {
+	if (inline_definitions) hs << "    ";
+	cpps << "  finish();\n";
+      }
+      if (inline_definitions) hs << "    ";
+      cpps << "  return a_" << name << "->evaluate(v_";
+      cpps << decl_name(af) << ");\n";
+      if (inline_definitions) hs << "    ";
+      cpps << "}\n" << endl; 
     }
     break;
   case KEYfunction_decl:
@@ -1604,7 +1574,7 @@ void dump_cpp_Declaration(Declaration decl,Declaration context,
       Type fty = function_decl_type(decl);
       Declaration rdecl = first_Declaration(function_type_return_values(fty));
       Block b = function_decl_body(decl);
-      if (context) hs << "public:\n  ";
+      if (context) hs << "  ";
       dump_function_prototype(empty_string,name,fty,hs);
       if (!inline_definitions) {
 	hs << ";\n" << endl;
@@ -1637,7 +1607,7 @@ void dump_cpp_Declaration(Declaration decl,Declaration context,
 	if (inline_definitions) cpps << "  ";
 	cpps << "}\n" << endl;
       } else {
-	cout << name << " has no body.\n";
+	// cout << name << " has no body.\n";
 	if (inline_definitions) hs << ";\n";
 	// 3. nothing -- leave to native code
       }
@@ -1652,49 +1622,37 @@ void dump_cpp_Declaration(Declaration decl,Declaration context,
       hs << "template <";
       for (Declaration f=first_Declaration(tfs); f; f=DECL_NEXT(f)) {
 	if (started) hs << ","; else started = true;
-	hs << "class T_" << decl_name(f);
+	hs << "class C_" << decl_name(f);
       }
       hs << ">\nstruct C_" << name << "{\n";
       for (Declaration f=first_Declaration(tfs); f; f=DECL_NEXT(f)) {
-	hs << "  ";
-	dump_Signature(make_type_use(0,f),some_type_formal_sig(f),hs);
+	char *tfn = decl_name(f);
+	hs << "  typedef typename C_" << tfn << "::T_Result T_" << tfn << ";\n";
+      }
+      for (Declaration f=first_Declaration(tfs); f; f=DECL_NEXT(f)) {
+	hs << "  C_" << decl_name(f);
 	hs << " *t_" << decl_name(f) << ";\n";
       }
+      ostringstream is;
+      is << " ";
+
       for (Declaration d=first_Declaration(body); d; d=DECL_NEXT(d)) {
-	dump_cpp_Declaration(d,decl,hs,hs);
+	dump_cpp_Declaration(d,output_streams(decl,hs,hs,is));
       }
       hs << "  C_" << name << "(";
       started = false;
       for (Declaration f=first_Declaration(tfs); f; f=DECL_NEXT(f)) {
 	if (started) hs << ","; else started = true;
-	dump_Signature(make_type_use(0,f),some_type_formal_sig(f),hs);
-	hs << " *_" << decl_name(f);
+	hs << "C_" << decl_name(f)
+	   << " *_" << decl_name(f);
       }
       hs << ") : ";
       started = false;
       for (Declaration f=first_Declaration(tfs); f; f=DECL_NEXT(f)) {
-	if (started) hs << ","; else started = true;
+	if (started) hs << ",\n    "; else started = true;
 	hs << "t_" << decl_name(f) << "(_" << decl_name(f) << ")";
       }
-      for (Declaration d=first_Declaration(body); d; d=DECL_NEXT(d)) {
-	switch (Declaration_KEY(d)) {
-	case KEYvalue_renaming:
-	  if (Type_KEY(infer_expr_type(value_renaming_old(d)))
-	      == KEYfunction_type)
-	    break;
-	  hs << ", v_" << def_name(declaration_def(d)) << "(";
-	  dump_Expression(value_renaming_old(d),hs);
-	  hs << ")";
-	  break;
-	case KEYfunction_decl:
-	case KEYpolymorphic:
-	  break;
-	case KEYpragma_call:
-	  break;
-	default:
-	  aps_error(d,"not generating code for %s",decl_name(d));
-	}
-      }
+      hs << is.str();
       hs << " {}\n};\n\n";
     }
     --inline_definitions;
@@ -1708,7 +1666,7 @@ void dump_cpp_Declaration(Declaration decl,Declaration context,
       if (Type_KEY(ty) == KEYfunction_type) {
 	Declaration ff = first_Declaration(function_type_formals(ty));
 	if (ff && Declaration_KEY(ff) == KEYseq_formal) break;
-	if (context) hs << " public:\n  ";
+	if (context) hs << "  ";
 	hs << "inline ";
 	dump_function_prototype(empty_string,name,ty,hs);
 	hs << " { return ";
@@ -1723,12 +1681,15 @@ void dump_cpp_Declaration(Declaration decl,Declaration context,
 	dump_Expression(funcall(old,as),hs);
 	hs << "; }\n";
       } else {
-	if (context) hs << " public:\n  ";
+	if (context) hs << "  ";
 	dump_Type(ty,hs);
 	hs << " v_" << name;
 	if (context) {
 	  // initialization done by module:
 	  hs << ";\n" << endl;
+	  is << ",\n    v_" << name << "(";
+	  dump_Expression(old,is);
+	  is << ")";
 	} else {
 	  if (!inline_definitions) {
 	    hs << ";\n" << endl;	
@@ -1742,14 +1703,33 @@ void dump_cpp_Declaration(Declaration decl,Declaration context,
     }
     break;
   case KEYtype_renaming:
-    /*! hack */
-    hs << "#define T_" << name << " ";
-    dump_Type(type_renaming_old(decl),hs);
-    hs << "\n#define t_" << name << " ";
-    dump_Type_value(type_renaming_old(decl),hs);
-    hs << "\n" << endl;
+    {
+      Type old = type_renaming_old(decl);
+      if (context) hs << "  ";
+      hs << "typedef ";
+      dump_Type_signature(old,hs);
+      hs << " C_" << name << ";\n";
+      if (context) hs << "  ";
+      hs << "typedef ";
+      dump_Type(old,hs);
+      hs << " T_" << name << ";\n";
+      if (context) hs << "  ";
+      hs << "C_" << name << " *t_" << name << ";\n";
+      if (!context) {
+	cpps << "C_" << name << " *t_" << name << " = ";
+	dump_Type_value(old,cpps);
+      }
+      if (context) {
+	is << ",\n    t_" << name << "(";
+	dump_Type_value(old,is);
+	is << ")";
+      }
+    }
     break;
   case KEYpragma_call:
+    break;
+  case KEYpattern_decl:
+    //! patterns not implemented
     break;
   default:
     cout << "Not handling declaration " << decl_name(decl) << endl;
@@ -1821,6 +1801,34 @@ void dump_Module(Module t, ostream& o)
   }
 }
 
+void dump_TypeEnvironment(TypeEnvironment*, ostream&os);
+
+bool no_type_is_phylum(Type ty) 
+{
+  Declaration decl = (Declaration)tnode_parent(ty);
+  if (ABSTRACT_APS_tnode_phylum(decl) == KEYDeclaration) {
+    switch (Declaration_KEY(decl)) {
+    case KEYtype_decl:
+      return false;
+    case KEYphylum_decl:
+      return true;
+    default:
+      break;
+    }
+  }
+  aps_error(decl,"no_type occurs in a strange place");
+  return false;
+}
+
+// use a sloppy global variable to avoid rewriting code
+static int type_prefix = 0;
+void dump_Type_prefixed(Type t, ostream&o)
+{
+  ++type_prefix;
+  dump_Type(t,o);
+  --type_prefix;
+}
+
 void dump_Type(Type t, ostream& o)
 {
   switch (Type_KEY(t)) {
@@ -1830,7 +1838,9 @@ void dump_Type(Type t, ostream& o)
       Declaration tdecl = USE_DECL(u);
       switch (Declaration_KEY(tdecl)) {
       default:
-	o << get_prefix(tdecl);
+	dump_TypeEnvironment(USE_TYPE_ENV(u),o);
+	if (type_prefix)
+	  o << get_prefix(tdecl);
 	/* FALL THROUGH */
       case KEYsome_type_formal:
 	o << "T_" << decl_name(tdecl);
@@ -1840,15 +1850,16 @@ void dump_Type(Type t, ostream& o)
     break;
   case KEYtype_inst:
     {
-      dump_Module(type_inst_module(t),o);
       Declaration mdecl = USE_DECL(module_use_use(type_inst_module(t)));
       TypeActuals tacts = type_inst_type_actuals(t);
+      if (inline_definitions) o << "typename ";
+      dump_Module(type_inst_module(t),o);
       bool started = false;
       FOR_SEQUENCE
 	(Type,tact,TypeActuals,tacts,
 	 if (started) o << ",";
 	 else { o << "<"; started = true; }
-	 dump_Type(tact,o));
+	 dump_Type_signature(tact,o));
       if (started) o << ">";
       o << "::T_" << decl_name(module_decl_result_type(mdecl));
     }
@@ -1860,7 +1871,11 @@ void dump_Type(Type t, ostream& o)
     dump_Type(private_type_rep(t),o);
     break;
   case KEYno_type:
-    o << "Node*"; //? not sure
+    if (no_type_is_phylum(t)) {
+      o << "C_PHYLUM::Node*";
+    } else {
+      o << "C_TYPE::Node*";
+    }
     break;
   case KEYfunction_type:
     {
@@ -1940,18 +1955,8 @@ void dump_Type_value(Type t, ostream& o)
     break;
   case KEYno_type:
     {
-      Declaration decl = (Declaration)tnode_parent(t);
-      if (ABSTRACT_APS_tnode_phylum(decl) == KEYDeclaration) {
-	switch (Declaration_KEY(decl)) {
-	case KEYtype_decl:
-	  o << "new C_TYPE()";
-	  break;
-	case KEYphylum_decl:
-	  o << "new C_PHYLUM()";
-	  break;
-	default:
-	  o << "new C_TYPE()";
-	}
+      if (no_type_is_phylum(t)) {
+	o << "new C_PHYLUM()";
       } else {
 	o << "new C_TYPE()";
       }
@@ -1978,6 +1983,67 @@ void dump_Default(Default d, ostream& o)
   }
 }
 
+bool funcall_is_collection_construction(Expression e)
+{
+  static SYMBOL braces = intern_symbol("{}");
+
+  switch (Expression_KEY(funcall_f(e))) {
+  default:
+    break;
+  case KEYvalue_use:
+    {
+      Use u = value_use_use(funcall_f(e));
+      Symbol sym = 0;
+      switch (Use_KEY(u)) {
+      case KEYuse:
+	sym = use_name(u);
+	break;
+      case KEYqual_use:
+	sym = qual_use_name(u);
+	break;
+      }
+      if (sym == braces) return true;
+    }
+    break;
+  }
+  return false;
+}
+
+void dump_collect_Actuals(Type ctype, Actuals as, ostream& o)
+{
+  switch (Actuals_KEY(as)) {
+  case KEYnil_Actuals:
+    dump_Type_value(ctype,o);
+    o << "->v_none()";
+    break;
+  case KEYlist_Actuals:
+    {
+      Expression e = list_Actuals_elem(as);
+      /* Handle a special case of sequence expression: */
+      if (Expression_KEY(e) == KEYrepeat) {
+	Expression seq = repeat_expr(e);
+	if (base_type_equal(infer_expr_type(seq),ctype)) {
+	  dump_Expression(seq,o);
+	  return;
+	}
+	/* Fall through and cause error */
+      }
+      dump_Type_value(ctype,o);
+      o << "->v_single(";
+      dump_Expression(list_Actuals_elem(as),o);
+      o << ")";
+    }
+    break;
+  case KEYappend_Actuals:
+    dump_Type_value(ctype,o);
+    o << "->v_append(";
+    dump_collect_Actuals(ctype,append_Actuals_l1(as),o);
+    o << ",";
+    dump_collect_Actuals(ctype,append_Actuals_l2(as),o);
+    o << ")";
+  }
+}
+
 void dump_Expression(Expression e, ostream& o)
 {
   switch (Expression_KEY(e)) {
@@ -1988,6 +2054,11 @@ void dump_Expression(Expression e, ostream& o)
     o << string_const_token(e);
     break;
   case KEYfuncall:
+    if (funcall_is_collection_construction(e)) {
+      // inline code to call append, single and null constructors
+      dump_collect_Actuals(infer_expr_type(e),funcall_actuals(e),o);
+      return;
+    }
     dump_Expression(funcall_f(e),o);
     o << "(";
     {
@@ -2016,65 +2087,65 @@ void dump_Expression(Expression e, ostream& o)
   }
 }
 
+static void dump_TypeContour(TypeContour *tc, bool instance, ostream& os) 
+{
+  if (!instance && inline_definitions) os << "typename ";
+  os << "C_";
+  os << decl_name(tc->source);
+  vector<Type> type_actuals;
+  switch (Declaration_KEY(tc->source)) {
+  case KEYpolymorphic:
+    {
+      int n=0;
+      for (Declaration f=first_Declaration(tc->type_formals);
+	   f; f=DECL_NEXT(f))
+	++n;
+      for (int i=0; i < n; ++i) {
+	type_actuals.push_back(tc->u.inferred[i]);
+      }
+    }
+    break;
+  case KEYmodule_decl:
+    for (Type ta = first_TypeActual(tc->u.type_actuals);
+	 ta ; ta = TYPE_NEXT(ta)) {
+      type_actuals.push_back(ta);
+    }
+    break;
+  default:
+    fatal_error("%d: Not a source", tnode_line_number(tc->source));
+  }
+
+  bool started = false;
+  for (unsigned i=0; i < type_actuals.size(); ++i) {
+    if (started) os << ","; else { os << "< "; started = true;}
+    dump_Type_signature(type_actuals[i],os);
+  }
+  if (started) os << ">";
+  if (instance) {
+    started = false;
+    for (unsigned i=0; i < type_actuals.size(); ++i) {
+      if (started) os << ","; else { os << "("; started = true;}
+      dump_Type_value(type_actuals[i],os);
+    }
+    if (started) os << ")";
+  }
+}
+
 static void dump_poly_inst(Use u, TypeEnvironment type_env, ostream& os)
 {
   if (type_env == 0) return;
   if (!type_env->source || Declaration_KEY(type_env->source) != KEYpolymorphic) return;
   dump_poly_inst(u,type_env->outer,os);
-  os << "C_";
-  os << def_name(polymorphic_def(type_env->source));
-  os << "<";
-  int n=0;
-  for (Declaration f=first_Declaration(type_env->type_formals);
-       f; f=DECL_NEXT(f))
-    ++n;
-  bool started = false;
-  for (int i=0; i < n; ++i) {
-    Type t = type_env->u.inferred[i];
-    if (t == 0) {
-      aps_error(u,"incomplete unification");
-      os << "UNKNOWN";
-      continue;
-    }
-    if (started) os << ","; else started = true;
-    dump_Type(t,os);
-  }
-  os << ">(";
-  started = false;
-  Declaration tf = first_Declaration(type_env->type_formals);
-  for (int i=0; i < n; ++i) {
-    Type t = type_env->u.inferred[i];
-    if (t == 0) continue;
-    if (started) os << ","; else started = true;
-    os << "(";
-    dump_Signature(t,sig_subst(u,some_type_formal_sig(tf)),os);
-    os << "*)(";
-    dump_Type_value(t,os);
-    os << ")";
-    tf = DECL_NEXT(tf);
-  }
-  os << ").";
+  dump_TypeContour(type_env,true,os);
+  os << ".";
 }
 
-void dump_TypeEnvironments(Use u, ostream&os)
+void dump_TypeEnvironment(TypeEnvironment te, ostream&os)
 {
-  TypeEnvironment te = USE_TYPE_ENV(u);
-  while (te && Declaration_KEY(te->source) == KEYpolymorphic)
-    te = te->outer;
   if (!te) return;
-  os << "C_" << decl_name(te->source);
-  bool started = false;
-  if (Declaration_KEY(te->source) == KEYclass_decl) {
-    os << "< ";
-    dump_Type(make_type_use(type_envs_nested(u),te->result),os);
-    started = true;
-  }
-  for (Type ta = first_TypeActual(te->u.type_actuals);
-       ta ; ta = TYPE_NEXT(ta)) {
-    if (started) os << ","; else { os << "< "; started = true;}
-    dump_Type(ta,os);
-  }
-  if (started) os << " >";
+  dump_TypeEnvironment(te->outer,os);
+  dump_TypeContour(te,false,os);
+  os << "::";
 }
 
 void dump_Use(Use u, char *prefix, ostream& os)
@@ -2086,11 +2157,7 @@ void dump_Use(Use u, char *prefix, ostream& os)
     break;
   case KEYqual_use:
     {
-      os << "((";
-      dump_TypeEnvironments(u,os);
-      os << "*)";
       dump_Type_value(qual_use_from(u),os);
-      os << ")";
       os << "->";
       sym = qual_use_name(u);
       break;
