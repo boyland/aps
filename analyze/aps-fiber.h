@@ -68,6 +68,7 @@ extern int fiber_debug;
 #define PUSH_FIBER 4
 #define FIBER_INTRO 8
 #define FIBER_FINAL 16
+#define CALLSITE_INFO 32 
 
 /* useful routines */
 
