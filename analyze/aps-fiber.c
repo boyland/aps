@@ -817,12 +817,23 @@ void *initialize_fibersets(void *statep, void *node) {
 			  &expr_fiberset_for(object,FIBERSET_NORMAL_REQUIRE));
 	} else if (direction_is_collection(attribute_decl_direction(field))) {
 	  if (fiber_debug & FIBER_INTRO) 
-	    printf("%d: found field assign of %s\n",tnode_line_number(expr),
+	    printf("%d: found field collect of %s\n",tnode_line_number(expr),
 		   decl_name(field));
 	  add_to_fiberset(lengthen_fiber(field,base_fiber),
 			  object,
 			  FIBERSET_REVERSE_PROVIDE,
 			  &expr_fiberset_for(object,FIBERSET_REVERSE_PROVIDE));
+	} else {
+	  if (fiber_debug & FIBER_INTRO) 
+	    printf("%d: found field assign of %s\n",tnode_line_number(expr),
+		   decl_name(field));
+	  /* force field to be required
+	   * otherwise, instance often cannot be found.
+	   */
+	  add_to_fiberset(lengthen_fiber(field,base_fiber),
+			  object,
+			  FIBERSET_NORMAL_REQUIRE,
+			  &expr_fiberset_for(object,FIBERSET_NORMAL_REQUIRE));
 	}
       } else if (gdecl != NULL) {
 	/* A shared use is implicitly of the form:
@@ -1139,6 +1150,7 @@ static void *add_fiberset_to_shared_info(void *fsp, void *node) {
 	  Declaration rhs_decl = top_level_match_first_rhs_decl(tdecl);
 	  if (forward_p) {
 	    /* move from lhs to rhs */
+	    /* printf("pushing shared info fiber forward\n"); */
 	    if (node_decl_phylum(lhs_decl) == phylum) {
 	      for (; rhs_decl != NULL; rhs_decl = next_rhs_decl(rhs_decl)) {
 		Declaration phy = node_decl_phylum(rhs_decl);
@@ -1191,16 +1203,26 @@ static void *add_fiberset_to_shared_use(void *fsp, void *node) {
 	  if (DECL_IS_SHARED(sdecl) &&
 	      Declaration_KEY(sdecl) == KEYvalue_decl &&
 	      (!FIELD_DECL_IS_UNTRACKED(sdecl) ||
-	       !DECL_IS_SHARED(fs->fiber->field)) &&
-	      ((FORWARD_FLOW_P(fstype) && EXPR_IS_RHS(expr)) ||
-	       (BACKWARD_FLOW_P(fstype) && EXPR_IS_LHS(expr)))) {
-	    Declaration field =
-	      ((fstype & FIBERSET_TYPE_REVERSE != 0)||
-	       FIELD_DECL_IS_UNTRACKED(sdecl))
-		?sdecl:reverse_field(sdecl);
-	    int fallthrough = FALSE;
+	       !DECL_IS_SHARED(fs->fiber->field))) {
+	    Declaration field = /* but see below */
+	      EXPR_IS_LHS(expr) ? reverse_field(sdecl) : sdecl;
 	    int fstype2 = EXPR_IS_LHS(expr) ?
 	      (fstype ^ FIBERSET_TYPE_REVERSE) : fstype;
+
+	    int fallthrough = FALSE;
+
+	    if (fstype & FIBERSET_TYPE_REVERSE)
+	      field = reverse_field(field);
+
+	    if (fiber_debug & PUSH_FIBER) {
+	      printf("%d:adding ",tnode_line_number(expr));
+	      print_fiberset_entry(fs,stdout);
+	      printf(" (field %s) to shared %s use of %s\n",
+		     decl_name(field),
+		     EXPR_IS_LHS(expr) ? "lhs" : "rhs",
+		     decl_name(sdecl));
+	    }
+
 	    switch (shorten(field,fs->fiber)) {
 	    case no_shorter: break;
 	    case two_shorter:
@@ -1414,6 +1436,7 @@ static void push_fiber(FIBERSET fs, Declaration module, STATE *state) {
 	    shared_info_state = state;
 	    switch (Declaration_KEY(phy)) {
 	    case KEYphylum_decl:
+	      /* printf("shared info for phylum %s\n",decl_name(phy)); */
 	      traverse_Declaration(add_fiberset_to_shared_info,fs,module);
 	      break;
 	    case KEYsome_function_decl:
@@ -1427,25 +1450,29 @@ static void push_fiber(FIBERSET fs, Declaration module, STATE *state) {
 	      }
 	      break;
 	    }
-	    /* for forward flow, transfer to RHS shared uses
-	     * for backward flow, transfer to LHS shared uses
+	    /*
+	     * for forward flow:
+	     *   with field: interested in RHS shared uses.
+	     *   with reverse field: interested in LHS shared uses.
+	     * for backward flow: uninterested
 	     */
-	    /* if (fs->fiber->shorter != base_fiber) */
-	    switch (Declaration_KEY(phy)) {
-	    case KEYphylum_decl:
-	      /* find shared uses in the top level matches for this phylum */
-	      for (i=0; i < state->match_rules.length; ++i) {
-		Declaration tlm = state->match_rules.array[i];
-		if (Declaration_KEY(tlm) == KEYtop_level_match) {
-		  Declaration node = responsible_node_declaration(tlm);
-		  if (node_decl_phylum(node) == phy)
-		    traverse_Declaration(add_fiberset_to_shared_use,fs,tlm);
+	    if (FORWARD_FLOW_P(fstype)) {
+	      switch (Declaration_KEY(phy)) {
+	      case KEYphylum_decl:
+		/* find shared uses in the top level matches for this phylum */
+		for (i=0; i < state->match_rules.length; ++i) {
+		  Declaration tlm = state->match_rules.array[i];
+		  if (Declaration_KEY(tlm) == KEYtop_level_match) {
+		    Declaration node = responsible_node_declaration(tlm);
+		    if (node_decl_phylum(node) == phy)
+		      traverse_Declaration(add_fiberset_to_shared_use,fs,tlm);
+		  }
 		}
+		break;
+	      case KEYsome_function_decl:
+		traverse_Declaration(add_fiberset_to_shared_use,fs,phy);
+		break;
 	      }
-	      break;
-	    case KEYsome_function_decl:
-	      traverse_Declaration(add_fiberset_to_shared_use,fs,phy);
-	      break;
 	    }
 	  }
 	} else {
@@ -1486,8 +1513,24 @@ static void push_fiber(FIBERSET fs, Declaration module, STATE *state) {
 	 */
 	void *parent = tnode_parent(expr);
 	switch (ABSTRACT_APS_tnode_phylum(parent)) {
-	default: fatal_error("%d:unexpected parent phylum",
-			     tnode_line_number(parent));
+	default: fatal_error("%d:unexpected parent phylum:%d",
+			     tnode_line_number(parent),
+			     ABSTRACT_APS_tnode_phylum(parent));
+	case KEYExpression:
+	  { Expression expr = (Expression)parent;
+	    switch (Expression_KEY(expr)) {
+	    default:
+	      fatal_error("%d:unexpected parent expression:%d",
+			  tnode_line_number(parent),
+			  Expression_KEY(expr));
+	      break;
+	    case KEYrepeat:
+	      add_to_fiberset(fs->fiber,expr,fstype,
+			      &expr_fiberset_for(expr,fstype));
+	      break;
+	    }
+	  }
+	  break;
 	case KEYPattern:
 	  /*!! for now */
 	  break;
@@ -1652,19 +1695,36 @@ static void push_fiber(FIBERSET fs, Declaration module, STATE *state) {
 				object, fstype2,
 				&expr_fiberset_for(object,fstype2));
 	      } else { /* direct field */
+		/* Direct field accesses are handled specially.
+		 * Ideally, they would simply be a simplification of
+		 * collect assigns, (in which case we would reverse the 
+		 * fiberset type and then move back to the creation point
+		 * where the fiberset would be reversed again.
+		 * But they aren't.  
+		 * Thus we need to move the information directly to
+		 * the declaration.  I think it is OK that that
+		 * this information doesn't land on the constructor, but I'm
+		 * not sure (2002/5/24)
+		 */
 		Declaration odecl;
 		switch (Expression_KEY(object)) {
+		default: fatal_error("%d: too complex direct field access",
+				     tnode_line_number(object));
 		case KEYvalue_use:
 		  odecl = USE_DECL(value_use_use(object));
-		  if (odecl != NULL) {
-		    add_to_fiberset(lengthen_fiber(field,fs->fiber),
-				    odecl,fstype, /* not fstype2 !! */
-				    &fiberset_for(odecl,fstype));
-		    break;
-		  }
-		  /* fall through */
-		default: fatal_error("%d: bad direct field access",
-				     tnode_line_number(object));
+		  break;
+		case KEYfuncall:
+		  odecl = attr_ref_p(object);
+		  if (odecl == NULL) odecl = field_ref_p(object);
+		  break;
+		}
+		if (odecl != NULL) {
+		  add_to_fiberset(lengthen_fiber(field,fs->fiber),
+				  odecl,fstype, /* not fstype2 !! */
+				  &fiberset_for(odecl,fstype));
+		} else {
+		  fatal_error("%d: unknown direct field access",
+			      tnode_line_number(object));		  
 		}
 	      }
 	    } else if ((decl = attr_ref_p(expr)) != NULL) {
@@ -1840,7 +1900,17 @@ void print_fiberset_entry(FIBERSET fs, FILE *stream) {
 	    Expression func = funcall_f(expr);
 	    switch (Expression_KEY(func)) {
 	    case KEYvalue_use:
-	      printf(" of %s(...)",symbol_name(use_name(value_use_use(func))));
+	      {
+		Use u = value_use_use(func);
+		switch (Use_KEY(u)) {
+		case KEYuse:
+		  printf(" of %s(...)",symbol_name(use_name(u)));
+		  break;
+		case KEYqual_use:
+		  printf(" of ...$%s(...)",symbol_name(qual_use_name(u)));
+		  break;
+		}
+	      }
 	      break;
 	    }
 	  }
