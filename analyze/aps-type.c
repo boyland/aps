@@ -318,7 +318,7 @@ Type infer_expr_type(Expression e)
     check_expr_type(append_s2(e),ty);
     break;
   case KEYrepeat:
-    ty = infer_expr_type(repeat_expr(e));
+    ty = infer_element_type(repeat_expr(e));
     break;
   case KEYguarded:
     ty = infer_expr_type(guarded_expr(e));
@@ -406,7 +406,7 @@ void check_expr_type(Expression e, Type type)
     check_expr_type(append_s2(e),type);
     break;
   case KEYrepeat:
-    check_expr_type(repeat_expr(e),type);
+    check_element_type(repeat_expr(e),type);
     break;
   case KEYguarded:
     check_expr_type(guarded_expr(e),type);
@@ -497,6 +497,12 @@ Type infer_element_type(Expression e)
 {
   Type st = infer_expr_type(e);
   return type_element_type(st);
+}
+
+void check_element_type(Expression e, Type type)
+{
+  /* For now, just be lazy */
+  check_type_equal(e,type,infer_element_type(e));
 }
 
 /* check actuals, possibly side-effecting type_env.
