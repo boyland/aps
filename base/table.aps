@@ -1,0 +1,6 @@
+-- attempt to define tables in APS
+module TABLE[KeyType :: BASIC[]; ValueType :: BASIC[]] :: COMBINABLE[] begin
+  constructor table_entry(key : KeyType; val : ValueType) : Result;
+  function select(table : Result; key : KeyType) : Result := table;
+  function arbitrary(table : Result) : ValueType;
+end;
