@@ -1,21 +1,25 @@
-#include <stdio.h>
-extern "C" {
-#include "../aps/string.h"
-}
-#include "/usr/include/string.h"
 #include <iostream>
 #include <cctype>
 #include <stack>
 #include <map>
 #include <sstream>
 #include <vector>
+#include <string>
+
 extern "C" {
 #include "aps-ag.h"
 String get_code_name(Symbol);
 }
+
 #include "dump-cpp.h"
 
 using namespace std;
+
+using std::string;
+
+// extra decl_flags flags:
+#define LOCAL_ATTRIBUTE_FLAG (1<<24)
+#define IMPLEMENTED_PATTERN_VAR (1<<25)
 
 extern int aps_yylineno;
 
@@ -238,6 +242,204 @@ static void push_attr_context(void *node)
   }
 }
 
+// Output code to test if pattern matches node (no binding)
+// As a side-effect, information is left in place to enable
+// dump_Pattern_bindings to work.
+void dump_Pattern_cond(Pattern p, string node, ostream& os);
+
+void dump_seq_function(Type et, Type st, string func_name, ostream& os) 
+{
+  os << "C__basic_";
+  if (func_name == "first" || func_name == "last") {
+    os << "16";
+  } else if (func_name == "butfirst" || func_name == "butlast") {
+    os << "17";
+  } else if (func_name == "length" || func_name == "empty") {
+    os << "22";
+  }
+  os << "<";
+  dump_Type_signature(et,os);
+  os << ",";
+  dump_Type_signature(st,os);
+  os << ">(";
+  dump_Type_value(et,os);
+  os << ",";
+  dump_Type_value(st,os);
+  os << ").v_" << func_name;
+}
+
+void dump_seq_Pattern_cond(Pattern pa, Type st, string node, ostream& os)
+{
+  if (pa == 0) {
+    dump_seq_function(st,type_element_type(st),"empty",os);
+    os << "(" << node << ")";
+  } else {
+    Pattern next_pa = PAT_NEXT(pa);
+    switch (Pattern_KEY(pa)) {
+    case KEYrest_pattern:
+      if (Pattern_KEY(rest_pattern_constraint(pa)) != KEYno_pattern) {
+	aps_error(pa,"Cannot handle complicated ... patterns");
+      }
+      if (next_pa) {
+	if (PAT_NEXT(next_pa)) {
+	  aps_error(next_pa,"Sequence pattern too complicated for now");
+	} else {
+	  ostringstream ns;
+	  dump_seq_function(infer_pattern_type(pa),st,"last",ns);
+	  ns << "(" << node << ")";	  
+	  dump_Pattern_cond(next_pa,ns.str(),os);
+	}
+      } else {
+	os << "true";
+      }
+      break;
+    default:
+      {
+	ostringstream ns;
+	dump_seq_function(infer_pattern_type(pa),st,"first",ns);
+	ns << "(" << node << ")";	
+	dump_Pattern_cond(pa,ns.str(),os);
+	os << "&&";
+	ostringstream rs;
+	dump_seq_function(infer_pattern_type(pa),st,"butfirst",rs);
+	rs << "(" << node << ")";
+	dump_seq_Pattern_cond(next_pa,st,rs.str(),os);
+      }
+      break;
+    }
+  }
+}
+
+void dump_Pattern_cond(Pattern p, string node, ostream& os) 
+{
+  switch (Pattern_KEY(p)) {
+  default:
+    aps_error(p,"Cannot implement this kind of pattern");
+    break;
+  case KEYmatch_pattern:
+    os << node << "->type==";
+    dump_Type_value(match_pattern_type(p),os);
+    os <<"->get_type() && ";
+    dump_Pattern_cond(match_pattern_pat(p),node,os);
+    break;
+  case KEYpattern_call:
+    {
+      static Symbol seq_symbol = intern_symbol("{}");
+      Pattern pf = pattern_call_func(p);
+      Type rt = infer_pattern_type(p);
+      Type pft = infer_pattern_type(pf);
+      PatternActuals pactuals = pattern_call_actuals(p);
+      Use pfuse;
+      switch (Pattern_KEY(pf)) {
+      default:
+	aps_error(p,"cannot find constructor (can only handle ?x=f(...) or f(...)");
+	return;
+      case KEYpattern_use:
+	pfuse = pattern_use_use(pf);
+	break;
+      }
+      Declaration pfdecl = USE_DECL(pfuse);
+      if (def_name(declaration_def(pfdecl)) == seq_symbol) {
+	dump_seq_Pattern_cond(first_PatternActual(pactuals),rt,node,os);
+	return;
+      } else if (Declaration_KEY(pfdecl) != KEYconstructor_decl) {
+	aps_error(pfuse,"Cannot handle calls to pattern functions");
+	return;
+      }
+      os << node << "->cons==";
+      dump_Use(pfuse,"c_",os);
+
+      ostringstream ts;
+      ts << "((";
+      dump_TypeEnvironment(USE_TYPE_ENV(pfuse),ts);
+      ts << "V_" << decl_name(pfdecl) << "*)" << node << ")";
+      string typed_node = ts.str();
+
+      Pattern pa = first_PatternActual(pactuals);
+      Declaration pff = first_Declaration(function_type_formals(pft));
+      for ( ; pa && pff; pa = PAT_NEXT(pa), pff = DECL_NEXT(pff)) {
+	os << "&&";
+	dump_Pattern_cond(pa,typed_node+"->v_"+decl_name(pff),os);
+      }
+    }
+    break;
+  case KEYand_pattern:
+    dump_Pattern_cond(and_pattern_p1(p),node,os);
+    os <<"&&";
+    dump_Pattern_cond(and_pattern_p2(p),node,os);
+    break;
+  case KEYpattern_var:
+    {
+      Declaration f = pattern_var_formal(p);
+      static Symbol underscore_symbol = intern_symbol("_");
+      if (def_name(formal_def(f)) != underscore_symbol) {
+	Declaration_info(f)->decl_flags |= IMPLEMENTED_PATTERN_VAR;
+	struct Pattern_info *pi = Pattern_info(p);
+	pi->pat_impl = new string();
+	*((string *)pi->pat_impl) = node;
+      }
+      os << "true";
+    }
+    break;
+  case KEYcondition:
+    dump_Expression(condition_e(p),os);
+    break;
+  }
+}
+
+// Print out the bindings to be generated by a pattern match.
+// (Can only be called after dump_Pattern_cond)
+void dump_Pattern_bindings(Pattern p, ostream& os)
+{
+  switch (Pattern_KEY(p)) {
+  default:
+    aps_error(p,"Cannot handle this kind of pattern");
+    break;
+  case KEYmatch_pattern:
+    dump_Pattern_bindings(match_pattern_pat(p),os);
+    break;
+  case KEYpattern_call:
+    for (Pattern pa = first_PatternActual(pattern_call_actuals(p));
+	 pa; pa=PAT_NEXT(pa)) {
+      dump_Pattern_bindings(pa,os);
+    }
+    break;
+  case KEYrest_pattern:
+    break;
+  case KEYand_pattern:
+    dump_Pattern_bindings(and_pattern_p1(p),os);
+    dump_Pattern_bindings(and_pattern_p2(p),os);
+    break;
+  case KEYpattern_var:
+    {
+      Declaration f = pattern_var_formal(p);
+      if (Declaration_info(f)->decl_flags & IMPLEMENTED_PATTERN_VAR) {
+	Declaration_info(f)->decl_flags &= ~IMPLEMENTED_PATTERN_VAR;
+	struct Pattern_info *pi = Pattern_info(p);
+	string *ps = (string *)pi->pat_impl;
+	pi->pat_impl = 0;
+	os << indent();
+	dump_Typed_decl(infer_formal_type(f),f,"v_",os);
+	os << " = " << *ps << ";\n";
+	delete ps;
+      }
+    }
+    break;
+  case KEYcondition:
+    break;
+  }
+}
+
+string matcher_bindings(string node, Match m)
+{
+  Pattern p = matcher_pat(m);
+  ostringstream os1, os2;
+  dump_Pattern_cond(p,node,os1);
+  dump_Pattern_bindings(p,os2);
+  // ignore os1 contents
+  return os2.str();
+}
+
 static void dump_context_open(void *c, ostream& os) {
   switch (ABSTRACT_APS_tnode_phylum(c)) {
   case KEYDeclaration:
@@ -262,11 +464,13 @@ static void dump_context_open(void *c, ostream& os) {
 	return;
       case KEYfor_stmt:
 	{
+	  //!! Doesn't work.
 	  Type ty = infer_expr_type(for_stmt_expr(decl));
 	  os << indent() << "{ ";
 	  dump_Type(ty,os);
 	  os << " node = ";
 	  dump_Expression(for_stmt_expr(decl),os);
+	  os << ";\n";
 	  os << indent() << "Constructor* cons = node->cons;\n";
 	}
 	return;
@@ -321,6 +525,13 @@ static void dump_context_open(void *c, ostream& os) {
     {
       Match m = (Match)c;
       Pattern p = matcher_pat(m);
+      os << indent() << "if (";
+      dump_Pattern_cond(p,"node",os);
+      os << ") {\n";
+      start_indent+=2;
+      dump_Pattern_bindings(p,os);
+      start_indent-=2;
+#ifdef UNDEF
       Use pfuse;
       switch (Pattern_KEY(p)) {
       case KEYand_pattern:
@@ -372,6 +583,7 @@ static void dump_context_open(void *c, ostream& os) {
 	os << " v_" << decl_name(rd) << " = n->v_"
 	   << decl_name(cf) << ";\n";
       }
+#endif
       return;
     }
   default:
@@ -967,6 +1179,264 @@ void dump_Type_service_transfers(ServiceRecord& sr,
   }
 }
 
+void dump_local_attribute(Declaration d, Type at, Declaration context,
+			  String prefix, const output_streams& oss)
+{
+  ostream& hs = oss.hs;
+  ostream& cpps = oss.cpps;
+  ostream& is = oss.is;
+  // ostream& bs = inline_definitions ? hs : cpps;
+
+  char *name = decl_name(d);
+  int i = Declaration_info(d)->instance_index; // unique number
+  Type lt = value_decl_type(d);
+	
+      
+  hs << " private:\n"
+     << "  class A" << i << "_" << name << " : public Attribute<";
+  dump_Type_signature(at,hs);
+  hs << ",";
+  dump_Type_signature(lt,hs);
+  hs << "> {\n";
+  hs << "    C_" << decl_name(context) << "* context;\n";
+  hs << "  public:\n";
+  hs << "    A" << i << "_" << name << "(C_" << decl_name(context) << "*c,";
+  dump_Type_signature(at,hs);
+  hs << " *nt, ";
+  dump_Type_signature(lt,hs);
+  hs << " *vt)";
+  if (!inline_definitions) {
+    hs << ";\n";
+    cpps << "\n" << prefix << "A" << i << "_" << name
+	 << "::A" << i << "_" << name
+	 << "(C_" << decl_name(context) << "*c,";
+    dump_Type_signature(at,cpps);
+    cpps << " *nt, ";
+    dump_Type_signature(lt,cpps);
+    cpps << " *vt)";
+  }
+  cpps << " : Attribute<";
+  dump_Type_signature(at,cpps);
+  cpps << ",";
+  dump_Type_signature(lt,cpps);
+  cpps << ">(nt,vt,\"local " << i << "(" << name << ")\"), context(c) {}\n";
+  hs << "    ";
+  dump_Type(lt,hs);
+  hs << " compute(";
+  dump_Type(at,hs);
+  hs << " node)";
+  if (!inline_definitions) {
+    hs << ";\n";
+    dump_Type(lt,cpps);
+    cpps << " " << prefix << "A" << i << "_" << name << "::compute(";
+    dump_Type(at,cpps);
+    cpps << " node)";
+  }
+  cpps << "{ return context->c" << i << "_" << name << "(node); }\n";
+  hs << "};\n public:\n";
+
+  hs << "  A" << i << "_" << name << " *a" << i << "_" << name << ";\n";
+      
+  is << ",\n    a" << i << "_" << name << "(new A" << i << "_" << name << "(";
+  is << "this,";
+  dump_Type_value(at,is);
+  is << ",";
+  dump_Type_value(lt,is);
+  is << "))";
+}
+
+// record where we found a local attribute 
+// (used in dynamic scheduling only)
+struct LocalAttribute {
+  Declaration local;
+  Block block;
+  string context_bindings; // string of local declarations from "anchor"
+  LocalAttribute(Declaration l, Block b, string cb)
+    : local(l), block(b), context_bindings(cb) {}
+};
+
+vector<LocalAttribute> local_attributes;
+
+void dump_local_attributes(Block b, Type at, Declaration context,
+			   string bindings, String prefix,
+			   const output_streams& oss)
+{
+  for (Declaration d = first_Declaration(block_body(b)); d; d=DECL_NEXT(d)) {
+    switch (Declaration_KEY(d)) {
+    default:
+      aps_error(d,"Cannot handle this kind of statement");
+    case KEYvalue_decl:
+      // only for dynamic scheduling:
+      assert(static_schedule == false);
+      Declaration_info(d)->instance_index = local_attributes.size();
+      Declaration_info(d)->decl_flags |= LOCAL_ATTRIBUTE_FLAG;
+      local_attributes.push_back(LocalAttribute(d,b,bindings));
+      dump_local_attribute(d,at,context,prefix,oss);
+      break;
+    case KEYassign:
+      break;
+    case KEYblock_stmt:
+      dump_local_attributes(block_stmt_body(d),at,context,bindings,prefix,oss);
+      break;
+    case KEYif_stmt:
+      dump_local_attributes(if_stmt_if_true(d),at,context,bindings,prefix,oss);
+      dump_local_attributes(if_stmt_if_false(d),at,context,bindings,prefix,oss);
+      break;
+    case KEYcase_stmt:
+      {
+	Expression expr = case_stmt_expr(d);
+	static int unique = 0;
+	ostringstream cns;
+	cns << "cn" << ++unique;
+	string cn = cns.str();
+
+	ostringstream ns;
+	ns << "  "; if (inline_definitions) ns << "  ";
+	dump_Type(infer_expr_type(expr),ns);
+	ns << " " << cn << " = ";
+	dump_Expression(expr,ns);
+	ns << ";\n";
+	string more_bindings = bindings + ns.str();
+
+	FOR_SEQUENCE
+	  (Match,m,Matches,case_stmt_matchers(d),
+	   dump_local_attributes(matcher_body(m),at,context,
+				 more_bindings + matcher_bindings(cn,m),
+				 prefix,oss));
+	// don't need "cn" in default branch:
+	dump_local_attributes(case_stmt_default(d),at,context,bindings,prefix,oss);
+      }
+      break;
+    }
+  }
+}
+
+void implement_local_attributes(String prefix, const output_streams& oss)
+{
+  ostream& hs = oss.hs;
+  ostream& cpps = oss.cpps;
+  // ostream& is = oss.is;
+  ostream& bs = inline_definitions ? hs : cpps;
+
+  int n = local_attributes.size();
+  for (int i=0; i <n; ++i) {
+    Declaration d = local_attributes[i].local;
+    Block b = local_attributes[i].block;
+    char *name = decl_name(d);
+    hs << "  ";
+    dump_Type(value_decl_type(d),hs);
+    hs << " c" << i << "_" << name << "(C_PHYLUM::Node* anchor)";
+    if (!inline_definitions) {
+      hs << ";\n";
+      dump_Type_prefixed(value_decl_type(d),cpps);
+      cpps << " " << prefix << "c" << i << "_" << name 
+	   << "(C_PHYLUM::Node* anchor)";
+    }
+    bs << " {\n";
+    bs << local_attributes[i].context_bindings;
+    bs << "\n"; // blank line
+    dump_Block(b,dump_attr_assign,d,bs);
+    if (inline_definitions) hs << "  ";
+    if (direction_is_collection(value_decl_direction(d))) {
+      bs << "  return collection;\n";
+    } else switch (Default_KEY(value_decl_default(d))) {
+    default:
+      bs << "  throw UndefinedAttributeException(\"local " << i << "("
+	 << name << ")\");\n";
+      break;
+    case KEYsimple:
+      bs << "  return ";
+      dump_Expression(simple_value(value_decl_default(d)),bs);
+      bs << ";\n";
+      break;
+    }
+    if (inline_definitions) hs << "  ";
+    bs << "}\n";
+  }
+}
+
+void implement_attributes(Declaration first_decl, Declaration context,
+			  const output_streams& oss)
+{
+  ostream& hs = oss.hs;
+  ostream& cpps = oss.cpps;
+  // ostream& is = oss.is;
+  ostream& bs = inline_definitions ? hs : cpps;
+
+  if (!first_decl) return;
+
+  String prefix = get_prefix(first_decl);
+
+  for (Declaration decl = first_decl; decl; decl=DECL_NEXT(decl)) {
+    if (Declaration_KEY(decl) != KEYattribute_decl) continue;
+    char *name = decl_name(decl);
+    Declarations afs = function_type_formals(attribute_decl_type(decl));
+    Declaration af = first_Declaration(afs);
+    Type at = formal_type(af);
+    // Declaration pd = USE_DECL(type_use_use(at));
+    Declarations rdecls = function_type_return_values(attribute_decl_type(decl));
+    Type rt = value_decl_type(first_Declaration(rdecls));
+    bool inh = (ATTR_DECL_IS_INH(decl) != 0);
+    
+    if (!static_schedule) {
+      hs << "  "; dump_Type(rt,hs); hs << " c_" << name << "(";
+      dump_Type(at,hs);
+      hs << " anode)";
+      if (!inline_definitions) {
+	hs << ";\n";
+	dump_Type(rt,cpps);
+	cpps << " " << prefix << "c_" << name << "(";
+	dump_Type(at,cpps);
+	cpps << " anode)";
+      }
+      bs << " {\n";  if (inline_definitions) hs << "  ";
+      if (inh) {
+	bs << "  C_PHYLUM::Node* node=anode->parent;\n";
+	bs << "  if (node != 0) {\n";
+      } else {
+	bs << "  C_PHYLUM::Node* node = anode;\n";
+      }
+      if (inline_definitions) hs << "  ";
+      bs << "  C_PHYLUM::Node* anchor = node;\n";
+      if (inline_definitions) hs << "  ";
+      bs << "  Constructor* cons = node->cons;\n";
+      for (Declaration d=first_Declaration(block_body(module_decl_contents(context)));
+	   d != NULL; d = DECL_NEXT(d)) {
+	switch (Declaration_KEY(d)) {
+	case KEYtop_level_match:
+	  {
+	    Match m = top_level_match_m(d);
+	    push_attr_context(m);
+	    Block body = matcher_body(top_level_match_m(d));
+	    dump_Block(body,dump_attr_assign,decl,bs);
+	    pop_attr_context(bs);
+	  }
+	  break;
+	default:
+	  break;
+	}
+      }
+      if (inh) {
+	bs << "  }\n";
+      }
+      if (direction_is_collection(attribute_decl_direction(decl))) {
+	bs << "  return collection;\n";
+      } else switch (Default_KEY(attribute_decl_default(decl))) {
+      default:
+	bs << "  throw UndefinedAttributeException(std::string(\""
+	     << name << " of \")+anode);\n";
+	break;
+      case KEYsimple:
+	bs << "  return ";
+	dump_Expression(simple_value(attribute_decl_default(decl)),bs);
+	bs << ";\n";
+	break;
+      }
+      bs << "}\n";
+    }
+  }
+}
+
 void dump_cpp_Declaration(Declaration decl,const output_streams& oss)
 {
   ostream& hs = oss.hs;
@@ -1095,9 +1565,16 @@ void dump_cpp_Declaration(Declaration decl,const output_streams& oss)
 	}
       }
 
-      is << "\n    /* body over */"; is.flush();
+      //is << "\n    /* body over */"; is.flush();
 
       first_decl = first_Declaration(body); // result is special
+      if (static_schedule) {
+	// schedule_attributes();
+	fatal_error("static scheduling not implemented");
+      } else {
+	implement_local_attributes(prefix,oss);
+	implement_attributes(first_decl,decl,oss);
+      }
 
       // The normal default constructor header:
       hs << "\n  C_" << name << "(";
@@ -1430,7 +1907,6 @@ void dump_cpp_Declaration(Declaration decl,const output_streams& oss)
       // Declaration pd = USE_DECL(type_use_use(at));
       Declarations rdecls = function_type_return_values(attribute_decl_type(decl));
       Type rt = value_decl_type(first_Declaration(rdecls));
-      bool inh = (ATTR_DECL_IS_INH(decl) != 0);
       
       hs << " private:\n";
       hs << "  class A_" << name << " : public Attribute<";
@@ -1493,63 +1969,6 @@ void dump_cpp_Declaration(Declaration decl,const output_streams& oss)
       is << ",";
       dump_Type_value(rt,is);
       is << "))";
-
-      if (static_schedule) {
-	hs << "  };\n";
-      } else {
-	hs << "  "; dump_Type(rt,hs); hs << " c_" << name << "(";
-	dump_Type(at,hs);
-	hs << " anode)";
-	if (!inline_definitions) {
-	  hs << ";\n";
-	  dump_Type(rt,cpps);
-	  cpps << " " << prefix << "c_" << name << "(";
-	  dump_Type(at,cpps);
-	  cpps << " anode)";
-	}
-	cpps << " {\n";
-	if (inh) {
-	  cpps << "  C_PHYLUM::Node* node=anode->parent;\n";
-	  cpps << "  if (node != 0) {\n";
-	} else {
-	  cpps << "  C_PHYLUM::Node* node = anode;\n";
-	}
-	cpps << "  Constructor* cons = node->cons;\n";
-	for (Declaration d=first_Declaration(block_body(module_decl_contents(context)));
-	     d != NULL; d = DECL_NEXT(d)) {
-	  switch (Declaration_KEY(d)) {
-	  case KEYtop_level_match:
-	    {
-	      Match m = top_level_match_m(d);
-	      push_attr_context(m);
-	      Block body = matcher_body(top_level_match_m(d));
-	      dump_Block(body,dump_attr_assign,decl,cpps);
-	      pop_attr_context(cpps);
-	    }
-	    break;
-	  default:
-	    break;
-	  }
-	}
-	if (inh) {
-	  cpps << "  }\n";
-	}
-	if (direction_is_collection(attribute_decl_direction(decl))) {
-	  cpps << "  return collection;\n";
-	} else switch (Default_KEY(attribute_decl_default(decl))) {
-	default:
-	  cpps << "  throw UndefinedAttributeException(std::string(\""
-	       << name << " of \")+anode);\n";
-	  break;
-	case KEYsimple:
-	  cpps << "  return ";
-	  dump_Expression(simple_value(attribute_decl_default(decl)),cpps);
-	  cpps << ";\n";
-	  break;
-	}
-	cpps << "}\n";
-      }
-
 
       hs << "  ";
       dump_function_prototype(empty_string,name,attribute_decl_type(decl),hs);
@@ -1644,13 +2063,13 @@ void dump_cpp_Declaration(Declaration decl,const output_streams& oss)
       for (Declaration f=first_Declaration(tfs); f; f=DECL_NEXT(f)) {
 	if (started) hs << ","; else started = true;
 	hs << "C_" << decl_name(f)
-	   << " *_" << decl_name(f);
+	   << " *_t_" << decl_name(f);
       }
       hs << ") : ";
       started = false;
       for (Declaration f=first_Declaration(tfs); f; f=DECL_NEXT(f)) {
 	if (started) hs << ",\n    "; else started = true;
-	hs << "t_" << decl_name(f) << "(_" << decl_name(f) << ")";
+	hs << "t_" << decl_name(f) << "(_t_" << decl_name(f) << ")";
       }
       hs << is.str();
       hs << " {}\n};\n\n";
@@ -1658,6 +2077,16 @@ void dump_cpp_Declaration(Declaration decl,const output_streams& oss)
     --inline_definitions;
     break;
   case KEYtop_level_match:
+    if (!static_schedule) {
+      Match m = top_level_match_m(decl);
+      Declaration cdecl = top_level_match_constructor_decl(decl);
+      Type ct = constructor_decl_type(cdecl);
+      Declaration rdecl = first_Declaration(function_type_return_values(ct));
+      Type anchor_type = value_decl_type(rdecl);
+      Block body = matcher_body(m);
+      dump_local_attributes(body,anchor_type,context,
+			    matcher_bindings("anchor",m),prefix,oss);
+    }
     break;
   case KEYvalue_renaming:
     {
@@ -1736,13 +2165,16 @@ void dump_cpp_Declaration(Declaration decl,const output_streams& oss)
   }
 }
 
-void dump_Matches(Matches ms, ASSIGNFUNC f, void*arg, ostream&os)
+void dump_Matches(Matches ms, bool exclusive, ASSIGNFUNC f, void*arg, ostream&os)
 {
   FOR_SEQUENCE
     (Match,m,Matches,ms,
      push_attr_context(m);
      dump_Block(matcher_body(m),f,arg,os);
-     pop_attr_context(os));
+     bool need_else = attr_context_started >= attr_context_depth;
+     pop_attr_context(os);
+     if (exclusive && need_else) os << indent() << "else\n";
+     );
 }
 
 void dump_Block(Block b,ASSIGNFUNC f,void*arg,ostream&os)
@@ -1769,17 +2201,20 @@ void dump_Block(Block b,ASSIGNFUNC f,void*arg,ostream&os)
      case KEYcase_stmt:
        push_attr_context(d);
        //!! we implement case and for!!
-       dump_Matches(case_stmt_matchers(d),f,arg,os);
+       dump_Matches(case_stmt_matchers(d),true,f,arg,os);
+       os << indent() << "{\n"; // because of "else"
        dump_Block(case_stmt_default(d),f,arg,os);
+       os << indent() << "}\n";
        pop_attr_context(os);
        break;
      case KEYfor_stmt:
        push_attr_context(d);
-       dump_Matches(for_stmt_matchers(d),f,arg,os);
+       dump_Matches(for_stmt_matchers(d),false,f,arg,os);
        pop_attr_context(os);
        break;
      case KEYvalue_decl:
-       if (depends_on(arg,d,b)) {
+       if (!(Declaration_info(d)->decl_flags & LOCAL_ATTRIBUTE_FLAG) &&
+	   depends_on(arg,d,b)) {
 	 dump_local_decl(arg,d,os);
        }
        break;
@@ -2077,7 +2512,18 @@ void dump_Expression(Expression e, ostream& o)
     o << ")";
     break;
   case KEYvalue_use:
-    dump_Use(value_use_use(e),"v_",o);
+    {
+      Use u = value_use_use(e);
+      Declaration d = USE_DECL(u);
+      if (Declaration_info(d)->decl_flags & LOCAL_ATTRIBUTE_FLAG) {
+	o << "a" << Declaration_info(d)->instance_index << "_"
+	  << decl_name(d) << "->evaluate(anchor)";
+      } else if (Declaration_info(d)->decl_flags & IMPLEMENTED_PATTERN_VAR) {
+	o << *((string*)(Pattern_info((Pattern)tnode_parent(d))->pat_impl));
+      } else {
+	dump_Use(u,"v_",o);
+      }
+    }
     break;
   case KEYtyped_value:
     dump_Expression(typed_value_expr(e),o);
@@ -2118,6 +2564,9 @@ static void dump_TypeContour(TypeContour *tc, bool instance, ostream& os)
   bool started = false;
   for (unsigned i=0; i < type_actuals.size(); ++i) {
     if (started) os << ","; else { os << "< "; started = true;}
+    if (type_actuals[i] == 0) {
+      fatal_error("insufficient type inference");
+    }
     dump_Type_signature(type_actuals[i],os);
   }
   if (started) os << ">";
