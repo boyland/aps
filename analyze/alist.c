@@ -40,3 +40,7 @@ BOOL setassoc(void *key, void *value, ALIST alist) {
   }
   return NOT_OK;
 }
+
+void *alist_key(ALIST a) { return a->key; }
+void *alist_value(ALIST a) { return a->value; }
+ALIST alist_next(ALIST a) { return a->next; }
