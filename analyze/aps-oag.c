@@ -331,29 +331,38 @@ void compute_oag(Declaration module, STATE *s) {
   int j;
   for (j=0; j < s->phyla.length; ++j) {
     schedule_summary_dependency_graph(&s->phy_graphs[j]);
-  }
 
-  /* now perform closure */
-  {
-    int saved_analysis_debug = analysis_debug;
-    int j;
+    /* now perform closure */
+    {
+      int saved_analysis_debug = analysis_debug;
+      int j;
 
-    if (oag_debug & TYPE_3_DEBUG) {
-      analysis_debug |= TWO_EDGE_CYCLE;
+      if (oag_debug & TYPE_3_DEBUG) {
+	analysis_debug |= TWO_EDGE_CYCLE;
+      }
+
+      if (analysis_debug & DNC_ITERATE) {
+	printf("\n**** After OAG schedule for phylum %d:\n\n",j);
+      }
+
+      if (analysis_debug & ASSERT_CLOSED) {
+	for (j=0; j < s->match_rules.length; ++j) {
+	  printf("Checking rule %d\n",j);
+	  assert_closed(&s->aug_graphs[j]);
+	}
+      }
+
+      dnc_close(s);
+
+      analysis_debug = saved_analysis_debug;
     }
-
     if (analysis_debug & DNC_ITERATE) {
-      printf("\n**** After introduction of OAG schedule:\n\n");
+      printf ("\n*** After closure after schedule OAG phylum %d\n\n",j);
+      print_analysis_state(s,stdout);
+      print_cycles(s,stdout);
     }
-
-    for (j=0; j < s->match_rules.length; ++j) {
-      printf("Checking rule %d\n",j);
-      assert_closed(&s->aug_graphs[j]);
-    }
-
-    dnc_close(s);
-
-    analysis_debug = saved_analysis_debug;
+      
+    if (analysis_state_cycle(s)) break;
   }
 
   if (!analysis_state_cycle(s)) {
