@@ -33,3 +33,15 @@ void Implementation::ModuleInfo::note_attribute_decl(Declaration ad,
 {
   attribute_decls.push_back(ad);
 }
+
+static void *clear_impl_marks(void *ignore, void *node) {
+  if (ABSTRACT_APS_tnode_phylum(node) == KEYDeclaration) {
+    Declaration_info((Declaration)node)->decl_flags &= ~IMPLEMENTATION_MARKS;
+  }
+  return ignore;
+}
+
+void clear_implementation_marks(Declaration d) {
+  int nothing;
+  traverse_Declaration(clear_impl_marks,&nothing,d);
+}
