@@ -96,23 +96,33 @@ int worklist_length(AUG_GRAPH *aug_graph) {
   return i;
 }
 
+void check_two_edge_cycle(EDGESET new_edge, AUG_GRAPH *aug_graph);
+
 void add_to_worklist(EDGESET node, AUG_GRAPH *aug_graph) {
-  if (aug_graph != NULL && node->next_in_edge_worklist == NULL) {
-    if (aug_graph->worklist_tail != node) {
-      if (analysis_debug & WORKLIST_CHANGES) {
-	printf("Worklist gets %d ",worklist_length(aug_graph)+1);
-	print_edgeset(node,stdout);
-      }
-      if (aug_graph->worklist_tail == NULL) {
-	if (aug_graph->worklist_head != NULL)
-	  fatal_error("Worklist head is wrong!");
-	aug_graph->worklist_head = node;
-      } else {
-	if (aug_graph->worklist_head == NULL)
-	  fatal_error("Worklist head is NULL");
-	aug_graph->worklist_tail->next_in_edge_worklist = node;
-      }
-      aug_graph->worklist_tail = node;
+  /* First check if
+   * (1) we actually have an aug_graph
+   * (2) the edge isn't already in the list
+   *     in which case it points to another edge or is the tail
+   */
+  if (aug_graph != NULL &&
+      node->next_in_edge_worklist == NULL &&
+      aug_graph->worklist_tail != node) {
+    if (analysis_debug & WORKLIST_CHANGES) {
+      printf("Worklist gets %d ",worklist_length(aug_graph)+1);
+      print_edgeset(node,stdout);
+    }
+    if (aug_graph->worklist_tail == NULL) {
+      if (aug_graph->worklist_head != NULL)
+	fatal_error("Worklist head is wrong!");
+      aug_graph->worklist_head = node;
+    } else {
+      if (aug_graph->worklist_head == NULL)
+	fatal_error("Worklist head is NULL");
+      aug_graph->worklist_tail->next_in_edge_worklist = node;
+    }
+    aug_graph->worklist_tail = node;
+    if (analysis_debug & TWO_EDGE_CYCLE) {
+      check_two_edge_cycle(node, aug_graph);
     }
   }
 }
@@ -286,6 +296,48 @@ void add_transitive_edge_to_graph(INSTANCE *source,
   add_edge_to_graph(source,sink,&cond,kind,aug_graph);
 }
     
+void close_using_edge(AUG_GRAPH *aug_graph, EDGESET edge);
+
+void check_two_edge_cycle(EDGESET new_edge, AUG_GRAPH *aug_graph)
+{
+  /* First find the set of edges in the opposite direction */
+  INSTANCE *source = new_edge->source;
+  INSTANCE *sink = new_edge->sink;
+  int oindex = sink->index*(aug_graph->instances.length)+source->index;
+  EDGESET others = aug_graph->graph[oindex];
+  static EDGESET recursive = 0;
+
+  /* Now see if any of them cause a cycle with the given edge */
+  for (; others != NULL; others=others->rest) {
+    DEPENDENCY kind = dependency_trans(new_edge->kind,others->kind);
+    CONDITION cond;
+
+    if (kind == no_dependency) continue;
+
+    cond.positive = new_edge->cond.positive | others->cond.positive;
+    cond.negative = new_edge->cond.negative | others->cond.negative;
+    if (cond.positive & cond.negative) continue;
+
+    /* found a two edge cycle */
+
+    printf("Found a two-edge cycle: \n  ");
+    print_edge(new_edge,stdout); fputs("  ",stdout);
+    print_edge(others,stdout);
+
+    if (recursive) {
+      printf("Caused by previous add: \n  ");
+      print_edge(recursive,stdout);
+    }
+  }
+
+  /* force transitive edges */
+  if (!recursive) {
+    recursive = new_edge;
+    close_using_edge(aug_graph,new_edge);
+    recursive = 0;
+  }
+}
+
 
 /*** AUXILIARY FUNCTIONS FOR IFS ***/
 
@@ -1279,8 +1331,9 @@ static void record_expression_dependencies(INSTANCE *sink, CONDITION *cond,
 	  }
 
 	  /* attach to result, and somewhere else ? attach actuals */
-	  printf("%d: looking at local function %s\n",
-		 tnode_line_number(e),decl_name(decl));
+	  /* printf("%d: looking at local function %s\n",
+	   *	 tnode_line_number(e),decl_name(decl));
+	   */
 	  {
 	    Declaration proxy = Expression_info(e)->funcall_proxy;
 	    Declaration rd = some_function_decl_result(decl);
@@ -2238,15 +2291,28 @@ static void synchronize_dependency_graphs(AUG_GRAPH *aug_graph,
       int aug_index = i*n + j;
       int sum_index = (i-start)*phy_n + (j-start);
       DEPENDENCY kind=edgeset_kind(aug_graph->graph[aug_index]);
-      if (!AT_MOST(kind,phy_graph->mingraph[sum_index])) {
+      if (!AT_MOST(dependency_indirect(kind),
+		   phy_graph->mingraph[sum_index])) {
 	kind = dependency_indirect(kind); //! more precisely DNC artificial
 	kind = dependency_join(kind,phy_graph->mingraph[sum_index]);
+	if (kind == phy_graph->mingraph[sum_index]) {
+	  fatal_error("kind computation broken");
+	}
 	if (analysis_debug & SUMMARY_EDGE) {
 	  printf("Adding to summary edge %d: ",kind);
 	  print_instance(source,stdout);
 	  printf(" -> ");
 	  print_instance(sink,stdout);
 	  printf("\n");
+	}
+	if (analysis_debug & TWO_EDGE_CYCLE) {
+	  if (phy_graph->mingraph[(j-start)*phy_n+(i-start)]) {
+	    printf("Found summary two edge cycle: ");
+	    print_instance(source,stdout);
+	    printf(" <-> ");
+	    print_instance(sink,stdout);
+	    printf("\n");
+	  }
 	}
 	phy_graph->mingraph[sum_index] = kind;
 	/*?? put on a worklist somehow ? */
@@ -2347,7 +2413,7 @@ void augment_dependency_graph(AUG_GRAPH *aug_graph) {
 		       aug_graph,aug_graph->match_rule);
 }
 
-static void close_using_edge(AUG_GRAPH *aug_graph, EDGESET edge) {
+void close_using_edge(AUG_GRAPH *aug_graph, EDGESET edge) {
   int i,j;
   int source_index = edge->source->index;
   int sink_index = edge->sink->index;
@@ -2381,28 +2447,55 @@ static void close_using_edge(AUG_GRAPH *aug_graph, EDGESET edge) {
   }
 }
 
+/* A very slow check, hence optional.
+ * O(n^3*2^c) where 'n' is the number of instances.
+ * (for reasonable non-toy examples, n can be > 100).
+ * The 2^c term rarely contributes much.
+ * Activate with -D0 (zero)
+ */
+void assert_closed(AUG_GRAPH *aug_graph) {
+  int n = aug_graph->instances.length;
+  int n2 = n*n;
+  int i;
+
+  assert(aug_graph->worklist_head == NULL);
+
+  for (i=0; i < n2; ++i) {
+    EDGESET es = aug_graph->graph[i];
+    for (; es != NULL; es = es->rest) {
+      close_using_edge(aug_graph,es);
+      assert(aug_graph->worklist_head == NULL);
+    }
+  }
+}
+
 /* return whether any changes were noticed */
 BOOL close_augmented_dependency_graph(AUG_GRAPH *aug_graph) {
   augment_dependency_graph(aug_graph);
   if (aug_graph->worklist_head == NULL) {
     if (analysis_debug & DNC_ITERATE)
       printf("Worklist is empty\n");
+    if (analysis_debug & ASSERT_CLOSED) assert_closed(aug_graph);
     return FALSE;
   }
 
   while (aug_graph->worklist_head != NULL) {
-    EDGESET edge=aug_graph->worklist_head;
-    aug_graph->worklist_head = edge->next_in_edge_worklist;
-    if (aug_graph->worklist_tail == edge) {
-      if (edge->next_in_edge_worklist != NULL)
-	fatal_error("worklist out of whack!");
-      aug_graph->worklist_tail = NULL;
+    while (aug_graph->worklist_head != NULL) {
+      EDGESET edge=aug_graph->worklist_head;
+      aug_graph->worklist_head = edge->next_in_edge_worklist;
+      if (aug_graph->worklist_tail == edge) {
+	if (edge->next_in_edge_worklist != NULL)
+	  fatal_error("worklist out of whack!");
+	aug_graph->worklist_tail = NULL;
+      }
+      edge->next_in_edge_worklist = NULL;
+      close_using_edge(aug_graph,edge);
     }
-    edge->next_in_edge_worklist = NULL;
-    close_using_edge(aug_graph,edge);
+    
+    augment_dependency_graph(aug_graph);
   }
 
-  augment_dependency_graph(aug_graph);
+  if (analysis_debug & ASSERT_CLOSED) assert_closed(aug_graph);
   return TRUE;
 }
 
@@ -2462,11 +2555,10 @@ DEPENDENCY analysis_state_cycle(STATE *s) {
   return kind;
 }
 
-STATE *compute_dnc(Declaration module) {
-  STATE *s=(STATE *)HALLOC(sizeof(STATE));
+void dnc_close(STATE*s) {
   int i,j;
   BOOL changed;
-  init_analysis_state(s,module);
+
   for (i=0; ; ++i) {
     if (analysis_debug & DNC_ITERATE) {
       printf("*** AFTER %d ITERATIONS ***\n",i);
@@ -2489,8 +2581,14 @@ STATE *compute_dnc(Declaration module) {
     }
     if (!changed) break;
   }
+}
+
+STATE *compute_dnc(Declaration module) {
+  STATE *s=(STATE *)HALLOC(sizeof(STATE));
+  init_analysis_state(s,module);
+  dnc_close(s);
   if (analysis_debug & (DNC_ITERATE|DNC_FINAL)) {
-    printf("*** FINAL ANALYSIS STATE ***\n");
+    printf("*** FINAL DNC STATE ***\n");
     print_analysis_state(s,stdout);
     print_cycles(s,stdout);
   }
@@ -2501,6 +2599,7 @@ STATE *compute_dnc(Declaration module) {
 /*** DEBUGGING OUTPUT ***/
 
 void print_attrset(ATTRSET s, FILE *stream) {
+  if (stream == 0) stream = stdout;
   fputc('{',stream);
   while (s != NULL) {
     fputs(symbol_name(def_name(declaration_def(s->attr))),stream);
@@ -2511,6 +2610,7 @@ void print_attrset(ATTRSET s, FILE *stream) {
 }
 
 void print_instance(INSTANCE *i, FILE *stream) {
+  if (stream == 0) stream = stdout;
   if (i->node != NULL) {
     if (ABSTRACT_APS_tnode_phylum(i->node) != KEYDeclaration) {
       fprintf(stream,"%d:?<%d>",tnode_line_number(i->node),
@@ -2556,6 +2656,7 @@ void print_instance(INSTANCE *i, FILE *stream) {
 }
 
 void print_edge_helper(EDGESET e, FILE* stream) {
+  if (stream == 0) stream = stdout;
   switch (e->kind) {
   case no_dependency: fputc('!',stream); break;
   case indirect_control_fiber_dependency:
@@ -2574,6 +2675,7 @@ void print_edge_helper(EDGESET e, FILE* stream) {
 }
 
 void print_edge(EDGESET e, FILE *stream) {
+  if (stream == 0) stream = stdout;
   print_instance(e->source,stream);
   fputs("->",stream);
   print_instance(e->sink,stream);
@@ -2583,6 +2685,7 @@ void print_edge(EDGESET e, FILE *stream) {
 }
   
 void print_edgeset(EDGESET e, FILE *stream) {
+  if (stream == 0) stream = stdout;
   if (e != NULL) {
     EDGESET tmp=e;
     print_instance(e->source,stream);
@@ -2644,6 +2747,7 @@ char *aug_graph_name(AUG_GRAPH *aug_graph) {
 }
 
 void print_aug_graph(AUG_GRAPH *aug_graph, FILE *stream) {
+  if (stream == 0) stream = stdout;
   fputs("Augmented dependency graph for ",stream);
   switch (Declaration_KEY(aug_graph->match_rule)) {
   case KEYtop_level_match:
@@ -2709,6 +2813,7 @@ void print_phy_graph(PHY_GRAPH *phy_graph, FILE *stream) {
   int j=0;
   int n=phy_graph->instances.length;
   
+  if (stream == 0) stream = stdout;
   fprintf(stream,"\nSummary dependency graph for %s\n",
 	  symbol_name(def_name(declaration_def(phy_graph->phylum))));
   for (i=0; i < n; ++i) {
@@ -2728,6 +2833,7 @@ void print_phy_graph(PHY_GRAPH *phy_graph, FILE *stream) {
 
 void print_analysis_state(STATE *s, FILE *stream) {
   int i;
+  if (stream == 0) stream = stdout;
   fprintf(stream,"Analysis state for %s\n",
 	  symbol_name(def_name(declaration_def(s->module))));
   print_aug_graph(&s->global_dependencies,stream);
@@ -2741,6 +2847,7 @@ void print_analysis_state(STATE *s, FILE *stream) {
 
 void print_cycles(STATE *s, FILE *stream) {
   int i,j;
+  if (stream == 0) stream = stdout;
   /** test for cycles **/
   for (i=0; i < s->phyla.length; ++i) {
     BOOL fiber_cycle = FALSE;
