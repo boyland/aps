@@ -34,7 +34,7 @@ void schedule_summary_dependency_graph(PHY_GRAPH *phy_graph) {
 	  for (j=0; j < n; ++j) { /* force extra dependencies */
 	    int sch = phy_graph->summary_schedule[j];
 	    if (sch != 0 && sch != -phase)
-	      phy_graph->mingraph[j*n+i] = fiber_dependency;
+	      phy_graph->mingraph[j*n+i] = indirect_control_dependency;
 	  }
 	  if (oag_debug & TOTAL_ORDER) {
 	    printf("%d- ",phase);
@@ -60,7 +60,7 @@ void schedule_summary_dependency_graph(PHY_GRAPH *phy_graph) {
 	  for (j=0; j < n; ++j) { /* force extra dependencies */
 	    int sch = phy_graph->summary_schedule[j];
 	    if (sch != 0 && sch != phase)
-	      phy_graph->mingraph[j*n+i] = fiber_dependency;
+	      phy_graph->mingraph[j*n+i] = indirect_control_dependency;
 	  }
 	  if (oag_debug & TOTAL_ORDER) {
 	    printf("%d+ ",phase);
