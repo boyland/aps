@@ -24,6 +24,22 @@ void aps_error(void *tnode, char *fmt, ...)
   ++aps_error_count;
 }  
 
+void aps_warning(void *tnode, char *fmt, ...)
+{
+  va_list args;
+  va_start(args,fmt);
+  
+  fflush(stdout);
+
+  (void)  fprintf(stderr, "%s.aps:%d:Warning: ",
+                  aps_yyfilename,tnode_line_number(tnode));
+  (void) vfprintf(stderr, fmt, args);
+  (void)  fprintf(stderr, "\n");
+  (void)   fflush(stderr);
+  
+  va_end(args);
+}  
+
 void aps_check_error(char *type)
 {
   if (aps_error_count) {
