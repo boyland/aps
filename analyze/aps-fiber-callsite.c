@@ -12,7 +12,7 @@ CALLSITE_SET next_cs = 1;
 int CallSiteNum = 0;
 VECTOR(CALLSITE_SET) refs;
   
-int SHOW_AI_INFO = 1;
+int SHOW_AI_INFO = 0;  /* (1/0) show/not show interim processing information */
 
 
 void nothing() {}
@@ -42,11 +42,15 @@ int callset_AI(Declaration module, STATE *s) {
 }
 
 
-/* wrap up the manipulations of CALLSITE_SET */
+/* wrap up the manipulations of type CALLSITE_SET */
 int callsite_set_empty_p(CALLSITE_SET css) {
   return (css==0);
 }
 
+CALLSITE_SET empty_callsite_set() {
+  return 0;
+}
+ 
 void INCLUDE(CALLSITE_SET* pDest, CALLSITE_SET source) {
   if(pDest != NULL && source != 0)
     *pDest |= source;
@@ -77,7 +81,6 @@ void* traverser(void *changed, void *node) {
       default: break;
       /* only inspect the assigments */
       case KEYassign:
-nothing();
         DEBUG_INFO("#%d", tnode_line_number(decl));
         {
         Expression lhs = assign_lhs(decl);
@@ -248,7 +251,7 @@ CALLSITE_SET interpret(void *node) {
 	          CALLSITE_SET sites = interpret(actual);
                   VECTOR(CALLSITE_SET)* pCS = Declaration_info(attr)->call_sites;
                   int i, dist;
-                  CALLSITE_SET newSites = 0;
+                  CALLSITE_SET newSites = empty_callsite_set();
                   for(i = 1, dist=0; i<next_cs; i<<=1,dist++)
                     if(sites&i) newSites |= pCS->array[dist];
                   return newSites;
@@ -368,7 +371,7 @@ void *init_things(void *dist, void *node) {
             {
             int i;
             for(i=0; i<sites->length; i++)
-            sites->array[i] = 0;
+            sites->array[i] = empty_callsite_set();
             }
           }
         else 
@@ -440,115 +443,3 @@ Declaration sth_use_p(Expression expr) {
 }
 
 
-/* 
- * following are a bunch of debug fuctions, 
- * totally deletable if there will be no other aps novice like yw
- */
-void *check_all_decls(void *nouse, void * node) {
-  switch (ABSTRACT_APS_tnode_phylum(node)) {
-  case KEYDeclaration:
-    { Declaration d = (Declaration)node;
-      decl_type(d); 
-    }
-    break;
-  }
-  return nouse;
-}
-
-void *check_all_assign(void *nouse, void * node) {
-  switch (ABSTRACT_APS_tnode_phylum(node)) {
-  case KEYDeclaration:
-    { Declaration decl = (Declaration)node;
-      switch (Declaration_KEY(decl)) {
-      case KEYassign:
-        DEBUG_INFO("#%d\t",
-                tnode_line_number(decl));
-        {
-        Expression lhs = assign_lhs(decl);
-        Expression rhs = assign_rhs(decl);
-        DEBUG_INFO("LHS=");
-        expr_type(lhs);
-        DEBUG_INFO("\tRHS=");
-        expr_type(rhs);
-        DEBUG_INFO("\n");
-        }
-      default: break;
-      }
-    }
-    break;
-  }
-  return nouse;
-}
-
-void decl_type(Declaration d) {
-  switch (Declaration_KEY(d)) {
-  case KEYprocedure_decl:	
-  	DEBUG_INFO("%d\tKEYprocedure_decl\t%s\n", tnode_line_number(d),decl_name(d)); break;
-  case KEYnormal_formal:	
-  	DEBUG_INFO("%d\tKEYnormal_formal\t%s\n", tnode_line_number(d),decl_name(d)); break;
-  case KEYno_decl:	
-  	DEBUG_INFO("%d\tKEYno_decl\n", tnode_line_number(d)); break;
-  case KEYclass_decl:	
-  	DEBUG_INFO("%d\tKEYclass_decl\n", tnode_line_number(d)); break;
-  case KEYmodule_decl:	
-  	DEBUG_INFO("%d\tKEYmodule_decl\n", tnode_line_number(d)); break;
-  case KEYphylum_decl:	
-  	DEBUG_INFO("%d\tKEYphylum_decl\n", tnode_line_number(d)); break;
-  case KEYtype_decl:	
-  	DEBUG_INFO("%d\tKEYtype_decl\n", tnode_line_number(d)); break;
-  case KEYvalue_decl:	
-  	DEBUG_INFO("%d\tKEYvalue_decl\t%s\n", tnode_line_number(d),decl_name(d)); break;
-  case KEYattribute_decl:	
-  	DEBUG_INFO("%d\tKEYattribute_decl\t%s\n", tnode_line_number(d), decl_name(d)); break;
-  case KEYfunction_decl:	
-  	DEBUG_INFO("%d\tKEYfunction_decl\t%s\n", tnode_line_number(d),decl_name(d)); break;
-  case KEYconstructor_decl:	
-  	DEBUG_INFO("%d\tKEYconstructor_decl\t%s\n", tnode_line_number(d),decl_name(d)); break;
-  case KEYpattern_decl:	
-  	DEBUG_INFO("%d\tKEYpattern_decl\n", tnode_line_number(d)); break;
-  case KEYnormal_assign:	
-  	DEBUG_INFO("%d\tKEYnormal_assign\t\n", tnode_line_number(d)); break;
-  case KEYcollect_assign:	
-  	DEBUG_INFO("%d\tcollect_assign\n", tnode_line_number(d)); break;
-  case KEYif_stmt:	
-  	DEBUG_INFO("%d\tKEYif_stmt\n", tnode_line_number(d)); break;
-  case KEYcase_stmt:	
-  	DEBUG_INFO("%d\tKEYcase_stmt\n", tnode_line_number(d)); break;
-  case KEYpragma_call:	
-  	DEBUG_INFO("%d\tKEYpragma_call\n", tnode_line_number(d)); break;
-  default:	break;
-  }
-}
-
-void value_use_decl_type(Expression e) {
-  switch (Expression_KEY(e)) {
-  case KEYvalue_use:
-    { Declaration decl = USE_DECL(value_use_use(e));
-      switch (Declaration_KEY(decl)) {
-	case KEYprocedure_decl:	DEBUG_INFO("KEYprocedure_decl\n"); break;
-	case KEYnormal_formal:	DEBUG_INFO("KEYnormal_formal\n"); break;
-        default:		DEBUG_INFO("other decl type\n"); break;
-      }
-    }
-  }
-}
-
-void expr_type(Expression e) {
-  switch (Expression_KEY(e)) {
-  case KEYvalue_use:		DEBUG_INFO("KEYvalue_use"); break;
-  case KEYtyped_value:		DEBUG_INFO("KEYtyped_value"); break;
-  case KEYfuncall:		DEBUG_INFO("KEYfuncall"); break;
-  case KEYpattern_value:	DEBUG_INFO("KEYpattern_value"); break;
-  case KEYinteger_const: 	DEBUG_INFO("KEYinteger_const"); break;
-  case KEYreal_const:		DEBUG_INFO("KEYreal_const"); break;
-  case KEYstring_const: 	DEBUG_INFO("KEYstring_const");break;
-  case KEYchar_const: 		DEBUG_INFO("KEYchar_const");break;
-  case KEYundefined: 		DEBUG_INFO("KEYundefined"); break;
-  case KEYno_expr: 		DEBUG_INFO("KEYno_expr"); break;
-  case KEYappend:		DEBUG_INFO("KEYappend"); break;
-  case KEYempty:		DEBUG_INFO("KEYempty"); break;
-  case KEYclass_value:		DEBUG_INFO("KEYclass_value"); break;
-  case KEYmodule_value:		DEBUG_INFO("KEYmodule_value"); break;
-  default:			DEBUG_INFO("Other expression type"); break;
-  }	        
-}
