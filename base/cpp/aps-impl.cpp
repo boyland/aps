@@ -134,8 +134,11 @@ T_String C_NULL_TYPE::v_string(Node *n) {
 
 C_NULL_PHYLUM::C_NULL_PHYLUM() : phylum(0) {}
   
+int aps_impl_lineno;
+
 C_NULL_PHYLUM::Node::Node(Constructor*c)
-  : C_NULL_TYPE::Node(c), index(((Phylum*)type)->install(this)) {}
+  : C_NULL_TYPE::Node(c), index(((Phylum*)type)->install(this)),
+    lineno(aps_impl_lineno) {}
 
 T_String C_NULL_PHYLUM::Node::to_string() {
   return cons->get_name() + "#" + t_Integer->v_string(index);
