@@ -172,16 +172,45 @@ static void make_augmented_cycles_for_node(AUG_GRAPH *aug_graph,
 }
 
 
-void *make_augmented_cycles_proc_calls(void *paug_graph, void *node) {
+void *make_augmented_cycles_func_calls(void *paug_graph, void *node) {
   AUG_GRAPH *aug_graph = (AUG_GRAPH *)paug_graph;
   switch (ABSTRACT_APS_tnode_phylum(node)) {
+  default:
+    break;
+  case KEYExpression:
+    {
+      Expression e = (Expression)node;
+      Declaration fdecl = 0;
+      if ((fdecl = local_call_p(e)) != NULL &&
+	  Declaration_KEY(fdecl) == KEYfunction_decl) {
+	Declaration proxy = Expression_info(e)->funcall_proxy;
+	/* need to figure out constructor index */
+	int i;
+	for (i=0; i<aug_graph->global_state->match_rules.length; ++i)
+	  if (aug_graph == &aug_graph->global_state->aug_graphs[i])
+	    break;
+	if (proxy == NULL)
+	  fatal_error("missing funcall proxy");
+	make_augmented_cycles_for_node(aug_graph,
+				       constructor_instance_start[i],
+				       proxy);
+      }
+    }
+    break;
   case KEYDeclaration:
     { Declaration decl = (Declaration)node;
       switch (Declaration_KEY(decl)) {
+      default:
+	break;
+      case KEYsome_function_decl:
+      case KEYtop_level_match:
+	/* don't look inside (unless its what we're doing the analysis for) */
+	if (aug_graph->match_rule != node) return NULL;
+	break;
       case KEYassign:
 	{ Declaration pdecl = proc_call_p(assign_rhs(decl));
 	  if (pdecl != NULL) {
-	    /* need to figure out cvonstructor index */
+	    /* need to figure out constructor index */
 	    int i;
 	    for (i=0; i<aug_graph->global_state->match_rules.length; ++i)
 	      if (aug_graph == &aug_graph->global_state->aug_graphs[i])
@@ -228,7 +257,7 @@ static void make_augmented_cycles(AUG_GRAPH *aug_graph, int constructor_index)
     break;
   }
   /* find procedure calls */
-  traverse_Declaration(make_augmented_cycles_proc_calls,
+  traverse_Declaration(make_augmented_cycles_func_calls,
 		       aug_graph,aug_graph->match_rule);
   
 }
@@ -293,6 +322,23 @@ SYMBOL make_up_down_name(char *n, int num,BOOL up) {
   return intern_symbol(name);
 }
 
+static char danger[1000];
+
+static char *phylum_to_string(Declaration d)
+{
+  switch (Declaration_KEY(d)) {
+  default:
+    return decl_name(d);
+  case KEYpragma_call:
+    sprintf(danger,"%s:%d",symbol_name(pragma_call_name(d)),
+	    tnode_line_number(d));
+    return danger;
+  case KEYif_stmt:
+    sprintf(danger,"if:%d",tnode_line_number(d));
+    return danger;
+  }
+}
+
 static void add_up_down_attributes(STATE *s) {
   int i,j,k,l;
   CONDITION cond;
@@ -308,13 +354,13 @@ static void add_up_down_attributes(STATE *s) {
       INSTANCE *array = phy->instances.array;
       int upindex, downindex;
       Declaration upattr =
-	attribute_decl(def(make_up_down_name(decl_name(s->phyla.array[j]),
+	attribute_decl(def(make_up_down_name(phylum_to_string(s->phyla.array[j]),
 					     i,TRUE),
 			   FALSE,FALSE),
 		       no_type(), /* sloppy */
 		       direction(FALSE,FALSE,FALSE),no_default());
       Declaration downattr =
-	attribute_decl(def(make_up_down_name(decl_name(s->phyla.array[j]),
+	attribute_decl(def(make_up_down_name(phylum_to_string(s->phyla.array[j]),
 					     i,FALSE),
 			   FALSE,FALSE),
 		       no_type(), /* sloppy */
@@ -394,7 +440,7 @@ static void add_up_down_attributes(STATE *s) {
 	  else if (DECL_IS_RHS(array[k].node))
 	    cycle_type |= CYC_BELOW;
 	  else
-	    fatal_error("Cannot classify node: %s",decl_name(array[k].node));
+	    fatal_error("Cannot classify node: %s",phylum_to_string(array[k].node));
 	}
       }
       if (cycle_type == CYC_BELOW) {
@@ -577,8 +623,27 @@ void break_fiber_cycles(Declaration module,STATE *s) {
   get_fiber_cycles(s);
   add_up_down_attributes(s);
   release(mark);
-  printf("After introduction of up/down attributes:\n");
-  print_analysis_state(s,stdout);
+  if (analysis_debug & DNC_ITERATE) {
+    printf("\n**** After introduction of up/down attributes:\n\n");
+    print_analysis_state(s,stdout);
+  }
+
+  {
+    int saved_analysis_debug = analysis_debug;
+    int j;
+    analysis_debug |= -1;
+    for (j=0; j < s->match_rules.length; ++j) {
+      printf("UP/DOWN closing rule %s\n",aug_graph_name(&s->aug_graphs[j]));
+      (void)close_augmented_dependency_graph(&s->aug_graphs[j]);
+    }
+    (void)close_augmented_dependency_graph(&s->global_dependencies);
+    analysis_debug = saved_analysis_debug;
+  }
+
+  if (analysis_debug & (DNC_ITERATE|DNC_FINAL)) {
+    printf("\n****** After closure of up/down attributes:\n\n");
+    print_analysis_state(s,stdout);
+  }
 }
 
 
