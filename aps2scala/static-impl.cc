@@ -331,6 +331,8 @@ static bool implement_visit_function(AUG_GRAPH* aug_graph,
 	     << "," << rhs << ");\n";
 	}
       } else {
+	aps_warning(in->node,"Attribute %s.%s is apparently undefined",
+		    decl_name(in->node),symbol_name(asym));
 	os << "// " << in << " is ready.\n";
       }
       continue;
