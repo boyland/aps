@@ -58,6 +58,7 @@ main(int argc,char **argv) {
 	    case 'C': cycle_debug |= PRINT_CYCLE; break;
 	    case 'o': oag_debug |= DEBUG_ORDER; break;
 	    case 'O': oag_debug |= TOTAL_ORDER; break;
+	    case 'T': oag_debug |= PROD_ORDER; break;
 	    }
 	  } while (*options != '\0');
 	}
