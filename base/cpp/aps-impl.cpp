@@ -62,6 +62,11 @@ string operator+(const string&s,C_NULL_TYPE::Node*n)
   return s + n->to_string();
 }
 
+string operator+(const string&s,int i)
+{
+  return s + t_Integer->v_string(i);
+}
+
 Module::Module() : complete(false) {}
 
 void Module::finish() { complete = true; }
@@ -184,8 +189,12 @@ int Phylum::size()
 
 C_NULL_PHYLUM::Node* Phylum::node(int i) const
 {
-  if (i < 0) throw invalid_argument("negative index to Phylum::node(int)");
-  if (i >= int(nodes.size())) throw out_of_range("index too large to Phylum::node(int)");
+  if (i < 0) {
+    throw invalid_argument("negative index to Phylum::node(int)");
+  }
+  if (i >= int(nodes.size())) {
+    throw out_of_range("index too large to Phylum::node(int)");
+  }
   return nodes[i];
 }
 
