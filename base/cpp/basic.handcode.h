@@ -1,6 +1,8 @@
 #ifndef BASIC_HANDCODE_H
 #define BASIC_HANDCODE_H
 
+// #include <iostream>
+#include <stack>
 #include "stdarg.h"
 
 // inline versions of TYPE functions
@@ -50,33 +52,6 @@ inline bool C_PHYLUM::v_object_id_less(Node *x, Node*y) { return x->index < y->i
 template<class C_E>
 inline void C_BAG<C_E>::v_assert(C_BAG::T_Result) { }
 
-class C_STRING : public C_TYPE
-{
- public:
-  typedef std::string T_Result;
-  void v_assert(T_Result) {}
-  bool v_equal(T_Result l1,T_Result l2) { return l1 == l2; }
-  T_Result v_concatenate(T_Result l1,T_Result l2) { return l1 + l2; }
-  T_Result v_append(T_Result l1, T_Result l2) { return l1 + l2; }
-  T_Result v_single(char c) { return T_Result(1,c); }
-  T_Result v_none() { return ""; }
-  bool v_member(char x,T_Result l) { return l.find(x) < l.size(); }
-  char v_nth(int i,T_Result l) { return l.at(i); }
-  char v_nth_from_end(int i,T_Result l) { return l.at(l.size()-i-1); }
-  int v_position(char x,T_Result l) { return l.find(x); }
-  int v_position_from_end(char x,T_Result l) { return l.rfind(x); }
-  T_Result v_subseq(T_Result l,int s,int f) { return l.substr(s,f); }
-  T_Result v_subseq_from_end(T_Result l,int s,int f);
-  T_Result v_butsubseq(T_Result l,int start,int finish);
-  T_Result v_butsubseq_from_end(T_Result l,int start,int finish);
-  bool v_less(T_Result x,T_Result y) { return x < y; }
-  bool v_less_equal(T_Result x,T_Result y) { return x <= y; }
-  T_Result v_string(T_Result x) { return x; }
-
-  void finish() {}
-};
-
-
 // Useful things for collection functions:
 template <class C_C, class C_E> 
 struct COLL {
@@ -90,15 +65,42 @@ struct COLL {
   C_C* collection_type;
   C_E* element_type;
   COLL(C_C* ct, C_E* et) : collection_type(ct), element_type(et) {}
-
+  
+  T_String to_string(Coll l) {
+    static const int max_print = 5;
+    std::stack<Coll> stack;
+    stack.push(l);
+    int printed = 0;
+    T_String res = "{";
+    while (!stack.empty() && printed < max_print) {
+      Coll l = stack.top();
+      stack.pop();
+      if (V_append *a1 = dynamic_cast<V_append*>(l)) {
+	stack.push(a1->v_l2);
+	stack.push(a1->v_l1);
+      } else if (V_single *s1 = dynamic_cast<V_single*>(l)) {
+	if (printed != 0) res += ',';
+	res += element_type->v_string(s1->v_x);
+	++printed;
+      }
+    }
+    if (!stack.empty()) {
+      res += "...";
+    }
+    res += '}';
+    return res;
+  }
+    
   bool equal(Coll l1, Coll l2) {
-    if (V_append *l1 = dynamic_cast<V_append*>(l1)) {
-      int n1 = length(l1->v_l1);
-      return equal(l1->v_l1,subseq(l2,0,n1)) &&
-	equal(l1->v_l2,butsubseq(l2,0,n1));
-    } else if (V_single *l1 = dynamic_cast<V_single*>(l1)) {
+    //std::cout << "equal(" << collection_type->v_string(l1) << ","
+    //	      << collection_type->v_string(l2) << ")" << std::endl;
+    if (V_append *a1 = dynamic_cast<V_append*>(l1)) {
+      int n1 = length(a1->v_l1);
+      return equal(a1->v_l1,subseq(l2,0,n1)) &&
+	equal(a1->v_l2,butsubseq(l2,0,n1));
+    } else if (V_single *s1 = dynamic_cast<V_single*>(l1)) {
       int n2 = length(l2);
-      return n2 == 1 && element_type->v_equal(l1->v_x,nth(0,l2));
+      return n2 == 1 && element_type->v_equal(s1->v_x,nth(0,l2));
     } else if (dynamic_cast<V_none*>(l1)) {
       return length(l2) == 0;
     }
@@ -206,7 +208,7 @@ struct COLL {
 	Coll rem2 = butsubseq(n->v_l2,0,finish-n1);
 	return collection_type->v_append(rem1,rem2);
       }
-    } else if (V_single * n = dynamic_cast<V_single*>(l)) {
+    } else if (dynamic_cast<V_single*>(l)) {
       if (start == 0) return collection_type->v_none();
     }
     return l;
@@ -217,6 +219,7 @@ struct COLL {
   }
 
   static int length(Coll l) {
+    // std::cout << "length(" << l->to_string() << ")"<< std::endl;
     if (V_append * n = dynamic_cast<V_append*>(l)) {
       return length(n->v_l1) + length(n->v_l2);
     } else if (dynamic_cast<V_single*>(l)) {
@@ -224,7 +227,19 @@ struct COLL {
     } else if (dynamic_cast<V_none*>(l)) {
       return 0;
     } else {
-      throw stub_error("COLLECTION$length isn't working");
+      throw assertion_error("COLLECTION$length isn't working");
+    }
+  }
+
+  static int empty(Coll l) {
+    if (V_append * n = dynamic_cast<V_append*>(l)) {
+      return empty(n->v_l1) && empty(n->v_l2);
+    } else if (dynamic_cast<V_single*>(l)) {
+      return false;
+    } else if (dynamic_cast<V_none*>(l)) {
+      return true;
+    } else {
+      throw assertion_error("COLLECTION$empty isn't working");
     }
   }
 };
@@ -483,6 +498,11 @@ class C__basic_22 {
   inline int v_length(typename T::T_Result l) {
     return COLL<T,E>::length(l);
   }
+
+  // useful, but not in the current basic.aps
+  inline bool v_empty(typename T::T_Result l) {
+    return COLL<T,E>::empty(l);
+  }
 };
 
 template<>
@@ -492,6 +512,10 @@ class C__basic_22<C_Character,C_String> {
 
   inline int v_length(T_String l) {
     return l.size();
+  }
+
+  inline bool v_empty(T_String l) {
+    return l.empty();
   }
 };
 
