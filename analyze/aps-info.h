@@ -26,6 +26,7 @@ extern struct Declaration_info {
   CONDITION decl_cond; /* condition that must be satisfied to take effect */
   struct summary_dependency_graph *node_phy_graph;
   unsigned decl_flags;
+  void * call_sites; 
 #define DECL_LHS_FLAG 1
 #define DECL_RHS_FLAG 2
 #define DECL_OBJECT_FLAG 4
