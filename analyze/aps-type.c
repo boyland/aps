@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include "alloc.h"
+#include "jbb-alloc.h"
 #include "aps-ag.h"
 
 int type_debug = FALSE;
@@ -502,7 +502,13 @@ Type type_element_type(Type st)
       }
       break;
     case KEYtype_inst:
-      return first_TypeActual(type_inst_type_actuals(st));
+      {
+	Type ta = first_TypeActual(type_inst_type_actuals(st));
+	Declaration mdecl = USE_DECL(module_use_use(type_inst_module(st)));
+	Declaration rdecl = module_decl_result_type(mdecl);
+	if (ta) return ta; /*! Hack: assume first parameter is type */
+	return type_element_type(some_type_decl_type(rdecl));
+      }
       break;
     default:
       aps_error(st,"not sure what sort of collection type this is");
