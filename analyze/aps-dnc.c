@@ -52,6 +52,8 @@ enum instance_direction instance_direction(INSTANCE *i) {
     return dir;
   } else if (DECL_IS_RHS(i->node)) {
     return invert_direction(dir);
+  } else if (DECL_IS_LOCAL(i->node)) {
+    return instance_local;
   } else {
     fatal_error("%d: unknown attributed node",tnode_line_number(i->node));
   }
@@ -925,6 +927,17 @@ INSTANCE *get_expression_instance(FIBER fiber, int frev,
 	  break;
 	}
 	return get_instance(decl,fiber,frev,ndecl,aug_graph);
+      } else if ((decl = field_ref_p(e)) != NULL) {
+	Expression node = field_ref_object(e);
+	Declaration ndecl = NULL;
+	switch (Expression_KEY(node)) {
+	default: fatal_error("%d: can't handle this attribute instance",
+			     tnode_line_number(node));
+	case KEYvalue_use:
+	  ndecl = USE_DECL(value_use_use(node));
+	  break;
+	}
+	return get_instance(decl,fiber,frev,ndecl,aug_graph);
       } else {
 	fatal_error("%d: Cannot get expression instance",tnode_line_number(e));
 	return NULL;
@@ -1204,6 +1217,15 @@ static void *get_edges(void *vaug_graph, void *node) {
 	      FIBERSET rfs = fiberset_for(decl,FIBERSET_REVERSE_FINAL);
 	      Declaration pdecl = constructor_decl_phylum(cdecl);
 	      Declaration fdecl;
+	      /*
+	      printf("Looking at %s which instantiates %s\n",decl_name(decl),
+		     decl_name(cdecl));
+	      printf("Normal: ");
+	      print_fiberset(fs,stdout);
+	      printf("\nReverse: ");
+	      print_fiberset(rfs,stdout);
+	      printf("\n");
+	      */
 	      /* add fiber dependencies for fields */
 	      for (fdecl = NEXT_FIELD(pdecl);
 		   fdecl != NULL;
@@ -1221,11 +1243,31 @@ static void *get_edges(void *vaug_graph, void *node) {
 		      get_instance(decl,fiber,FALSE,NULL,aug_graph);
 		    if (fiber->field == fdecl &&
 			fiber->shorter == base_fiber) {
+		      INSTANCE* between =
+			get_instance(fdecl,NULL,FALSE,decl,aug_graph);
 		      /* not a fiber dependency because we have to collect
 		       * the values together.
 		       */
-		      add_edge_to_graph(source,sink,cond,dependency,aug_graph);
+		      /*
+		      printf("Adding extra edges ");
+		      print_instance(source,stdout);
+		      printf(" -> ");
+		      print_instance(between,stdout);
+		      printf(" -> ");
+		      print_instance(sink,stdout);
+		      printf("\n");
+		      */
+		      /* And put the instance between */
+		      add_edge_to_graph(source,between,cond,dependency,aug_graph);
+		      add_edge_to_graph(between,sink,cond,dependency,aug_graph);
 		    } else {
+		      /*
+		      printf("Avoiding extra edges ");
+		      print_instance(source,stdout);
+		      printf(" -> ");
+		      print_instance(sink,stdout);
+		      printf("\n");
+		      */
 		      add_edge_to_graph(source,sink,cond,
 					fiber_dependency,aug_graph);
 		    }
@@ -1278,11 +1320,17 @@ static void *get_edges(void *vaug_graph, void *node) {
 	      record_expression_dependencies(sink,cond,NULL,FALSE,
 					     dependency,TRUE,rhs,aug_graph);
 	    } else {
-	      INSTANCE *sink = get_expression_instance(fiber,FALSE,
-						       object,aug_graph);
+	      INSTANCE *sink = get_expression_instance(NULL,FALSE,
+						       lhs,aug_graph);
+	      INSTANCE *fsink = get_expression_instance(fiber,FALSE,
+							object,aug_graph);
+	      /* assignment also requires the object is ready to assign */
+	      if (osrc != fsink)
+		add_edge_to_graph(osrc,fsink,cond,dependency,aug_graph);
 	      record_condition_dependencies(sink,cond,aug_graph);
 	      record_expression_dependencies(sink,cond,NULL,FALSE,
 					     dependency,TRUE,rhs,aug_graph);
+	      add_edge_to_graph(sink,fsink,cond,dependency,aug_graph);
 	    }
 	  } else if ((field = shared_use_p(lhs)) != NULL) {
 	    /* Assignment of shared global */
@@ -1773,7 +1821,8 @@ static void init_analysis_state(STATE *s, Declaration module) {
     for (; decl != NULL; decl = Declaration_info(decl)->next_decl) {
       switch (Declaration_KEY(decl)) {
       case KEYattribute_decl:
-	if (!ATTR_DECL_IS_SYN(decl) && !ATTR_DECL_IS_INH(decl)) {
+	if (!ATTR_DECL_IS_SYN(decl) && !ATTR_DECL_IS_INH(decl) &&
+	    !FIELD_DECL_P(decl)) {
 	  aps_error(decl,"%s not declared either synthesized or inherited",
 		    decl_name(decl));
 	  Declaration_info(decl)->decl_flags |= ATTR_DECL_SYN_FLAG;
