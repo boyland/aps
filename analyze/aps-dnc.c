@@ -2285,7 +2285,19 @@ BOOL close_augmented_dependency_graph(AUG_GRAPH *aug_graph) {
   return TRUE;
 }
 
-/* return whether any changes were noticed */
+/**
+ * Ensure that the summary dependency graph is transitively closed.
+ * <bf>!! Profiling indicates that about 23% of the time
+ * to analyze cool-semant (with fibering) is taken up in this function!</bf>
+ * The remaining <em>hot</em> functions are
+ * <dl>
+ * <dt>close_using_edge<dd> 14%
+ * <dt>dependency_trans<dd> 13%
+ * <dt>synchronize_dependency_graphs<dd> 9%
+ * <dt>schedule_rest<dd> 5%
+ * </dl>
+ * @return whether any changes were noticed 
+ */
 BOOL close_summary_dependency_graph(PHY_GRAPH *phy_graph) {
   int i,j,k;
   int n = phy_graph->instances.length;
