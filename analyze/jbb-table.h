@@ -5,3 +5,5 @@ extern TABLE new_table();
 extern void *get(TABLE,void *key);
 extern void set(TABLE,void *key, void *value);
 #endif
+extern void *table_get(TABLE,void *key);
+extern void table_set(TABLE,void *key, void *value);
