@@ -12,7 +12,7 @@ CALLSITE_SET next_cs = 1;
 int CallSiteNum = 0;
 VECTOR(CALLSITE_SET) refs;
   
-int SHOW_AI_INFO = 0;
+int SHOW_AI_INFO = 1;
 
 
 void nothing() {}
@@ -77,6 +77,7 @@ void* traverser(void *changed, void *node) {
       default: break;
       /* only inspect the assigments */
       case KEYassign:
+nothing();
         DEBUG_INFO("#%d", tnode_line_number(decl));
         {
         Expression lhs = assign_lhs(decl);
@@ -165,6 +166,15 @@ CALLSITE_SET interpret(void *node) {
         }
       if(udecl != NULL) 
         { 
+          /* first check if it is declared in case statement */
+	  Declaration case_stmt;
+	  if ((case_stmt = formal_in_case_p(udecl)) != NULL) {
+	    Expression expr = case_stmt_expr(case_stmt);
+	    CALLSITE_SET case_expr_sites = interpret(expr);
+	    DEBUG_INFO("\t\tin case statement [%d]\n", tnode_line_number(case_stmt));
+	    return case_expr_sites;
+	  }
+
         pSite = Declaration_info(udecl)->call_sites;
         if(pSite == NULL) {
           DEBUG_INFO("\tValue use not decared locally: %s\n",
@@ -431,7 +441,8 @@ Declaration sth_use_p(Expression expr) {
 
 
 /* 
- * following are a bunch of debug fuctions
+ * following are a bunch of debug fuctions, 
+ * totally deletable if there will be no other aps novice like yw
  */
 void *check_all_decls(void *nouse, void * node) {
   switch (ABSTRACT_APS_tnode_phylum(node)) {
