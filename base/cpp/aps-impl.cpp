@@ -209,6 +209,8 @@ string Constructor::get_name() const { return name; }
 int Constructor::get_index() const { return index; }
 Type* Constructor::get_type() const { return type; }
 
+Circular::Pending Circular::pending;
+int Circular::CheckPending::num_checks = 0;
 
 
 
