@@ -115,6 +115,19 @@ void schedule_summary_dependency_graph(PHY_GRAPH *phy_graph) {
   }
 }
 
+CONDITION instance_condition(INSTANCE *in)
+{
+  Declaration ad = in->fibered_attr.attr;
+  if (in->node != 0) {
+    return Declaration_info(in->node)->decl_cond;
+  } else switch (ABSTRACT_APS_tnode_phylum(ad)) {
+  case KEYMatch:
+    return Match_info((Match)ad)->match_cond;
+  default:
+    return Declaration_info(ad)->decl_cond;
+  }
+}
+
 CTO_NODE* schedule_rest(AUG_GRAPH *aug_graph,
 			CTO_NODE* prev,
 			CONDITION cond,
@@ -124,13 +137,10 @@ CTO_NODE* schedule_rest(AUG_GRAPH *aug_graph,
   int i;
   int n = aug_graph->instances.length;
   int needed_condition_bits;
+  INSTANCE* in;
 
   /* If nothing more to do, we are done. */
   if (remaining == 0) return 0;
-
-  /* Pre-allocate a node */
-  cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
-  cto_node->cto_prev = prev;
 
   for (i=0; i < n; ++i) {
     INSTANCE *in1 = &aug_graph->instances.array[i];
@@ -138,8 +148,6 @@ CTO_NODE* schedule_rest(AUG_GRAPH *aug_graph,
 
     /* If already scheduled, then ignore. */
     if (aug_graph->schedule[i] != 0) continue;
-
-    needed_condition_bits = 0;
 
     /* Look for a predecessor edge */
     for (j=0; j < n; ++j) {
@@ -168,10 +176,6 @@ CTO_NODE* schedule_rest(AUG_GRAPH *aug_graph,
 
 	/* If j not scheduled, then i cannot be considered */
 	if (aug_graph->schedule[j] == 0) break; /* leave edges != 0 */
-
-	/* see what conditions remain to be resolved. */
-	needed_condition_bits |= (edges->cond.positive&~cond.positive);
-	needed_condition_bits |= (edges->cond.negative&~cond.negative);
       }
 
       /* If a remaining edge, then i cannot be considered */
@@ -183,54 +187,59 @@ CTO_NODE* schedule_rest(AUG_GRAPH *aug_graph,
   }
 
   if (i == n) {
-    /* can't find anything */
-    int bits = cond.positive|cond.negative;
-    printf("Horrible hack (only works when conditions are ordered)\n");
-    needed_condition_bits = 1;
-    while (bits > needed_condition_bits)
-      needed_condition_bits <<= 1;
+    fatal_error("Cannot make conditional total order!");
+  }
+
+  in = &aug_graph->instances.array[i];
+
+  /* check to see if makes sense
+   * (No need to schedule something that
+   * occurs only in a different condition branch.)
+   */
+  {
+    CONDITION icond = instance_condition(in);
+    if ((cond.positive|icond.positive)&
+	(cond.negative|icond.negative)) {
+      if (oag_debug & PROD_ORDER) {
+	int i=n-remaining;
+	for (; i > 0; --i) printf("  ");
+	print_instance(in,stdout);
+	puts(" (ignored)");
+      }
+      aug_graph->schedule[i] = 1;
+      cto_node = schedule_rest(aug_graph,prev,cond,remaining-1);
+      aug_graph->schedule[i] = 0;
+      return cto_node;
+    }
   }
 
   if (oag_debug & PROD_ORDER) {
     int i=n-remaining;
     for (; i > 0; --i) printf("  ");
+    print_instance(in,stdout);
+    putchar('\n');
   }
-  if (needed_condition_bits) {
-    int cindex = 0;
-    int cmask = 1;
 
-    cto_node->cto_type = CTO_CONDITION;
-    /* find first needed condition bit */
-    while (!(needed_condition_bits & 1)) {
-      needed_condition_bits >>= 1;
-      ++cindex;
-      cmask <<= 1;
-    }
-    if (oag_debug & PROD_ORDER) {
-      printf("Condition %d\n",cindex);
-    }
-    cto_node->cto_cond_index = cindex;
+  cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
+  cto_node->cto_prev = prev;
+  cto_node->cto_instance = in;
 
+  aug_graph->schedule[i] = 1;
+  if (if_rule_p(in->fibered_attr.attr)) {
+    int cmask = 1 << (if_rule_index(in->fibered_attr.attr));
     cond.negative |= cmask;
-    cto_node->cto_cond_if_false =
-      schedule_rest(aug_graph,cto_node,cond,remaining);
+    cto_node->cto_if_false =
+      schedule_rest(aug_graph,cto_node,cond,remaining-1);
     cond.negative &= ~cmask;
     cond.positive |= cmask;
-    cto_node->cto_cond_if_true =
-      schedule_rest(aug_graph,cto_node,cond,remaining);
+    cto_node->cto_if_true =
+      schedule_rest(aug_graph,cto_node,cond,remaining-1);
     cond.positive &= ~cmask;
   } else {
-    INSTANCE* in = &aug_graph->instances.array[i];
-    if (oag_debug & PROD_ORDER) {
-      print_instance(in,stdout);
-      putchar('\n');
-    }
-    cto_node->cto_type = CTO_INSTANCE;
-    cto_node->cto_instance = in;
-    aug_graph->schedule[i] = 1;
     cto_node->cto_next = schedule_rest(aug_graph,cto_node,cond,remaining-1);
-    aug_graph->schedule[i] = 0;
   }
+  aug_graph->schedule[i] = 0;
+
   return cto_node;
 }
 
