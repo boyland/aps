@@ -27,3 +27,6 @@ aps-debug.o : aps-debug.h
 
 bin.install: apsc
 	cp apsc /users/classes/cs754/bin/.`uname -m`-`uname -s`/apssched
+
+% : RCS/%,v
+	co $*
