@@ -755,7 +755,7 @@ static void *get_instances(void *vaug_graph, void *node) {
 	if (array == NULL) {
 	  extern int aps_yylineno;
 	  aps_yylineno = tnode_line_number(e);
-	  proxy = pragma_call(def_name(function_decl_def(fdecl)),
+	  proxy = pragma_call(def_name(some_function_decl_def(fdecl)),
 			      nil_Expressions());
 	  Expression_info(e)->funcall_proxy = proxy;
 	  Declaration_info(proxy)->instance_index = index;
