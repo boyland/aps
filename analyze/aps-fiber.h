@@ -86,6 +86,7 @@ extern Expression field_ref_object(Expression); /* also good for attr_ref's */
 extern Declaration node_decl_phylum(Declaration);
 extern Declaration constructor_decl_phylum(Declaration);
 extern Declaration some_function_decl_result(Declaration);
+extern Declaration attribute_decl_phylum(Declaration attr);
 
 /* routines for handling shared uses */
 extern Declaration phylum_shared_info_attribute(Declaration,
