@@ -1222,7 +1222,30 @@ void dump_cpp_Declaration(Declaration decl,const output_streams& oss)
       }
       
       for (Declaration d = first_decl; d ; d = DECL_NEXT(d)) {
-	dump_cpp_Declaration(d,new_oss);
+	switch (Declaration_KEY(d)) {
+	case KEYmodule_decl:
+	case KEYtype_decl:
+	case KEYphylum_decl:
+	case KEYtype_renaming:
+	  // do type decls first (try to avoid C++ typedef problems)
+	  dump_cpp_Declaration(d,new_oss);
+	  break;
+	default:
+	  break;
+	}
+      }
+      for (Declaration d = first_decl; d ; d = DECL_NEXT(d)) {
+	switch (Declaration_KEY(d)) {
+	case KEYmodule_decl:
+	case KEYtype_decl:
+	case KEYphylum_decl:
+	case KEYtype_renaming:
+	  // already did this:
+	  break;
+	default:
+	  dump_cpp_Declaration(d,new_oss);
+	}
+	// now specific to module things:
 	switch (Declaration_KEY(d)) {
 	case KEYattribute_decl:
 	  {
