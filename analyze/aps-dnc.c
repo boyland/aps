@@ -591,18 +591,22 @@ static void *get_instances(void *vaug_graph, void *node) {
        * root phylum in the global dependency graph.
        */
       if (array == NULL) Declaration_info(decl)->instance_index = index;
-      { Declaration sattr = phylum_shared_info_attribute(s->start_phylum,s);
-	FIBERSET fiberset;
-	assign_instance(array,index++,sattr,NULL,FALSE,decl);
-	for (fiberset = fiberset_for(sattr,FIBERSET_NORMAL_FINAL);
-	     fiberset != NULL;
-	     fiberset=fiberset->rest) {
-	  assign_instance(array,index++,sattr,fiberset->fiber,FALSE,decl);
-	}
-	for (fiberset = fiberset_for(sattr,FIBERSET_REVERSE_FINAL);
-	     fiberset != NULL;
-	     fiberset=fiberset->rest) {
-	  assign_instance(array,index++,sattr,fiberset->fiber,TRUE,decl);
+      {
+	ATTRSET attrset=attrset_for(s,s->start_phylum);
+	for (; attrset != NULL; attrset=attrset->rest) {
+	  Declaration attr = attrset->attr;
+	  FIBERSET fiberset;
+	  assign_instance(array,index++,attr,NULL,FALSE,decl);
+	  for (fiberset = fiberset_for(attr,FIBERSET_NORMAL_FINAL);
+	       fiberset != NULL;
+	       fiberset=fiberset->rest) {
+	    assign_instance(array,index++,attr,fiberset->fiber,FALSE,decl);
+	  }
+	  for (fiberset = fiberset_for(attr,FIBERSET_REVERSE_FINAL);
+	       fiberset != NULL;
+	       fiberset=fiberset->rest) {
+	    assign_instance(array,index++,attr,fiberset->fiber,TRUE,decl);
+	  }
 	}
       }
       break;
@@ -2272,7 +2276,9 @@ static void synchronize_dependency_graphs(AUG_GRAPH *aug_graph,
       fputs(" != ",stderr);
       print_instance(phy_source,stderr);
       fputc('\n',stderr);
-      fatal_error("instances %d vs %d in different order",i,i-start);
+      fatal_error("instances %s:%d vs %s:%d in different order",
+		  aug_graph_name(aug_graph),i,
+		  phy_graph_name(phy_graph),i-start);
     }
     for (j=start; j < max; ++j) {
       INSTANCE *sink = &aug_graph->instances.array[j];
@@ -2794,6 +2800,10 @@ void print_aug_graph(AUG_GRAPH *aug_graph, FILE *stream) {
     }
   }
   fputc('\n',stream);
+}
+
+char *phy_graph_name(PHY_GRAPH *phy_graph) {
+  return symbol_name(def_name(declaration_def(phy_graph->phylum)));
 }
 
 void print_phy_graph(PHY_GRAPH *phy_graph, FILE *stream) {
