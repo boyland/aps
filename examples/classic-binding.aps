@@ -1,0 +1,183 @@
+with "simple";
+
+-- needs to be global to avoid method problem
+function string_equal(x,y : String) : Boolean := x=y;
+
+module NAME_RESOLUTION[T :: var SIMPLE[]] extends T begin
+
+  -- shapes: used just for object identity
+  phylum ShapeStructure;
+  constructor shape(name : String) : ShapeStructure;
+  type Shape := remote ShapeStructure;
+
+  attribute Type.type_shape : Shape;
+  attribute Expr.expr_shape : Shape;
+
+  pragma synthesized(type_shape,expr_shape);
+  
+  -- environment:
+  type Entity := PAIR[String,Shape];
+  type Environment := LIST[Entity];
+  initial_env : Environment := Environment${};
+    
+  attribute Block.block_env : Environment;
+  attribute Decls.decls_envin : Environment;
+  attribute Decls.decls_envout : Environment;
+  attribute Decl.decl_envin : Environment;
+  attribute Decl.decl_envout : Environment;
+  attribute Stmts.stmts_env : Environment;
+  attribute Stmt.stmt_env : Environment;
+  attribute Expr.expr_env : Environment;
+  
+  pragma synthesized(decls_envout,decl_envout);
+  pragma inherited(decls_envin,decl_envin);
+  pragma inherited(block_env,stmts_env,stmt_env,expr_env);
+  
+  -- use sets
+  type Used := SET[String](string_equal);
+  
+  attribute Block.block_used : Used;
+  attribute Decls.decls_uin : Used;
+  attribute Decls.decls_uout : Used;
+  attribute Decl.decl_uin : Used;
+  attribute Decl.decl_uout : Used;
+  attribute Stmts.stmts_used : Used;
+  attribute Stmt.stmt_used : Used;
+  attribute Expr.expr_used : Used;
+
+  pragma synthesized(block_used,stmts_used,stmt_used,expr_used);
+  pragma inherited(decls_uin,decl_uin);
+  pragma synthesized(decls_uout,decl_uout);
+
+  -- error messages
+  type Messages := BAG[String];
+  attribute Program.prog_msgs : Messages;
+  attribute Block.block_msgs : Messages;
+  attribute Decls.decls_msgs : Messages;
+  attribute Decl.decl_msgs : Messages;
+  attribute Stmts.stmts_msgs : Messages;
+  attribute Stmt.stmt_msgs : Messages;
+  attribute Expr.expr_msgs : Messages;
+
+  function (&&)(x,y : Messages) : Messages := Messages$combine(x,y);
+
+  pragma synthesized(prog_msgs,block_msgs,decls_msgs,decl_msgs,
+		     stmts_msgs,stmt_msgs,expr_msgs);
+ 
+  not_found : Shape := nil;
+  
+  int_shape : Shape := shape("integer");
+  str_shape : Shape := shape("string");
+
+  match ?p:Program=program(?b:Block) begin
+    b.block_env := initial_env;
+    p.prog_msgs := b.block_msgs;
+  end;
+  
+  match ?block:Block=block(?decls:Decls,?stmts:Stmts) begin
+    decls.decls_envin := block.block_env;
+    stmts.stmts_env := decls.decls_envout;
+    decls.decls_uin := stmts.stmts_used;
+    block.block_used := decls.decls_uout;
+    block.block_msgs := Messages$append(decls.decls_msgs, stmts.stmts_msgs);
+  end;
+  
+  match ?decls:Decls=no_decls() begin
+    decls.decls_envout := decls.decls_envin;
+    decls.decls_uout := decls.decls_uin;
+    decls.decls_msgs := Messages$none();
+  end;
+  
+  match ?decls0:Decls=xcons_decls(?decls1:Decls,?decl:Decl) begin
+    decls1.decls_envin := decls0.decls_envin;
+    decl.decl_envin := decls1.decls_envout;
+    decls0.decls_envout := decl.decl_envout;
+    decl.decl_uin := decls0.decls_uin;
+    decls1.decls_uin := decl.decl_uout;
+    decls0.decls_uout := decls1.decls_uout;
+    decls0.decls_msgs := Messages$append(decls1.decls_msgs,decl.decl_msgs);
+  end;
+  
+  match ?d:Decl=decl(?id:String,?ty:Type) begin
+    d.decl_envout := Environment$cons(Entity$pair(id,ty.type_shape),
+				      d.decl_envin);
+    if id in d.decl_uin then
+      d.decl_msgs := Messages$none();
+      d.decl_uout := d.decl_uin \ id;
+    else
+      d.decl_msgs := Messages$single(id ++ " is unused");
+      d.decl_uout := d.decl_uin;
+    endif;
+  end;
+  
+  match ?t:Type=integer() begin
+    t.type_shape := int_shape;
+  end;
+  
+  match ?t:Type=string() begin
+    t.type_shape := str_shape;
+  end;
+  
+  match ?stmts:Stmts=no_stmts() begin
+    stmts.stmts_used := Used$none();
+    stmts.stmts_msgs := Messages$none();
+  end;
+  
+  match ?stmts0:Stmts=xcons_stmts(?stmts1:Stmts,?stmt:Stmt) begin
+    stmts1.stmts_env := stmts0.stmts_env;
+    stmt.stmt_env := stmts0.stmts_env;
+    stmts0.stmts_used := stmts1.stmts_used \/ stmt.stmt_used;
+    stmts0.stmts_msgs := stmts1.stmts_msgs && stmt.stmt_msgs;
+  end;
+  
+  match ?stmt:Stmt=block_stmt(?block:Block) begin
+    block.block_env := stmt.stmt_env;
+    stmt.stmt_used := block.block_used;
+    stmt.stmt_msgs := block.block_msgs;
+  end;
+  
+  match ?stmt:Stmt=assign_stmt(?expr1:Expr,?expr2:Expr) begin
+    expr1.expr_env := stmt.stmt_env;
+    expr2.expr_env := stmt.stmt_env;
+    stmt.stmt_used := expr1.expr_used \/ expr2.expr_used;
+    if expr1.expr_shape /= expr2.expr_shape then
+      stmt.stmt_msgs := Messages$single("type mismatch") &&
+	  expr1.expr_msgs && expr2.expr_msgs;
+    else
+      stmt.stmt_msgs := expr1.expr_msgs && expr2.expr_msgs;
+    endif;
+  end;
+  
+  match ?e:Expr=intconstant(?:Integer) begin
+    e.expr_shape := int_shape;
+    e.expr_used := Used$none();
+    e.expr_msgs := Messages$none();
+  end;
+  
+  match ?e:Expr=strconstant(?:String) begin
+    e.expr_shape := str_shape;
+    e.expr_used := Used$none();
+    e.expr_msgs := Messages$none();
+  end;
+  
+  match ?expr:Expr=variable(?id:String) begin
+    shape : Shape := lookup(id,expr.expr_env);
+    expr.expr_shape := shape;
+    expr.expr_used := Used$single(id);
+    if shape = not_found then
+      expr.expr_msgs := Messages$single(id ++ " not declared");
+    else
+      expr.expr_msgs := Messages$none();
+    endif;
+  end;
+  
+  function lookup(name : String; env : Environment) : Shape begin
+    if length(env) = 0 then
+      result := not_found;
+    elsif Entity$fst(first(env)) = name then
+      result := Entity$snd(first(env));
+    else
+      result := lookup(name,butfirst(env));
+    endif;
+  end;
+end;
