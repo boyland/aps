@@ -11,6 +11,65 @@
 int analysis_debug = 0;
 
 
+/*** FUNCTIONS THAT BELONG IN FIBER MODULE ***/
+
+BOOL fiber_is_reverse(FIBER f)
+{
+  NODE_IN_TREE n = (NODE_IN_TREE)f;
+  if (n == 0) return FALSE;
+  return n->dir != 2;
+}
+
+/* The following function will not be necessary
+ * Once the DFA graph is explicit encoded using fibers and not with
+ * DFA_tree.
+ */
+void print_fibers(STATE *s)
+{
+  int i, n;
+  n = s->fibers.length;
+  for (i=1; i < n; ++i) {
+    FIBER f = s->fibers.array[i]; 
+    ALIST l = f->longer;
+    printf("Fiber #%d: ",i);
+    print_fiber(f,stdout);
+    if (fiber_is_reverse(f))
+	puts(" BACKWARD");
+    else
+      puts("");
+    while (l != NULL) {
+      printf("  %s . this = ", decl_name((Declaration)alist_key(l)));
+      print_fiber((FIBER)alist_value(l),stdout);
+      printf("\n");
+      l = alist_next(l);
+    }
+  }
+}
+
+/* The following function should be done as part of fiber module.
+ * Then we don't need to call this here.
+ *
+ * We shouldn't use static arrays at all, and better still would be
+ * avoid global things as well, and put everything in the "STATE".
+ */
+
+#define DONT_USE_CONSTANTS_LIKE_THIS 100
+void add_fibers_to_state(STATE *s)
+{
+  int n = 1;
+  int i;
+  for (i = 1; i < DONT_USE_CONSTANTS_LIKE_THIS; ++i) {
+    if (DFA[i] == 0) break;
+    ++n;
+  }
+  VECTORALLOC(s->fibers,FIBER,n);
+  s->fibers.array[0] = base_fiber;
+  for (i = 1; i < n; ++i) {
+    s->fibers.array[i] = &DFA[i]->as_fiber;
+  }
+  print_fibers(s);
+}
+
 /*** FUNCTIONS FOR INSTANCES */
 
 BOOL fibered_attr_equal(FIBERED_ATTRIBUTE *fa1, FIBERED_ATTRIBUTE *fa2) {
@@ -19,13 +78,13 @@ BOOL fibered_attr_equal(FIBERED_ATTRIBUTE *fa1, FIBERED_ATTRIBUTE *fa2) {
 
 enum instance_direction fibered_attr_direction(FIBERED_ATTRIBUTE *fa) {
   if (ATTR_DECL_IS_SYN(fa->attr)) {
-    if (fa->fiber_is_reverse) {
+    if (fiber_is_reverse(fa->fiber)) {
       return instance_inward;
     } else {
       return instance_outward;
     }
   } else if (ATTR_DECL_IS_INH(fa->attr)) {
-    if (fa->fiber_is_reverse) {
+    if (fiber_is_reverse(fa->fiber)) {
       return instance_outward;
     } else {
       return instance_inward;
@@ -182,6 +241,7 @@ EDGESET new_edgeset(INSTANCE *source,
   new_edge->kind = kind;
   new_edge->next_in_edge_worklist = NULL;
   if (analysis_debug & ADD_EDGE) {
+    fputs("  ",stdout);
     print_edgeset(new_edge,stdout);
   }
   return new_edge;
@@ -220,6 +280,30 @@ DEPENDENCY edgeset_lowerbound(EDGESET es) {
     max=dependency_join(max,es->kind);
   }
   return max;
+}
+
+/** Return TRUE if the edge is already in the graph. */
+BOOL edge_present(INSTANCE *source,
+		  INSTANCE *sink,
+		  CONDITION* cond,
+		  DEPENDENCY kind,
+		  AUG_GRAPH *aug_graph)
+{
+  int index = source->index*(aug_graph->instances.length)+sink->index;
+
+  EDGESET es = aug_graph->graph[index];
+  while (es != NULL) {
+    switch (cond_compare(cond,&es->cond)) {
+    case CONDlt:
+    case CONDeq:
+      if (AT_MOST(kind,es->kind)) return TRUE;
+      break;
+    default:
+      break;
+    }
+    es = es->rest;
+  }
+  return FALSE;
 }
 
 EDGESET add_edge(INSTANCE *source,
@@ -525,13 +609,12 @@ Declaration proc_call_p(Expression e) {
 }
 
 static void assign_instance(INSTANCE *array, int index,
-			    Declaration attr, FIBER fiber, BOOL frev,
+			    Declaration attr, FIBER fiber,
 			    Declaration node) {
   if (attr == NULL) fatal_error("null instance!");
   if (array == NULL) return;
   array[index].fibered_attr.attr = attr;
   array[index].fibered_attr.fiber = fiber;
-  array[index].fibered_attr.fiber_is_reverse = frev;
   array[index].node = node;
   array[index].index = index;
   if (analysis_debug & CREATE_INSTANCE) {
@@ -544,16 +627,16 @@ static void assign_instance(INSTANCE *array, int index,
 static int assign_instances(INSTANCE *array, int index,
 			    Declaration attr, Declaration node) {
   FIBERSET fiberset;
-  assign_instance(array,index++,attr,NULL,FALSE,node);
+  assign_instance(array,index++,attr,NULL,node);
   for (fiberset = fiberset_for(attr,FIBERSET_NORMAL_FINAL);
        fiberset != NULL;
        fiberset=fiberset->rest) {
-    assign_instance(array,index++,attr,fiberset->fiber,FALSE,node);
+    assign_instance(array,index++,attr,fiberset->fiber,node);
   }
   for (fiberset = fiberset_for(attr,FIBERSET_REVERSE_FINAL);
        fiberset != NULL;
        fiberset=fiberset->rest) {
-    assign_instance(array,index++,attr,fiberset->fiber,TRUE,node);
+    assign_instance(array,index++,attr,fiberset->fiber,node);
   }
   return index;
 }
@@ -596,16 +679,16 @@ static void *get_instances(void *vaug_graph, void *node) {
 	for (; attrset != NULL; attrset=attrset->rest) {
 	  Declaration attr = attrset->attr;
 	  FIBERSET fiberset;
-	  assign_instance(array,index++,attr,NULL,FALSE,decl);
+	  assign_instance(array,index++,attr,NULL,decl);
 	  for (fiberset = fiberset_for(attr,FIBERSET_NORMAL_FINAL);
 	       fiberset != NULL;
 	       fiberset=fiberset->rest) {
-	    assign_instance(array,index++,attr,fiberset->fiber,FALSE,decl);
+	    assign_instance(array,index++,attr,fiberset->fiber,decl);
 	  }
 	  for (fiberset = fiberset_for(attr,FIBERSET_REVERSE_FINAL);
 	       fiberset != NULL;
 	       fiberset=fiberset->rest) {
-	    assign_instance(array,index++,attr,fiberset->fiber,TRUE,decl);
+	    assign_instance(array,index++,attr,fiberset->fiber,decl);
 	  }
 	}
       }
@@ -622,16 +705,16 @@ static void *get_instances(void *vaug_graph, void *node) {
 	for (; attrset != NULL; attrset=attrset->rest) {
 	  Declaration attr = attrset->attr;
 	  FIBERSET fiberset;
-	  assign_instance(array,index++,attr,NULL,FALSE,decl);
+	  assign_instance(array,index++,attr,NULL,decl);
 	  for (fiberset = fiberset_for(attr,FIBERSET_NORMAL_FINAL);
 	       fiberset != NULL;
 	       fiberset=fiberset->rest) {
-	    assign_instance(array,index++,attr,fiberset->fiber,FALSE,decl);
+	    assign_instance(array,index++,attr,fiberset->fiber,decl);
 	  }
 	  for (fiberset = fiberset_for(attr,FIBERSET_REVERSE_FINAL);
 	       fiberset != NULL;
 	       fiberset=fiberset->rest) {
-	    assign_instance(array,index++,attr,fiberset->fiber,TRUE,decl);
+	    assign_instance(array,index++,attr,fiberset->fiber,decl);
 	  }
 	}
       }
@@ -657,7 +740,7 @@ static void *get_instances(void *vaug_graph, void *node) {
 		      (ATTR_DECL_INH_FLAG|ATTR_DECL_SYN_FLAG|
 		       DECL_LHS_FLAG|DECL_RHS_FLAG)))
 	    { FIBERSET fiberset;
-	      assign_instance(array,index++,decl,NULL,FALSE,NULL);
+	      assign_instance(array,index++,decl,NULL,NULL);
 	       /* printf("%s, first option: ",decl_name(decl));
 		 print_fiberset(fiberset_for(decl,FIBERSET_NORMAL_FINAL),
 		 stdout);
@@ -665,7 +748,7 @@ static void *get_instances(void *vaug_graph, void *node) {
 	      for (fiberset = fiberset_for(decl,FIBERSET_NORMAL_FINAL);
 		   fiberset != NULL;
 		   fiberset=fiberset->rest) {
-		assign_instance(array,index++,decl,fiberset->fiber,FALSE,NULL);
+		assign_instance(array,index++,decl,fiberset->fiber,NULL);
 	      }
 	      /* printf(", ");
 		 print_fiberset(fiberset_for(decl,FIBERSET_REVERSE_FINAL),stdout);
@@ -673,9 +756,9 @@ static void *get_instances(void *vaug_graph, void *node) {
 	      for (fiberset = fiberset_for(decl,FIBERSET_REVERSE_FINAL);
 		   fiberset != NULL;
 		   fiberset=fiberset->rest) {
-		assign_instance(array,index++,decl,fiberset->fiber,TRUE,NULL);
+		assign_instance(array,index++,decl,fiberset->fiber,NULL);
 	      }
-	    }
+	    } else
 	    /* then fibers on attributes */
 	    { ATTRSET attrset=attrset_for(s,tdecl);
 	      /*printf(" Second option: ");
@@ -684,16 +767,16 @@ static void *get_instances(void *vaug_graph, void *node) {
 	      for (; attrset != NULL; attrset=attrset->rest) {
 		Declaration attr = attrset->attr;
 		FIBERSET fiberset;
-		assign_instance(array,index++,attr,NULL,FALSE,decl);
+		assign_instance(array,index++,attr,NULL,decl);
 		for (fiberset = fiberset_for(attr,FIBERSET_NORMAL_FINAL);
 		     fiberset != NULL;
 		     fiberset=fiberset->rest) {
-		  assign_instance(array,index++,attr,fiberset->fiber,FALSE,decl);
+		  assign_instance(array,index++,attr,fiberset->fiber,decl);
 		}
 		for (fiberset = fiberset_for(attr,FIBERSET_REVERSE_FINAL);
 		     fiberset != NULL;
 		     fiberset=fiberset->rest) {
-		  assign_instance(array,index++,attr,fiberset->fiber,TRUE,decl);
+		  assign_instance(array,index++,attr,fiberset->fiber,decl);
 		}
 	      }
 	    }
@@ -782,7 +865,7 @@ static void *get_instances(void *vaug_graph, void *node) {
   return vaug_graph;
 }
 
-static INSTANCE *get_instance_or_null(Declaration attr, FIBER fiber, BOOL frev,
+static INSTANCE *get_instance_or_null(Declaration attr, FIBER fiber, 
 				      Declaration node, AUG_GRAPH *aug_graph)
 {
   int i;
@@ -795,16 +878,15 @@ static INSTANCE *get_instance_or_null(Declaration attr, FIBER fiber, BOOL frev,
   for (i=start; i < n; ++i) {
     if (array[i].fibered_attr.attr == attr &&
 	array[i].fibered_attr.fiber == fiber &&
-	array[i].fibered_attr.fiber_is_reverse == frev &&
 	array[i].node == node) return &array[i];
   }
   return NULL;
 }
 
-INSTANCE *get_instance(Declaration attr, FIBER fiber, BOOL frev,
+INSTANCE *get_instance(Declaration attr, FIBER fiber,
 		       Declaration node, AUG_GRAPH *aug_graph)
 {
-  INSTANCE *instance = get_instance_or_null(attr,fiber,frev,node,aug_graph);
+  INSTANCE *instance = get_instance_or_null(attr,fiber,node,aug_graph);
   if (instance != NULL) return instance;
   { INSTANCE in;
     int i;
@@ -814,7 +896,6 @@ INSTANCE *get_instance(Declaration attr, FIBER fiber, BOOL frev,
     
     in.fibered_attr.attr = attr;
     in.fibered_attr.fiber = fiber;
-    in.fibered_attr.fiber_is_reverse = frev;
     in.node = node;
 
     fputs("Looking for ",stderr);
@@ -831,7 +912,7 @@ INSTANCE *get_instance(Declaration attr, FIBER fiber, BOOL frev,
 }
 
 static INSTANCE *get_summary_instance_or_null(Declaration attr, FIBER fiber, 
-					      BOOL frev, PHY_GRAPH* phy_graph)
+					      PHY_GRAPH* phy_graph)
 {
   int i;
   INSTANCE *array = phy_graph->instances.array;
@@ -843,17 +924,16 @@ static INSTANCE *get_summary_instance_or_null(Declaration attr, FIBER fiber,
   for (i=start; i < n; ++i) {
     if (array[i].fibered_attr.attr == attr &&
 	array[i].fibered_attr.fiber == fiber &&
-	array[i].fibered_attr.fiber_is_reverse == frev &&
 	array[i].node == NULL) return &array[i];
   }
   return NULL;
 }
 
-INSTANCE *get_summary_instance(Declaration attr, FIBER fiber, BOOL frev,
+INSTANCE *get_summary_instance(Declaration attr, FIBER fiber,
 			       PHY_GRAPH *phy_graph)
 {
   INSTANCE *instance =
-    get_summary_instance_or_null(attr,fiber,frev,phy_graph);
+    get_summary_instance_or_null(attr,fiber,phy_graph);
   if (instance != NULL) return instance;
   { INSTANCE in;
     int i;
@@ -863,7 +943,6 @@ INSTANCE *get_summary_instance(Declaration attr, FIBER fiber, BOOL frev,
     
     in.fibered_attr.attr = attr;
     in.fibered_attr.fiber = fiber;
-    in.fibered_attr.fiber_is_reverse = frev;
     in.node = NULL;
 
     fputs("Looking for summary ",stderr);
@@ -879,347 +958,121 @@ INSTANCE *get_summary_instance(Declaration attr, FIBER fiber, BOOL frev,
   return NULL;
 }
 
-/** Connect the source to the sink and all their appropriate fibers.
- * Reverse fibers connect in the opposite direction.
+
+/*******************************************				    
+    Dependencies to edges 
+ *********************************************/
+
+typedef struct dep_modifier {
+  Declaration field;
+  struct dep_modifier *next;
+} MODIFIER;
+#define NO_MODIFIER ((MODIFIER*)0)
+
+FIBER dep_modifier_fiber(MODIFIER* dm, FIBER f) {
+  if (f == NULL) f = base_fiber;
+  if (dm == 0) return f;
+  f = dep_modifier_fiber(dm->next, f);
+  if (f == 0) return f;
+  f = (FIBER)assoc(dm->field,f->longer);
+  return f;
+}
+
+typedef struct dep_vertex {
+  Declaration attr;
+  Declaration node;
+  MODIFIER* modifier;
+} VERTEX;
+
+void print_dep_vertex(VERTEX*,FILE*);
+
+INSTANCE* dep_vertex_instance(VERTEX* dv, FIBER f, AUG_GRAPH* aug_graph)
+{
+  f = dep_modifier_fiber(dv->modifier,f);
+  if (f == NULL) return NULL;
+  return get_instance_or_null(dv->attr,f,dv->node,aug_graph);
+}
+
+INSTANCE* summary_vertex_instance(VERTEX* dv, FIBER f, PHY_GRAPH* phy_graph)
+{
+  f = dep_modifier_fiber(dv->modifier,f);
+  if (f == NULL) return NULL;
+  return get_summary_instance_or_null(dv->attr,f,phy_graph);  
+}
+
+/**
+ * Connect the two vertices together, and if the kind is not indirect,
+ * add fiber dependencies too.
  */
-void add_edges_to_graph(INSTANCE *source,
-			INSTANCE *sink,
+void add_edges_to_graph(VERTEX* v1,
+			VERTEX* v2,
 			CONDITION *cond,
 			DEPENDENCY kind,
 			AUG_GRAPH *aug_graph) {
-  INSTANCE *array = aug_graph->instances.array;
-  int start1 = source - array;
-  int mid1;
-  int max1 = aug_graph->instances.length;
-  int start2 = sink - array;
-  int mid2;
-  int max2 = max1;
-  int i1, i2;
-  Declaration attr1 = source->fibered_attr.attr;
-  Declaration attr2 = sink->fibered_attr.attr;
-  Declaration node1 = source->node;
-  Declaration node2 = sink->node;
-  Declaration field1 = NULL;
-  Declaration field2 = NULL;
-  Declaration rfield1 = NULL;
-  Declaration rfield2 = NULL;
-  int reverse1 = source->fibered_attr.fiber_is_reverse;
-  int reverse2 = sink->fibered_attr.fiber_is_reverse;
+  STATE *s = aug_graph->global_state;
+  int i;
 
-  if (kind == no_dependency) return;
-
-  /* first just add the edge */
-  add_edge_to_graph(source,sink,cond,kind,aug_graph);
-
-  if (source->fibered_attr.fiber != NULL) {
-    field1 = source->fibered_attr.fiber->field;
-    rfield1 = reverse_field(field1);
-  }
-  if (sink->fibered_attr.fiber != NULL) {
-    field2 = sink->fibered_attr.fiber->field;
-    rfield2 = reverse_field(field2);
+  if (analysis_debug & ADD_EDGE) {
+    print_dep_vertex(v1,stdout);
+    fputs("->",stdout);
+    print_dep_vertex(v2,stdout);
+    fputs(":",stdout);
+    print_edge_helper(kind,cond,stdout);
+    puts("");
   }
 
-  if (field1 != NULL) {
-    /* move back start1 */
-    while (array[start1].fibered_attr.fiber != NULL) --start1;
-  }
-  if (field2 != NULL) {
-    /* move back start2 */
-    while (array[start2].fibered_attr.fiber != NULL) --start2;
-  }
-
-  for (i1 = start1 + 1; i1 < max1; ++i1) {
-    if (!(array[i1].fibered_attr.attr == attr1 &&
-	  array[i1].fibered_attr.fiber_is_reverse == FALSE &&
-	  array[i1].node == node1)) break;
-  }
-  mid1 = i1;
-  for (i1 = mid1; i1 < max1; ++i1) {
-    if (!(array[i1].fibered_attr.attr == attr1 &&
-	  array[i1].fibered_attr.fiber_is_reverse == TRUE &&
-	  array[i1].node == node1)) break;
-  }
-  max1 = i1;
-
-  for (i2 = start2 + 1; i2 < max2; ++i2) {
-    if (!(array[i2].fibered_attr.attr == attr2 &&
-	  array[i2].fibered_attr.fiber_is_reverse == FALSE &&
-	  array[i2].node == node2)) break;
-  }
-  mid2 = i2;
-  for (i2 = mid2; i2 < max2; ++i2) {
-    if (!(array[i2].fibered_attr.attr == attr2 &&
-	  array[i2].fibered_attr.fiber_is_reverse == TRUE &&
-	  array[i2].node == node2)) break;
-  }
-  max2 = i2;
-
-  /*
-  printf("Dependencies (%d,%d) -> [%d,%d), [%d,%d) -> (%d,%d)\n",
-	 start1,mid1,mid2,max2,
-	 mid1,max1,start2,mid2);
-  */
-
-  /* The range (start,mid) holds regular fibered attributes, and
-   * the range [mid,max) holds reverse fibered attributes.
-   * Now for each case where the two ranges have a fiber in common
-   * we connect an edge (in the normal or reverse direction)
-   */
-
-  /*
-  if (reverse1 != reverse2)
-    printf("A cross dependency! (%d,%d) -> [%d,%d), [%d,%d) -> (%d,%d)\n",
-	   start1,mid1,mid2,max2,
-	   mid1,max1,start2,mid2);
-  */
-
-  for (i1 = start1+1; i1 < max1; ++i1) {
-    INSTANCE *in1 = &array[i1];
-    FIBER f1 = array[i1].fibered_attr.fiber;
-    Declaration field1 = NULL;
-    if (source->fibered_attr.fiber != NULL)
-      field1 = source->fibered_attr.fiber->field;
-    if (field1 != NULL && (reverse1 != (i1 >= mid1)))
-      field1 = reverse_field(field1);
-    if (field1 == NULL || f1->field == field1) { /* shorten is possible */
-      FIBER f1a, f1b;
-      if (field1 == NULL) {
-	f1a = f1b = f1;
-      } else if (FIELD_DECL_IS_CYCLIC(field1)) {
-	f1a = f1; f1b = f1->shorter;
-      } else {
-	f1a = f1b = f1->shorter;
-      }
-      /* f1a and f1b are the "results" of shorten(field1,f1) */
-      for (i2 = start2+1; i2 < max2; ++i2) {
-	INSTANCE *in2 = &array[i2];
-	FIBER f2 = array[i2].fibered_attr.fiber;
-	Declaration field2 = NULL;
-	if (sink->fibered_attr.fiber != NULL)
-	  field2 = sink->fibered_attr.fiber->field;
-	if (field2 != NULL && (reverse2 != (i2 >= mid2)))
-	  field2 = reverse_field(field2);
-	if ((reverse1 == (i1 >= mid1)) == (reverse2 == (i2 >= mid2)) &&
-	    (field2 == NULL || f2->field == field2)) { /* shorten possible */
-	  FIBER f2a, f2b;
-	  if (field2 == NULL) {
-	    f2a = f2b = f2;
-	  } else if (FIELD_DECL_IS_CYCLIC(field2)) {
-	    f2a = f2; f2b = f2->shorter;
-	  } else {
-	    f2a = f2b = f2->shorter;
-	  }
-	  if (f1a == f2a || f1b == f2a || f1b == f2a || f1b == f2b) {
-	    if (reverse1 == (i1 >= mid1)) 
-	      add_edge_to_graph(in1,in2,cond,fiber_dependency,aug_graph);
-	    else
-	      add_edge_to_graph(in2,in1,cond,fiber_dependency,aug_graph);
-	  }
-	}
-      }
+  // first add simple edge
+  {
+    INSTANCE *source = dep_vertex_instance(v1,0,aug_graph);
+    INSTANCE *sink = dep_vertex_instance(v2,0,aug_graph);
+    if (source != NULL && sink != NULL) {
+      add_edge_to_graph(source,sink,cond,kind,aug_graph);
     }
   }
+
+  // if not carrying, don't add fiber dependencies
+  if ((kind & DEPENDENCY_MAYBE_CARRYING) == 0) return;
+
+  // if carrying, then we add fiber dependencies.
+  kind &= ~DEPENDENCY_NOT_JUST_FIBER;
   
-#ifdef UNDEF
-  if (field1 != NULL && field2 != NULL) {
-    print_instance(source,stderr);
-    fprintf(stderr,"->");
-    print_instance(sink,stderr);
-    fprintf(stderr,"\n");
-    fatal_error("Cannot do this case yet");
+  for (i=0; i < s->fibers.length; ++i) {
+    FIBER f = s->fibers.array[i];
+    INSTANCE *i1 = dep_vertex_instance(v1,f,aug_graph);
+    INSTANCE *i2 = dep_vertex_instance(v2,f,aug_graph);
+    if (f == base_fiber || i1 == NULL || i2 == NULL) continue;
+    if (fiber_is_reverse(f)) {
+      INSTANCE *i = i1;
+      i1 = i2;
+      i2 = i;
+    }
+    add_edge_to_graph(i1,i2,cond,kind,aug_graph);
   }
-
-  if (reverse1) {
-    for (i1 = start1+1; i1 < mid1; ++i1) { /* reverse2 -> normal1 */
-      INSTANCE *in1 = &array[i1];
-      FIBER f1 = array[i1].fibered_attr.fiber;
-      if (f1->field == rfield1)
-	for (i2 = mid2; i2 < max2; ++i2) {
-	  INSTANCE *in2 = &array[i2];
-	  FIBER f2 = array[i2].fibered_attr.fiber;
-	  if (lengthen_fiber(rfield1,f2) == f1)
-	    add_edge_to_graph(in2,in1,cond,fiber_dependency,aug_graph);
-	}
-    }
-    for (i1 = mid1; i1 < max1; ++i1) { /* reverse1 -> normal2 */
-      INSTANCE *in1 = &array[i1];
-      FIBER f1 = array[i1].fibered_attr.fiber;
-      if (f1->field == field1)
-	for (i2 = start2+1; i2 < mid2; ++i2) {
-	  INSTANCE *in2 = &array[i2];
-	  FIBER f2 = array[i2].fibered_attr.fiber;
-	  if (lengthen_fiber(field1,f2) == f1)
-	    add_edge_to_graph(in1,in2,cond,fiber_dependency,aug_graph);
-	}
-    }
-  } else if (reverse2) {
-    for (i2 = start2+1; i2 < mid2; ++i2) { /* normal2 -> reverse1 */
-      INSTANCE *in2 = &array[i2];
-      FIBER f2 = array[i2].fibered_attr.fiber;
-      if (f2->field == rfield2)
-	for (i1 = mid1; i1 < max1; ++i1) {
-	  INSTANCE *in1 = &array[i1];
-	  FIBER f1 = array[i1].fibered_attr.fiber;
-	  if (lengthen_fiber(rfield2,f1) == f2)
-	    add_edge_to_graph(in2,in1,cond,fiber_dependency,aug_graph);
-	}
-    }
-    for (i2 = mid2; i2 < max2; ++i2) { /* normal1 -> reverse2 */
-      INSTANCE *in2 = &array[i2];
-      FIBER f2 = array[i2].fibered_attr.fiber;
-      if (f2->field == field2)
-	for (i1 = start1+1; i1 < mid1; ++i1) {
-	  INSTANCE *in1 = &array[i1];
-	  FIBER f1 = array[i1].fibered_attr.fiber;
-	  if (lengthen_fiber(field2,f1) == f2)
-	    add_edge_to_graph(in1,in2,cond,fiber_dependency,aug_graph);
-	}
-    }
-  } else {
-    /* we assume one of field1,field2 is NULL */
-    for (i1 = start1+1; i1 < mid1; ++i1) { /* normal1 -> normal2 */
-      INSTANCE *in1 = &array[i1];
-      FIBER f1 = array[i1].fibered_attr.fiber;
-      if (field1 == NULL || f1->field == field1)
-	for (i2 = start2+1; i2 < mid2; ++i2) {
-	  INSTANCE *in2 = &array[i2];
-	  FIBER f2 = array[i2].fibered_attr.fiber;
-	  if (lengthen_fiber(field1,f2) == lengthen_fiber(field2,f1))
-	    add_edge_to_graph(in1,in2,cond,fiber_dependency,aug_graph);
-	}
-    }
-    for (i1 = mid1; i1 < max1; ++i1) { /* reverse2 -> reverse1 */
-      INSTANCE *in1 = &array[i1];
-      FIBER f1 = array[i1].fibered_attr.fiber;
-      if (rfield1 == NULL || f1->field == rfield1)
-	for (i2 = mid2; i2 < max2; ++i2) {
-	  INSTANCE *in2 = &array[i2];
-	  FIBER f2 = array[i2].fibered_attr.fiber;
-	  if (lengthen_fiber(rfield1,f2) == lengthen_fiber(rfield2,f1))
-	    add_edge_to_graph(in2,in1,cond,fiber_dependency,aug_graph);
-	}
-    }
-  }
- 
-#endif
-	/*
-	{ print_instance(source,stdout);
-	  printf(" -> ");
-	  print_instance(sink,stdout);
-	  printf(" implies? ");
-	  print_instance(&array[i1],stdout);
-	  printf(" -> ");
-	  print_instance(&array[i2],stdout);
-	  printf("\n");
-	}
-	*/
-
-  /* Done */
 }
 
-/* Return the instance for a given expression.
- * It is an error if the expression is something other than an instance.
- * @return null if the expression refers to constant (external) things.
- */
-INSTANCE *get_expression_instance(FIBER fiber, int frev,
-				  Expression e, AUG_GRAPH *aug_graph) {
-  switch (Expression_KEY(e)) {
-  default:
-    fatal_error("%d: Cannot get expression instance",tnode_line_number(e));
-    break;
-  case KEYfuncall:
-    { Declaration decl;
-      if ((decl = attr_ref_p(e)) != NULL) {
-	Expression node = attr_ref_object(e);
-	Declaration ndecl = NULL;
-	switch (Expression_KEY(node)) {
-	default: fatal_error("%d: can't handle this attribute instance",
-			     tnode_line_number(node));
-	case KEYvalue_use:
-	  ndecl = USE_DECL(value_use_use(node));
-	  break;
-	}
-	return get_instance(decl,fiber,frev,ndecl,aug_graph);
-      } else if ((decl = field_ref_p(e)) != NULL) {
-	Expression node = field_ref_object(e);
-	Declaration ndecl = NULL;
-	switch (Expression_KEY(node)) {
-	default: fatal_error("%d: can't handle this attribute instance",
-			     tnode_line_number(node));
-	case KEYvalue_use:
-	  ndecl = USE_DECL(value_use_use(node));
-	  break;
-	}
-	if (fiber != NULL && fiber != base_fiber) {
-	  /*printf("Trying untested techniques\n");*/
-	  if (fiber->shorter == 0) fatal_error("What base fiber?");
-	  fiber = lengthen_fiber(decl,fiber);
-	  decl = ndecl;
-	  ndecl = NULL;
-	}
-	return get_instance(decl,fiber,frev,ndecl,aug_graph);
-      } else {
-	fatal_error("%d: Cannot get expression instance",tnode_line_number(e));
-	return NULL;
-      }
-    }
-    break;
+Declaration attr_ref_node_decl(Expression e)
+{
+  Expression node = attr_ref_object(e);
+  switch (Expression_KEY(node)) {
+  default: fatal_error("%d: can't handle this attribute instance",
+		       tnode_line_number(node));
   case KEYvalue_use:
-    { Declaration decl=Use_info(value_use_use(e))->use_decl;
-      if (decl == NULL)
-	fatal_error("%d: unbound expression",tnode_line_number(e));
-
-      if (DECL_IS_LOCAL(decl)) {
-	Declaration rdecl;
-	if (DECL_IS_SHARED(decl) &&
-	    (rdecl = responsible_node_declaration(e)) != NULL) {
-	  fatal_error("%d: Cannot get expression instance for shared %s",
-		      tnode_line_number(e),decl_name(decl));
-	  return NULL;
-	} else if (Declaration_info(decl)->decl_flags &
-		   (ATTR_DECL_INH_FLAG|ATTR_DECL_SYN_FLAG)) {
-	  /* a use of parameter or result (we hope) */
-	  Declaration fdecl = aug_graph->match_rule;
-	  switch (Declaration_KEY(decl)) {
-	  case KEYnormal_formal:
-	  case KEYvalue_decl:
-	    break;
-	  default:
-	    fatal_error("%d: incomplete attribute %s",
-			tnode_line_number(e),decl_name(decl));
-	  }
-	  return get_instance(decl,fiber,frev,fdecl,aug_graph);
-	} else if (Declaration_info(decl)->decl_flags &
-		   (DECL_LHS_FLAG|DECL_RHS_FLAG)) {
-	  /* no dependency need be added */
-	  return NULL;
-	} else {
-	  /* an unshared (local) dependency within an aug graph */
-	  return get_instance(decl,fiber,frev,NULL,aug_graph);
-	}
-      } else {
-	return NULL;
-      }
-    }
-    break;
+    return USE_DECL(value_use_use(node));
   }
 }
 
 /** Add edges to the dependency graph to represent dependencies
- * from sink to the value computed in the expression.
+ * from the value computed in the expression to the given sink
  * @param cond condition under which dependency holds
- * @param fiber fibers of the value depended on (usually NULL)
- * @param frev whether the fiber is the reverse fiber
- * @param kind whether a real dependency or a fiber dependency
- * @param carrying whether the dependency carries a value.
- *        If not, then we don't add additional fiber dependencies.
+ * @param mod modifier to apply to instances found
+ * @param kind whether carrying/non-fiber etc.
  */
-static void record_expression_dependencies(INSTANCE *sink, CONDITION *cond,
-					   FIBER fiber, int frev,
-					   DEPENDENCY kind, int carrying,
+static void record_expression_dependencies(VERTEX *sink, CONDITION *cond,
+					   DEPENDENCY kind, MODIFIER *mod,
 					   Expression e, AUG_GRAPH *aug_graph)
 {
+  VERTEX source;
+  MODIFIER new_mod;
   /* Several different cases
    *
    * l
@@ -1231,9 +1084,8 @@ static void record_expression_dependencies(INSTANCE *sink, CONDITION *cond,
    */
   switch (Expression_KEY(e)) {
   default:
-    fprintf(stderr,"fatal_error: %d: cannot handle this expression (%d)\n",
+    fatal_error("%d: cannot handle this expression (%d)\n",
 		tnode_line_number(e), Expression_KEY(e));
-    repeat_expr(e); /* force crash */
     break;
   case KEYinteger_const:
   case KEYreal_const:
@@ -1242,13 +1094,12 @@ static void record_expression_dependencies(INSTANCE *sink, CONDITION *cond,
     /* nothing to do */
     break;
   case KEYrepeat:
-    record_expression_dependencies(sink,cond,fiber,frev,kind,carrying,
+    record_expression_dependencies(sink,cond,kind,mod,
 				   repeat_expr(e),aug_graph);
     break;
   case KEYvalue_use:
     { Declaration decl=Use_info(value_use_use(e))->use_decl;
       Declaration rdecl;
-      INSTANCE *source;
       if (decl == NULL)
 	fatal_error("%d: unbound expression",tnode_line_number(e));
       if (DECL_IS_LOCAL(decl) &&
@@ -1256,99 +1107,80 @@ static void record_expression_dependencies(INSTANCE *sink, CONDITION *cond,
 	  (rdecl = responsible_node_declaration(e)) != NULL) {
 	/* a shared dependency: we get it from the shared_info */
 	Declaration phy = node_decl_phylum(rdecl);
-	Declaration sattr =
+
+	source.node = rdecl;
+	source.attr = 
 	  phylum_shared_info_attribute(phy,aug_graph->global_state);
-	FIBER new_fiber = lengthen_fiber(decl,fiber);
-	INSTANCE *osrc = get_instance(sattr,fiber,frev,rdecl,aug_graph);
-	source = get_instance(sattr,new_fiber,frev,rdecl,aug_graph);
-	if (carrying) {
-	  add_edges_to_graph(source,sink,cond,kind,aug_graph);
-	} else {
-	  add_edge_to_graph(source,sink,cond,kind,aug_graph);
-	}
-	add_edge_to_graph(osrc,sink,cond,kind,aug_graph);
+	source.modifier = NO_MODIFIER;
+	add_edges_to_graph(&source,sink,cond,kind&~DEPENDENCY_MAYBE_CARRYING,
+			   aug_graph);
+
+	new_mod.field = decl;
+	new_mod.next = mod;
+	source.modifier = &new_mod;
+	add_edges_to_graph(&source,sink,cond,kind,aug_graph);
+      } else if (Declaration_info(decl)->decl_flags &
+		 (ATTR_DECL_INH_FLAG|ATTR_DECL_SYN_FLAG)) {
+	/* a use of parameter or result (we hope) */
+	Declaration fdecl = aug_graph->match_rule;
+	source.node = aug_graph->match_rule;
+	source.attr = decl;
+	source.modifier = mod;
+	add_edges_to_graph(&source,sink,cond,kind,aug_graph);
       } else {
-	source = get_expression_instance(fiber,frev,e,aug_graph);
-	if (source != NULL) {
-	  if (carrying) {
-	    add_edges_to_graph(source,sink,cond,kind,aug_graph);
-	  } else {
-	    add_edge_to_graph(source,sink,cond,kind,aug_graph);
-	  }
-	}
+	source.node = NULL;
+	source.attr = decl;
+	source.modifier = mod;
+	add_edges_to_graph(&source,sink,cond,kind,aug_graph);
       }
     }
     break;
   case KEYfuncall:
     { Declaration decl;
       if ((decl = attr_ref_p(e)) != NULL) {
-	INSTANCE *source = get_expression_instance(fiber,frev,e,aug_graph);
-	if (carrying) {
-	  add_edges_to_graph(source,sink,cond,kind,aug_graph);
-	} else {
-	  add_edge_to_graph(source,sink,cond,kind,aug_graph);
-	}
+	source.node = attr_ref_node_decl(e);
+	source.attr = decl;
+	source.modifier = mod;
+	add_edges_to_graph(&source,sink,cond,kind,aug_graph);
       } else if ((decl = field_ref_p(e)) != NULL) {
 	Expression object = field_ref_object(e);
-	FIBER f2 = lengthen_fiber(decl,fiber);
-	record_expression_dependencies(sink,cond,fiber,frev,kind,FALSE,
-				       object,aug_graph);
-	record_expression_dependencies(sink,cond,f2,frev,kind,carrying,
-				       object,aug_graph);
+	new_mod.field = decl;
+	new_mod.next = mod;
+	// first the dependency on the pointer itself (NOT carrying)
+	record_expression_dependencies(sink,cond,
+				       kind&~DEPENDENCY_MAYBE_CARRYING,
+				       NO_MODIFIER,object,aug_graph);
+	// then the dependency on the field (possibly carrying)
+	record_expression_dependencies(sink,cond,kind,&new_mod,object,
+				       aug_graph);
       } else if ((decl = local_call_p(e)) != NULL) {
 	Declaration result = some_function_decl_result(decl);
 	Expression actual = first_Actual(funcall_actuals(e));
-	/* Two possibilities:
-	 * 1> function
-	 *    - We depend on all arguments, and on all
-	 *      fibers that the result depends on.
-	 *    - Then fibers of the call are made to depend on
-	 *      what arguments and fibers of arguments that
-	 *      the corresponding fibers of the result depend on.
-	 * 2> procedure
-	 *    - We have an instance for this call.
-	 *    - We use the summary I/O graph for procedure to find out
-	 *      what parameters and what fibers of them we depend on.
-	 */
-	switch (Declaration_KEY(decl)) {
-	case KEYprocedure_decl:
-	  fatal_error("%d: Cannot handle procedure calls here\n",
-		      tnode_line_number(e));
-	  break;
-	case KEYfunction_decl:
-	  /* first depend on the arguments (not carrying, no fibers) */
-	  for (; actual != NULL; actual=Expression_info(actual)->next_actual) {
-	    record_expression_dependencies(sink,cond,0,FALSE,dependency,FALSE,
-					   actual,aug_graph);
-	  }
-
-	  /* attach to result, and somewhere else ? attach actuals */
-	  /* printf("%d: looking at local function %s\n",
-	   *	 tnode_line_number(e),decl_name(decl));
-	   */
-	  {
-	    Declaration proxy = Expression_info(e)->funcall_proxy;
-	    Declaration rd = some_function_decl_result(decl);
-	    INSTANCE *source = get_instance(rd,fiber,frev,proxy,aug_graph);
-	    
-	    if (carrying) {
-	      add_edges_to_graph(source,sink,cond,kind,aug_graph);
-	    } else {
-	      add_edge_to_graph(source,sink,cond,kind,aug_graph);
-	    }
+	/* first depend on the arguments (not carrying, no fibers) */
+	if (mod == NO_MODIFIER) {
+	  for (;actual!=NULL; actual=Expression_info(actual)->next_actual) {
+	    record_expression_dependencies(sink,cond,
+					   kind&~DEPENDENCY_MAYBE_CARRYING,
+					   NO_MODIFIER,actual,aug_graph);
 	  }
 	}
-      } else if ((decl = constructor_call_p(e)) != NULL) {
-	Expression actual = first_Actual(funcall_actuals(e));
-	for (; actual != NULL; actual=Expression_info(actual)->next_actual) {
-	  record_expression_dependencies(sink,cond,fiber,frev,kind,carrying,
-					 actual,aug_graph);
+
+	/* attach to result, and somewhere else ? attach actuals */
+	/* printf("%d: looking at local function %s\n",
+	 *	 tnode_line_number(e),decl_name(decl));
+	 */
+	{
+	  Declaration proxy = Expression_info(e)->funcall_proxy;
+	  source.node = proxy;
+	  source.attr = result;
+	  source.modifier = mod;
+	  add_edges_to_graph(&source,sink,cond,kind,aug_graph);
 	}
       } else {
 	/* some random (external) function call */
 	Expression actual = first_Actual(funcall_actuals(e));
 	for (; actual != NULL; actual=Expression_info(actual)->next_actual) {
-	  record_expression_dependencies(sink,cond,fiber,frev,kind,carrying,
+	  record_expression_dependencies(sink,cond,kind,mod,
 					 actual,aug_graph);
 	}
       }
@@ -1357,7 +1189,7 @@ static void record_expression_dependencies(INSTANCE *sink, CONDITION *cond,
   }
 }
 
-void record_condition_dependencies(INSTANCE *sink, CONDITION *cond,
+void record_condition_dependencies(VERTEX *sink, CONDITION *cond,
 				   AUG_GRAPH *aug_graph) {
   int i;
   unsigned bits=cond->positive|cond->negative;
@@ -1373,12 +1205,136 @@ void record_condition_dependencies(INSTANCE *sink, CONDITION *cond,
       void* if_rule = aug_graph->if_rules.array[i];
       /* printf("Getting dependencies for condition %d\n",i); */
       CONDITION *cond2 = if_rule_cond(if_rule);
-      int index = if_rule_index(if_rule);
-      INSTANCE* if_instance = &aug_graph->instances.array[index];
-      if (index > 32 || if_instance->index != index) 
-	fatal_error("something is fishy");
-      add_edge_to_graph(if_instance,sink,cond2,control_dependency,aug_graph);
+      VERTEX if_vertex;
+      if_vertex.node = 0;
+      if_vertex.attr = if_rule;
+      if_vertex.modifier = NO_MODIFIER;
+      add_edges_to_graph(&if_vertex,sink,cond2,control_dependency,aug_graph);
     }
+  }
+}
+
+/** Add edges to the dependency graph to represent dependencies
+ * from the rhs to the modified expression.
+ * @param cond condition under which dependency holds
+ * @param mod modifier to apply to instances found in the lhs
+ * @param kind whether carrying/non-fiber etc.
+ * @param the rhs that this depends on
+ */
+static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
+				    DEPENDENCY kind, MODIFIER *mod,
+				    Expression rhs, AUG_GRAPH *aug_graph)
+{
+  switch (Expression_KEY(lhs)) {
+  default:
+    fatal_error("%d: Unknown lhs key %d",
+		tnode_line_number(lhs),Expression_KEY(lhs));
+    break;
+  case KEYinteger_const:
+  case KEYreal_const:
+  case KEYstring_const:
+  case KEYchar_const:
+    if (mod != NULL) {
+      aps_error(lhs,"Cannot assign a constant.\n");
+    }
+    /* no dependencies */
+    break;
+  case KEYvalue_use:
+    {
+      Declaration decl = USE_DECL(value_use_use(lhs));
+      if (shared_use_p(lhs) != NULL) {
+	/* Assignment of shared global (or a field of a shared global) */
+	VERTEX sink;
+	MODIFIER new_mod;
+	
+	new_mod.next = mod;
+	if (EXPR_IS_LHS(lhs)) {
+	  new_mod.field = reverse_field(decl);
+	} else {
+	  new_mod.field = decl;
+	}
+	sink.node = responsible_node_declaration(lhs);
+	if (sink.node == NULL) {
+	  fatal_error("%d: Assignment of global %s in global space???",
+		      tnode_line_number(lhs), decl_name(decl));
+	  return;
+	}
+	/*!!!HERE! What if this is null ? */
+	sink.attr =
+	  phylum_shared_info_attribute(node_decl_phylum(sink.node),
+				       aug_graph->global_state);
+	sink.modifier = &new_mod;
+	record_expression_dependencies(&sink,cond,kind,NULL,rhs,aug_graph);
+	record_condition_dependencies(&sink,cond,aug_graph);
+	/* should also force a backwards depend on the shared info,
+	 * but shared info is actually uninteresting,
+	 * so I'll skip it...
+	 */
+      } else if (Declaration_info(decl)->decl_flags &
+		 (ATTR_DECL_INH_FLAG|ATTR_DECL_SYN_FLAG)) {
+	/* a use of parameter or result (we hope) */
+	VERTEX sink;
+	sink.node = aug_graph->match_rule;
+	sink.attr = decl;
+	sink.modifier = mod;
+	record_expression_dependencies(&sink,cond,kind,NULL,rhs,aug_graph);
+	record_condition_dependencies(&sink,cond,aug_graph);
+      } else {
+	VERTEX sink;
+	sink.node = 0;
+	sink.attr = decl;
+	sink.modifier = mod;
+	record_expression_dependencies(&sink,cond,kind,NULL,rhs,aug_graph);
+	record_condition_dependencies(&sink,cond,aug_graph);
+      }
+    }
+    break;
+  case KEYfuncall:
+    {
+      Declaration field, attr, fdecl, decl;
+      if ((field = field_ref_p(lhs)) != NULL) {
+	/* Assignment of a field, or a field of a field */
+	Expression object = field_ref_object(lhs);
+	MODIFIER new_mod;
+	new_mod.next = mod;
+	if (EXPR_IS_LHS(lhs)) {
+	  new_mod.field = reverse_field(field);
+	} else {
+	  new_mod.field = field;
+	}
+	record_lhs_dependencies(object,cond,kind,&new_mod,rhs,aug_graph);
+	record_lhs_dependencies(object,cond,control_dependency,
+				&new_mod,object,aug_graph);
+      } else if ((attr = attr_ref_p(lhs)) != NULL) {
+	VERTEX sink;
+	sink.node = attr_ref_node_decl(lhs);
+	sink.attr = attr;
+	sink.modifier = mod;
+	record_expression_dependencies(&sink,cond,kind,NULL,rhs,aug_graph);
+	record_condition_dependencies(&sink,cond,aug_graph);
+      } else if ((fdecl = local_call_p(lhs)) != NULL) {      
+	Declaration result = some_function_decl_result(decl);
+	Declaration proxy = Expression_info(lhs)->funcall_proxy;
+	VERTEX sink;
+	if (mod == NO_MODIFIER) {
+	  aps_error(lhs,"How can we assign the result of a function?");
+	}
+	sink.node = proxy;
+	sink.attr = result;
+	sink.modifier = mod;
+	record_expression_dependencies(&sink,cond,kind,NULL,rhs,aug_graph);
+	record_condition_dependencies(&sink,cond,aug_graph);
+      } else {
+	Expression actual = first_Actual(funcall_actuals(lhs));
+	if (mod == NO_MODIFIER) {
+	  aps_error(lhs,"How can we assign the result of a function?");
+	}
+	for (; actual != NULL; actual=Expression_info(actual)->next_actual) {
+	  record_lhs_dependencies(actual,cond,kind,mod,rhs,aug_graph);
+	}
+      }
+    }
+    break;
   }
 }
 
@@ -1424,24 +1380,29 @@ static void *get_edges(void *vaug_graph, void *node) {
 	{ Declaration case_stmt = formal_in_case_p(decl);
 	  if (case_stmt != NULL) {
 	    Expression expr = case_stmt_expr(case_stmt);
-	    INSTANCE *i = get_instance(decl,NULL,FALSE,NULL,aug_graph);
-	    record_condition_dependencies(i,cond,aug_graph);
-	    record_expression_dependencies(i,cond,NULL,FALSE,dependency,TRUE,
+	    VERTEX f;
+	    f.node = 0;
+	    f.attr = decl;
+	    f.modifier = NO_MODIFIER;
+	    record_condition_dependencies(&f,cond,aug_graph);
+	    record_expression_dependencies(&f,cond,dependency,NO_MODIFIER,
 					   expr,aug_graph);
 	  }
 	}
 	break;
       case KEYvalue_decl:
-	{ INSTANCE *i=get_instance(decl,NULL,FALSE,NULL,aug_graph);
+	{
 	  Default def = value_decl_default(decl);
 	  Declaration cdecl;
-	  if (i == NULL)
-	    fatal_error("%d: panic: instance is null",tnode_line_number(decl));
-	  record_condition_dependencies(i,cond,aug_graph);
+	  VERTEX sink;
+	  sink.attr = decl;
+	  sink.node = 0;
+	  sink.modifier = NO_MODIFIER;
+	  record_condition_dependencies(&sink,cond,aug_graph);
 	  switch (Default_KEY(def)) {
 	  case KEYno_default: break;
 	  case KEYsimple:
-	    record_expression_dependencies(i,cond,NULL,FALSE,dependency,TRUE,
+	    record_expression_dependencies(&sink,cond,dependency,NO_MODIFIER,
 					   simple_value(def),aug_graph);
 	    if ((cdecl = constructor_call_p(simple_value(def))) != NULL) {
 	      FIBERSET fs = fiberset_for(decl,FIBERSET_NORMAL_FINAL);
@@ -1462,58 +1423,24 @@ static void *get_edges(void *vaug_graph, void *node) {
 		   fdecl != NULL;
 		   fdecl = NEXT_FIELD(fdecl)) {
 		Declaration rfdecl = reverse_field(fdecl);
-		FIBERSET fs1;
-		for (fs1 = fs; fs1 != NULL; fs1=fs1->rest) {
-		  FIBER fiber = fs1->fiber;
-		  if ((fiber->field == fdecl ||
-		       fiber->field == rfdecl) &&
-		      member_fiberset(fiber,rfs)) {
-		    INSTANCE *source =
-		      get_instance(decl,fiber,TRUE,NULL,aug_graph);
-		    INSTANCE *sink =
-		      get_instance(decl,fiber,FALSE,NULL,aug_graph);
-		    if (fiber->field == fdecl &&
-			fiber->shorter == base_fiber) {
-		      INSTANCE* between =
-			get_instance(fdecl,NULL,FALSE,decl,aug_graph);
-		      /* not a fiber dependency because we have to collect
-		       * the values together.
-		       */
-		      /*
-		      printf("Adding extra edges ");
-		      print_instance(source,stdout);
-		      printf(" -> ");
-		      print_instance(between,stdout);
-		      printf(" -> ");
-		      print_instance(sink,stdout);
-		      printf("\n");
-		      */
-		      /* And put the instance between */
-		      add_edge_to_graph(source,between,cond,dependency,aug_graph);
-		      add_edge_to_graph(between,sink,cond,dependency,aug_graph);
-		      /* but also add a direct fiber dependency
-		       * so we know we have a direct dependency
-		       * between them (pure incremental purposes)
-		       */
-		      add_edge_to_graph(source,sink,cond,fiber_dependency,aug_graph);
-		    } else {
-		      /*
-		      printf("Avoiding extra edges ");
-		      print_instance(source,stdout);
-		      printf(" -> ");
-		      print_instance(sink,stdout);
-		      printf("\n");
-		      */
-		      add_edge_to_graph(source,sink,cond,
-					fiber_dependency,aug_graph);
-		    }
-		  }
-		}
+		VERTEX source;
+		MODIFIER dot_mod;
+		MODIFIER nodot_mod;
+		source.node = NULL;
+		source.attr = decl;
+		dot_mod.field = rfdecl;
+		nodot_mod.field = fdecl;
+		dot_mod.next = nodot_mod.next = NO_MODIFIER;
+		sink.modifier = &nodot_mod;
+		source.modifier = &dot_mod;
+		add_edges_to_graph(&source,&sink,cond,fiber_dependency,
+				   aug_graph);
+		
 	      }
 	    }
 	    break;
 	  case KEYcomposite:
-	    record_expression_dependencies(i,cond,NULL,FALSE,dependency,TRUE,
+	    record_expression_dependencies(&sink,cond,dependency,NO_MODIFIER,
 					   composite_initial(def),aug_graph);
 	    break;
 	  }
@@ -1522,153 +1449,64 @@ static void *get_edges(void *vaug_graph, void *node) {
 	    STATE *s = aug_graph->global_state;
 	    Declaration sattr =
 	      phylum_shared_info_attribute(s->start_phylum,s);
-	    FIBER fiber = lengthen_fiber(decl,base_fiber);
+	    Declaration rdecl = reverse_field(decl);
 	    Declaration module = aug_graph->match_rule;
-	    INSTANCE *i = get_instance(decl,NULL,FALSE,NULL,aug_graph);
-	    INSTANCE *use = get_instance_or_null(sattr,fiber,FALSE,
-						 module,aug_graph);
-	    INSTANCE *def = get_instance_or_null(sattr,fiber,TRUE,
-						 module,aug_graph);
-	    if (use != NULL)
-	      add_edges_to_graph(i,use,cond,dependency,aug_graph);
-	    if (def != NULL)
-	      add_edges_to_graph(def,i,cond,dependency,aug_graph);
+	    VERTEX shared_info_fiber, this_decl;
+	    MODIFIER dot_mod;
+	    MODIFIER nodot_mod;
+	    shared_info_fiber.node = module;
+	    shared_info_fiber.attr = sattr;
+	    this_decl.node = 0;
+	    this_decl.attr = decl;
+	    this_decl.modifier = NO_MODIFIER;
+	    dot_mod.field = rdecl;
+	    nodot_mod.field = decl;
+	    dot_mod.next = nodot_mod.next = NO_MODIFIER;
+
+	    /* add edges to collect value */
+	    shared_info_fiber.modifier = &dot_mod;
+	    add_edges_to_graph(&shared_info_fiber,&this_decl,
+			       NULL,dependency,aug_graph);
+
+	    /* add edges to broadcast value */
+	    shared_info_fiber.modifier = &nodot_mod;
+	    add_edges_to_graph(&this_decl,&shared_info_fiber,
+			       NULL,dependency,aug_graph);
 	  }
 	}
 	break;
       case KEYassign:
 	{ Expression lhs=assign_lhs(decl);
 	  Expression rhs=assign_rhs(decl);
-	  Declaration field;
-	  Declaration pdecl;
-	  if ((field = field_ref_p(lhs)) != NULL) {
-	    /* Assignment of a field */
-	    Expression object = field_ref_object(lhs);
-	    INSTANCE *osrc =
-	      get_expression_instance(NULL,FALSE,object,aug_graph);
-	    FIBER fiber = lengthen_fiber(field,base_fiber);
-	    if (direction_is_collection(attribute_decl_direction(field))) {
-	      INSTANCE *sink = get_expression_instance(fiber,TRUE,
-						       object,aug_graph);
-	      Expression_info(rhs)->value_for = sink;
-	      /* assignment requires the object is ready to assign */
-	      add_edge_to_graph(osrc,sink,cond,dependency,aug_graph);
-	      record_condition_dependencies(sink,cond,aug_graph);
-	      record_expression_dependencies(sink,cond,NULL,FALSE,
-					     dependency,TRUE,rhs,aug_graph);
-	    } else {
-	      INSTANCE *sink = get_expression_instance(NULL,FALSE,
-						       lhs,aug_graph);
-	      INSTANCE *fsink = get_expression_instance(fiber,FALSE,
-							object,aug_graph);
-	      Expression_info(rhs)->value_for = sink;
-	      /* assignment also requires the object is ready to assign */
-	      if (osrc != fsink) { /* avoid untracked fibers */
-		/* tracked but strict fields must still be assigned
-		 * before object is created.
-		 */
-		if (FIELD_DECL_IS_STRICT(field))
-		  add_edge_to_graph(fsink,osrc,cond,dependency,aug_graph);
-		/* Otherwise they must be assigned *after*
-		 * the object is created.
-		 *?? Why 2002/3/7?
-		 *?? These edges seem unnecessary
-		 */
-		else
-		  add_edge_to_graph(osrc,fsink,cond,dependency,aug_graph);
-	      }
-	      record_condition_dependencies(sink,cond,aug_graph);
-	      record_expression_dependencies(sink,cond,NULL,FALSE,
-					     dependency,TRUE,rhs,aug_graph);
-	      record_expression_dependencies(fsink,cond,NULL,FALSE,
-					     dependency,TRUE,rhs,aug_graph);
-	      add_edge_to_graph(sink,fsink,cond,dependency,aug_graph);
-	    }
-	  } else if ((field = shared_use_p(lhs)) != NULL) {
-	    /* Assignment of shared global */
-	    Declaration node = responsible_node_declaration(decl);
-	    Declaration sattr =
-	      phylum_shared_info_attribute(node_decl_phylum(node),
-					   aug_graph->global_state);
-	    FIBER fiber = lengthen_fiber(field,base_fiber);
-	    INSTANCE *sink = get_instance(sattr,fiber,TRUE,node,aug_graph);
-	    Expression_info(rhs)->value_for = sink;
-	    record_condition_dependencies(sink,cond,aug_graph);
-	    record_expression_dependencies(sink,cond,NULL,FALSE,
-					   dependency,TRUE,rhs,aug_graph);
-	  } else if ((pdecl = proc_call_p(rhs)) != NULL) {
-	    /* procedure call: connect up instances with locals */
-	    Declarations formals =
-	      function_type_formals(some_function_decl_type(pdecl));
-	    Declaration result = some_function_decl_result(pdecl);
-	    Actuals actuals = funcall_actuals(rhs);
-	    Declaration formal;
-	    Expression actual;
-	    /* connect the result */
-	    { INSTANCE *sink = get_expression_instance(NULL,FALSE,lhs,aug_graph);
-	      INSTANCE *src = get_instance(result,NULL,FALSE,decl,aug_graph);
-	      Expression_info(rhs)->value_for = sink;
-	      record_condition_dependencies(sink,cond,aug_graph);
-	      add_edges_to_graph(src,sink,cond,dependency,aug_graph);
-	    }
-	    /* connect the parameters */
-	    for (actual = first_Actual(actuals),
-		 formal = first_Declaration(formals);
-		 actual != NULL && formal != NULL;
-		 actual = Expression_info(actual)->next_actual,
-		 formal = Declaration_info(formal)->next_decl) {
-	      INSTANCE *sink = get_instance(formal,NULL,FALSE,decl,aug_graph);
-	      record_condition_dependencies(sink,cond,aug_graph);
-	      record_expression_dependencies(sink,cond,NULL,FALSE,
-					     dependency,TRUE,actual,aug_graph);
-	    }
-	    /* connect up the shared info */
-	    { STATE *s = aug_graph->global_state;
-	      Declaration node = responsible_node_declaration(decl);
-	      Declaration nodephy = node_decl_phylum(node);
-	      Declaration lattr = phylum_shared_info_attribute(nodephy,s);
-	      Declaration rattr = phylum_shared_info_attribute(pdecl,s);
-	      INSTANCE *source = get_instance(lattr,NULL,FALSE,node,aug_graph);
-	      INSTANCE *sink = get_instance(rattr,NULL,FALSE,decl,aug_graph);
-	      add_edges_to_graph(source,sink,cond,dependency,aug_graph);
-	    }
-	  } else {
-	    INSTANCE *sink = get_expression_instance(NULL,FALSE,lhs,aug_graph);
-	    Expression_info(rhs)->value_for = sink;
-	    record_condition_dependencies(sink,cond,aug_graph);
-	    record_expression_dependencies(sink,cond,NULL,FALSE,
-					   dependency,TRUE,rhs,aug_graph);
-	  }
+	  record_lhs_dependencies(lhs,cond,dependency,NULL,rhs,aug_graph);
 	}
 	break;
       case KEYif_stmt:
 	{
-	  int index = Declaration_info(decl)->if_index;
-	  INSTANCE* sink = &aug_graph->instances.array[index];
 	  Expression test = if_stmt_cond(decl);
-	  if (sink->index != index) fatal_error("%d:something is fishy",
-						tnode_line_number(decl));
-
-	  record_condition_dependencies(sink,cond,aug_graph);
-	  record_expression_dependencies(sink,cond,NULL,FALSE,
-					 control_dependency,FALSE,test,aug_graph);
+	  VERTEX sink;
+	  sink.node = 0;
+	  sink.attr = decl;
+	  sink.modifier = NO_MODIFIER;
+	  record_condition_dependencies(&sink,cond,aug_graph);
+	  record_expression_dependencies(&sink,cond,control_dependency,
+					 NULL,test,aug_graph);
 	}
 	break;
       case KEYcase_stmt:
 	{
 	  Match m;
+	  VERTEX sink;
+	  sink.node = 0;
+	  sink.modifier = NO_MODIFIER;
 	  for (m=first_Match(case_stmt_matchers(decl)); m; m=MATCH_NEXT(m)) {
-	    int index = Match_info(m)->if_index;
-	    INSTANCE* sink = &aug_graph->instances.array[index];
 	    Expression test = Match_info(m)->match_test;
-
-	    if (sink->index != index) fatal_error("something is fishy");
-
-	    record_condition_dependencies(sink,cond,aug_graph);
+	    sink.attr = (Declaration)m;
+	    record_condition_dependencies(&sink,cond,aug_graph);
 
 	    for (; test != 0; test = Expression_info(test)->next_expr) {
-	      record_expression_dependencies(sink,cond,NULL,FALSE,
-					     control_dependency,FALSE,test,aug_graph);
+	      record_expression_dependencies(&sink,cond,control_dependency,
+					     NO_MODIFIER,test,aug_graph);
 	    }
 	  }
 	}
@@ -1684,8 +1522,7 @@ static void *get_edges(void *vaug_graph, void *node) {
       Expression e = (Expression) node;
       Declaration fdecl;
       
-      if ((fdecl = local_call_p(e)) != NULL &&
-	  Declaration_KEY(fdecl) == KEYfunction_decl) {
+      if ((fdecl = local_call_p(e)) != NULL) {
 	Declaration proxy = Expression_info(e)->funcall_proxy;
 	CONDITION *cond;
 	void *parent = tnode_parent(node);
@@ -1698,20 +1535,26 @@ static void *get_edges(void *vaug_graph, void *node) {
 	/* connect result to conditions */
 	{
 	  Declaration rd = some_function_decl_result(fdecl);
-	  INSTANCE* sink = get_instance(rd,NULL,FALSE,proxy,aug_graph);
-	  record_condition_dependencies(sink,cond,aug_graph);
+	  VERTEX sink;
+	  sink.node = proxy;
+	  sink.attr = rd;
+	  sink.modifier = NO_MODIFIER;
+	  record_condition_dependencies(&sink,cond,aug_graph);
 	}
 
 	/* connect formals and actuals */
 	{
-	  Type ft = function_decl_type(fdecl);
+	  Type ft = some_function_decl_type(fdecl);
 	  Declaration f = first_Declaration(function_type_formals(ft));
 	  Expression a = first_Actual(funcall_actuals(e));
 	  for (; f != NULL; f = DECL_NEXT(f), a = EXPR_NEXT(a)) {
-	    INSTANCE *sink = get_instance(f,NULL,FALSE,proxy,aug_graph);
-	    record_expression_dependencies(sink,cond,NULL,FALSE,
-					   dependency,TRUE,a,aug_graph);
-	    record_condition_dependencies(sink,cond,aug_graph);
+	    VERTEX sink;
+	    sink.node = proxy;
+	    sink.attr = f;
+	    sink.modifier = NO_MODIFIER;
+	    record_expression_dependencies(&sink,cond,dependency,
+					   NO_MODIFIER,a,aug_graph);
+	    record_condition_dependencies(&sink,cond,aug_graph);
 	  }
 	}
 
@@ -1722,10 +1565,15 @@ static void *get_edges(void *vaug_graph, void *node) {
 	  Declaration rnodephy = node_decl_phylum(rnode);
 	  Declaration lattr = phylum_shared_info_attribute(rnodephy,s);
 	  Declaration rattr = phylum_shared_info_attribute(fdecl,s);
-	  INSTANCE *source = get_instance(lattr,NULL,FALSE,rnode,aug_graph);
-	  INSTANCE *sink = get_instance(rattr,NULL,FALSE,proxy,aug_graph);
-	  add_edges_to_graph(source,sink,cond,dependency,aug_graph);
-	  record_condition_dependencies(sink,cond,aug_graph);
+	  VERTEX source, sink;
+	  source.node = rnode;
+	  source.attr = lattr;
+	  source.modifier = NO_MODIFIER;
+	  sink.node = proxy;
+	  sink.attr = rattr;
+	  sink.modifier = NO_MODIFIER;
+	  add_edges_to_graph(&source,&sink,cond,dependency,aug_graph);
+	  record_condition_dependencies(&sink,cond,aug_graph);
 	}
       }
     }
@@ -1945,7 +1793,7 @@ static void init_augmented_dependency_graph(AUG_GRAPH *aug_graph,
     for (i=0; i < n; ++i) {
       assign_instance(aug_graph->instances.array, i,
 		      (Declaration)aug_graph->if_rules.array[i], /* kludge */
-		      0,0,0);
+		      0,0);
     }
     traverse_Declaration(get_instances,aug_graph,tlm);
   }
@@ -1962,23 +1810,25 @@ static void init_augmented_dependency_graph(AUG_GRAPH *aug_graph,
   /* initialize the edge set array */
   traverse_Block(get_edges,aug_graph,body);
 
-  /* add shared_info edges for rhs decls */
   if (aug_graph->first_rhs_decl != NULL) {
-    Declaration lattr = phylum_shared_info_attribute
-      (node_decl_phylum(aug_graph->lhs_decl),state);
-    INSTANCE *source =
-      get_instance(lattr,NULL,FALSE,aug_graph->lhs_decl,aug_graph);
+    VERTEX source;
     CONDITION cond;
     Declaration decl;
+    source.node = aug_graph->lhs_decl;
+    source.attr = phylum_shared_info_attribute
+      (node_decl_phylum(aug_graph->lhs_decl),state);
+    source.modifier = NO_MODIFIER;
     cond.positive = 0; cond.negative = 0;
     for (decl = aug_graph->first_rhs_decl;
 	 decl != NULL;
 	 decl = DECL_NEXT(decl)) {
       Declaration phy = node_decl_phylum(decl);
       if (phy != NULL) {
-	Declaration rattr = phylum_shared_info_attribute(phy,state);
-	INSTANCE *sink = get_instance(rattr,NULL,FALSE,decl,aug_graph);
-	add_edges_to_graph(source,sink,&cond,dependency,aug_graph);
+	VERTEX sink;
+	sink.node = decl;
+	sink.attr = phylum_shared_info_attribute(phy,state);
+	sink.modifier = NO_MODIFIER;
+	add_edges_to_graph(&source,&sink,&cond,dependency,aug_graph);
       }
     }
   }
@@ -2013,12 +1863,12 @@ static void init_summary_dependency_graph(PHY_GRAPH *phy_graph,
     INSTANCE *array=phy_graph->instances.array;
     for (; as != NULL; as=as->rest) {
       FIBERSET fs;
-      assign_instance(array,index++,as->attr,NULL,FALSE,NULL); /* base attribute */
+      assign_instance(array,index++,as->attr,NULL,NULL); /* base attribute */
       for (fs=fiberset_for(as->attr,FIBERSET_NORMAL_FINAL); fs != NULL; fs=fs->rest) {
-	assign_instance(array,index++,as->attr,fs->fiber,FALSE,NULL);
+	assign_instance(array,index++,as->attr,fs->fiber,NULL);
       }
       for (fs=fiberset_for(as->attr,FIBERSET_REVERSE_FINAL); fs != NULL; fs=fs->rest) {
-	assign_instance(array,index++,as->attr,fs->fiber,TRUE,NULL);
+	assign_instance(array,index++,as->attr,fs->fiber,NULL);
       }
     }
   }
@@ -2172,6 +2022,7 @@ static void init_analysis_state(STATE *s, Declaration module) {
   
   /* perform fibering */
   fiber_module(s->module,s);
+  add_fibers_to_state(s);
 
   /* initialize attrset_table */
   { Declaration decl = first_Declaration(decls);
@@ -2603,6 +2454,21 @@ void print_attrset(ATTRSET s, FILE *stream) {
   fputc('}',stream);
 }
 
+void print_dep_vertex(VERTEX *v, FILE *stream)
+{
+  INSTANCE fake;
+  MODIFIER* mod = v->modifier;
+  fake.node = v->node;
+  fake.fibered_attr.attr = v->attr;
+  fake.fibered_attr.fiber = 0;
+  print_instance(&fake,stream);
+  while (mod != NO_MODIFIER) {
+    fputs("#",stream);
+    fputs(decl_name(mod->field),stream);
+    mod = mod->next;
+  }
+}
+ 
 void print_instance(INSTANCE *i, FILE *stream) {
   if (stream == 0) stream = stdout;
   if (i->node != NULL) {
@@ -2642,16 +2508,14 @@ void print_instance(INSTANCE *i, FILE *stream) {
   }
   if (i->fibered_attr.fiber != NULL) {
     fputc('$',stream);
-    if (i->fibered_attr.fiber_is_reverse) {
-      fputc('!',stream);
-    }
     print_fiber(i->fibered_attr.fiber,stream);
   }
 }
 
-void print_edge_helper(EDGESET e, FILE* stream) {
+void print_edge_helper(DEPENDENCY kind, CONDITION *cond, FILE* stream) {
   if (stream == 0) stream = stdout;
-  switch (e->kind) {
+  switch (kind) {
+  default: fprintf(stream,"?%d",kind); break;
   case no_dependency: fputc('!',stream); break;
   case indirect_control_fiber_dependency:
   case indirect_fiber_dependency: fputc('?',stream); /* fall through */
@@ -2662,8 +2526,8 @@ void print_edge_helper(EDGESET e, FILE* stream) {
   case control_dependency:
   case dependency: break;
   }
-  print_condition(&e->cond,stream);
-  if ((e->kind & DEPENDENCY_NOT_JUST_FIBER) == 0) {
+  if (cond != NULL) print_condition(cond,stream);
+  if ((kind & DEPENDENCY_NOT_JUST_FIBER) == 0) {
     fputc(')',stream);
   }
 }
@@ -2674,7 +2538,7 @@ void print_edge(EDGESET e, FILE *stream) {
   fputs("->",stream);
   print_instance(e->sink,stream);
   fputc(':',stream);
-  print_edge_helper(e,stream);
+  print_edge_helper(e->kind,&e->cond,stream);
   fputc('\n',stream);
 }
   
@@ -2695,7 +2559,7 @@ void print_edgeset(EDGESET e, FILE *stream) {
 	fputs("!!SINK=",stream);
 	print_instance(tmp->sink,stream);
       }
-      print_edge_helper(tmp,stream);
+      print_edge_helper(tmp->kind,&tmp->cond,stream);
       tmp = tmp->rest;
       if (tmp != NULL) fputc(',',stream);
     }
@@ -2891,6 +2755,3 @@ void print_cycles(STATE *s, FILE *stream) {
     }
   }
 }
-
-
-
