@@ -244,6 +244,25 @@ struct COLL {
   }
 };
 
+// We have to define nth and friends on BAG becaus
+// of the way pattern matching works:
+template <class C_E>
+struct C__basic_16<C_E,C_BAG<C_E> > {
+  typedef C_BAG<C_E> C_T;
+  typedef typename C_E::T_Result T_E;
+  typedef typename C_T::T_Result T_T;
+  C_E *t_E;
+  C_T *t_T;
+  T_E v_first(T_T v_x){
+    return COLL<C_T,C_E>::nth(0,v_x);
+  }
+  T_E v_last(T_T v_x){
+    return COLL<C_T,C_E>::nth_from_end(0,v_x);
+  }
+  C__basic_16(C_E *_t_E,C_T *_t_T) : t_E(_t_E),
+    t_T(_t_T)  {}
+};
+ 
 // Sequence functions:
 template <class C_E>
 inline typename C_E::T_Result 
