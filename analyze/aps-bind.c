@@ -1,15 +1,10 @@
 #include <stdio.h>
-#include "alloc.h"
+#include "jbb-alloc.h"
 #include "aps-ag.h"
 
 int bind_debug;
 
-#define NAME_SIGNATURE 1
-#define NAME_TYPE 2
-#define NAME_PATTERN 4
-#define NAME_VALUE 8
-
-static int decl_namespaces(Declaration d) {
+int decl_namespaces(Declaration d) {
   switch (Declaration_KEY(d)) {
   case KEYclass_decl : /* fall through */
   case KEYclass_renaming: return NAME_SIGNATURE;
