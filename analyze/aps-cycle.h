@@ -13,6 +13,7 @@ typedef struct cycle_description {
 } CYCLE;
 
 #define PRINT_CYCLE 1
+#define DEBUG_UP_DOWN 2
 
 /* information about clauses */
 #define CYC_ABOVE 1
