@@ -271,25 +271,9 @@ class Circular {
 
  public:
 
-  static bool any_pending() {
-    return !pending.empty();
-  }
-
-  static void add_pending(Circular *c) {
-    pending.push_back(c);
-  }
-
-  static void clear_pending() {
-    unsigned n;
-    do {
-      n = 0;
-      for (Pending::iterator i = pending.begin(); i != pending.end(); ++i)
-	if (!(*i)->eval_changed()) ++n;
-    } while (n < pending.size());
-    for (Pending::iterator i = pending.begin(); i != pending.end(); ++i)
-      delete (*i);
-    pending.clear();
-  }
+  static bool any_pending();
+  static void add_pending(Circular *c);
+  static void clear_pending();
 
   class CheckPending {
     static int num_checks;

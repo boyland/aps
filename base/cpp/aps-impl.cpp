@@ -209,6 +209,26 @@ string Constructor::get_name() const { return name; }
 int Constructor::get_index() const { return index; }
 Type* Constructor::get_type() const { return type; }
 
+bool Circular::any_pending() {
+  return !pending.empty();
+}
+
+void Circular::add_pending(Circular *c) {
+  pending.push_back(c);
+}
+
+void Circular::clear_pending() {
+  unsigned n;
+  do {
+    n = 0;
+    for (Pending::iterator i = pending.begin(); i != pending.end(); ++i)
+      if (!(*i)->eval_changed()) ++n;
+  } while (n < pending.size());
+  for (Pending::iterator i = pending.begin(); i != pending.end(); ++i)
+    delete (*i);
+  pending.clear();
+}
+
 Circular::Pending Circular::pending;
 int Circular::CheckPending::num_checks = 0;
 
