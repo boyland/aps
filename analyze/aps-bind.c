@@ -39,10 +39,78 @@ static int decl_namespaces(Declaration d) {
 struct env_item {
   struct env_item *next;
   Declaration decl;
+  TypeEnvironment type_env;
   Symbol name;
   int namespaces;
 };
 typedef struct env_item *SCOPE;
+
+static Declaration module_TYPE;
+static Declaration module_PHYLUM;
+
+static TypeEnvironment current_type_env = 0;
+
+static void push_type_contour(Declaration d, TypeActuals tacts, Declaration tdecl) {
+  TypeEnvironment new_type_env =
+    (TypeEnvironment)HALLOC(sizeof(struct TypeContour));
+  new_type_env->outer = current_type_env;
+  new_type_env->source = d;
+  new_type_env->result = tdecl;
+  switch (Declaration_KEY(d)) {
+  case KEYsome_class_decl:
+    new_type_env->type_formals = some_class_decl_type_formals(d);
+    new_type_env->u.type_actuals = tacts;
+    break;
+  case KEYpolymorphic:
+    new_type_env->type_formals = polymorphic_type_formals(d);
+    new_type_env->u.inferred = 0; /* instantiate at each use */
+    break;
+  default:
+    fatal_error("push_type_contour called with bad declaration");
+  }
+  /* This should go somewhere else */
+  {
+    int i;
+    Declaration formal = first_Declaration(new_type_env->type_formals);
+    for (i=0; formal != 0; ++i, formal=DECL_NEXT(formal)) {
+      Declaration_info(formal)->instance_index = i;
+    }
+  }
+  current_type_env = new_type_env;
+}
+
+static void pop_type_contour()
+{
+  if (current_type_env != 0)
+    current_type_env = current_type_env->outer;
+  else
+    fatal_error("too many pop_type_contour");
+}
+
+/* instantiate polymorphic uses with space for inferred types */
+TypeEnvironment instantiate_type_env(TypeEnvironment form)
+{
+  if (form != 0 && Declaration_KEY(form->source) == KEYpolymorphic) {
+    TypeEnvironment ins =
+      (TypeEnvironment)HALLOC(sizeof(struct TypeContour));
+    Declarations tfs = form->type_formals;
+    Declaration tf;
+    int n=0;
+    int i;
+
+    ins->outer = instantiate_type_env(form->outer);
+    ins->source = form->source;
+    ins->type_formals = tfs;
+    for (tf=first_Declaration(tfs); tf != NULL; tf=DECL_NEXT(tf))
+      ++n;
+    /* allocate one more than necessary */
+    ins->u.inferred = (Type*)HALLOC((n+1)*sizeof(Type));
+    for (i=0; i <= n; ++i)
+      ins->u.inferred[i] = 0;
+    return ins;
+  }
+  return form;
+}
 
 static SCOPE add_env_item(SCOPE old, Declaration d) {
   switch (Declaration_KEY(d)) {
@@ -52,11 +120,12 @@ static SCOPE add_env_item(SCOPE old, Declaration d) {
       if (name == NULL) {
 	return old;
       } else {
-	SCOPE new_entry=(SCOPE)SALLOC(sizeof(struct env_item));
+	SCOPE new_entry=(SCOPE)HALLOC(sizeof(struct env_item));
 	new_entry->next = old;
 	new_entry->decl = d;
 	new_entry->name = name;
 	new_entry->namespaces = decl_namespaces(d);
+	new_entry->type_env = current_type_env;
 	return new_entry;
       }
     }
@@ -70,11 +139,11 @@ static void *do_bind(void *, void *);
 static void *set_next_fields(void *, void *);
 static void *activate_pragmas(void *, void *);
 
-static SCOPE add_ext_sig(SCOPE old, Signature sig) {
+static SCOPE add_ext_sig(SCOPE old, Declaration tdecl, Signature sig) {
   switch (Signature_KEY(sig)) {
   case KEYno_sig: return old;
   case KEYmult_sig:
-    return add_ext_sig(add_ext_sig(old,mult_sig_sig1(sig)),
+    return add_ext_sig(add_ext_sig(old,tdecl,mult_sig_sig1(sig)),tdecl,
 		       mult_sig_sig2(sig));
   case KEYsig_inst:
     /*! ignore is_input and is_var */
@@ -87,8 +156,13 @@ static SCOPE add_ext_sig(SCOPE old, Signature sig) {
 	  switch (Declaration_KEY(d)) {
 	  case KEYsome_class_decl:
 	    { SCOPE new_scope = old;
+	      TypeEnvironment saved = current_type_env;
+	      current_type_env = USE_TYPE_ENV(class_use_use(cl));
+	      push_type_contour(d,sig_inst_actuals(sig),tdecl);
 	      traverse_Block(get_public_bindings,&new_scope,
 			     some_class_decl_contents(d));
+	      pop_type_contour(); /* not actually necessary */
+	      current_type_env = saved;
 	      return new_scope; }
 	  default:
 	    /*! eventually handle renamings */
@@ -112,11 +186,14 @@ void bind_Program(Program p) {
   SCOPE scope=NULL;
   char *saved_filename = aps_yyfilename;
   Program basic_program = find_Program(make_string("basic"));
+  TypeEnvironment saved_type_env = current_type_env;
 
   if (PROGRAM_IS_BOUND(p)) return;
   Program_info(p)->program_flags |= PROGRAM_BOUND_FLAG;
 
+  current_type_env = 0;
   set_tnode_parent(p);
+  traverse_Program(set_next_fields,/* any nonnull value */p,p);
   
   if (basic_program != p) {
     bind_Program(basic_program);
@@ -126,9 +203,9 @@ void bind_Program(Program p) {
   aps_yyfilename = (char *)program_name(p);
   traverse_Program(do_bind,scope,p);
   release(top_mark);
-  traverse_Program(set_next_fields,/* any nonnull value */p,p);
   traverse_Program(activate_pragmas,/* any nonnull value */p,p);
   aps_yyfilename = saved_filename;
+  current_type_env = saved_type_env;
 }
 
 /* traverse_Declaration but skip the first call */
@@ -143,18 +220,201 @@ static SCOPE bind_Declarations(SCOPE scope, Declarations decls) {
   return new_scope;
 }
 
+static SCOPE signature_services(Declaration tdecl, Signature sig, SCOPE services);
+
+static SCOPE inst_services(TypeEnvironment use_type_env,
+			   Declaration class_decl,
+			   Declaration tdecl, /* type declaration */
+			   TypeActuals tacts,
+			   SCOPE services)
+{
+  TypeEnvironment saved = current_type_env;
+  Declaration tf;
+  /* Signature psig = some_class_decl_parent(class_decl); */
+  current_type_env = use_type_env;
+  push_type_contour(class_decl,tacts,tdecl);
+  /*!! HACK: needs to be fixed to handle extension correctly */
+  for (tf = first_Declaration(some_class_decl_type_formals(class_decl));
+       tf ; tf = DECL_NEXT(tf)) {
+    if (TYPE_FORMAL_IS_EXTENSION(tf)) {
+      /*! This won't work -- the environment is lost */
+      services = signature_services(tdecl,type_formal_sig(tf),services);
+    }
+  }
+  /*! Don't do this:
+   *! the services don't work correctly anyway (see above)
+   *! it's better to see what is actually available.
+   *
+   * services = signature_services(tdecl,psig,services); 
+   */
+  traverse_Block(get_public_bindings,&services,
+		 some_class_decl_contents(class_decl));  
+  pop_type_contour(); /* not actually necessary */
+  current_type_env = saved;
+  return services;
+}
+
+static SCOPE signature_services(Declaration tdecl, Signature sig, SCOPE services)
+{
+  switch (Signature_KEY(sig)) {
+  case KEYsig_use:
+     /*! ignoring the use_type_env is wrong */
+    {
+      Declaration sdecl = USE_DECL(sig_use_use(sig));
+      switch (Declaration_KEY(sdecl)) {
+      case KEYsignature_decl:
+	return signature_services(tdecl,signature_decl_sig(sdecl),services);
+      case KEYsignature_renaming:
+	return signature_services(tdecl,signature_renaming_old(sdecl),services);
+      default:
+	aps_error(sig,"not sure what sort of sig this is");
+	break;
+      }
+    }
+    break;
+  case KEYsig_inst:
+    {
+      Use u = class_use_use(sig_inst_class(sig));
+      Declaration cdecl = USE_DECL(u);
+      if (cdecl)
+	return inst_services(USE_TYPE_ENV(u),cdecl,tdecl,sig_inst_actuals(sig),
+			     services);
+    }
+  case KEYmult_sig:
+    return signature_services(tdecl,mult_sig_sig2(sig),
+			      signature_services(tdecl,mult_sig_sig1(sig),
+						 services));
+  case KEYfixed_sig:
+  case KEYno_sig:
+    break;
+  }
+  return services;
+}
+
+/* return list of things visible to this type */
+static SCOPE type_services(Type t)
+{
+  SCOPE services = (SCOPE)Type_info(t)->binding_temporary;
+  if (services != 0) return services;
+  switch (Type_KEY(t)) {
+  case KEYtype_use:
+    /*? I think ignore USE_TYEP_ENV is OK
+     *? since we will keep this information around
+     *? for later
+     */
+    {
+      Declaration tdecl = USE_DECL(type_use_use(t));
+      switch (Declaration_KEY(tdecl)) {
+      case KEYtype_decl:
+	{
+	  Type ty = type_decl_type(tdecl);
+	  if (Type_KEY(ty) == KEYno_type &&
+	      !Type_info(ty)->binding_temporary) {
+	    services = inst_services(0,module_TYPE,tdecl,0,services);
+	    Type_info(ty)->binding_temporary = services;
+	  } else if (Type_KEY(ty) == KEYtype_inst &&
+		     !Type_info(ty)->binding_temporary) {
+	    Use u = module_use_use(type_inst_module(ty));
+	    Declaration mdecl = USE_DECL(u);
+	    if (mdecl)
+	      services = inst_services(USE_TYPE_ENV(u),mdecl,tdecl,
+				       type_inst_type_actuals(ty),services);
+	    Type_info(ty)->binding_temporary = services;
+	  } else {
+	    services = type_services(ty);
+	  }
+	}
+	break;
+      case KEYphylum_decl:
+	{
+	  Type ty = phylum_decl_type(tdecl);
+	  if (Type_KEY(ty) == KEYno_type &&
+	      !Type_info(ty)->binding_temporary) {
+	    services = inst_services(0,module_PHYLUM,tdecl,0,services);
+	    Type_info(ty)->binding_temporary = services;
+	  } else if (Type_KEY(ty) == KEYtype_inst &&
+		     !Type_info(ty)->binding_temporary) {
+	    Use u = module_use_use(type_inst_module(ty));
+	    Declaration mdecl = USE_DECL(u);
+	    services = inst_services(USE_TYPE_ENV(u),mdecl,tdecl,
+				     type_inst_type_actuals(ty),services);
+	    Type_info(ty)->binding_temporary = services;
+	  } else {
+	    services = type_services(ty);
+	  }
+	}
+	break;
+      case KEYtype_renaming:
+	services = type_services(type_renaming_old(tdecl));
+	break;
+      case KEYsome_type_formal:
+	services = signature_services(tdecl,some_type_formal_sig(tdecl),services);
+	break;
+      default:
+	aps_error(t,"not sure what sort of type this is");
+	break;
+      }
+    }
+    break;
+  case KEYtype_inst:
+    aps_error(t,"MODULE[...] must be := assigned in a type declaration");
+    break;
+  case KEYremote_type:
+    services = type_services(remote_type_nodetype(t));
+    break;
+  case KEYprivate_type:
+    {
+      extern void print_Type(Type,FILE*);
+      printf("%d: getting services of ",tnode_line_number(t));
+      print_Type(t,stdout);
+      putc('\n',stdout);
+    }
+    services = type_services(private_type_rep(t));
+    break;
+  case KEYfunction_type:
+  case KEYno_type:
+    break;
+  }
+  Type_info(t)->binding_temporary = services;
+  return services;
+}
+
+static void *do_bind(void *vscope, void *node);
+
+static void bind_Use_by_name(Use u, Symbol name, int namespaces, SCOPE scope)
+{
+  while (scope != NULL) {
+    if (scope->name == name && (scope->namespaces&namespaces) != 0) {
+      Use_info(u)->use_decl = scope->decl;
+      Use_info(u)->use_type_env = instantiate_type_env(scope->type_env);
+      return;
+    }
+    scope=scope->next;
+  }
+}
+
 static void bind_Use(Use u, int namespaces, SCOPE scope) {
   switch (Use_KEY(u)) {
   case KEYuse:
-    { Symbol name = use_name(u);
-      while (scope != NULL) {
-	if (scope->name == name && (scope->namespaces&namespaces) != 0) {
-	  Use_info(u)->use_decl = scope->decl;
-	  return;
+    bind_Use_by_name(u,use_name(u),namespaces,scope);
+    break;
+  case KEYqual_use:
+    do_bind(scope,qual_use_from(u));
+    {
+      SCOPE s = type_services(qual_use_from(u));
+      bind_Use_by_name(u,qual_use_name(u),namespaces,s);
+      if (USE_DECL(u) == 0) {
+	SCOPE t;
+	int started = FALSE;
+	fprintf(stderr,"  services = [");
+	for (t=s; t != NULL; t=t->next) {
+	  if (started) fputc(',',stderr); else started = TRUE;
+	  fprintf(stderr,"%s",symbol_name(t->name));
 	}
-	scope=scope->next;
+	fprintf(stderr,"]\n");
       }
     }
+    break;
   }
 }
 
@@ -164,7 +424,9 @@ static void *get_bindings(void *scopep, void *node) {
     { Declaration d=(Declaration)node;
       *(SCOPE *)scopep = add_env_item(*(SCOPE *)scopep,d);
       if (Declaration_KEY(d) == KEYpolymorphic) {
+	push_type_contour(d,0,0);
 	traverse_Block(get_bindings,scopep,polymorphic_body(d));
+	pop_type_contour();
       }
       return NULL; }
   case KEYUnit:
@@ -195,7 +457,9 @@ static void *get_public_bindings(void *scopep, void *node) {
 	if (def_is_public(declaration_def(d))) {
 	  *(SCOPE *)scopep = add_env_item(*(SCOPE *)scopep,d);
 	  if (Declaration_KEY(d) == KEYpolymorphic) {
+	    push_type_contour(d,0,0);
 	    traverse_Block(get_public_bindings,scopep,polymorphic_body(d));
+	    pop_type_contour();
 	  }
 	}
 	return NULL;
@@ -238,6 +502,10 @@ static void *do_bind(void *vscope, void *node) {
 	  traverse_Declaration_skip(do_bind,new_scope,d); }
 	break;
       case KEYmodule_decl:
+	if (module_TYPE == 0 && streq(decl_name(d),"TYPE"))
+	  module_TYPE = d;
+	else if (module_PHYLUM == 0 && streq(decl_name(d),"PHYLUM"))
+	  module_PHYLUM = d;
 	{ new_scope = bind_Declarations(new_scope,
 					module_decl_type_formals(d));
 	  traverse_Signature(do_bind,new_scope,module_decl_parent(d));
@@ -247,7 +515,8 @@ static void *do_bind(void *vscope, void *node) {
 	  traverse_Declaration(do_bind,new_scope,
 			       module_decl_result_type(d));
 	  /* handle extension: common case only */
-	  { Type ext=some_type_decl_type(module_decl_result_type(d));
+	  { Declaration rdecl = module_decl_result_type(d);
+	    Type ext=some_type_decl_type(rdecl);
 	    switch (Type_KEY(ext)) {
 	    case KEYtype_use:
 	      { Declaration tf = Use_info(type_use_use(ext))->use_decl;
@@ -256,7 +525,7 @@ static void *do_bind(void *vscope, void *node) {
 		  case KEYsome_type_formal:
 		    Declaration_info(tf)->decl_flags |=
 		      TYPE_FORMAL_EXTENSION_FLAG;
-		    new_scope=add_ext_sig(new_scope,some_type_formal_sig(tf));
+		    new_scope=add_ext_sig(new_scope,rdecl,some_type_formal_sig(tf));
 		    break;
 		  }
 		}
@@ -323,12 +592,12 @@ static void *do_bind(void *vscope, void *node) {
     }
     break;
   case KEYUse:
-    { Use u = (Use)node;
-      switch (Use_KEY(u)) {
-      case KEYuse:
-	if (Use_info(u)->use_decl == NULL) {
-	  aps_error(u,"no binding for %s",symbol_name(use_name(u)));
-	}
+    {
+      Use u = (Use)node;
+      if (Use_info(u)->use_decl == NULL) {
+	Symbol name =
+	  (Use_KEY(u) == KEYqual_use) ? qual_use_name(u) : use_name(u);
+	aps_error(u,"no binding for %s",symbol_name(name));
       }
     }
     break;
@@ -425,6 +694,40 @@ static Pattern pattern_actuals_set_next_pattern_actual(PatternActuals pattern_ac
   return NULL;
 }
 
+static Type type_actuals_set_next_type_actual(TypeActuals type_actuals, Type next) {
+  switch (TypeActuals_KEY(type_actuals)) {
+  case KEYnil_TypeActuals: return next;
+  case KEYlist_TypeActuals:
+    { Type prev = list_TypeActuals_elem(type_actuals);
+      Type_info(prev)->next_type_actual = next;
+      return prev; }
+  case KEYappend_TypeActuals:
+    { TypeActuals some = append_TypeActuals_l1(type_actuals);
+      TypeActuals more = append_TypeActuals_l2(type_actuals);
+      Type middle = type_actuals_set_next_type_actual(more,next);
+      return type_actuals_set_next_type_actual(some,middle); }
+  }
+  fatal_error("control reached end of type_actuals_set_next_type_actual");
+  return NULL;
+}
+
+static Match matches_set_next_match(Matches matches, Match next) {
+  switch (Matches_KEY(matches)) {
+  case KEYnil_Matches: return next;
+  case KEYlist_Matches:
+    { Match prev = list_Matches_elem(matches);
+      Match_info(prev)->next_match = next;
+      return prev; }
+  case KEYappend_Matches:
+    { Matches some = append_Matches_l1(matches);
+      Matches more = append_Matches_l2(matches);
+      Match middle = matches_set_next_match(more,next);
+      return matches_set_next_match(some,middle); }
+  }
+  fatal_error("control reached end of matches_set_next_match");
+  return NULL;
+}
+
 static void *set_next_fields(void *ignore, void *node) {
   switch (ABSTRACT_APS_tnode_phylum(node)) {
   case KEYDeclarations:
@@ -452,6 +755,23 @@ static void *set_next_fields(void *ignore, void *node) {
     { Pattern pattern_actual = pattern_actuals_set_next_pattern_actual((PatternActuals)node,NULL);
       for (; pattern_actual != NULL; pattern_actual=Pattern_info(pattern_actual)->next_pattern_actual) {
 	traverse_Pattern(set_next_fields,ignore,pattern_actual);
+      }
+    }
+    return NULL;
+  case KEYTypeActuals:
+    { Type actual = type_actuals_set_next_type_actual((TypeActuals)node,NULL);
+      for (; actual != NULL; actual=Type_info(actual)->next_type_actual) {
+	traverse_Type(set_next_fields,ignore,actual);
+      }
+    }
+    return NULL;
+  case KEYMatches:
+    { Match match = matches_set_next_match((Matches)node,NULL);
+      Declaration parent = (Declaration)tnode_parent(node);
+      (void)Declaration_KEY(parent);
+      for (; match != NULL; match=Match_info(match)->next_match) {
+	Match_info(match)->header = parent;
+	traverse_Match(set_next_fields,ignore,match);
       }
     }
     return NULL;
@@ -512,6 +832,33 @@ Pattern first_PatternActual(PatternActuals l) {
     return NULL;
   }
 }
+
+Type first_TypeActual(TypeActuals l) {
+  switch (TypeActuals_KEY(l)) {
+  case KEYlist_TypeActuals:
+    return list_TypeActuals_elem(l);
+  case KEYappend_TypeActuals:
+    { Type first = first_TypeActual(append_TypeActuals_l1(l));
+      if (first != NULL) return first;
+      return first_TypeActual(append_TypeActuals_l2(l)); }
+  default:
+    return NULL;
+  }
+}
+
+Match first_Match(Matches l) {
+  switch (Matches_KEY(l)) {
+  case KEYlist_Matches:
+    return list_Matches_elem(l);
+  case KEYappend_Matches:
+    { Match first = first_Match(append_Matches_l1(l));
+      if (first != NULL) return first;
+      return first_Match(append_Matches_l2(l)); }
+  default:
+    return NULL;
+  }
+}
+
 
 
 /*** PRAGMA ACTIVATION ***/
