@@ -19,5 +19,11 @@ struct TypeContour {
   
 typedef struct TypeContour *TypeEnvironment;
 
+#define NAME_SIGNATURE 1
+#define NAME_TYPE 2
+#define NAME_PATTERN 4
+#define NAME_VALUE 8
+extern int decl_namespaces(Declaration d);
+
 extern int bind_debug;
 #define PRAGMA_ACTIVATION 1
