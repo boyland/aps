@@ -110,6 +110,8 @@ std::string s_string<C_NULL_PHYLUM::Node *>(C_NULL_PHYLUM::Node* n)
   return n->to_string();
 }
 
+C_NULL_TYPE::C_NULL_TYPE() : type(0) {}
+
 C_NULL_TYPE::Node::Node(Constructor*c)
   : type(c->get_type()), cons(c)
 {}
@@ -129,6 +131,8 @@ Type* C_NULL_TYPE::get_type() {
 T_String C_NULL_TYPE::v_string(Node *n) {
   return s_string<Node*>(n);
 }
+
+C_NULL_PHYLUM::C_NULL_PHYLUM() : phylum(0) {}
   
 C_NULL_PHYLUM::Node::Node(Constructor*c)
   : C_NULL_TYPE::Node(c), index(((Phylum*)type)->install(this)) {}
