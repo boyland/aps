@@ -1,7 +1,11 @@
 -- attempt to define tables in APS
-module TABLE[KeyType :: BASIC[]; ValueType :: COMBINABLE[]] :: COMBINABLE[] 
+module TABLE[KeyType :: ORDERED[]; ValueType :: COMBINABLE[]] :: COMBINABLE[]
 begin
+  private constructor full_table(entries : Integer) : Result;
+  private constructor empty_table() : Result;
   constructor table_entry(key : KeyType; val : ValueType) : Result;
+  initial : Result;
+  function combine(t1, t2 : Result) : Result;
   function select(table : Result; key : KeyType) : Result := table;
-  function arbitrary(table : Result) : ValueType;
+  -- function arbitrary(table : Result) : ValueType;
 end;
