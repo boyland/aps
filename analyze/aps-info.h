@@ -46,6 +46,8 @@ extern struct Declaration_info {
 #define SHARED_INFO_FLAG (1<<11)
 #define SHARED_DECL_FLAG (1<<12) /* decl'n declared at top-level of module */
 #define START_PHYLUM_FLAG (1<<13)
+#define FIELD_DECL_UNTRACKED_FLAG (1<<14)
+#define SELF_MANAGED_FLAG (1<<15)
 } *Declaration_info(Declaration);
 
 #define DECL_NEXT(decl) (Declaration_info(decl)->next_decl)
@@ -60,7 +62,7 @@ extern struct Declaration_info {
 #define DECL_IS_OBJECT(decl) \
   (Declaration_info(decl)->decl_flags&DECL_OBJECT_FLAG)
 #define DECL_IS_SYNTAX(decl) \
-  (Declaration_info(decl)->decl_flags&DECL_SYNTAX_FLAG)
+  (Declaration_info(decl)->decl_flags&(DECL_LHS_FLAG|DECL_RHS_FLAG))
 #define TYPE_FORMAL_IS_EXTENSION(decl) \
   (Declaration_info(decl)->decl_flags&TYPE_FORMAL_EXTENSION_FLAG)
 #define ATTR_DECL_IS_SYN(decl) \
@@ -69,6 +71,8 @@ extern struct Declaration_info {
   (Declaration_info(decl)->decl_flags&ATTR_DECL_INH_FLAG)
 #define FIELD_DECL_IS_STRICT(decl) \
   (Declaration_info(decl)->decl_flags&FIELD_DECL_STRICT_FLAG)
+#define FIELD_DECL_IS_UNTRACKED(decl) \
+  (Declaration_info(decl)->decl_flags&FIELD_DECL_UNTRACKED_FLAG)
 #define FIELD_DECL_IS_CYCLIC(decl) \
   (Declaration_info(decl)->decl_flags&FIELD_DECL_CYCLIC_FLAG)
 #define FIELD_DECL_P(decl) \
@@ -83,6 +87,8 @@ extern struct Declaration_info {
   (Declaration_info(decl)->decl_flags&SHARED_DECL_FLAG)
 #define DECL_IS_START_PHYLUM(decl) \
   (Declaration_info(decl)->decl_flags&START_PHYLUM_FLAG)
+#define DECL_IS_SELF_MANAGED(decl) \
+  (Declaration_info(decl)->decl_flags&SELF_MANAGED_FLAG)
 
 #define fibersets_for(decl) (Declaration_info(decl)->decl_fibersets)
 #define fiberset_for(decl,fstype) (fibersets_index(fibersets_for(decl),fstype))
@@ -104,6 +110,7 @@ extern struct Expression_info {
   Declaration call_decl; /* attribute or function decl called here */
   FIBERSETS expr_fibersets;
   int expr_flags;
+  int expr_helper_num; /* used in incremental impl. */
 #define EXPR_LHS_FLAG 1
 #define EXPR_RHS_FLAG 2
 } *Expression_info(Expression);
@@ -114,6 +121,7 @@ extern struct Expression_info {
 #define expr_fibersets_for(expr) (Expression_info(expr)->expr_fibersets)
 #define expr_fiberset_for(expr,fstype) \
   (fibersets_index(expr_fibersets_for(expr),fstype))
+#define expr_helper_for(expr) (Expression_info(expr)->expr_helper_num)
 
 extern struct Pattern_info {
   Pattern next_pattern_actual; /* in a sequence of args to a pattern call */
