@@ -3,77 +3,32 @@
 #include <stdarg.h>
 #include "aps-ag.h"
 
-static void usage() {
-  fprintf(stderr,"apsc: usage: apssched file...\n");
-  fprintf(stderr,"             schedule APS files\n");
+static char* argv0 = "apssched";
+
+void usage() {
+  fprintf(stderr,"apsc: usage: %s [-DH] [-D...] file...\n",argv0);
+  fprintf(stderr,"             schedule APS files (omit '.aps' extension)\n");
+  fprintf(stderr,"   -DH       print debug options\n");
   exit(1);
-}
-
-static int aps_error_count = 0;
-
-void aps_error(void *tnode, char *fmt, ...)
-{
-  va_list args;
-  va_start(args,fmt);
-
-  (void)  fprintf(stderr, "%s:%d:",
-		  aps_yyfilename,tnode_line_number(tnode));
-  (void) vfprintf(stderr, fmt, args);
-  (void)  fprintf(stderr, "\n");
-  (void)   fflush(stderr);
-
-  va_end(args);
-  ++aps_error_count;
 }
 
 main(int argc,char **argv) {
   int i;
+  argv0 = argv[0];
   for (i=1; i < argc; ++i) {
     if (argv[i][0] == '-') {
       char *options = argv[i]+1;
       if (*options == '\0') usage();
-      do {
-	switch (*options++) {
-	default: usage();
-	case 'D':
-	  if (*options == '\0') usage();
-	  do {
-	    switch (*options++) {
-	    default: usage(); break;
-	    case 'P': bind_debug |= PRAGMA_ACTIVATION; break;
-	    case '+': fiber_debug |= ADD_FIBER; break;
-	    case 'a': fiber_debug |= ALL_FIBERSETS; break;
-	    case 'p': fiber_debug |= PUSH_FIBER; break;
-	    case 'f': fiber_debug |= FIBER_INTRO; break;
-	    case 'F': fiber_debug |= FIBER_FINAL; break;
-	    case 's': fiber_debug |= CALLSITE_INFO; break;
-	    case 'i': analysis_debug |= CREATE_INSTANCE; break;
-	    case 'e': analysis_debug |= ADD_EDGE; break;
-	    case 'c': analysis_debug |= CLOSE_EDGE; break;
-	    case 'w': analysis_debug |= WORKLIST_CHANGES; break;
-	    case 'x': analysis_debug |= SUMMARY_EDGE_EXTRA; break;
-	    case 'E': analysis_debug |= SUMMARY_EDGE; break;
-	    case 'D': analysis_debug |= DNC_FINAL; break;
-	    case 'I': analysis_debug |= DNC_ITERATE; break;
-	    case 'C': cycle_debug |= PRINT_CYCLE; break;
-	    case 'o': oag_debug |= DEBUG_ORDER; break;
-	    case 'O': oag_debug |= TOTAL_ORDER; break;
-	    case 'T': oag_debug |= PROD_ORDER; break;
-	    }
-	  } while (*options != '\0');
-	}
-	break;
-      } while (*options != '\0');
+      if (*options == 'D') {
+	set_debug_flags(options);
+      }
     } else {
       Program p = find_Program(make_string(argv[i]));
       bind_Program(p);
+      aps_check_error("binding");
       type_Program(p);
+      aps_check_error("type");
     }
-  }
-
-  if (aps_error_count != 0) {
-    fprintf(stderr,"apsc: quit\n");
-    exit(aps_error_count);
   }
 
   for (i=1; i < argc; ++i) {
@@ -82,9 +37,10 @@ main(int argc,char **argv) {
     p = find_Program(make_string(argv[i]));
     aps_yyfilename = (char *)program_name(p);
     analyze_Program(p);
+    aps_check_error("analysis");
   }
   
-  exit(aps_error_count);
+  exit(0);
 }
 
 
