@@ -27,6 +27,7 @@ void usage() {
   fprintf(stderr,"    -DH   list debugging flags\n");
   fprintf(stderr,"    -V    increase verbosity of generation code\n");
   fprintf(stderr,"    -G    add Debug calls for every function\n");
+  fprintf(stderr,"    -p path set the APSPATH (overriding env. variable)");
   exit(1);
 }
 
@@ -59,6 +60,9 @@ int main(int argc,char **argv) {
       continue;
     } else if (streq(argv[i],"-G") || streq(argv[i],"--debug")) {
       ++debug;
+      continue;
+    } else if (streq(argv[i],"-p") || streq(argv[i],"--apspath")) {
+      set_aps_path(argv[++i]);
       continue;
     } else if (argv[i][0] == '-' && argv[i][1] == 'D') {
       set_debug_flags(argv[i]+2);
