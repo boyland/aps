@@ -1286,23 +1286,11 @@ static void record_expression_dependencies(INSTANCE *sink, CONDITION *cond,
 	}
       } else if ((decl = field_ref_p(e)) != NULL) {
 	Expression object = field_ref_object(e);
-	INSTANCE *osrc =  get_expression_instance(fiber,frev,object,aug_graph);
 	FIBER f2 = lengthen_fiber(decl,fiber);
-	INSTANCE *source = get_expression_instance(f2,frev,object,aug_graph);
-	/* a fiber dependency */
-	if (carrying) {
-	  add_edges_to_graph(source,sink,cond,kind,aug_graph);
-	} else {
-	  /* printf("Adding non-carrying field reference ");
-	   * print_instance(source,stdout);
-	   * printf("->");
-	   * print_instance(sink,stdout);
-	   * printf(": ");
-	   */
-	  add_edge_to_graph(source,sink,cond,kind,aug_graph);
-	}
-	/* and also depend on object itself (not a carrying dependency) */
-	add_edge_to_graph(osrc,sink,cond,kind&~DEPENDENCY_MAYBE_CARRYING,aug_graph);
+	record_expression_dependencies(sink,cond,fiber,frev,kind,FALSE,
+				       object,aug_graph);
+	record_expression_dependencies(sink,cond,f2,frev,kind,carrying,
+				       object,aug_graph);
       } else if ((decl = local_call_p(e)) != NULL) {
 	Declaration result = some_function_decl_result(decl);
 	Expression actual = first_Actual(funcall_actuals(e));
