@@ -1,0 +1,157 @@
+with "if";
+
+[T1,T2;P::PAIR[T1,T2]] pair = P$pair;
+
+-- Example from Remote Attribution paper (Figure 2)
+module NAME_RESOLUTION[] begin
+  -- the phyla:
+  phylum Program;
+  phylum Block;
+  phylum Decls; -- we don't use sequences here:
+  phylum Decl;
+  phylum Type;
+  phylum Stmts;
+  phylum Stmt;
+  phylum Expr;
+  
+  -- the attributes:
+  type Messages := BAG[String];
+  collection msgs : Messages;
+  
+  type Scope := remote Block;
+  root_scope : Scope := nil;
+  attribute Block.enclosing : Scope;
+  type DeclPair := PAIR[String,remote Decl];
+  type DeclPairs := BAG[DeclPair];
+  collection attribute Block.local_decls : DeclPairs;
+  -- an opaque function:
+  function fetch(id : String; pairs : DeclPairs) : remote Decl;
+  
+  -- don't use polymorphism:
+  attribute Decls.decls_scope : Scope;
+  attribute Decl.decl_scope : Scope;
+  attribute Stmts.stmts_scope : Scope;
+  attribute Stmt.stmt_scope : Scope;
+  attribute Expr.expr_scope : Scope;
+
+  collection attribute Decl.used : Boolean :> false, (or);
+
+  module SHAPE[] :: BASIC begin
+    constructor intshape() : Result;
+    constructor strshape() : Result;
+  end;
+    
+  type Shape := SHAPE[];
+  intshape = Shape$intshape();
+  strshape = Shape$strshape();
+
+  attribute Decl.decl_shape : Shape;
+  attribute Type.type_shape : Shape;
+  attribute Expr.expr_shape : Shape;
+  
+  not_found : Decl := decl("not_found",integer());
+
+  -- split into two function because we don't have let builtin
+  -- for expressions.  With conditional attribution, one function
+  -- methods would be fine.
+  function lookup(id : String; s : Scope) : remote Decl :=
+      (if)(s = root_scope,
+	   not_found,
+	   lookup2(id,s,fetch(id,s.local_decls)));
+  function lookup2(id : String; s : Scope; local : remote Decl) : remote Decl
+      := (if)(local = not_found,
+	      lookup(id,s.enclosing),
+	      local);
+    
+  constructor program(block : Block) : Program;
+  match ?p=program(?b) begin
+    b.enclosing := root_scope;
+  end;
+  
+  constructor block(decls : Decls; stmts : Stmts) : Block;
+  match ?b=block(?ds,?ss) begin
+    ds.decls_scope := b;
+    ss.stmts_scope := b;
+  end;
+  
+  constructor no_decls() : Decls;
+  match ?=no_decls() begin
+  end;
+  
+  constructor xcons_decls(ds : Decls; d : Decl) : Decls;
+  match ?ds0=xcons_decls(?ds1,?d) begin
+    ds1.decls_scope := ds0.decls_scope;
+    d.decl_scope := ds0.decls_scope;
+  end;
+  
+  constructor decl(id : String; ty : Type) : Decl;
+  match ?d=decl(?id,?ty) begin
+    d.decl_scope.local_decls :> {pair(id,d)};
+    d.decl_shape := ty.type_shape;
+    msgs :> 
+	(if)(d.used,{},
+	     {id ++ " is unused"});
+  end;
+  
+  constructor integer() : Type;
+  match ?t=integer() begin
+    t.type_shape := intshape;
+  end;
+  
+  constructor string() : Type;
+  match ?t=string() begin
+    t.type_shape := strshape;
+  end;
+  
+  constructor no_stmts() : Stmts;
+  match ?=no_stmts() begin
+  end;
+  
+  constructor xcons_stmts(ss : Stmts; s : Stmt) : Stmts;
+  match ?ss0=xcons_stmts(?ss1,?s) begin
+    ss1.stmts_scope := ss0.stmts_scope;
+    s.stmt_scope := ss0.stmts_scope;
+  end;
+  
+  constructor block_stmt(block : Block) : Stmt;
+  match ?s=block_stmt(?b) begin
+    b.enclosing := s.stmt_scope;
+  end;
+  
+  constructor assign_stmt(e1,e2 : Expr) : Stmt;
+  match ?s=assign_stmt(?e1,?e2) begin
+    e1.expr_scope := s.stmt_scope;
+    e2.expr_scope := s.stmt_scope;
+    msgs :>
+	(if)(e1.expr_shape /= e2.expr_shape,
+	     {"type mismatch"},
+	     {});
+  end;
+  
+  constructor intconstant(i : Integer) : Expr;
+  match ?e=intconstant(?) begin
+    e.expr_shape := intshape;
+  end;
+  
+  constructor strconstant(s : String) : Expr;
+  match ?e=strconstant(?) begin
+    e.expr_shape := strshape;
+  end;
+  
+  constructor variable(id : String) : Expr;
+  match ?e=variable(?id) begin
+    decl : remote Decl := lookup(id,e.expr_scope);
+    decl.used :> true;
+    e.expr_shape := decl.decl_shape;
+    msgs :> 
+	(if)(decl = not_found,
+	     {id ++ " not declared"},
+	     {});
+  end;
+end;
+  
+
+  
+  
+
+

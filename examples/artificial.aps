@@ -1,0 +1,36 @@
+module ARTIFICIAL[] begin
+  phylum S;
+  attribute S.out : Integer;
+
+  phylum A;
+  attribute A.sn : remote A;
+  attribute A.a : Integer;
+  attribute A.s : Integer;
+  collection attribute A.c : Integer :> 0, (+);
+
+  phylum B;
+  attribute B.inn : remote A; -- "in" is a keyword in APS
+  
+  constructor p1(a : A; b : B) : S;
+  match ?s0=p1(?a,?b) begin
+    b.inn := a.sn;
+    s0.out := a.s;
+  end;
+  
+  constructor p2() : A;
+  match ?a3=p2() begin
+    n : remote A := a3;
+    a3.sn := n;
+    a3.a := 0;
+    a3.s := a3.c;
+  end;
+  
+  constructor p3() : B;
+  match ?b=p3() begin
+    n1 : remote A := b.inn;
+    n2 : remote A := n1.sn;
+    v : Integer := n2.a;
+    n1.c :> v;
+  end;
+end;
+

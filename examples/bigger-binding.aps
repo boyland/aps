@@ -1,0 +1,296 @@
+with "bigger";
+-- Bigger example from fiber paper.
+module CODE_GENERATION[T :: var BIGGER[]] extends T begin
+
+  --- the local object types and their
+  --- "fields" (attributes in APS).
+  
+  -- contours:
+  phylum Contour;
+  constructor contour() : Contour;
+  type Scope := remote Contour;
+  attribute Contour.enclosing : Scope; -- normally would be a constructor field
+  attribute Contour.scope_level : Integer := 0; -- normally would be a constructor field
+  type Entities := BAG[EntityRef];
+  collection attribute Contour.entities : Entities;
+
+  pragma fiber_cyclic(enclosing);
+  
+  -- entities: AKA declarations
+  phylum Entity;
+  type EntityRef := remote Entity;
+  constructor entity(name : String) : Entity;
+  attribute Entity.entity_shape : Shape;
+  attribute Entity.entity_scope : Scope;
+  attribute Entity.entity_level : Integer;
+  collection attribute Entity.entity_used : Integer :> 0, (+);
+  collection attribute Entity.used_nonlocally : OrLattice;
+
+  pragma fiber_strict(entity_shape);
+  
+  -- shapes: used just for object identity
+  phylum ShapeStructure;
+  constructor shape(name : String) : ShapeStructure;
+  constructor array_shape(element_shape : Shape) : ShapeStructure;
+  type Shape := remote ShapeStructure;
+  
+  --- the globals
+  type Messages := BAG[String];
+  var collection msgs : Messages;
+
+  root_scope : Scope := contour();
+  
+  not_found : EntityRef := nil;
+  
+  int_shape : Shape := shape("integer");
+  str_shape : Shape := shape("string");
+  bool_shape : Shape := shape("boolean");
+
+  pragma fiber_strict(int_shape,str_shape,bool_shape);
+  -- pragma fiber_strict(root_scope,not_found);
+
+  --- Attributes on "nonterminals" (i.e. imported and fixed phyla)
+  
+  -- don't use polymorphism:
+  attribute Block.block_scope : Scope;
+  attribute Decls.decls_scope : Scope;
+  attribute Decl.decl_scope : Scope;
+  attribute Stmts.stmts_scope : Scope;
+  attribute Stmt.stmt_scope : Scope;
+  attribute Expr.expr_scope : Scope;
+
+  attribute Type.type_shape : Shape;
+  attribute Expr.expr_shape : Shape;
+
+  collection size : Integer :> 0, (+);
+
+  pragma inherited(block_scope,decls_scope,decl_scope,
+		   stmts_scope,stmt_scope,expr_scope);
+  pragma synthesized(type_shape,expr_shape);
+  
+  match ?p:Program=program(?b:Block) begin
+    b.block_scope := root_scope;
+  end;
+  
+  match ?b:Block=block(?ds:Decls,?ss:Stmts) begin
+    c : Contour := contour();
+    s : Scope := b.block_scope;
+    l : Integer := s.scope_level+1;
+    c.enclosing := s;
+    c.scope_level := l;
+    ds.decls_scope := c;
+    ss.stmts_scope := c;
+  end;
+  
+  match ?:Decls=no_decls() begin
+  end;
+  
+  match ?ds0:Decls=xcons_decls(?ds1:Decls,?d:Decl) begin
+    ds1.decls_scope := ds0.decls_scope;
+    d.decl_scope := ds0.decls_scope;
+  end;
+  
+  match ?d:Decl=decl(?id:String,?ty:Type) begin
+    e : Entity := entity(id);
+    e.entity_shape := ty.type_shape;
+    s : Scope := d.decl_scope;
+    s.entities :> {e};
+    l : Integer := s.scope_level;
+    e.entity_level := l;
+    if e.entity_used = 0 then
+      msgs :> {id ++ " is unused"};
+    endif;
+    if e.used_nonlocally then
+      size :> 2;
+    else
+      size :> 1;
+    endif;
+  end;
+  
+  match ?t:Type=integer() begin
+    t.type_shape := int_shape;
+  end;
+  
+  match ?t:Type=string() begin
+    t.type_shape := str_shape;
+  end;
+  
+  match ?t:Type=boolean() begin
+    t.type_shape := bool_shape;
+  end;
+  
+  match ?t:Type=array(?et:Type) begin
+    at : ShapeStructure := array_shape(et.type_shape);
+    t.type_shape := at;
+  end;
+  
+  match ?:Stmts=no_stmts() begin
+  end;
+  
+  match ?ss0:Stmts=xcons_stmts(?ss1:Stmts,?s:Stmt) begin
+    ss1.stmts_scope := ss0.stmts_scope;
+    s.stmt_scope := ss0.stmts_scope;
+  end;
+  
+  match ?s:Stmt=block_stmt(?b:Block) begin
+    b.block_scope := s.stmt_scope;
+  end;
+  
+  match ?s:Stmt=if_stmt(?cond:Expr,?s1:Stmt,?s2:Stmt) begin
+    cond.expr_scope := s.stmt_scope;
+    s1.stmt_scope := s.stmt_scope;
+    s2.stmt_scope := s.stmt_scope;
+    if cond.expr_shape /= bool_shape then
+      msgs :> {"expected boolean"};
+    endif;
+    size :> 1;
+  end;
+
+  match ?s:Stmt=while_stmt(?cond:Expr,?body:Stmt) begin
+    cond.expr_scope := s.stmt_scope;
+    body.stmt_scope := s.stmt_scope;
+    if cond.expr_shape /= bool_shape then
+      msgs :> {"expected boolean"};
+    endif;
+    size :> 2;
+  end;
+
+  match ?s:Stmt=assign_stmt(?e1:Expr,?e2:Expr) begin
+    e1.expr_scope := s.stmt_scope;
+    e2.expr_scope := s.stmt_scope;
+    if e1.expr_shape /= e2.expr_shape then
+      msgs :> {"type mismatch"};
+    endif;
+    size :> 1;
+  end;
+  
+  match ?e:Expr=plus(?e1:Expr,?e2:Expr) begin
+    e1.expr_scope := e.expr_scope;
+    e2.expr_scope := e.expr_scope;
+    if e1.expr_shape /= int_shape or
+	e2.expr_shape /= int_shape then
+      msgs :> {"expected integer"};
+    endif;
+    e.expr_shape := int_shape;
+    size :> 1;
+  end;
+
+  match ?e:Expr=less(?e1:Expr,?e2:Expr) begin
+    e1.expr_scope := e.expr_scope;
+    e2.expr_scope := e.expr_scope;
+    if e1.expr_shape /= int_shape or
+	e2.expr_shape /= int_shape then
+      msgs :> {"expected integer"};
+    endif;
+    e.expr_shape := bool_shape;
+    size :> 1;
+  end;
+
+  match ?e:Expr=equal(?e1:Expr,?e2:Expr) begin
+    e1.expr_scope := e.expr_scope;
+    e2.expr_scope := e.expr_scope;
+    if e1.expr_shape /= e2.expr_shape then
+      msgs :> {"type mismatch"};
+    endif;
+    e.expr_shape := bool_shape;
+    size :> 1;
+  end;
+
+  match ?e:Expr=concat(?e1:Expr,?e2:Expr) begin
+    e1.expr_scope := e.expr_scope;
+    e2.expr_scope := e.expr_scope;
+    if e1.expr_shape /= str_shape or
+	e2.expr_shape /= str_shape then
+      msgs :> {"expected string"};
+    endif;
+    e.expr_shape := str_shape;
+    size :> 4;
+  end;
+
+  match ?e:Expr=logor(?e1:Expr,?e2:Expr) begin
+    e1.expr_scope := e.expr_scope;
+    e2.expr_scope := e.expr_scope;
+    if e1.expr_shape /= bool_shape or
+	e2.expr_shape /= bool_shape then
+      msgs :> {"expected boolean"};
+    endif;
+    e.expr_shape := bool_shape;
+    size :> 1;
+  end;
+
+  match ?e:Expr=substring(?s:Expr,?i1:Expr,?i2:Expr) begin
+    s.expr_scope := e.expr_scope;
+    i1.expr_scope := e.expr_scope;
+    i2.expr_scope := e.expr_scope;
+    if s.expr_shape /= str_shape or
+	i1.expr_shape /= int_shape or
+	i2.expr_shape /= int_shape then
+      msgs :> {"bad substring operation"};
+    endif;
+    e.expr_shape := str_shape;
+    size :> 4;
+  end;
+
+  match ?e:Expr=array_ref(?arr:Expr,?ind:Expr) begin
+    arr.expr_scope := e.expr_scope;
+    ind.expr_scope := e.expr_scope;
+    if ind.expr_shape /= int_shape then
+      msgs :> {"expected integer"};
+    endif;
+    case arr.expr_shape begin
+      match array_shape(?sh:Shape) begin
+	e.expr_shape := sh;
+      end;
+    else
+      msgs :> {"expected array"};
+    end;
+    size :> 2;
+  end;
+
+  match ?e:Expr=intconstant(?:Integer) begin
+    e.expr_shape := int_shape;
+  end;
+  
+  match ?e:Expr=strconstant(?:String) begin
+    e.expr_shape := str_shape;
+  end;
+  
+  match ?e:Expr=boolconstant(?:Boolean) begin
+    e.expr_shape := bool_shape;
+  end;
+  
+  match ?e:Expr=variable(?id:String) begin
+    decl : EntityRef;
+    decl := lookup(id,e.expr_scope);
+    if decl = not_found then
+      msgs :> {id ++ " not declared"};
+    else
+      decl.entity_used :> 1;
+      e.expr_shape := decl.entity_shape;
+      ldiff : Integer := decl.entity_level-e.expr_scope.scope_level;
+      size :> 2*(ldiff);
+      if ldiff /= 0 then
+	decl.used_nonlocally :> true;
+      endif;
+      if decl.entity_used > 1 then
+	size :> 1;
+      else
+	size :> 2;
+      endif;
+    endif;
+  end;
+  
+  procedure lookup(name : String; scope : Scope) : EntityRef begin
+    if scope = root_scope then
+      result := not_found;
+    else
+      case scope.entities begin
+	match {...,?e:EntityRef=entity(?n:String if n=name),...} begin
+	  result := e;
+	end;
+      else
+	result := lookup(name,scope.enclosing);
+      end;
+    endif;
+  end;
+end;

@@ -1,0 +1,26 @@
+with "simple";
+-- Simple example of SNC
+module SIMPLE_SNC[T :: var SIMPLE[]] extends T begin
+  attribute Expr.i1 : Integer;
+  attribute Expr.i2 : Integer;
+  attribute Expr.s1 : Integer;
+  attribute Expr.s2 : Integer;
+  
+  attribute Stmt.total : Integer;
+
+  pragma inherited(i1,i2);
+  pragma synthesized(s1,s2,total);
+
+  match ?s:Stmt=assign_stmt(?e1:Expr,?e2:Expr) begin
+    e1.i1 := 0;
+    e1.i2 := e1.s1;
+    e2.i2 := 0;
+    e2.i1 := e2.s2;
+    s.total := e1.i2 + e2.s1;
+  end;
+  
+  match ?e:Expr=intconstant(?i:Integer) begin
+    e.s1 := e.i1;
+    e.s2 := e.i2;
+  end;
+end;

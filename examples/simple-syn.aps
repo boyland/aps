@@ -1,0 +1,14 @@
+with "simple";
+-- Simple example of synthesized attributes only
+module SIMPLE_SYN[T :: var SIMPLE[]] extends T begin
+  attribute Decls.decl_count : Integer;
+  
+  match ?ds:Decls=no_decls() begin
+    ds.decl_count := 0;
+  end;
+  
+  match ?ds0:Decls=xcons_decls(?ds1:Decls,?d:Decl) begin
+    ds0.decl_count := ds1.decl_count + 1;
+  end;
+  
+end;

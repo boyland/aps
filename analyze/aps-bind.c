@@ -1,0 +1,588 @@
+#include <stdio.h>
+#include "alloc.h"
+#include "aps-ag.h"
+
+int bind_debug;
+
+#define NAME_SIGNATURE 1
+#define NAME_TYPE 2
+#define NAME_PATTERN 4
+#define NAME_VALUE 8
+
+static int decl_namespaces(Declaration d) {
+  switch (Declaration_KEY(d)) {
+  case KEYclass_decl : /* fall through */
+  case KEYclass_renaming: return NAME_SIGNATURE;
+  case KEYmodule_decl : /* fall through */
+  case KEYmodule_renaming: return NAME_TYPE|NAME_SIGNATURE;
+  case KEYsignature_decl : /* fall through */
+  case KEYsignature_renaming: return NAME_SIGNATURE;
+  case KEYtype_decl: /* fall through */
+  case KEYphylum_decl: /* fall through */
+  case KEYtype_formal: /* fall through */
+  case KEYphylum_formal: /* fall through */
+  case KEYtype_renaming: return NAME_TYPE;
+  case KEYpattern_decl: /* fall through */
+  case KEYpattern_renaming: return NAME_PATTERN;
+  case KEYconstructor_decl: return NAME_PATTERN|NAME_VALUE;
+  case KEYattribute_decl: /* fall through */
+  case KEYfunction_decl: /* fall through */
+  case KEYprocedure_decl: /* fall through */
+  case KEYvalue_decl: /* fall through */
+  case KEYvalue_renaming: /* fall through */
+  case KEYformal: return NAME_VALUE;
+  default:
+  return 0;
+  }
+}
+
+struct env_item {
+  struct env_item *next;
+  Declaration decl;
+  Symbol name;
+  int namespaces;
+};
+typedef struct env_item *SCOPE;
+
+static SCOPE add_env_item(SCOPE old, Declaration d) {
+  switch (Declaration_KEY(d)) {
+  case KEYdeclaration:
+    {
+      Symbol name = def_name(declaration_def(d));
+      if (name == NULL) {
+	return old;
+      } else {
+	SCOPE new_entry=(SCOPE)SALLOC(sizeof(struct env_item));
+	new_entry->next = old;
+	new_entry->decl = d;
+	new_entry->name = name;
+	new_entry->namespaces = decl_namespaces(d);
+	return new_entry;
+      }
+    }
+  }
+  return old;
+}
+
+static void *get_bindings(void *, void *);
+static void *get_public_bindings(void *, void *);
+static void *do_bind(void *, void *);
+static void *set_next_fields(void *, void *);
+static void *activate_pragmas(void *, void *);
+
+static SCOPE add_ext_sig(SCOPE old, Signature sig) {
+  switch (Signature_KEY(sig)) {
+  case KEYno_sig: return old;
+  case KEYmult_sig:
+    return add_ext_sig(add_ext_sig(old,mult_sig_sig1(sig)),
+		       mult_sig_sig2(sig));
+  case KEYsig_inst:
+    /*! ignore is_input and is_var */
+    { Class cl = sig_inst_class(sig);
+      switch (Class_KEY(cl)) {
+      case KEYclass_use:
+	{ Declaration d = Use_info(class_use_use(cl))->use_decl;
+	  if (d == NULL) fatal_error("%d: class not found",
+				     tnode_line_number(cl));
+	  switch (Declaration_KEY(d)) {
+	  case KEYsome_class_decl:
+	    { SCOPE new_scope = old;
+	      traverse_Block(get_public_bindings,&new_scope,
+			     some_class_decl_contents(d));
+	      return new_scope; }
+	  default:
+	    /*! eventually handle renamings */
+	    fatal_error("%d: complicated binding for class",
+			tnode_line_number(cl));
+	  }
+	}
+      default:
+	fatal_error("%d: bad binding for class",
+		    tnode_line_number(cl));
+      }
+    }
+  default:
+    fatal_error("%d: signature too complicated",tnode_line_number(sig));
+  }
+  return old;
+}
+
+void bind_Program(Program p) {
+  void *top_mark = SALLOC(0);
+  SCOPE scope=NULL;
+  char *saved_filename = aps_yyfilename;
+  Program basic_program = find_Program(make_string("basic"));
+
+  if (PROGRAM_IS_BOUND(p)) return;
+  Program_info(p)->program_flags |= PROGRAM_BOUND_FLAG;
+
+  set_tnode_parent(p);
+  
+  if (basic_program != p) {
+    bind_Program(basic_program);
+    traverse_Program(get_public_bindings,&scope,basic_program);
+  }
+  traverse_Program(get_bindings,&scope,p);
+  aps_yyfilename = (char *)program_name(p);
+  traverse_Program(do_bind,scope,p);
+  release(top_mark);
+  traverse_Program(set_next_fields,/* any nonnull value */p,p);
+  traverse_Program(activate_pragmas,/* any nonnull value */p,p);
+  aps_yyfilename = saved_filename;
+}
+
+/* traverse_Declaration but skip the first call */
+static void bind_Declaration(SCOPE scope, Declaration decl) {
+  traverse_Declaration_skip(do_bind,scope,decl);
+}
+
+static SCOPE bind_Declarations(SCOPE scope, Declarations decls) {
+  SCOPE new_scope = scope;
+  traverse_Declarations(get_bindings,&new_scope,decls);
+  traverse_Declarations(do_bind,new_scope,decls);
+  return new_scope;
+}
+
+static void bind_Use(Use u, int namespaces, SCOPE scope) {
+  switch (Use_KEY(u)) {
+  case KEYuse:
+    { Symbol name = use_name(u);
+      while (scope != NULL) {
+	if (scope->name == name && (scope->namespaces&namespaces) != 0) {
+	  Use_info(u)->use_decl = scope->decl;
+	  return;
+	}
+	scope=scope->next;
+      }
+    }
+  }
+}
+
+static void *get_bindings(void *scopep, void *node) {
+  switch (ABSTRACT_APS_tnode_phylum(node)) {
+  case KEYDeclaration:
+    { Declaration d=(Declaration)node;
+      *(SCOPE *)scopep = add_env_item(*(SCOPE *)scopep,d);
+      if (Declaration_KEY(d) == KEYpolymorphic) {
+	traverse_Block(get_bindings,scopep,polymorphic_body(d));
+      }
+      return NULL; }
+  case KEYUnit:
+    { Unit u=(Unit)node;
+      switch (Unit_KEY(u)) {
+      case KEYwith_unit:
+	{ char *str = (char *)with_unit_name(u);
+	  char *prefix = HALLOC(strlen(str));
+	  Program p;
+	  strcpy(prefix,str+1);
+	  prefix[strlen(prefix)-1] = '\0';
+	  p = find_Program(make_string(prefix));
+	  bind_Program(p);
+	  traverse_Program(get_public_bindings,scopep,p);
+	}
+      }
+    }
+  }
+  return scopep;
+}
+
+static void *get_public_bindings(void *scopep, void *node) {
+  switch (ABSTRACT_APS_tnode_phylum(node)) {
+  case KEYDeclaration:
+    { Declaration d=(Declaration)node;
+      switch (Declaration_KEY(d)) {
+      case KEYdeclaration:
+	if (def_is_public(declaration_def(d))) {
+	  *(SCOPE *)scopep = add_env_item(*(SCOPE *)scopep,d);
+	  if (Declaration_KEY(d) == KEYpolymorphic) {
+	    traverse_Block(get_public_bindings,scopep,polymorphic_body(d));
+	  }
+	}
+	return NULL;
+      }
+    }
+  }
+  return scopep;
+}
+
+static void *do_bind(void *vscope, void *node) {
+  SCOPE scope=(SCOPE)vscope;
+  /* sanity check: */
+  if (scope != NULL) Declaration_KEY(scope->decl);
+  switch (ABSTRACT_APS_tnode_phylum(node)) {
+  case KEYBlock:
+    { void *top_mark = SALLOC(0);
+      /* printf("vscope = 0x%x, scope = 0x%x\n",vscope,scope); */
+      if (vscope != scope) fatal_error("corruption!");
+      (void)bind_Declarations(scope,block_body((Block)node));
+      release(top_mark);
+      return NULL; }
+  case KEYMatch:
+    { SCOPE new_scope = scope;
+      Match m = (Match)node;
+      Pattern p = matcher_pat(m);
+      void *top_mark = SALLOC(0);
+      traverse_Pattern(get_bindings,&new_scope,p);
+      traverse_Match_skip(do_bind,new_scope,m);
+      release(top_mark);
+      return NULL; }
+  case KEYDeclaration:
+    { SCOPE new_scope = scope;
+      Declaration d = (Declaration)node;
+      void *top_mark = SALLOC(0);
+      switch (Declaration_KEY(d)) {
+      case KEYclass_decl:
+	{ new_scope = bind_Declarations(new_scope,
+					class_decl_type_formals(d));
+	  new_scope = add_env_item(new_scope,class_decl_result_type(d));
+	  traverse_Declaration_skip(do_bind,new_scope,d); }
+	break;
+      case KEYmodule_decl:
+	{ new_scope = bind_Declarations(new_scope,
+					module_decl_type_formals(d));
+	  traverse_Signature(do_bind,new_scope,module_decl_parent(d));
+	  new_scope = bind_Declarations(new_scope,
+					module_decl_value_formals(d));
+	  new_scope=add_env_item(new_scope,module_decl_result_type(d));
+	  traverse_Declaration(do_bind,new_scope,
+			       module_decl_result_type(d));
+	  /* handle extension: common case only */
+	  { Type ext=some_type_decl_type(module_decl_result_type(d));
+	    switch (Type_KEY(ext)) {
+	    case KEYtype_use:
+	      { Declaration tf = Use_info(type_use_use(ext))->use_decl;
+		if (tf != NULL) {
+		  switch (Declaration_KEY(tf)) {
+		  case KEYsome_type_formal:
+		    Declaration_info(tf)->decl_flags |=
+		      TYPE_FORMAL_EXTENSION_FLAG;
+		    new_scope=add_ext_sig(new_scope,some_type_formal_sig(tf));
+		    break;
+		  }
+		}
+	      }
+	      break;
+	    }
+	  }
+	  traverse_Block(do_bind,new_scope,module_decl_contents(d)); }
+	break;
+      case KEYfunction_decl:
+      case KEYprocedure_decl:
+	{ Type ftype = some_function_decl_type(d);
+	  new_scope = bind_Declarations(new_scope,
+					function_type_formals(ftype));
+	  new_scope = bind_Declarations(new_scope,
+					function_type_return_values(ftype));
+	  traverse_Declaration_skip(do_bind,new_scope,d); }
+	break;
+      case KEYpolymorphic:
+	{ new_scope = bind_Declarations(new_scope,
+					polymorphic_type_formals(d));
+	  traverse_Declaration_skip(do_bind,new_scope,d); }
+	break;
+      default: return vscope; /* continue as normal */
+      }
+      release(top_mark);
+      return NULL;
+    }
+    break;
+  case KEYClass:
+    switch (Class_KEY((Class)node)) {
+    case KEYclass_use:
+      bind_Use(class_use_use((Class)node),NAME_SIGNATURE,scope);
+    }
+    break;
+  case KEYModule:
+    switch (Module_KEY((Module)node)) {
+    case KEYmodule_use:
+      bind_Use(module_use_use((Module)node),NAME_SIGNATURE,scope);
+    }
+    break;
+  case KEYSignature:
+    switch (Signature_KEY((Signature)node)) {
+    case KEYsig_use:
+      bind_Use(sig_use_use((Signature)node),NAME_SIGNATURE,scope);
+    }
+    break;
+  case KEYType:
+    switch (Type_KEY((Type)node)) {
+    case KEYtype_use:
+      bind_Use(type_use_use((Type)node),NAME_TYPE,scope);
+    }
+    break;
+  case KEYPattern:
+    switch (Pattern_KEY((Pattern)node)) {
+    case KEYpattern_use:
+      bind_Use(pattern_use_use((Pattern)node),NAME_PATTERN,scope);
+    }
+    break;
+  case KEYExpression:
+    switch (Expression_KEY((Expression)node)) {
+    case KEYvalue_use:
+      bind_Use(value_use_use((Expression)node),NAME_VALUE,scope);
+    }
+    break;
+  case KEYUse:
+    { Use u = (Use)node;
+      switch (Use_KEY(u)) {
+      case KEYuse:
+	if (Use_info(u)->use_decl == NULL) {
+	  aps_error(u,"no binding for %s",symbol_name(use_name(u)));
+	}
+      }
+    }
+    break;
+  }
+  return vscope;
+}
+
+/************* setting the next_decl field **************/
+
+static Declaration decls_set_next_decl(Declarations decls, Declaration next) {
+  switch (Declarations_KEY(decls)) {
+  case KEYnil_Declarations: return next;
+  case KEYlist_Declarations:
+    { Declaration prev = list_Declarations_elem(decls);
+      Declaration_info(prev)->next_decl = next;
+#ifdef DEBUG
+      switch (Declaration_KEY(prev)) {
+      case KEYdeclaration:
+	{ char *name=symbol_name(def_name(declaration_def(prev)));
+	  char *nextname="NULL";
+	  if (next != NULL) {
+	    switch (Declaration_KEY(next)) {
+	    case KEYdeclaration:
+	      nextname=symbol_name(def_name(declaration_def(next)));
+	      break;
+	    default:
+	      nextname="<something>";
+	      break;
+	    }
+	  }
+	  fprintf(stderr,"setting decl_next(%s) to %s\n",name,nextname);
+	}
+      }
+#endif
+      return prev; }
+  case KEYappend_Declarations:
+    { Declarations some = append_Declarations_l1(decls);
+      Declarations more = append_Declarations_l2(decls);
+      Declaration middle = decls_set_next_decl(more,next);
+      return decls_set_next_decl(some,middle); }
+  }
+  fatal_error("control reached end of decls_set_next_decl");
+  return NULL;
+}
+
+static Expression actuals_set_next_actual(Actuals actuals, Expression next) {
+  switch (Actuals_KEY(actuals)) {
+  case KEYnil_Actuals: return next;
+  case KEYlist_Actuals:
+    { Expression prev = list_Actuals_elem(actuals);
+      Expression_info(prev)->next_actual = next;
+      return prev; }
+  case KEYappend_Actuals:
+    { Actuals some = append_Actuals_l1(actuals);
+      Actuals more = append_Actuals_l2(actuals);
+      Expression middle = actuals_set_next_actual(more,next);
+      return actuals_set_next_actual(some,middle); }
+  }
+  fatal_error("control reached end of actuals_set_next_actual");
+  return NULL;
+}
+
+static Expression exprs_set_next_expr(Expressions exprs, Expression next) {
+  switch (Expressions_KEY(exprs)) {
+  case KEYnil_Expressions: return next;
+  case KEYlist_Expressions:
+    { Expression prev = list_Expressions_elem(exprs);
+      Expression_info(prev)->next_expr = next;
+      return prev; }
+  case KEYappend_Expressions:
+    { Expressions some = append_Expressions_l1(exprs);
+      Expressions more = append_Expressions_l2(exprs);
+      Expression middle = exprs_set_next_expr(more,next);
+      return exprs_set_next_expr(some,middle); }
+  }
+  fatal_error("control reached end of exprs_set_next_expr");
+  return NULL;
+}
+
+static Pattern pattern_actuals_set_next_pattern_actual(PatternActuals pattern_actuals, Pattern next) {
+  switch (PatternActuals_KEY(pattern_actuals)) {
+  case KEYnil_PatternActuals: return next;
+  case KEYlist_PatternActuals:
+    { Pattern prev = list_PatternActuals_elem(pattern_actuals);
+      Pattern_info(prev)->next_pattern_actual = next;
+      return prev; }
+  case KEYappend_PatternActuals:
+    { PatternActuals some = append_PatternActuals_l1(pattern_actuals);
+      PatternActuals more = append_PatternActuals_l2(pattern_actuals);
+      Pattern middle = pattern_actuals_set_next_pattern_actual(more,next);
+      return pattern_actuals_set_next_pattern_actual(some,middle); }
+  }
+  fatal_error("control reached end of pattern_actuals_set_next_pattern_actual");
+  return NULL;
+}
+
+static void *set_next_fields(void *ignore, void *node) {
+  switch (ABSTRACT_APS_tnode_phylum(node)) {
+  case KEYDeclarations:
+    { Declaration decl = decls_set_next_decl((Declarations)node,NULL);
+      for (; decl != NULL; decl=Declaration_info(decl)->next_decl) {
+	traverse_Declaration(set_next_fields,ignore,decl);
+      }
+    }
+    return NULL;
+  case KEYActuals:
+    { Expression actual = actuals_set_next_actual((Actuals)node,NULL);
+      for (; actual != NULL; actual=Expression_info(actual)->next_actual) {
+	traverse_Expression(set_next_fields,ignore,actual);
+      }
+    }
+    return NULL;
+  case KEYExpressions:
+    { Expression expr = exprs_set_next_expr((Expressions)node,NULL);
+      for (; expr != NULL; expr=Expression_info(expr)->next_expr) {
+	traverse_Expression(set_next_fields,ignore,expr);
+      }
+    }
+    return NULL;
+  case KEYPatternActuals:
+    { Pattern pattern_actual = pattern_actuals_set_next_pattern_actual((PatternActuals)node,NULL);
+      for (; pattern_actual != NULL; pattern_actual=Pattern_info(pattern_actual)->next_pattern_actual) {
+	traverse_Pattern(set_next_fields,ignore,pattern_actual);
+      }
+    }
+    return NULL;
+  default: break;
+  }
+  return ignore;
+}
+
+/* potentially useful later */
+Declaration first_Declaration(Declarations l) {
+  switch (Declarations_KEY(l)) {
+  case KEYlist_Declarations:
+    return list_Declarations_elem(l);
+  case KEYappend_Declarations:
+    { Declaration first = first_Declaration(append_Declarations_l1(l));
+      if (first != NULL) return first;
+      return first_Declaration(append_Declarations_l2(l)); }
+  default:
+    return NULL;
+  }
+}
+
+Expression first_Actual(Actuals l) {
+  switch (Actuals_KEY(l)) {
+  case KEYlist_Actuals:
+    return list_Actuals_elem(l);
+  case KEYappend_Actuals:
+    { Expression first = first_Actual(append_Actuals_l1(l));
+      if (first != NULL) return first;
+      return first_Actual(append_Actuals_l2(l)); }
+  default:
+    return NULL;
+  }
+}
+
+Expression first_Expression(Expressions l) {
+  switch (Expressions_KEY(l)) {
+  case KEYlist_Expressions:
+    return list_Expressions_elem(l);
+  case KEYappend_Expressions:
+    { Expression first = first_Expression(append_Expressions_l1(l));
+      if (first != NULL) return first;
+      return first_Expression(append_Expressions_l2(l)); }
+  default:
+    return NULL;
+  }
+}
+
+Pattern first_PatternActual(PatternActuals l) {
+  switch (PatternActuals_KEY(l)) {
+  case KEYlist_PatternActuals:
+    return list_PatternActuals_elem(l);
+  case KEYappend_PatternActuals:
+    { Pattern first = first_PatternActual(append_PatternActuals_l1(l));
+      if (first != NULL) return first;
+      return first_PatternActual(append_PatternActuals_l2(l)); }
+  default:
+    return NULL;
+  }
+}
+
+
+/*** PRAGMA ACTIVATION ***/
+
+static void *activate_pragmas(void *ignore, void *node) {
+  static Symbol synthesized_symbol=NULL;
+  static Symbol inherited_symbol=NULL;
+  static Symbol fiber_strict_symbol=NULL;
+  static Symbol fiber_cyclic_symbol=NULL;
+  static Symbol start_phylum_symbol=NULL;
+  if (synthesized_symbol == NULL) {
+    synthesized_symbol=intern_symbol("synthesized");
+    inherited_symbol=intern_symbol("inherited");
+    fiber_strict_symbol=intern_symbol("fiber_strict");
+    fiber_cyclic_symbol=intern_symbol("fiber_cyclic");
+    start_phylum_symbol=intern_symbol("root_phylum");
+  }
+  if (ABSTRACT_APS_tnode_phylum(node) == KEYDeclaration) {
+    Declaration decl=(Declaration)node;
+    switch (Declaration_KEY(decl)) {
+    case KEYpragma_call:
+      { Symbol pragma_sym = pragma_call_name(decl);
+	Expressions exprs = pragma_call_parameters(decl);
+	Expression expr = first_Expression(exprs);
+	for (; expr != NULL; expr=Expression_info(expr)->next_expr) {
+	  switch (Expression_KEY(expr)) {
+	  case KEYvalue_use:
+	    { Declaration d = Use_info(value_use_use(expr))->use_decl;
+	      if (d != NULL) {
+		if (pragma_sym == synthesized_symbol) {
+		  if (bind_debug & PRAGMA_ACTIVATION)
+		    printf("%s is synthesized\n",
+			   symbol_name(def_name(declaration_def(d))));
+		  Declaration_info(d)->decl_flags |= ATTR_DECL_SYN_FLAG;
+		} else if (pragma_sym == inherited_symbol) {
+		  if (bind_debug & PRAGMA_ACTIVATION)
+		    printf("%s is inherited\n",
+			   symbol_name(def_name(declaration_def(d))));
+		  Declaration_info(d)->decl_flags |= ATTR_DECL_INH_FLAG;
+		} else if (pragma_sym == fiber_strict_symbol) {
+		  if (bind_debug & PRAGMA_ACTIVATION)
+		    printf("%s is strict for fibering\n",
+			   symbol_name(def_name(declaration_def(d))));
+		  Declaration_info(d)->decl_flags |= FIELD_DECL_STRICT_FLAG;
+		} else if (pragma_sym == fiber_cyclic_symbol) {
+		  if (bind_debug & PRAGMA_ACTIVATION)
+		    printf("%s is cyclic for fibering\n",
+			   symbol_name(def_name(declaration_def(d))));
+		  Declaration_info(d)->decl_flags |= FIELD_DECL_CYCLIC_FLAG;
+		}
+	      }
+	    }
+	    break;
+	  case KEYtype_value:
+	    switch (Type_KEY(type_value_t(expr))) {
+	    case KEYtype_use:
+	      { Declaration d = USE_DECL(type_use_use(type_value_t(expr)));
+		if (pragma_sym == start_phylum_symbol) {
+		  if (bind_debug & PRAGMA_ACTIVATION)
+		    printf("%s is start phylum\n",
+			   symbol_name(def_name(declaration_def(d))));
+		  Declaration_info(d)->decl_flags |= START_PHYLUM_FLAG;
+		}
+	      }
+	    }
+	    break;
+	  }
+	}
+      }
+      break; 
+    }
+  }
+  return ignore;
+}

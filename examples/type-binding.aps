@@ -1,0 +1,202 @@
+with "type-decl";
+-- Type example from fiber paper.
+-- (no collections)
+module TYPE_BINDING[T :: var TYPE_DECL[]] extends T begin
+
+  --- the local object types and their
+  --- "fields" (attributes in APS).
+  
+  -- contours:
+  phylum Contour;
+  constructor contour() : Contour;
+  type Scope := remote Contour;
+  attribute Contour.enclosing : Scope; -- normally would be a constructor field
+  type Entities := BAG[EntityRef];
+  collection attribute Contour.entities : Entities;
+
+  pragma fiber_cyclic(enclosing);
+
+  -- entities: AKA declarations
+  phylum Entity;
+  type EntityRef := remote Entity;
+  constructor value_entity() : Entity;
+  constructor type_entity() : Entity;
+  attribute Entity.entity_name : String;
+  attribute Entity.entity_shape : Shape;
+  pragma fiber_strict(entity_shape,entity_name); -- avoid type 3 circularities
+ 
+  
+  -- shapes: used just for object identity
+  phylum ShapeStructure;
+  constructor primitive_shape(name : String) : ShapeStructure;
+  constructor vector_shape(element_shape : Shape) : ShapeStructure;
+  constructor named_shape() : ShapeStructure;
+  attribute ShapeStructure.named_shape_shape : Shape;
+  pragma fiber_cyclic(named_shape_shape);
+  type Shape := remote ShapeStructure;
+  
+  --- the globals
+  type Messages := BAG[String];
+  var collection msgs : Messages;
+
+  root_scope : Scope := nil;
+  
+  not_found : EntityRef := nil;
+  
+  int_shape : Shape := primitive_shape("integer");
+  str_shape : Shape := primitive_shape("string");
+
+
+  --- Attributes on "nonterminals" (i.e. imported and fixed phyla)
+  
+  -- don't use polymorphism:
+  attribute Block.block_scope : Scope;
+  attribute Decls.decls_scope : Scope;
+  attribute Decl.decl_scope : Scope;
+  attribute Type.type_scope : Scope;
+  attribute Stmts.stmts_scope : Scope;
+  attribute Stmt.stmt_scope : Scope;
+  attribute Expr.expr_scope : Scope;
+  
+  pragma inherited(block_scope,decls_scope,decl_scope,type_scope,
+		   stmts_scope,stmt_scope,expr_scope);
+
+  attribute Type.type_shape : Shape;
+  attribute Expr.expr_shape : Shape;
+  
+  pragma synthesized(type_shape,expr_shape);
+  
+  match ?p:Program=program(?b:Block) begin
+    b.block_scope := root_scope;
+  end;
+  
+  match ?b:Block=block(?ds:Decls,?ss:Stmts) begin
+    c : Contour := contour();
+    c.enclosing := b.block_scope;
+    ds.decls_scope := c;
+    ss.stmts_scope := c;
+  end;
+  
+  match ?ds:Decls=no_decls() begin
+  end;
+  
+  match ?ds0:Decls=xcons_decls(?ds1:Decls,?d:Decl) begin
+    ds1.decls_scope := ds0.decls_scope;
+    d.decl_scope := ds0.decls_scope;
+  end;
+  
+  match ?d:Decl=decl(?id:String,?ty:Type) begin
+    e : EntityRef := value_entity();
+    e.entity_name := id;
+    e.entity_shape := ty.type_shape;
+    d.decl_scope.entities :> {e};
+    ty.type_scope := d.decl_scope;
+  end;
+  
+  match ?d:Decl=type_decl(?id:String,?ty:Type) begin
+    e : EntityRef := type_entity();
+    e.entity_name := id;
+    e.entity_shape := ty.type_shape;
+    d.decl_scope.entities :> {e};
+    ty.type_scope := d.decl_scope;
+  end;
+  
+  match ?t:Type=integer() begin
+    t.type_shape := int_shape;
+  end;
+  
+  match ?t:Type=string() begin
+    t.type_shape := str_shape;
+  end;
+  
+  match ?t:Type=vector(?et:Type) begin
+    et.type_scope := t.type_scope;
+    ts : ShapeStructure := vector_shape(et.type_shape);
+    t.type_shape := ts;
+  end;
+
+  match ?t:Type=use(?id:String) begin
+    e : Entity;
+    e := lookup(id,t.type_scope);
+    ts : ShapeStructure := named_shape();
+    t.type_shape := ts;
+    case e begin
+      match type_entity() begin
+	ts.named_shape_shape := e.entity_shape;
+      end;
+    else
+      ts.named_shape_shape := nil;
+    end;
+  end;
+  
+  match ?:Stmts=no_stmts() begin
+  end;
+  
+  match ?ss0:Stmts=xcons_stmts(?ss1:Stmts,?s:Stmt) begin
+    ss1.stmts_scope := ss0.stmts_scope;
+    s.stmt_scope := ss0.stmts_scope;
+  end;
+  
+  match ?s:Stmt=block_stmt(?b:Block) begin
+    b.block_scope := s.stmt_scope;
+  end;
+  
+  match ?s:Stmt=assign_stmt(?e1:Expr,?e2:Expr) begin
+    e1.expr_scope := s.stmt_scope;
+    e2.expr_scope := s.stmt_scope;
+  end;
+  
+  match ?e:Expr=intconstant(?:Integer) begin
+    e.expr_shape := int_shape;
+  end;
+  
+  match ?e:Expr=strconstant(?:String) begin
+    e.expr_shape := str_shape;
+  end;
+  
+  match ?e:Expr=variable(?id:String) begin
+    decl : EntityRef;
+    decl := lookup(id,e.expr_scope);
+    case decl begin
+      match value_entity() begin
+	e.expr_shape := decl.entity_shape;
+      end;
+    else
+      e.expr_shape := nil;
+    end;
+  end;
+  
+  procedure lookup(name : String; scope : Scope) : EntityRef begin
+    if scope = root_scope then
+      result := not_found;
+    else
+      case scope.entities begin
+	match {...,?e:EntityRef if e.entity_name=name,...} begin
+	  result := e;
+	end;
+      else
+	result := lookup(name,scope.enclosing);
+      end;
+    endif;
+  end;
+  
+  match ?e:Expr=access(?a:Expr,?i:Expr) begin
+    e.expr_shape := element_type(a.expr_shape);
+  end;
+  
+  function element_type(at : Shape) : Shape begin
+    case at begin
+      match vector_shape(?et:Shape) begin
+	result := et;
+      end;
+    else
+      case at begin
+	match named_shape() begin
+	  result := element_type(at.named_shape_shape);
+	end;
+      else
+	result := int_shape;
+      end;
+    end;
+  end;
+end;

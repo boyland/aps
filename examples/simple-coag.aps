@@ -1,0 +1,46 @@
+with "simple";
+-- Simple example of OAG
+module SIMPLE_OAG[T :: var SIMPLE[]] extends T begin
+  attribute Decls.ai1 : Integer;
+  attribute Decls.ai2 : Integer;
+  attribute Decls.as1 : Integer;
+  attribute Decls.as2 : Integer;
+  attribute Decl.bi : Integer;
+  attribute Decl.bs : Integer;
+  
+  attribute Block.total : Integer;
+
+  pragma inherited(ai1,ai2,bi);
+  pragma synthesized(as1,as2,bs,total);
+
+  match ?b:Block=block(?ds:Decls,?ss:Stmts) begin
+    ds.ai1 := 12;
+    ds.ai2 := ds.as1;
+    b.total := ds.as2;
+  end;
+
+  match ?ds:Decls=no_decls() begin
+    ds.as1 := ds.ai1;
+    ds.as2 := ds.ai2;
+  end;
+  
+  match ?ds0:Decls=xcons_decls(?ds1:Decls,?d:Decl) begin
+    if odd(ds0.ai1) then
+      ds1.ai1 := ds0.ai1;
+      ds1.ai2 := ds1.as1;
+      ds0.as1 := ds1.as2;
+      d.bi := ds0.ai2;
+      ds0.as2 := d.bs;
+    else
+      d.bi := ds0.ai1;
+      ds0.as1 := d.bs;
+      ds1.ai1 := ds0.ai2;
+      ds1.ai2 := ds1.as1;
+      ds0.as2 := ds1.as2;
+    endif;
+  end;
+  
+  match ?d:Decl=decl(?id:String,?ty:Type) begin
+    d.bs := d.bi + 1;
+  end;
+end;

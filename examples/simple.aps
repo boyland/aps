@@ -1,0 +1,34 @@
+-- Simple programming language from fiber paper.
+module SIMPLE[] begin
+  pragma root_phylum(type Program);
+  -- the phyla:
+  phylum Program;
+  phylum Block;
+  phylum Decls; -- we don't use sequences here:
+  phylum Decl;
+  phylum Type;
+  phylum Stmts;
+  phylum Stmt;
+  phylum Expr;
+  
+  constructor program(block : Block) : Program;
+  constructor block(decls : Decls; stmts : Stmts) : Block;
+  constructor no_decls() : Decls;
+  constructor xcons_decls(ds : Decls; d : Decl) : Decls;
+  constructor decl(id : String; ty : Type) : Decl;
+  constructor integer() : Type;
+  constructor string() : Type;
+  constructor no_stmts() : Stmts;
+  constructor xcons_stmts(ss : Stmts; s : Stmt) : Stmts;
+  constructor block_stmt(block : Block) : Stmt;
+  constructor assign_stmt(e1,e2 : Expr) : Stmt;
+  constructor intconstant(i : Integer) : Expr;
+  constructor strconstant(s : String) : Expr;
+  constructor variable(id : String) : Expr;
+end;
+  
+
+  
+  
+
+

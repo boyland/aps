@@ -1,0 +1,114 @@
+with "simple";
+-- Example from fiber paper.
+module NAME_RESOLUTION[T :: var SIMPLE[]] extends T begin
+
+  --- the local object types and their
+  --- "fields" (attributes in APS).
+  
+  type Entities := BAG[EntityRef];
+  collection entities : Entities;
+
+  -- entities: AKA declarations
+  phylum Entity;
+  type EntityRef := remote Entity;
+  constructor entity() : Entity;
+  attribute Entity.entity_name : String;
+  attribute Entity.entity_shape : Shape;
+  collection attribute Entity.entity_used : OrLattice;
+  
+  -- shapes: used just for object identity
+  phylum ShapeStructure;
+  constructor shape(name : String) : ShapeStructure;
+  type Shape := remote ShapeStructure;
+  
+  --- the globals
+  type Messages := BAG[String];
+  var collection msgs : Messages;
+
+  not_found : EntityRef := nil;
+  
+  int_shape : Shape := shape("integer");
+  str_shape : Shape := shape("string");
+
+
+  --- Attributes on "nonterminals" (i.e. imported and fixed phyla)
+  
+  attribute Type.type_shape : Shape;
+  attribute Expr.expr_shape : Shape;
+  
+  pragma synthesized(type_shape,expr_shape);
+  
+  match ?p:Program=program(?b:Block) begin
+  end;
+  
+  match ?b:Block=block(?ds:Decls,?ss:Stmts) begin
+  end;
+  
+  match ?:Decls=no_decls() begin
+  end;
+  
+  match ?ds0:Decls=xcons_decls(?ds1:Decls,?d:Decl) begin
+  end;
+  
+  match ?d:Decl=decl(?id:String,?ty:Type) begin
+    e : Entity := entity();
+    entities :> {e};
+    e.entity_name := id;
+    e.entity_shape := ty.type_shape;
+    if not e.entity_used then
+      msgs :> {id ++ " is unused"};
+    endif;
+  end;
+  
+  match ?t:Type=integer() begin
+    t.type_shape := int_shape;
+  end;
+  
+  match ?t:Type=string() begin
+    t.type_shape := str_shape;
+  end;
+  
+  match ?:Stmts=no_stmts() begin
+  end;
+  
+  match ?ss0:Stmts=xcons_stmts(?ss1:Stmts,?s:Stmt) begin
+  end;
+  
+  match ?s:Stmt=block_stmt(?b:Block) begin
+  end;
+  
+  match ?s:Stmt=assign_stmt(?e1:Expr,?e2:Expr) begin
+    if e1.expr_shape /= e2.expr_shape then
+      msgs :> {"type mismatch"};
+    endif;
+  end;
+  
+  match ?e:Expr=intconstant(?:Integer) begin
+    e.expr_shape := int_shape;
+  end;
+  
+  match ?e:Expr=strconstant(?:String) begin
+    e.expr_shape := str_shape;
+  end;
+  
+  match ?e:Expr=variable(?id:String) begin
+    decl : EntityRef;
+    decl := lookup(id);
+    if decl = not_found then
+      msgs :> {id ++ " not declared"};
+    else
+      decl.entity_used :> true;
+      e.expr_shape := decl.entity_shape;
+    endif;
+  end;
+  
+  procedure lookup(name : String) found : EntityRef begin
+    case entities begin
+      match {...,?ent:EntityRef if ent.entity_name=name,...} begin
+	found := ent;
+      end;
+    else
+      found := not_found;
+    end;
+  end;
+end;

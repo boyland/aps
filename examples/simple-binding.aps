@@ -1,0 +1,152 @@
+with "simple";
+-- Example from fiber paper.
+module NAME_RESOLUTION[T :: var SIMPLE[]] extends T begin
+
+  --- the local object types and their
+  --- "fields" (attributes in APS).
+  
+  -- contours:
+  phylum Contour;
+  constructor contour() : Contour;
+  type Scope := remote Contour;
+  attribute Contour.enclosing : Scope; -- normally would be a constructor field
+  type Entities := BAG[EntityRef];
+  collection attribute Contour.entities : Entities;
+
+  pragma fiber_cyclic(enclosing);
+  
+  -- entities: AKA declarations
+  phylum Entity;
+  type EntityRef := remote Entity;
+  constructor entity() : Entity;
+  attribute Entity.entity_name : String;
+  attribute Entity.entity_shape : Shape;
+  collection attribute Entity.entity_used : OrLattice;
+  
+  pragma fiber_strict(entity_name,entity_shape);
+  
+  -- shapes: used just for object identity
+  phylum ShapeStructure;
+  constructor shape(name : String) : ShapeStructure;
+  type Shape := remote ShapeStructure;
+  
+  --- the globals
+  type Messages := BAG[String];
+  var collection msgs : Messages;
+
+  root_scope : Scope := nil;
+  
+  not_found : EntityRef := nil;
+  
+  int_shape : Shape := shape("integer");
+  str_shape : Shape := shape("string");
+
+  pragma fiber_strict(root_scope,not_found,int_shape,str_shape);
+
+  --- Attributes on "nonterminals" (i.e. imported and fixed phyla)
+  
+  -- don't use polymorphism:
+  attribute Block.block_scope : Scope;
+  attribute Decls.decls_scope : Scope;
+  attribute Decl.decl_scope : Scope;
+  attribute Stmts.stmts_scope : Scope;
+  attribute Stmt.stmt_scope : Scope;
+  attribute Expr.expr_scope : Scope;
+
+  attribute Type.type_shape : Shape;
+  attribute Expr.expr_shape : Shape;
+
+  pragma inherited(block_scope,decls_scope,decl_scope,
+		   stmts_scope,stmt_scope,expr_scope);
+  pragma synthesized(type_shape,expr_shape);
+  
+  match ?p:Program=program(?b:Block) begin
+    b.block_scope := root_scope;
+  end;
+  
+  match ?b:Block=block(?ds:Decls,?ss:Stmts) begin
+    c : Contour := contour();
+    c.enclosing := b.block_scope;
+    ds.decls_scope := c;
+    ss.stmts_scope := c;
+  end;
+  
+  match ?:Decls=no_decls() begin
+  end;
+  
+  match ?ds0:Decls=xcons_decls(?ds1:Decls,?d:Decl) begin
+    ds1.decls_scope := ds0.decls_scope;
+    d.decl_scope := ds0.decls_scope;
+  end;
+  
+  match ?d:Decl=decl(?id:String,?ty:Type) begin
+    e : Entity := entity();
+    d.decl_scope.entities :> {e};
+    e.entity_name := id;
+    e.entity_shape := ty.type_shape;
+    if not e.entity_used then
+      msgs :> {id ++ " is unused"};
+    endif;
+  end;
+  
+  match ?t:Type=integer() begin
+    t.type_shape := int_shape;
+  end;
+  
+  match ?t:Type=string() begin
+    t.type_shape := str_shape;
+  end;
+  
+  match ?:Stmts=no_stmts() begin
+  end;
+  
+  match ?ss0:Stmts=xcons_stmts(?ss1:Stmts,?s:Stmt) begin
+    ss1.stmts_scope := ss0.stmts_scope;
+    s.stmt_scope := ss0.stmts_scope;
+  end;
+  
+  match ?s:Stmt=block_stmt(?b:Block) begin
+    b.block_scope := s.stmt_scope;
+  end;
+  
+  match ?s:Stmt=assign_stmt(?e1:Expr,?e2:Expr) begin
+    e1.expr_scope := s.stmt_scope;
+    e2.expr_scope := s.stmt_scope;
+    if e1.expr_shape /= e2.expr_shape then
+      msgs :> {"type mismatch"};
+    endif;
+  end;
+  
+  match ?e:Expr=intconstant(?:Integer) begin
+    e.expr_shape := int_shape;
+  end;
+  
+  match ?e:Expr=strconstant(?:String) begin
+    e.expr_shape := str_shape;
+  end;
+  
+  match ?e:Expr=variable(?id:String) begin
+    decl : EntityRef;
+    decl := lookup(id,e.expr_scope);
+    if decl = not_found then
+      msgs :> {id ++ " not declared"};
+    else
+      decl.entity_used :> true;
+      e.expr_shape := decl.entity_shape;
+    endif;
+  end;
+  
+  procedure lookup(name : String; scope : Scope) : EntityRef begin
+    if scope = root_scope then
+      result := not_found;
+    else
+      case scope.entities begin
+	match {...,?e:EntityRef if e.entity_name=name,...} begin
+	  result := e;
+	end;
+      else
+	result := lookup(name,scope.enclosing);
+      end;
+    endif;
+  end;
+end;
