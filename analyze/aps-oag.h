@@ -21,3 +21,4 @@ extern int oag_debug;
 #define DEBUG_ORDER 2
 #define PROD_ORDER 4
 #define PROD_ORDER_DEBUG 8
+#define TYPE_3_DEBUG 16
