@@ -303,6 +303,11 @@ static bool implement_visit_function(AUG_GRAPH* aug_graph,
 	    os << "v" << i << "_" << asym << " = " << rhs << ";\n";
 	}
       } else {
+	if (Declaration_KEY(ad) == KEYvalue_decl &&
+	    !direction_is_collection(value_decl_direction(ad))) {
+	  aps_warning(ad,"Local attribute %s is apparently undefined",
+			  decl_name(ad));
+        }
 	os << "// " << in << " is ready now\n";
       }
       continue;
