@@ -48,6 +48,8 @@ extern void check_function_return_type(Expression,Actuals,Type);
 extern Type infer_pfunction_return_type(Pattern,PatternActuals);
 extern void check_pfunction_return_type(Pattern,PatternActuals,Type);
 
+extern Type type_element_type(Type);
+
 /* return true is environment is ready to use
  * (no remaining inference required)
  * Since polymorphic scopes may not export type declarations
@@ -75,6 +77,9 @@ Signature sig_subst(Use,Signature);
 void check_type_subst(void *node, Type t1, Use u2, Type t2);
 
 void check_type_equal(void* node, Type,Type);
+
+/*! This function will fail to terminate in the case of recursive types */
+extern int base_type_equal(Type b1, Type b2);
 
 void print_TypeEnvironment(TypeEnvironment,FILE*);
 void print_Use(Use,FILE*);
