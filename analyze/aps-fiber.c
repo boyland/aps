@@ -12,6 +12,7 @@ int fiber_debug = 0;
 typedef struct edges {
   struct edges *rest;   // rest of esges
   Declaration  edge;    // f or f. or empty(null).
+  int from; // FSA from
 } *EDGES;           // list of edges
 
 typedef struct nodeset {
@@ -41,15 +42,15 @@ typedef struct worklist {
 #define MAX_FSA_NUMBER 1800
 #define MAX_DFA_NUMBER 1000
 
-// 2-D arary: a list of edges b/w any two nodes in FSA.
-EDGES FSA_graph[MAX_FSA_NUMBER][MAX_FSA_NUMBER];    //! need to be created dynamically
+// 1-D arary: a list of edges to any node
+EDGES FSA_graph[MAX_FSA_NUMBER];    //! need to be created dynamically
 
 // record the DFA nodes: the index number of DFA node is set from 1.
 NODE_IN_TREE DFA[MAX_DFA_NUMBER];
 
 // DFA is a tree with edge f in F b/w nodes
 Declaration DFA_tree[MAX_DFA_NUMBER][MAX_DFA_NUMBER]; // edge from j to i for [j][i]
-int DFA_tree_used[MAX_DFA_NUMBER][MAX_DFA_NUMBER];    // if 1, indicated used; for recursive use
+
 NODESET DFA_result_set;         // nodeset we are interested in in DFA.
                                 // Those states will lead to the final state.
 WORKLIST wl= NULL;
@@ -2298,31 +2299,33 @@ void add_FSA_edge(int from, int to, Declaration edge) {
   // check first if the edge has been in the tnode.
   // if not, add it, otherwise do nothing.
   static int count = 0;
-  EDGES edgeset = FSA_graph[from][to];
+  EDGES edgeset = FSA_graph[to];
 
   if ((from <= 1) ||
       (to <= 1)) {
     fatal_error("adding edges for an unidentified edge.");
   }
   if (fiber_debug & PUSH_FIBER) {
-    printf("add one edge b/w %d %d\n", from, to);
+    printf("add one edge b/w %d %d (%s)\n", from, to,
+	   edge ? decl_name(edge) : "<epsilon>");
   }
-  if (edge_in_set(edge, edgeset)) {
-    if (fiber_debug & PUSH_FIBER) {
-      printf("	edge already exist.\n");
-    }
-    return;
-  } else {
-    EDGES p = (EDGES)malloc(sizeof(struct edges));
-    p->rest = edgeset;
-    p->edge = edge;
-    FSA_graph[from][to] = p;
-    done = FALSE;
-    if (fiber_debug & PUSH_FIBER) {
-      printf("	new edge (#%d) is added.\n",++count);
+  for (edgeset = FSA_graph[to]; edgeset; edgeset=edgeset->rest) {
+    if (edgeset->from == from && edgeset->edge == edge) {
+      if (fiber_debug & PUSH_FIBER) {
+	printf("	edge already exist.\n");
+      }
+      return;
     }
   }
-  return;
+  edgeset = (EDGES)malloc(sizeof(struct edges));
+  edgeset->rest = FSA_graph[to];
+  edgeset->edge = edge;
+  edgeset->from = from;
+  FSA_graph[to] = edgeset;
+  done = FALSE;
+  if (fiber_debug & PUSH_FIBER) {
+    printf("	new edge (#%d) is added.\n",++count);
+  }
 }
 
 // union of two nodesets. ns1 = ns1 + ns2
@@ -2586,10 +2589,10 @@ NODESET link_expr_lhs(Expression e, NODESET ns) {
 
 static int edge_num = 0;
 // print edges
-void print_edges(EDGES edges, int from, int to){
+void print_edges(EDGES edges, int to){
   EDGES p = edges;
   while (p) {
-    printf("    edge: %d ---- %d : %s\n", from, to,
+    printf("    edge: %d ---- %d : %s\n", p->from, to,
 	   p->edge ? decl_name(p->edge) : "<epsilon>");
     p = p->rest;
     edge_num++;
@@ -2600,56 +2603,34 @@ void print_edges(EDGES edges, int from, int to){
 void print_FSA(){
 	int from, to;
 	int max = FSA_next_node_index;
-	for (from = 0; from < max; from++){
-		for (to = 0; to < max; to++){
-		//	printf(" edges from node %d to node %d:\n", from, to);
-			print_edges(FSA_graph[from][to], from, to);	
-		}
+	for (to = 0; to < max; to++){
+	  //	printf(" edges from node %d to node %d:\n", from, to);
+	  print_edges(FSA_graph[to], to);	
 	}
 }
-
-//
-
-int atleast_one_epsilon(EDGES e){
-	EDGES p = e;
-	while (p) {
-		if (p->edge == NULL)
-			return 1;
-		p = p->rest;
-	}
-	return 0;
-}
-
 
 NODESET beclose(NODESET N){
-	NODESET p = N;
-	NODESET head = p;
-retry:
-	while (p) {
-		int node = p->node;
-		int i;
-		for (i=2; i<FSA_next_node_index; i++){
-			EDGES e = FSA_graph[i][node];
-			if (atleast_one_epsilon(e)&&(!node_in_set(head,i)))	{ // epsilon
-					head = add_to_nodeset(head, i);
-					p = head;
-					goto retry;
-			}	// if
-		}	// for
-		p = p->rest;
-	}	// while
-	return head;
-}
-
-// if exist any edge of f b/w source_node and target_node; return 1;
-int exist_edge(int source_node, int target_node, Declaration f){
-
-	EDGES es = FSA_graph[source_node][target_node];
-	while (es) {
-		if (es->edge == f) return 1;
-		es = es->rest;
+  NODESET p = N;
+  NODESET head = p;
+  NODESET tail = NULL;
+  BOOL done;
+  do {
+    done = TRUE;
+    NODESET next_tail = head;
+    for (p=head; p != tail; p=p->rest) {
+      int node = p->node;
+      EDGES es;
+      for (es = FSA_graph[node]; es; es=es->rest) {
+	int from = es->from;
+	if (es->edge == NULL && !node_in_set(head,from)) { // an epsilon edge
+	  head = add_to_nodeset(head,from);
+	  done = FALSE;
 	}
-	return 0;
+      }
+    }
+    tail = next_tail;
+  } while (!done);
+  return head;
 }
 
 int nodeset_hash(NODESET p)
@@ -2668,14 +2649,14 @@ NODE_IN_TREE makeNode(NODE_IN_TREE T, Declaration f, BOOL reverse) {
   
   if (T == NULL) return NULL;
   
-  NODESET p = T->ns;
-  while (p) {
-    int source;
-    for (source = 2; source < FSA_next_node_index; source++){
-      if (exist_edge(source, p->node, f))
-	result = add_to_nodeset(result, source);
+  NODESET p;
+  for (p = T->ns; p; p=p->rest) {
+    EDGES ns;
+    for (ns = FSA_graph[p->node]; ns != NULL; ns=ns->rest) {
+      if (ns->edge == f && !node_in_set(result,ns->from)) {
+	result = add_to_nodeset(result, ns->from);
+      }
     }
-    p = p->rest;
   }	
   if (result == NULL) return NULL;
 
@@ -2948,90 +2929,6 @@ void *DFA_fiber_set(void *u, void *node)
 int buff_size = 40960;
 int max_field_len = 64;
 
-void release_visited(NODESET visited){
-	NODESET p = visited;
-	int from, to;
-
-	if (p == NULL) return;
-
-	to = p->node;
-	p = p->rest;
-	printf("  %d <--",to);
-	while (p) {
-		from = p->node;
-		DFA_tree_used[from][to] = 0;  // edge released
-		
-		printf("%d <--",from);
-		to = from;
-		p = p->rest;
-	}
-	printf("\n");
-
-	for (from=1; from <MAX_DFA_NUMBER; from++)
-		for (to=1; to<MAX_DFA_NUMBER; to++)
-			if (DFA_tree_used[from][to] == 1 ) 
-				printf("DEBUG: WARING: release not correct: %d-->%d\n",from, to);
-}
-
-// path from node
-/*! This print a very exponential number of paths */
-void print_DFA_path_rec(int node) {
-  static char *print_buffer = 0;
-  static int buffer_size = 0;
-  static int buffer_point = 0;
-
-  if (node == 1) {
-    if (buffer_point > 0) {
-      print_buffer[buffer_point] = '\0';
-      printf("  %s\n",print_buffer);
-    }
-  } else {
-    int i=0;
-    int saved_bp = buffer_point;
-    for (i=0; i <= DFA_node_number; ++i) {
-      Declaration f = DFA_tree[node][i];
-      if (f != 0) {
-	DFA_tree[node][i] = 0; // avoid traversing cycles
-
-	char *s = decl_name(f);
-	int n = strlen(s);
-	
-	/* increase buffer size as necessary */
-	if (n + buffer_point + 3 >= buffer_size) {
-	  int new_buffer_size = 2*(n+buffer_point+3);
-	  char *new_buffer = (char *)malloc(new_buffer_size);
-	  int j;
-	  for (j=0; j < buffer_point; ++j) {
-	    new_buffer[j] = print_buffer[j];
-	  }
-	  buffer_size = new_buffer_size;
-	  if (print_buffer != 0) free(print_buffer);
-	  print_buffer = new_buffer;
-	}
-	
-	/* now put name into buffer */
-	strcpy(print_buffer+buffer_point,s);
-	buffer_point += n;
-	if (i == node) {
-	  strcpy(print_buffer+buffer_point,"*");
-	  buffer_point += 1;
-	}
-	strcpy(print_buffer+buffer_point,".");
-	buffer_point += 1;
-
-	/* now do recurseive call */
-
-	print_DFA_path_rec(i);
-
-	/* now restore edge */
-	DFA_tree[node][i] = f;
-	/* and ignore part added */
-	buffer_point = saved_bp;
-      }
-    }
-  }
-}
-
 // according to DFA_result_set, print all possible fibers
 void print_DFA_path(){
   NODESET p = DFA_result_set;
@@ -3181,7 +3078,7 @@ void fiber_module(Declaration module, STATE *s) {
 	}
 
 	// initionlize the graph 
-//	FSA_graph = (EDGES)malloc(sizeof(struct edges)*index*index);
+//	FSA_graph = (EDGES)malloc(sizeof(struct edges)*index);
 
 	// printf("DEBUG: traverse declaration to build FSA.\n");
 	traverse_Declaration(build_FSA, s, module);
