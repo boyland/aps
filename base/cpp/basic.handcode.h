@@ -10,7 +10,7 @@ inline bool C_TYPE::v_node_equivalent(Node *x, Node *y) { return x == y; }
 // inline versions of BOOLEAN functions
 inline void C_BOOLEAN::v_assert(bool x) { assert(x == 0 || x == 1); }
 inline bool C_BOOLEAN::v_equal(bool x, bool y) { return x == y; }
-inline string C_BOOLEAN::v_string(bool x) { return x ? "true" : "false"; }
+inline T_String C_BOOLEAN::v_string(bool x) { return x ? "true" : "false"; }
 
 // outside functions:
 inline bool v_and(bool x, bool y) { return x & y; }
@@ -38,7 +38,7 @@ inline void C_CHARACTER::v_assert(char x) {}
 inline bool C_CHARACTER::v_equal(char x, char y) { return x == y; }
 inline bool C_CHARACTER::v_less(char x, char y) { return x < y; }
 inline bool C_CHARACTER::v_less_equal(char x, char y) { return x <= y; }
-inline string C_CHARACTER::v_string(char x) { return string(1,x); }
+inline T_String C_CHARACTER::v_string(char x) { return std::string(1,x); }
 
 inline int v_char_code(char x) { return x; }
 inline char v_int_char(int x) { return x; }
@@ -47,67 +47,49 @@ inline bool C_PHYLUM::v_identical(Node *x, Node *y) { return x == y; }
 inline int C_PHYLUM::v_object_id(Node *x) { return x->index; }
 inline bool C_PHYLUM::v_object_id_less(Node *x, Node*y) { return x->index < y->index; }
 
-template<class E>
-inline void C_BAG<E>::v_assert(C_BAG::T_Result) { }
+template<class C_E>
+inline void C_BAG<C_E>::v_assert(C_BAG::T_Result) { }
 
-template <>
-inline Node* C_BAG<Node*>::v__op_AC(Node* f,...) {
-  //!! buggy (can't put 0 in a list)
-  Node *l = v_single(f);
-  va_list ap;
-  va_start(ap,f);
-  while ((f = va_arg(ap,Node*)) != 0)
-    l = v_append(l,v_single(f));
-  return l;
-}
-
-//!! People won't be able to call it...
-template <>
-inline Node* C_BAG<string>::v__op_AC(string f,...) {
-  throw stub_error("BAG[String]${}");
-}
-
-class C_STRING : virtual public Module, virtual public C_ORDERED< string >, 
-		 virtual public C_PRINTABLE< string > ,
-		 virtual public C_CONCATENATING< string >
+class C_STRING : public C_TYPE
 {
  public:
-  typedef string T_Result;
-  C_STRING *t_Result;
-  void v_assert(string) {}
-  bool v_equal(string l1,string l2) { return l1 == l2; }
-  string v_concatenate(string l1,string l2) { return l1 + l2; }
-  bool v_member(char x,string l) { return l.find(x) < l.size(); }
-  char v_nth(int i,string l) { return l.at(i); }
-  char v_nth_from_end(int i,string l) { return l.at(l.size()-i-1); }
-  int v_position(char x,string l) { return l.find(x); }
-  int v_position_from_end(char x,string l) { return l.rfind(x); }
-  string v_subseq(string l,int s,int f) { return l.substr(s,f); }
-  string v_subseq_from_end(string l,int s,int f);
-  string v_butsubseq(string l,int start,int finish);
-  string v_butsubseq_from_end(string l,int start,int finish);
-  string v__op_AC(...);
-  bool v_less(string x,string y) { return x < y; }
-  bool v_less_equal(string x,string y) { return x <= y; }
-  string v_string(string x) { return x; }
+  typedef std::string T_Result;
+  void v_assert(T_Result) {}
+  bool v_equal(T_Result l1,T_Result l2) { return l1 == l2; }
+  T_Result v_concatenate(T_Result l1,T_Result l2) { return l1 + l2; }
+  T_Result v_append(T_Result l1, T_Result l2) { return l1 + l2; }
+  T_Result v_single(char c) { return T_Result(1,c); }
+  T_Result v_none() { return ""; }
+  bool v_member(char x,T_Result l) { return l.find(x) < l.size(); }
+  char v_nth(int i,T_Result l) { return l.at(i); }
+  char v_nth_from_end(int i,T_Result l) { return l.at(l.size()-i-1); }
+  int v_position(char x,T_Result l) { return l.find(x); }
+  int v_position_from_end(char x,T_Result l) { return l.rfind(x); }
+  T_Result v_subseq(T_Result l,int s,int f) { return l.substr(s,f); }
+  T_Result v_subseq_from_end(T_Result l,int s,int f);
+  T_Result v_butsubseq(T_Result l,int start,int finish);
+  T_Result v_butsubseq_from_end(T_Result l,int start,int finish);
+  bool v_less(T_Result x,T_Result y) { return x < y; }
+  bool v_less_equal(T_Result x,T_Result y) { return x <= y; }
+  T_Result v_string(T_Result x) { return x; }
 
-  C_STRING() : t_Result(this) {}
-  C_STRING(const C_STRING& from) : t_Result(from.t_Result) {}
   void finish() {}
 };
 
 
 // Useful things for collection functions:
-template <class C, class E> 
+template <class C_C, class C_E> 
 struct COLL {
-  typedef typename C::T_Result Coll;
-  typedef typename C::V_append V_append;
-  typedef typename C::V_single V_single;
-  typedef typename C::V_none V_none;
+  typedef typename C_C::T_Result Coll;
+  typedef typename C_C::V_append V_append;
+  typedef typename C_C::V_single V_single;
+  typedef typename C_C::V_none V_none;
 
-  C* collection_type;
-  C_BASIC<E>* element_type;
-  COLL(C* ct, C_BASIC<E>* et) : collection_type(ct), element_type(et) {}
+  typedef typename C_E::T_Result T_E;
+
+  C_C* collection_type;
+  C_E* element_type;
+  COLL(C_C* ct, C_E* et) : collection_type(ct), element_type(et) {}
 
   bool equal(Coll l1, Coll l2) {
     if (V_append *l1 = dynamic_cast<V_append*>(l1)) {
@@ -122,7 +104,7 @@ struct COLL {
     }
     throw stub_error("COLLECTION[...]$equal isn't working");
   }
-  static E nth(int i, Coll l) {
+  static T_E nth(int i, Coll l) {
     if (V_append * n = dynamic_cast<V_append*>(l)) {
       int n1 = length(n->v_l1);
       if (n1 > i) {
@@ -134,13 +116,13 @@ struct COLL {
       if (i == 0) {
 	return n->v_x;
       } else {
-	throw out_of_range("COLLECTION[...]$nth");
+	throw std::out_of_range("COLLECTION[...]$nth");
       }
     } else {
-      throw out_of_range("COLLECTION[...]$nth");
+      throw std::out_of_range("COLLECTION[...]$nth");
     }
   }
-  static E nth_from_end(int i, Coll l) {
+  static T_E nth_from_end(int i, Coll l) {
     if (V_append * n = dynamic_cast<V_append*>(l)) {
       int n2 = length(n->v_l2);
       if (n2 > i) {
@@ -152,13 +134,13 @@ struct COLL {
       if (i == 0) {
 	return n->v_x;
       } else {
-	throw out_of_range("COLLECTION[...]$nth_from_end");
+	throw std::out_of_range("COLLECTION[...]$nth_from_end");
       }
     } else {
-      throw out_of_range("COLLECTION[...]$nth_from_end");
+      throw std::out_of_range("COLLECTION[...]$nth_from_end");
     }
   }
-  int position(E x, Coll l) {
+  int position(T_E x, Coll l) {
     if (V_append * n = dynamic_cast<V_append*>(l)) {
       int p1 = position(x,n->v_l1);
       if (p1 >= 0) return p1;
@@ -169,10 +151,12 @@ struct COLL {
     }
     return -1;
   }
-  int position_from_end(E x, Coll l) {
-    throw stub_error("COLLECTION[...]$position_from_end");
+  int position_from_end(T_E x, Coll l) {
+    int i = position(x,l);
+    if (i == -1) return -1;
+    return length(l)-1-i;
   }
-  bool member(E x, Node *l) {
+  bool member(T_E x, Coll l) {
     return position(x,l) >= 0;
   }
   Coll subseq(Coll l, int start, int finish) {
@@ -199,7 +183,8 @@ struct COLL {
     }
   }
   Coll subseq_from_end(Coll l, int start, int finish) {
-    throw stub_error("COLLECTION[...]$subseq_from_end");
+    int len = length(l);
+    return subseq(l,l-1-finish,l-1-start);
   }
   Coll butsubseq(Coll l, int start, int finish) {
     // cout << "~[" << start << "," << finish << ")" << endl;
@@ -227,7 +212,8 @@ struct COLL {
     return l;
   }
   Coll butsubseq_from_end(Coll l, int start, int finish) {
-    throw stub_error("COLLECTION[...]$butsubseq_from_end");
+    int n = length(l);
+    return butsubseq(l,n-finish-1,n-start-1);
   }
 
   static int length(Coll l) {
@@ -243,101 +229,110 @@ struct COLL {
   }
 };
 
-template <class E>
-inline bool C_LIST<E>::v_equal(Node *l1, Node* l2) {
-  return COLL<C_LIST<E>,E>(this,t_ElemType).equal(l1,l2);
+// Sequence functions:
+template <class C_E>
+inline typename C_E::T_Result 
+C_SEQUENCE<C_E>::v_nth(int i, T_Result l) {
+  return COLL<C_SEQUENCE<C_E>,C_E>::nth(i,l);
 }
 
-template <class E>
-inline E C_LIST<E>::v_nth(int i, Node* l) {
-  return COLL<C_LIST<E>,E>::nth(i,l);
+template <class C_E>
+inline typename C_E::T_Result 
+C_SEQUENCE<C_E>::v_nth_from_end(int i, T_Result l) {
+  return COLL<C_SEQUENCE<C_E>,C_E>::nth_from_end(i,l);
 }
 
-template <class E>
-inline E C_LIST<E>::v_nth_from_end(int i, Node* l) {
-  return COLL<C_LIST<E>,E>::nth_from_end(i,l);
+template <class C_E>
+inline int C_SEQUENCE<C_E>::v_position(T_ElemType x, T_Result l) {
+  return COLL<C_SEQUENCE<C_E>,C_E>(this,t_ElemType).position(x,l);
 }
 
-template <class E>
-inline int C_LIST<E>::v_position(E x, Node* l) {
-  return COLL<C_LIST<E>,E>(this,t_ElemType).position(x,l);
+template <class C_E>
+inline int C_SEQUENCE<C_E>::v_position_from_end(T_ElemType x, T_Result l) {
+  return COLL<C_SEQUENCE<C_E>,C_E>(this,t_ElemType).position_from_end(x,l);
 }
 
-template <class E>
-inline int C_LIST<E>::v_position_from_end(E x, Node* l) {
-  return COLL<C_LIST<E>,E>(this,t_ElemType).position_from_end(x,l);
+template <class C_E>
+inline bool C_SEQUENCE<C_E>::v_member(T_ElemType x, T_Result l) {
+  return COLL<C_SEQUENCE<C_E>,C_E>(this,t_ElemType).member(x,l);
 }
 
-template <class E>
-inline bool C_LIST<E>::v_member(E x, Node* l) {
-  return COLL<C_LIST<E>,E>(this,t_ElemType).member(x,l);
+// List functions 
+
+template <class C_E>
+inline bool C_LIST<C_E>::v_equal(T_Result l1, T_Result l2) {
+  return COLL<C_LIST<C_E>,C_E>(this,t_ElemType).equal(l1,l2);
 }
 
-template <class E>
-inline Node* C_LIST<E>::v_subseq(Node *l, int s, int f) {
-  return COLL<C_LIST<E>,E>(this,t_ElemType).subseq(l,s,f);
+template <class C_E>
+inline typename C_E::T_Result
+C_LIST<C_E>::v_nth(int i, T_Result l) {
+  return COLL<C_LIST<C_E>,C_E>::nth(i,l);
 }
 
-template <class E>
-inline Node* C_LIST<E>::v_subseq_from_end(Node *l, int s, int f) {
-  return COLL<C_LIST<E>,E>(this,t_ElemType).subseq_from_end(l,s,f);
+template <class C_E>
+inline typename C_E::T_Result
+C_LIST<C_E>::v_nth_from_end(int i, T_Result l) {
+  return COLL<C_LIST<C_E>,C_E>::nth_from_end(i,l);
 }
 
-template <class E>
-inline Node* C_LIST<E>::v_butsubseq(Node *l, int s, int f) {
-  return COLL<C_LIST<E>,E>(this,t_ElemType).butsubseq(l,s,f);
+template <class C_E>
+inline int C_LIST<C_E>::v_position(T_ElemType x, T_Result l) {
+  return COLL<C_LIST<C_E>,C_E>(this,t_ElemType).position(x,l);
 }
 
-template <class E>
-inline Node* C_LIST<E>::v_butsubseq_from_end(Node *l, int s, int f) {
-  return COLL<C_LIST<E>,E>(this,t_ElemType).butsubseq_from_end(l,s,f);
+template <class C_E>
+inline int C_LIST<C_E>::v_position_from_end(T_ElemType x, T_Result l) {
+  return COLL<C_LIST<C_E>,C_E>(this,t_ElemType).position_from_end(x,l);
 }
 
-// The following gets a compiler error if 
-// I try to have it generic over all list element types
-template <>
-inline Node* C_LIST<Node*>::v__op_AC(Node* f,...) {
-  //!! buggy (can't put 0 in a list)
-  Node *l = v_single(f);
-  va_list ap;
-  va_start(ap,f);
-  while ((f = va_arg(ap,Node*)) != 0)
-    l = v_append(l,v_single(f));
-  return l;
+template <class C_E>
+inline bool C_LIST<C_E>::v_member(T_ElemType x, T_Result l) {
+  return COLL<C_LIST<C_E>,C_E>(this,t_ElemType).member(x,l);
 }
 
-template <>
-inline Node* C_LIST<int>::v__op_AC(int f,...) {
-  //!! buggy (can't put 0 in a list)
-  Node *l = v_single(f);
-  va_list ap;
-  va_start(ap,f);
-  while ((f = va_arg(ap,int)) != 0)
-    l = v_append(l,v_single(f));
-  return l;
+template <class C_E>
+inline typename C_LIST<C_E>::T_Result 
+C_LIST<C_E>::v_subseq(T_Result l, int s, int f) {
+  return COLL<C_LIST<C_E>,C_E>(this,t_ElemType).subseq(l,s,f);
 }
 
-template <>
-inline Node* C_LIST<string>::v__op_AC(string,...) {
-  throw stub_error("List[...]${}");
+template <class C_E>
+inline typename C_LIST<C_E>::T_Result 
+C_LIST<C_E>::v_subseq_from_end(T_Result l, int s, int f) {
+  return COLL<C_LIST<C_E>,C_E>(this,t_ElemType).subseq_from_end(l,s,f);
 }
 
-template<class E>
-inline bool C_SET<E>::v_equal(T_Result s1, T_Result s2) 
+template <class C_E>
+inline typename C_LIST<C_E>::T_Result 
+C_LIST<C_E>::v_butsubseq(T_Result l, int s, int f) {
+  return COLL<C_LIST<C_E>,C_E>(this,t_ElemType).butsubseq(l,s,f);
+}
+
+template <class C_E>
+inline typename C_LIST<C_E>::T_Result 
+C_LIST<C_E>::v_butsubseq_from_end(T_Result l, int s, int f) {
+  return COLL<C_LIST<C_E>,C_E>(this,t_ElemType).butsubseq_from_end(l,s,f);
+}
+
+// SET
+
+template<class C_E>
+inline bool C_SET<C_E>::v_equal(T_Result s1, T_Result s2) 
 { return v_less_equal(s1,s2) && v_less_equal(s2,s1); }
 
-template<class E>
-inline bool C_SET<E>::v_less(T_Result s1, T_Result s2) 
+template<class C_E>
+inline bool C_SET<C_E>::v_less(T_Result s1, T_Result s2) 
 { return v_less_equal(s1,s2) && !v_less_equal(s2,s1); }
 
 template<class E>
 inline bool C_SET<E>::v_less_equal(T_Result s1, T_Result s2)
 {
   if(s1->cons == this->c_append) {
-    C_SET<E>::V_append * n = (C_SET<E>::V_append *) s1;
+    typename C_SET<E>::V_append * n = (typename C_SET<E>::V_append *) s1;
     return v_less_equal(n->v_l1,s2) && v_less_equal(n->v_l2, s2);
   } else if(s1->cons == this->c_single){
-    return v_member( ((C_SET<E>::V_single *)s1)->v_x, s2);
+    return v_member( ((typename C_SET<E>::V_single *)s1)->v_x, s2);
   } else if(s1->cons == this->c_none){
     return true;
   } else {
@@ -347,43 +342,33 @@ inline bool C_SET<E>::v_less_equal(T_Result s1, T_Result s2)
 }
 
 template<class E>
-inline C_SET<E>::T_Result C_SET<E>::v_none()
+inline typename C_SET<E>::T_Result C_SET<E>::v_none()
 { return C_BAG<E>::v_none(); }
 
 template<class E>
-inline C_SET<E>::T_Result C_SET<E>::v_single(E x)
+inline typename C_SET<E>::T_Result C_SET<E>::v_single(T_ElemType x)
 { return C_BAG<E>::v_single(x); }
 
 template<class E>
-inline C_SET<E>::T_Result C_SET<E>::v__op_AC(E,...)
-{ throw stub_error("SET[...]${}"); }
-
-template<>
-inline C_SET<Node*>::T_Result C_SET<Node*>::v__op_AC(T_Result f, ...) {
-  //!! buggy (can't put 0 in a list)
-  Node *l = v_single(f);
-  va_list ap;
-  va_start(ap,f);
-  while ((f = va_arg(ap,T_Result)) != 0)
-    l = v_union(l,v_single(f));
-  return l;
-}
-
-template<class E>
-inline bool C_SET<E>::v_member(E x, T_Result s) 
+inline bool C_SET<E>::v_member(T_ElemType x, T_Result s) 
 { return C_BAG<E>::v_member(x,s); }
 
 template<class E>
-inline C_SET<E>::T_Result C_SET<E>::v_union(T_Result s1, T_Result s2) 
-{ 
+inline typename C_SET<E>::T_Result C_SET<E>::v_union(T_Result s1, T_Result s2) 
+{
+  // C++ can't handle this code without the followign repeated typedefs:
+  typedef typename C_SET<E>::V_append V_append;
+  typedef typename C_SET<E>::V_single V_single;
+  typedef typename C_SET<E>::V_none V_none;
+
   if(s1->cons == this->c_append) {
-    C_SET<E>::V_append * n = (C_SET<E>::V_append *) s1;
+    V_append * n = (V_append *) s1;
     return v_union(n->v_l1,v_union(n->v_l1, s2));
   } else if(s1->cons == this->c_single){
-    C_SET<E>::V_single * n = (C_SET<E>::V_single *) s1;
+    V_single * n = (V_single *) s1;
     if(v_member(n->v_x, s2)){
       if(s2->cons == this->c_append){
-	C_SET<E>::V_append * m = (C_SET<E>::V_append *) s2;
+	V_append * m = (V_append *) s2;
 	if(v_member(n->v_x,m->v_l1)){
 	  return new V_append(this->c_append,v_union(s1,m->v_l1),
 			      v_union(new V_none(this->c_none),m->v_l2));
@@ -401,7 +386,7 @@ inline C_SET<E>::T_Result C_SET<E>::v_union(T_Result s1, T_Result s2)
       return new V_append(this->c_append,s1,s2);
   } else if(s1->cons == this->c_none){
     if(s2->cons == this->c_append){
-      C_SET<E>::V_append * m = (C_SET<E>::V_append *) s2;
+      V_append * m = (V_append *) s2;
       return new V_append(this->c_append,v_union(s1,m->v_l1),
 			  v_union(s1,m->v_l2));
     }else if(s2->cons == this->c_single){
@@ -419,13 +404,18 @@ inline C_SET<E>::T_Result C_SET<E>::v_union(T_Result s1, T_Result s2)
 }
 
 template<class E>
-inline C_SET<E>::T_Result C_SET<E>::v_intersect(T_Result s1, T_Result s2) 
+inline typename C_SET<E>::T_Result C_SET<E>::v_intersect(T_Result s1, T_Result s2) 
 {
+  // C++ can't handle this code without the followign repeated typedefs:
+  typedef typename C_SET<E>::V_append V_append;
+  typedef typename C_SET<E>::V_single V_single;
+  typedef typename C_SET<E>::V_none V_none;
+
   if(s1->cons == this->c_append) {
-    C_SET<E>::V_append * n = (C_SET<E>::V_append *) s1;
+    V_append * n = (V_append *) s1;
     return v_union(v_intersect(n->v_l1,s2),v_intersect(n->v_l1, s2));
   } else if(s1->cons == this->c_single){
-    C_SET<E>::V_single * n = (C_SET<E>::V_single *) s1;
+    V_single * n = (V_single *) s1;
     if(v_member(n->v_x, s2)){
       return new V_single(this->c_single,n->v_x);
     }else
@@ -439,15 +429,20 @@ inline C_SET<E>::T_Result C_SET<E>::v_intersect(T_Result s1, T_Result s2)
 }
 
 template<class E>
-inline C_SET<E>::T_Result C_SET<E>::v_difference(T_Result s1, T_Result s2) 
+inline typename C_SET<E>::T_Result C_SET<E>::v_difference(T_Result s1, T_Result s2) 
 {
+  // C++ can't handle this code without the followign repeated typedefs:
+  typedef typename C_SET<E>::V_append V_append;
+  typedef typename C_SET<E>::V_single V_single;
+  typedef typename C_SET<E>::V_none V_none;
+
   if(s2->cons == this->c_append) {
-    C_SET<E>::V_append * n = (C_SET<E>::V_append *) s2;
+    V_append * n = (V_append *) s2;
     return v_difference(v_difference(s1, n->v_l1), n->v_l2);
   } else if(s2->cons == this->c_single){
-    C_SET<E>::V_single * n = (C_SET<E>::V_single *) s2;
+    V_single * n = (V_single *) s2;
     if(s1->cons == this->c_append){
-      C_SET<E>::V_append * m = (C_SET<E>::V_append *) s1;
+      V_append * m = (V_append *) s1;
       return new V_append(this->c_append,v_difference(m->v_l1,s2),
 			  v_difference(m->v_l2,s2));
     }else if (s1->cons == this->c_single){
@@ -463,7 +458,7 @@ inline C_SET<E>::T_Result C_SET<E>::v_difference(T_Result s1, T_Result s2)
     }
   } else if(s2->cons == this->c_none){
     if(s1->cons == this->c_append){
-      C_SET<E>::V_append * m = (C_SET<E>::V_append *) s1;
+      V_append * m = (V_append *) s1;
       return new V_append(this->c_append,v_difference(m->v_l1,s2),
 			  v_difference(m->v_l2,s2));
     }else if (s1->cons == this->c_single){
@@ -483,7 +478,7 @@ inline C_SET<E>::T_Result C_SET<E>::v_difference(T_Result s1, T_Result s2)
 template <class E, class T>
 class C__basic_22 {
  public:
-  C__basic_22(Module *,C_READ_ONLY_COLLECTION<T,E>*) {}
+  C__basic_22(E *, T *) {}
 
   inline int v_length(typename T::T_Result l) {
     return COLL<T,E>::length(l);
@@ -491,11 +486,11 @@ class C__basic_22 {
 };
 
 template<>
-class C__basic_22<T_Character,T_String> {
+class C__basic_22<C_Character,C_String> {
  public:
-  C__basic_22(Module *,C_READ_ONLY_COLLECTION<T_String,T_Character>*) {}
+  C__basic_22(C_Character *,C_String *) {}
 
-  inline int v_length(string l) {
+  inline int v_length(T_String l) {
     return l.size();
   }
 };
