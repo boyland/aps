@@ -9,9 +9,21 @@ extern "C" {
 #include "dump-cpp.h"
 #include "implement.h"
 
-using namespace std;
+// Dynamic implementation of attribute grammars in APS syntax
+// Many many known bugs.
+// In particular:
+// case is not implemented exclusively:
+//    z : Integer := 0;
+//    case foo() of
+//      match foo() begin
+//        y := 2;
+//      end;
+//    else
+//      z := 4;
+//    end;
+// It will say z is 4, when it should be zero.
 
-#define LOCAL_ATTRIBUTE_FLAG (1<<24)
+using namespace std;
 
 struct ContextRecordNode {
   Declaration context;
@@ -39,16 +51,6 @@ static void push_attr_context(void *node)
   }
 }
 
-string matcher_bindings(string node, Match m)
-{
-  Pattern p = matcher_pat(m);
-  ostringstream os1, os2;
-  dump_Pattern_cond(p,node,os1);
-  dump_Pattern_bindings(p,os2);
-  // ignore os1 contents
-  return os2.str();
-}
-
 static void dump_context_open(void *c, ostream& os) {
   switch (ABSTRACT_APS_tnode_phylum(c)) {
   case KEYDeclaration:
@@ -71,6 +73,11 @@ static void dump_context_open(void *c, ostream& os) {
 	  dump_Expression(case_stmt_expr(decl),os);
 	  os << ";\n";
 	  os << indent() << "Constructor* cons = node->cons;\n";
+	  //os << indent() << "if (cons == 0) throw std::runtime_exception"
+	  // We need an if so each case can use else:
+	  os << indent() << "if (0) {}\n";
+	  //! BUG
+	  //! We should then test all cases up to the one we are matching.
 	}
 	return;
       case KEYfor_stmt:
@@ -105,11 +112,12 @@ static void dump_context_open(void *c, ostream& os) {
       case KEYtop_level_match:
 	{
 	  Type ty = infer_pattern_type(matcher_pat(top_level_match_m(decl)));
-	  os << indent() << "for (int i=";
-	  dump_Type_value(ty,os);
-	  os << "->size(); i >= 0; --i) {\n";
+	  os << indent() << "Phylum* phy = "
+	     << as_val(ty) << "->get_phylum();\n";
+	  os << indent() << "for (int i=phy->size(); i >= 0; --i) {\n";
 	  ++nesting_level;
-	  os << indent() << ty << " node = " << as_val(ty) << "->node(i);\n";
+	  os << indent() << ty << " anchor = phy->node(i);\n";
+	  os << indent() << ty << " node = anchor;\n";
 	  os << indent() << "Constructor* cons = node->cons;\n";
 	}
 	return;
@@ -121,21 +129,34 @@ static void dump_context_open(void *c, ostream& os) {
   case KEYBlock:
     {
       Block b = (Block)c;
-      // only for if_stmt for now
       Declaration parent = (Declaration)tnode_parent(b);
-      if (b == if_stmt_if_true(parent)) {
-	os << indent() << "if (cond) {\n";
-      } else {
-	os << indent() << "if (!cond) {\n";
+      switch (Declaration_KEY(parent)) {
+      case KEYif_stmt:
+	if (b == if_stmt_if_true(parent)) {
+	  os << indent() << "if (cond) {\n";
+	} else {
+	  os << indent() << "if (!cond) {\n";
+	}
+	++nesting_level;
+	break;
+      case KEYcase_stmt:
+	os << "else {\n";
+	++nesting_level;
+	break;
+      default:
+	fatal_error("%d: cannot determine why we have this attr_context",
+		    tnode_line_number(b));
+	break;
       }
-      ++nesting_level;
       return;
     }
   case KEYMatch:
     {
       Match m = (Match)c;
       Pattern p = matcher_pat(m);
-      os << indent() << "if (";
+      Declaration header = Match_info(m)->header;
+      bool is_exclusive = Declaration_KEY(header) == KEYcase_stmt;
+      os << indent() << (is_exclusive ? "else if (" : "if (");
       dump_Pattern_cond(p,"node",os);
       os << ") {\n";
       nesting_level+=1;
@@ -181,6 +202,9 @@ static void dump_attr_assign(void *vdecl, Declaration ass, ostream& os)
     dir = value_decl_direction(decl);
     def = value_decl_default(decl);
     activate_attr_context(os);
+    if (Declaration_info(decl)->decl_flags & VAR_VALUE_DECL_FLAG) {
+      os << indent() << "s_ " << decl_name(decl) << " = EVALUATED;\n";
+    }
     os << indent();
     break;
   case KEYfuncall:
@@ -248,9 +272,7 @@ void dump_Matches(Matches ms, bool exclusive, ASSIGNFUNC f, void*arg, ostream&os
     (Match,m,Matches,ms,
      push_attr_context(m);
      dump_Block(matcher_body(m),f,arg,os);
-     bool need_else = attr_context_started >= attr_context_depth;
      pop_attr_context(os);
-     if (exclusive && need_else) os << indent() << "else\n";
      );
 }
 
@@ -279,9 +301,9 @@ void dump_Block(Block b,ASSIGNFUNC f,void*arg,ostream&os)
        push_attr_context(d);
        //!! we implement case and for!!
        dump_Matches(case_stmt_matchers(d),true,f,arg,os);
-       os << indent() << "{\n"; // because of "else"
+       push_attr_context(case_stmt_default(d));
        dump_Block(case_stmt_default(d),f,arg,os);
-       os << indent() << "}\n";
+       pop_attr_context(os);
        pop_attr_context(os);
        break;
      case KEYfor_stmt:
@@ -377,6 +399,8 @@ void implement_local_attributes(vector<Declaration>& local_attributes,
     Block b = local_attribute_block(d);
     int i = LOCAL_UNIQUE_PREFIX(d);
     char *name = decl_name(d);
+    bool is_col = direction_is_collection(value_decl_direction(d));
+    
     hs << indent() << value_decl_type(d)
        << " c" << i << "_" << name << "(C_PHYLUM::Node* anchor)";
     INDEFINITION;
@@ -389,6 +413,12 @@ void implement_local_attributes(vector<Declaration>& local_attributes,
     bs << " {\n";
     ++nesting_level;
     bs << local_attribute_context_bindings(d);
+    if (is_col) {
+      bs << "\n"
+	 << indent() << value_decl_type(d) << " collection = ";
+      dump_vd_Default(d,bs);
+      bs << ";\n";
+    }
     bs << "\n"; // blank line
     dump_Block(b,dump_attr_assign,d,bs);
     dump_default_return(value_decl_default(d),value_decl_direction(d),
@@ -417,48 +447,102 @@ void implement_attributes(const vector<Declaration>& attrs,
     Type at = formal_type(af);
     // Declaration pd = USE_DECL(type_use_use(at));
     Declarations rdecls = function_type_return_values(attribute_decl_type(ad));
-    Type rt = value_decl_type(first_Declaration(rdecls));
+    Declaration rdecl = first_Declaration(rdecls);
+    Type rt = value_decl_type(rdecl);
     bool inh = (ATTR_DECL_IS_INH(ad) != 0);
+    bool is_col = direction_is_collection(attribute_decl_direction(ad));
     
-    hs << "  "; dump_Type(rt,hs); hs << " c_" << name << "(";
-    dump_Type(at,hs);
-    hs << " anode)";
-    //cout << "Before INDEF, ns = " << nesting_level << endl;
+    oss << header_return_type<Type>(rt) << " "
+	<< header_function_name(string("c_")+name)
+	<< "(" << at << " anode)" << header_end();
     INDEFINITION;
-    //cout << "After INDEF, ns = " << nesting_level << endl;
-    if (!inline_definitions) {
-      hs << ";\n";
-      dump_Type(rt,cpps);
-      cpps << " " << prefix << "c_" << name << "(";
-      dump_Type(at,cpps);
-      cpps << " anode)";
-    }
     bs << " {\n";  
     ++nesting_level;
-    if (inh) {
-      bs << indent() << "C_PHYLUM::Node* node=anode->parent;\n";
-      bs << indent() << "if (node != 0) {\n";
-      ++nesting_level;
+    if (is_col) {
+      bs << indent() << rt << " collection = ";
+      dump_vd_Default(rdecl,bs);
+      bs << ";\n";
     } else {
-      bs << indent() << "C_PHYLUM::Node* node = anode;\n";
+      if (inh) {
+	bs << indent() << "C_PHYLUM::Node* node=anode->parent;\n";
+	bs << indent() << "if (node != 0) {\n";
+	++nesting_level;
+      } else {
+	bs << indent() << "C_PHYLUM::Node* node = anode;\n";
+      }
+      bs << indent() << "C_PHYLUM::Node* anchor = node;\n";
+      bs << indent() << "Constructor* cons = node->cons;\n";
     }
-    bs << indent() << "C_PHYLUM::Node* anchor = node;\n";
-    bs << indent() << "Constructor* cons = node->cons;\n";
     for (vector<Declaration>::const_iterator i = tlms.begin();
 	 i != tlms.end(); ++i) {
+      if (is_col) push_attr_context(*i);
       Match m = top_level_match_m(*i);
       push_attr_context(m);
       Block body = matcher_body(m);
       dump_Block(body,dump_attr_assign,ad,bs);
       pop_attr_context(bs);
+      if (is_col) pop_attr_context(bs);
     }
-    if (inh) {
+    if (inh & !is_col) {
       --nesting_level;
       bs << indent() << "}\n";
     }
     dump_default_return(attribute_decl_default(ad),
 			attribute_decl_direction(ad),
 			string("anode->to_string()+\".") + name + "\"", bs);
+    --nesting_level;
+    bs << indent() << "}\n";
+  }
+}
+
+void implement_var_value_decls(const vector<Declaration>& vvds,
+			       const vector<Declaration>& tlms,
+			       const output_streams& oss)
+{
+  ostream& hs = oss.hs;
+  ostream& cpps = oss.cpps;
+  // ostream& is = oss.is;
+  ostream& bs = inline_definitions ? hs : cpps;
+  string prefix = oss.prefix;
+
+  int n = vvds.size();
+  for (int i=0; i <n; ++i) {
+    Declaration vvd = vvds[i];
+    char *name = decl_name(vvd);
+    Type vt = value_decl_type(vvd);
+    bool is_col = direction_is_collection(value_decl_direction(vvd));
+
+    oss << header_return_type<Type>(vt) << " "
+	<< header_function_name(string("c_")+name)
+	<< "()" << header_end();
+    INDEFINITION;
+    bs << " {\n";  
+    ++nesting_level;
+    bs << indent() << "if (s_" << name << " >= EVALUATED) "
+       << "return v_" << name << ";\n";
+    bs << indent() << "if (s_" << name << " == CYCLE) "
+       << "throw CyclicAttributeException(\"" << name << "\");\n";
+    bs << indent() << "s_" << name << " = CYCLE;\n";
+    if (is_col) {
+      bs << "\n"
+	 << indent() << vt << " collection = ";
+      dump_vd_Default(vvd,bs);
+      bs << "\n";
+    }
+    for (vector<Declaration>::const_iterator i = tlms.begin();
+	 i != tlms.end(); ++i) {
+      push_attr_context(*i);
+      Match m = top_level_match_m(*i);
+      push_attr_context(m);
+      Block body = matcher_body(m);
+      dump_Block(body,dump_attr_assign,vvd,bs);
+      pop_attr_context(bs);
+      pop_attr_context(bs);
+    }
+    bs << indent() << "s_" << name << " = EVALUATED;\n";
+    dump_default_return(value_decl_default(vvd),
+			value_decl_direction(vvd),
+			string("\"") + name + "\"", bs);
     --nesting_level;
     bs << indent() << "}\n";
   }
@@ -476,36 +560,70 @@ public:
       Super::note_top_level_match(tlm,oss);
     }
 
+    void dump_compute(string cfname, const output_streams& oss) {
+      ostream& bs = inline_definitions ? oss.hs : oss.cpps;
+
+      oss << header_return_type<string>("value_type") << " "
+	  << header_function_name("compute")
+	  << "(node_type node)"
+	  << header_end();
+      INDEFINITION;
+      bs << "{ \n";
+      ++nesting_level;
+      bs << indent() << "return context->" << cfname << "(node);\n";
+      --nesting_level;
+      bs << indent() << "}\n";
+    }
+    
     void note_local_attribute(Declaration ld, const output_streams& oss) {
       Super::note_local_attribute(ld,oss);
       Declaration_info(ld)->decl_flags |= LOCAL_ATTRIBUTE_FLAG;
+      int i = LOCAL_UNIQUE_PREFIX(ld);
+      dump_compute(string("c")+i+"_"+decl_name(ld),oss);
     }
-
+    
+    void note_attribute_decl(Declaration ad, const output_streams& oss) {
+      Super::note_attribute_decl(ad,oss);
+      dump_compute(string("c_")+decl_name(ad),oss);
+    }
+    
     void note_var_value_decl(Declaration vd, const output_streams& oss) {
       Super::note_var_value_decl(vd,oss);
+      Declaration_info(vd)->decl_flags |= VAR_VALUE_DECL_FLAG;
+      char *name = decl_name(vd);
+      oss.hs << indent() << "EvalStatus s_" << name << ";\n";
+      oss.is << ",\n    s_" << name << "(UNEVALUATED)";
     }
 
     void implement(const output_streams& oss) {
       implement_local_attributes(local_attributes,oss);
       implement_attributes(attribute_decls,top_level_matches,oss);
+      implement_var_value_decls(var_value_decls,top_level_matches,oss);
 
       ostream& hs = oss.hs;
       ostream& cpps = oss.cpps;
       ostream& bs = inline_definitions ? hs : cpps;
-      char *name = decl_name(module_decl);
+      // char *name = decl_name(module_decl);
 
       Declarations ds = block_body(module_decl_contents(module_decl));
       
       // Implement finish routine:
-      hs << "  void finish()";
+      hs << indent() << "void finish()";
       if (!inline_definitions) {
 	hs << ";\n";
-	cpps << "void C_" << name << "::finish()";
+	cpps << "void " << oss.prefix << "finish()";
       }
-      bs << " {";
+      INDEFINITION;
+      bs << " {\n";
+      ++nesting_level;
       for (Declaration d = first_Declaration(ds); d; d = DECL_NEXT(d)) {
 	char* kind = NULL;
 	switch(Declaration_KEY(d)) {
+	case KEYvalue_decl:
+	  if (!def_is_constant(value_decl_def(d))) {
+	    bs << indent() << "(void)c_" << decl_name(d) << "();\n";
+	  }
+	  break;
 	case KEYphylum_decl:
 	case KEYtype_decl:
 	  kind = "t_";
@@ -518,10 +636,12 @@ public:
 	}
 	if (kind != NULL) {
 	  char *n = decl_name(d);
-	  bs << "\n  " << kind << n << "->finish(); ";
+	  bs << indent() << kind << n << "->finish();\n";
 	}
       }
-      bs << " }\n\n";
+      --nesting_level;
+      bs << indent() << "}\n\n";
+      clear_implementation_marks(module_decl);
     }
   };
 
@@ -534,19 +654,34 @@ public:
     Type fty = function_decl_type(f);
     Declaration rdecl = first_Declaration(function_type_return_values(fty));
     Block b = function_decl_body(f);
-    dump_Block(b,dump_attr_assign,rdecl,os);
-    os << indent()
-       << "throw UndefinedAttributeException(\"" << decl_name(f) << "\");\n";
-  }
+    bool is_col = direction_is_collection(value_decl_direction(rdecl));
+    char *name = decl_name(f);
+    
+    if (is_col) {
+      os << "\n"
+	 << indent() << value_decl_type(rdecl) << " collection = ";
+      dump_vd_Default(rdecl,os);
+      os << ";\n";
+    }
+    os << "\n"; // blank line
 
-  void implement_attr_call(Declaration, Expression, ostream&) {
-    // not called
+    dump_Block(b,dump_attr_assign,rdecl,os);
+    dump_default_return(value_decl_default(rdecl),
+			value_decl_direction(rdecl),
+			string("\"local ")+name+"\"",os);
   }
 
   void implement_value_use(Declaration vd, ostream& os) {
-    if (Declaration_info(vd)->decl_flags & LOCAL_ATTRIBUTE_FLAG) {
+    int flags = Declaration_info(vd)->decl_flags;
+    if (flags & LOCAL_ATTRIBUTE_FLAG) {
       os << "a" << LOCAL_UNIQUE_PREFIX(vd) << "_"
 	 << decl_name(vd) << "->evaluate(anchor)"; 
+    } else if (flags & VAR_VALUE_DECL_FLAG) {
+      os << "c_" << decl_name(vd) << "()";
+    } else if (flags & ATTRIBUTE_DECL_FLAG) {
+      // not currently active:
+      // (but should work just fine)
+      os << "a" << "_" << decl_name(vd) << "->evaluate";
     } else {
       aps_error(vd,"internal_error: What is special about this?");
     }
