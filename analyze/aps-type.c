@@ -1410,11 +1410,14 @@ Type type_subst(Use type_envs, Type ty)
       while (type_env != 0 && type_env->source != parent)
 	type_env = type_env->outer;
       if (type_env == 0) {
+	/*
+	 * ? It seems that returning 'ty' is correct here.
 	print_Use(type_envs,stdout);
 	printf(" used for ");
 	print_Type(ty,stdout);
 	printf("\n");
 	aps_error(ty,"qualification fetches outer type ? (internal error)");
+	*/
 	return ty;
       }
       switch (Declaration_KEY(tdecl)) {
