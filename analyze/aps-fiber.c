@@ -1479,8 +1479,6 @@ USET doUO(Expression e, OSET oset) {
 		  p->u = e;
 		  p->rest = NULL;
       add_to_uset(responsible_node_shared_info(e, mystate),p);
-//			 printf("DEBUG: responsible_node_shared_info: %s\n", 
-//			 decl_name(responsible_node_shared_info(e,mystate)) );
 		  add_to_oset(sdecl,oset);
 		  RETURN get_uset(sdecl);
 		} else if (!DECL_IS_SYNTAX(sdecl)) {
@@ -1615,16 +1613,10 @@ OSET doOU(Expression e, USET uset)
 		  RETURN EMPTY_OSET;
 		} else if (DECL_IS_SHARED(sdecl)) {
 //			printf("	%d: decl is shared.\n", tnode_line_number(e));
-			//! shared global info
 		  Declaration rsi = responsible_node_shared_info(e, mystate);
 		  if (rsi != NULL) {
-//				printf("  %d: responsible node for shared info: %s; current decl: %s's uset:", 
-//						tnode_line_number(e), decl_name(rsi), decl_name(sdecl));
-//				if (get_uset(sdecl)==NULL)
-//					printf("NULL.\n");
-//				else printf("strange.\n");
-				// uset of shared decl is added to the responsible node.
-		  	add_to_uset(rsi, get_uset(sdecl));  
+		    // uset of shared decl is added to the responsible node.
+		    add_to_uset(rsi, get_uset(sdecl));  
 				
 		  } else {
 		    // we are in the top-level area, and
@@ -1847,10 +1839,6 @@ EDGES get_fields(EDGES fields_list, Declaration decl){
   for (fdecl = NEXT_FIELD(pdecl); fdecl != NULL; 
        fdecl = NEXT_FIELD(fdecl)) {
     // if fdecl is first time met, add it to fields_list.
-//    if (!direction_is_collection(attribute_decl_direction(fdecl))) 
-//      printf("DEBUG: attri is not collection. %s\n", decl_name(fdecl));
-//    else
-//      printf("DEBUG: attri is collection. %s\n", decl_name(fdecl));
     
     if (new_field(fdecl, fields_list)) {
       EDGES p = (EDGES)malloc(sizeof(struct edges));
@@ -1879,57 +1867,38 @@ void *count_node(void *u, void *node)
   case KEYDeclaration:
     {
       Declaration decl = (Declaration)node;
-      index = id_decl_uset(decl, index);		//Qu , Qu(-)
+      // index = id_decl_uset(decl, index);		//Qu , Qu(-)
       switch (Declaration_KEY(decl)) {
-			default: break;	
-			case KEYtop_level_match: {
-		
-			// shared_info
-	//			Declaration lhs = top_level_match_lhs_decl(decl);
-	//			Declaration sattr_l = phylum_shared_info_attribute(node_decl_phylum(lhs),
-	//															mystate);
-
-	//			Declaration rhs = top_level_match_first_rhs_decl(decl);
-	//			for(; rhs!= NULL; rhs = next_rhs_decl(rhs)) {
-	//				Declaration phy = node_decl_phylum(rhs);
-			//! why phy sometimes is NULL?
-	//				if (phy) {
-	//					Declaration sattr_r = phylum_shared_info_attribute(phy, mystate);
-	//				}
-	//			}	// for
-		
-		//! real code
-				Declaration lhs = top_level_match_lhs_decl(decl);
-				index = id_decl_node(lhs, index);
-				omiga = add_to_nodeset(omiga, index);
-				index++;		// bar	Qx(-)
-				omiga = add_to_nodeset(omiga, index);
-				Declaration rhs = top_level_match_first_rhs_decl(decl);
-				for(; rhs!= NULL; rhs = next_rhs_decl(rhs)) {
-					index = id_decl_node(rhs, index);
-					omiga = add_to_nodeset(omiga, index);
-					index++;		//bar
-					omiga = add_to_nodeset(omiga, index);
-				}
-				break;
-			}	// case top_level_match
-
-		// value_decl: includes initilization precess
+      default: break;
+      case KEYattribute_decl:
+	if (FIELD_DECL_P(decl)) {
+	  if (new_field(decl, all_fields_list)) {
+	    EDGES p = (EDGES)malloc(sizeof(struct edges));
+	    p->edge = decl;
+	    p->rest = all_fields_list;
+	    all_fields_list = p;
+	  }
+	}
+	/* FAll THROUGH */
       case KEYvalue_decl: {
-				index = id_decl_node(decl, index);
-				omiga = add_to_nodeset(omiga, index);
-				index++;		//bar
-				omiga = add_to_nodeset(omiga, index);
-				// if this is an object decl, get the fields of the object's type.
-				Declaration cdecl;
-				if ((cdecl = object_decl_p(decl)) != NULL) {
-					if (fiber_debug & ALL_FIBERSETS) 
-					printf("object decl: %d %s \n", tnode_line_number(node),decl_name(cdecl));
-					all_fields_list = get_fields(all_fields_list, cdecl);
-					;
-				}
-				break;
+	index = id_decl_node(decl, index);
+	omiga = add_to_nodeset(omiga, index);
+	index++;		//bar
+	omiga = add_to_nodeset(omiga, index);
       } // valuse_decl
+      break;
+      case KEYsome_function_decl: {
+	Type ft = some_function_decl_type(decl);
+	Declarations fs = function_type_formals(ft);
+	Declaration f = first_Declaration(fs);
+	for (; f != 0; f = DECL_NEXT(f)) {
+	  index = id_decl_node(f, index);
+	  omiga = add_to_nodeset(omiga, index);
+	  index++;		//bar
+	  omiga = add_to_nodeset(omiga, index);
+	}
+      }
+      break;
       }; // switch Declaration_KEY(decl)
       break;
     }	// case KEYDecl
@@ -1938,52 +1907,29 @@ void *count_node(void *u, void *node)
     {
       Expression e = (Expression)node;
       switch (Expression_KEY(e)) {
-      default:  {
-	aps_error(e, "wrong: not a proper expression in count_node.");
-	return NULL;
-      }
-      case KEYrepeat:
-	break;
-      case KEYvalue_use: {
-	Declaration decl = USE_DECL(value_use_use(e));
-	int i;
-	index = id_decl_node(decl, index);
-	omiga = add_to_nodeset(omiga, index);
-	index++; //bar
-	omiga = add_to_nodeset(omiga, index);
-	break;		// do same for all value_use
-      }	// case KEYvalue_use 
+      default:  break;
+			case KEYvalue_use: {
+				Declaration sdecl = USE_DECL(value_use_use(e));
+			//!! get shared_info's fields
+			//!! not expected. 
+				if (DECL_IS_SHARED(sdecl)) {
+					Declaration rsi = responsible_node_shared_info(e, mystate);
+	 if (rsi != NULL) {
+		Declaration cdecl;
+		if ((cdecl = object_decl_p(sdecl))!=NULL) {
+					get_fields(all_fields_list, cdecl);
+	}
+	}
+
+				}
+			}; break;
       case KEYfuncall: {
 	Declaration fdecl;
-	if ((fdecl = attr_ref_p(e)) != NULL) { //attr ref: X.a
-	} else if ((fdecl = field_ref_p(e)) != NULL) { // field ref:w.f
+	if ((fdecl = field_ref_p(e)) != NULL) { // field ref:w.f
 	  // node Qf 
-	  index = id_decl_node(fdecl, index);
-	  omiga = add_to_nodeset(omiga, index);
-	  index++;			// Qf(-): not really needed, only to make odd/even
-	  omiga = add_to_nodeset(omiga, index);
-	} else if ((fdecl = local_call_p(e)) != NULL) { //local call
-	  Expression arg;
-	  Declaration result = some_function_decl_result(fdecl);
-	  
-	  for (arg = first_Actual(funcall_actuals(e));
-	       arg != NULL;
-	       arg = Expression_info(arg)->next_expr){
-	    
-	    // get decl of formals
-	    Declaration f = function_actual_formal(fdecl,arg,e);
-	    index = id_decl_node(f, index);
-	    omiga = add_to_nodeset(omiga, index);
-	    index++;		//bar
-	    omiga = add_to_nodeset(omiga, index);
-	  }
-	  index = id_decl_node(result, index);
-	  omiga = add_to_nodeset(omiga, index);
+	  index = id_expr_node(e, index);
 	  index++;	
-	  omiga = add_to_nodeset(omiga, index);
-	} else { 		// primitive call
-	  ;			// do nothing?
-	}	// if
+	}
 	break;
       } // case funcall
       } // switch expr
@@ -2221,6 +2167,9 @@ void *build_FSA(void *u, void *node)
   case KEYExpression: {
      Expression expr = (Expression)node;
      link_expr_rhs(expr, default_node_set);
+		 switch (Expression_KEY(expr)) {
+			default: break;
+		 }
      return NULL;
   }
   }	// switch node
@@ -2365,27 +2314,45 @@ NODESET uset_to_nodeset(USET uset) {
 }
 
 NODESET link_expr_rhs(Expression e, NODESET ns){
-	if (e==NULL) return EMPTY_NODESET;
-	switch (Expression_KEY(e)){
-	default: aps_error(e, "wrong: not a proper expression to add edges.");
-	  return EMPTY_NODESET;
-	case KEYinteger_const:
-	case KEYreal_const:
-	case KEYstring_const:
-	case KEYchar_const:
-	  return EMPTY_NODESET;
-
+  if (e==NULL) return EMPTY_NODESET;
+  switch (Expression_KEY(e)){
+  default: aps_error(e, "wrong: not a proper expression to add edges.");
+    return EMPTY_NODESET;
+  case KEYinteger_const:
+  case KEYreal_const:
+  case KEYstring_const:
+  case KEYchar_const:
+    return EMPTY_NODESET;
+    
   case KEYrepeat:
           RETURN link_expr_rhs(repeat_expr(e),ns);
 	  
-	case KEYvalue_use: {
-	  Declaration decl = USE_DECL(value_use_use(e));
-// node =0 is allowed.
-//	  if (get_node_decl(decl)==0) 
-//	    printf("wrong in KEYvalue_use: node id is 0\n");
-	  return set_of_node(get_node_decl(decl)); // {Qd}
-	  break;
-	} // case value_use
+  case KEYvalue_use: {
+    Declaration decl = USE_DECL(value_use_use(e));
+    Declaration rdecl;
+    if (DECL_IS_LOCAL(decl) &&
+			DECL_IS_SHARED(decl)  &&
+			(rdecl = responsible_node_declaration(e)) != NULL) {
+//				(rdecl = responsible_node_shared_info(e, mystate)) != NULL) {
+      // use of a global value in a rule (need to use shared_info)
+      //!! HERE!
+
+      NODESET n;
+//!! the following code makes segment fault.
+//      for (n=ns; n; n = n->rest) {
+//        add_FSA_edge(get_node_expr(e)+1, n->node, rdecl);
+//        add_FSA_edge(get_node_expr(e), n->node, reverse_field(rdecl));
+        // Qe(-) to n: bar node is even number.
+        // the edge is reverse_field(fdecl);
+//      } // for end
+
+		return set_of_node(get_node_decl(rdecl));
+    } else {
+      return set_of_node(get_node_decl(decl)); // {Qd}
+    }
+  } // case value_use
+  break;
+
 	case KEYfuncall: {
 	  Declaration fdecl;
 	  
@@ -2407,7 +2374,14 @@ NODESET link_expr_rhs(Expression e, NODESET ns){
 	    return oset_to_nodeset(oset);
 	    
 	  } else if ((fdecl = local_call_p(e)) != NULL) { // local call
-				//! need to deal with local call
+			//! need to deal with local call
+      Declaration fsi = phylum_shared_info_attribute(fdecl, mystate);
+      // responsible shared info: shared_info on X0.
+      Declaration rsi = responsible_node_shared_info(e, mystate);
+			//!! deal with shared info here??
+			NODESET ns = set_of_node(get_node_decl(rsi));
+
+		// normal stuff
 	    Expression arg;
 	    Declaration result = some_function_decl_result(fdecl);
 	    
@@ -2424,6 +2398,7 @@ NODESET link_expr_rhs(Expression e, NODESET ns){
 	    return set_of_node(get_node_decl(result)); // {Qresult}
 	    
 	  } else { // primitive call
+
 	    NODESET nodeset = EMPTY_NODESET;
 	    Expression arg = first_Actual(funcall_actuals(e));
 	    for (; arg; arg = Expression_info(arg)->next_expr){
@@ -2446,7 +2421,17 @@ NODESET link_expr_lhs(Expression e, NODESET ns) {
 	  return link_expr_lhs(repeat_expr(e),ns);
 	case KEYvalue_use: {
 	  Declaration decl = USE_DECL(value_use_use(e));
-	  return set_of_node(get_node_decl(decl)+1);  // Qd(-)
+    Declaration rdecl;
+    if (DECL_IS_LOCAL(decl) &&
+      DECL_IS_SHARED(decl)  &&
+//      (rdecl = responsible_node_declaration(e)) != NULL) {
+        (rdecl = responsible_node_shared_info(e, mystate)) != NULL) {
+      // use of a global value in a rule (need to use shared_info)
+      //!! HERE!
+
+    return set_of_node(get_node_decl(rdecl)+1);
+		} //if 
+//	  return set_of_node(get_node_decl(decl)+1);  // Qd(-)
 	  break;
 	} // case value_use
 	case KEYfuncall: {
@@ -2818,18 +2803,6 @@ void *DFA_fiber_set(void *u, void *node)
       int index = Declaration_info(decl)->index ;
       if (index == 0) break;		// not the interested x
       
-      /*
-	// shared_info attri
-	switch (Declaration_KEY(decl)) {
-	default: break;
-	case KEYvalue_decl:
-	if (DECL_IS_SHARED(decl)) {
-	Declaration sattr =
-	phylum_shared_info_attribute(state->start_phylum,state);
-	decl = sattr;
-	}; break;
-	}
-      */
       // init NORMAL and REVERSE of FINAL fibersets here
       FIBERSETS*  decl_fsets;
       decl_fsets = &(Declaration_info(decl)->decl_fibersets);
@@ -3074,7 +3047,7 @@ void fiber_module(Declaration module, STATE *s) {
       POLYMORPHIC_INSTANCES(MODULE_SHARED_INFO_POLYMORPHIC(module));
     while (instance != NULL) {
       Declaration si = list_Declarations_elem(block_body(polymorphic_body(instance)));
-      // printf("For %s\n",decl_name(si));
+      printf("For %s\n",decl_name(si));
       print_all_ou(NULL, si);	
       instance = DECL_NEXT(instance);
     }
@@ -3106,6 +3079,8 @@ void fiber_module(Declaration module, STATE *s) {
 	printf("DEBUG: traverse declaration to build FSA.\n");
 	traverse_Declaration(build_FSA, module, module);
 
+	printf("DEBUG: after traverse build_FSA.\n");
+
 	if (fiber_debug & ALL_FIBERSETS) {
 		printf("\nFSA is built: the graph is: \n");
 		print_FSA(index);
@@ -3131,7 +3106,6 @@ void fiber_module(Declaration module, STATE *s) {
 	  printf("\nDFA: the number of node created: %d\n\n", DFA_node_number);
 	}
 
-	if (fiber_debug & ALL_FIBERSETS) {
 	  printf("Fiber Set for any x:\n");
 	  traverse_Declaration(DFA_fiber_set, module, module);
 	  // print FS of shared_info
@@ -3144,7 +3118,6 @@ void fiber_module(Declaration module, STATE *s) {
 	    DFA_fiber_set(NULL, si);	
 	    instance = DECL_NEXT(instance);
 	  }
-	}
 
 
 
