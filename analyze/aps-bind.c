@@ -208,9 +208,11 @@ void bind_Program(Program p) {
   current_type_env = saved_type_env;
 }
 
-/* traverse_Declaration but skip the first call */
-static void bind_Declaration(SCOPE scope, Declaration decl) {
-  traverse_Declaration_skip(do_bind,scope,decl);
+static SCOPE bind_Declaration(SCOPE scope, Declaration decl) {
+  SCOPE new_scope = scope;
+  traverse_Declaration(get_bindings,&new_scope,decl);
+  traverse_Declaration(do_bind,new_scope,decl);
+  return new_scope;
 }
 
 static SCOPE bind_Declarations(SCOPE scope, Declarations decls) {
@@ -549,6 +551,11 @@ static void *do_bind(void *vscope, void *node) {
 					polymorphic_type_formals(d));
 	  traverse_Declaration_skip(do_bind,new_scope,d); }
 	break;
+      case KEYfor_in_stmt:
+	traverse_Expression(do_bind,new_scope,for_in_stmt_seq(d));
+	new_scope = bind_Declaration(new_scope,for_in_stmt_formal(d));
+	traverse_Block(do_bind,new_scope,for_in_stmt_body(d)); 
+	break;
       default: return vscope; /* continue as normal */
       }
       release(top_mark);
@@ -866,15 +873,19 @@ Match first_Match(Matches l) {
 static void *activate_pragmas(void *ignore, void *node) {
   static Symbol synthesized_symbol=NULL;
   static Symbol inherited_symbol=NULL;
-  static Symbol fiber_strict_symbol=NULL;
+  static Symbol field_strict_symbol=NULL;
+  static Symbol fiber_untracked_symbol=NULL;
   static Symbol fiber_cyclic_symbol=NULL;
   static Symbol start_phylum_symbol=NULL;
+  static Symbol self_managed_symbol=NULL;
   if (synthesized_symbol == NULL) {
     synthesized_symbol=intern_symbol("synthesized");
     inherited_symbol=intern_symbol("inherited");
-    fiber_strict_symbol=intern_symbol("fiber_strict");
+    field_strict_symbol=intern_symbol("field_strict");
+    fiber_untracked_symbol=intern_symbol("fiber_untracked");
     fiber_cyclic_symbol=intern_symbol("fiber_cyclic");
     start_phylum_symbol=intern_symbol("root_phylum");
+    self_managed_symbol=intern_symbol("self_managed");
   }
   if (ABSTRACT_APS_tnode_phylum(node) == KEYDeclaration) {
     Declaration decl=(Declaration)node;
@@ -898,11 +909,17 @@ static void *activate_pragmas(void *ignore, void *node) {
 		    printf("%s is inherited\n",
 			   symbol_name(def_name(declaration_def(d))));
 		  Declaration_info(d)->decl_flags |= ATTR_DECL_INH_FLAG;
-		} else if (pragma_sym == fiber_strict_symbol) {
+		} else if (pragma_sym == field_strict_symbol) {
 		  if (bind_debug & PRAGMA_ACTIVATION)
-		    printf("%s is strict for fibering\n",
+		    printf("%s is strict for incrementality\n",
 			   symbol_name(def_name(declaration_def(d))));
 		  Declaration_info(d)->decl_flags |= FIELD_DECL_STRICT_FLAG;
+		} else if (pragma_sym == fiber_untracked_symbol) {
+		  if (bind_debug & PRAGMA_ACTIVATION)
+		    printf("%s is untracked for fibering\n",
+			   symbol_name(def_name(declaration_def(d))));
+		  Declaration_info(d)->decl_flags |=
+		    FIELD_DECL_UNTRACKED_FLAG;
 		} else if (pragma_sym == fiber_cyclic_symbol) {
 		  if (bind_debug & PRAGMA_ACTIVATION)
 		    printf("%s is cyclic for fibering\n",
@@ -921,6 +938,11 @@ static void *activate_pragmas(void *ignore, void *node) {
 		    printf("%s is start phylum\n",
 			   symbol_name(def_name(declaration_def(d))));
 		  Declaration_info(d)->decl_flags |= START_PHYLUM_FLAG;
+		} else if (pragma_sym == self_managed_symbol) {
+		  if (bind_debug & PRAGMA_ACTIVATION)
+		    printf("%s is self managed\n",
+			   symbol_name(def_name(declaration_def(d))));
+		  Declaration_info(d)->decl_flags |= SELF_MANAGED_FLAG;
 		}
 	      }
 	    }

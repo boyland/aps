@@ -41,7 +41,11 @@ FIBER lengthen_fiber(Declaration field, FIBER xshorter) {
     BOOL error = FALSE;
     /* check special instructions for the field */
     Declaration base = field_base(field);
-    if (FIELD_DECL_IS_STRICT(base)) return shorter;
+    if (base == 0) {
+      fatal_error("base of field %s[0%o] is NULL!\n",
+		  decl_name(field),Declaration_info(field)->decl_flags);
+    }
+    if (FIELD_DECL_IS_UNTRACKED(base)) return shorter;
     if (FIELD_DECL_IS_CYCLIC(base) &&
 	shorter->field == field) return shorter;
     /* check whether the field already occurs in the fiber */
@@ -71,7 +75,7 @@ enum shortening { no_shorter, one_shorter, one_same, two_shorter };
 enum shortening shorten(Declaration field, FIBER longer) {
   /* check special instructions for the field */
   Declaration base = field_base(field);
-  if (FIELD_DECL_IS_STRICT(base)) return one_same;
+  if (FIELD_DECL_IS_UNTRACKED(base)) return one_same;
   if (FIELD_DECL_IS_CYCLIC(base)) {
     if (longer->field == field) return two_shorter;
     /* otherwise fall through to end */
@@ -801,7 +805,7 @@ void *initialize_fibersets(void *statep, void *node) {
       Declaration field = field_ref_p(expr);
       Declaration cdecl = constructor_call_p(expr);
       Declaration gdecl = shared_use_p(expr);
-      if (field != NULL && !FIELD_DECL_IS_STRICT(field)) {
+      if (field != NULL && !FIELD_DECL_IS_UNTRACKED(field)) {
 	Expression object = field_ref_object(expr);
 	if (EXPR_IS_RHS(expr)) {
 	  if (fiber_debug & FIBER_INTRO) 
@@ -1186,13 +1190,13 @@ static void *add_fiberset_to_shared_use(void *fsp, void *node) {
 	   */
 	  if (DECL_IS_SHARED(sdecl) &&
 	      Declaration_KEY(sdecl) == KEYvalue_decl &&
-	      (!FIELD_DECL_IS_STRICT(sdecl) ||
+	      (!FIELD_DECL_IS_UNTRACKED(sdecl) ||
 	       !DECL_IS_SHARED(fs->fiber->field)) &&
 	      ((FORWARD_FLOW_P(fstype) && EXPR_IS_RHS(expr)) ||
 	       (BACKWARD_FLOW_P(fstype) && EXPR_IS_LHS(expr)))) {
 	    Declaration field =
 	      ((fstype & FIBERSET_TYPE_REVERSE != 0)||
-	       FIELD_DECL_IS_STRICT(sdecl))
+	       FIELD_DECL_IS_UNTRACKED(sdecl))
 		?sdecl:reverse_field(sdecl);
 	    int fallthrough = FALSE;
 	    int fstype2 = EXPR_IS_LHS(expr) ?
@@ -1545,6 +1549,11 @@ static void push_fiber(FIBERSET fs, Declaration module, STATE *state) {
 		  if (fstype2 & FIBERSET_TYPE_REVERSE) {
 		    /* for opposite direction sets, we use f' instead of f */
 		    field = reverse_field(field);
+		    if (field == 0) {
+		      fprintf(stderr,"flags for %s are 0%o\n",
+			      decl_name(decl),Declaration_info(decl)->decl_flags);
+		      fatal_error("No reverse field for %s\n",decl_name(decl));
+		    }
 		  }
 		  switch (shorten(field,fs->fiber)) {
 		  case no_shorter: break;
