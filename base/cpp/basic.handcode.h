@@ -413,40 +413,15 @@ inline typename C_SET<E>::T_Result C_SET<E>::v_union(T_Result s1, T_Result s2)
 
   if(s1->cons == this->c_append) {
     V_append * n = (V_append *) s1;
-    return v_union(n->v_l1,v_union(n->v_l1, s2));
+    return v_union(n->v_l1,v_union(n->v_l2, s2));
   } else if(s1->cons == this->c_single){
     V_single * n = (V_single *) s1;
     if(v_member(n->v_x, s2)){
-      if(s2->cons == this->c_append){
-	V_append * m = (V_append *) s2;
-	if(v_member(n->v_x,m->v_l1)){
-	  return new V_append(this->c_append,v_union(s1,m->v_l1),
-			      v_union(new V_none(this->c_none),m->v_l2));
-	}else{
-	  return new V_append(this->c_append,v_union(s1,m->v_l1),
-			      v_union(new V_none(this->c_none),m->v_l1));
-	}
-      }else if(s2->cons == this->c_single){
-	return new V_single(this->c_single,n->v_x);
-      }else{
-	cout << "Really strange error!!" << endl;
-	return new V_none(this->c_none);
-      }
+      return s2;
     }else
       return new V_append(this->c_append,s1,s2);
   } else if(s1->cons == this->c_none){
-    if(s2->cons == this->c_append){
-      V_append * m = (V_append *) s2;
-      return new V_append(this->c_append,v_union(s1,m->v_l1),
-			  v_union(s1,m->v_l2));
-    }else if(s2->cons == this->c_single){
-	return new V_single(this->c_single,((V_single *)s2)->v_x);
-    }else if(s2->cons == this->c_none){
-	return new V_none(this->c_none);
-    }else{
-      cout << "Really strange error!!" << endl;
-      return new V_none(this->c_none);
-    }
+    return s2;
   } else {
     cout << "Really strange error!!" << endl;
     return new V_none(this->c_none);
@@ -463,15 +438,15 @@ inline typename C_SET<E>::T_Result C_SET<E>::v_intersect(T_Result s1, T_Result s
 
   if(s1->cons == this->c_append) {
     V_append * n = (V_append *) s1;
-    return v_union(v_intersect(n->v_l1,s2),v_intersect(n->v_l1, s2));
+    return new V_append(this->c_append,v_intersect(n->v_l1,s2),v_intersect(n->v_l2, s2));
   } else if(s1->cons == this->c_single){
     V_single * n = (V_single *) s1;
     if(v_member(n->v_x, s2)){
-      return new V_single(this->c_single,n->v_x);
+      return s1;
     }else
       return new V_none(this->c_none);
   } else if(s1->cons == this->c_none){
-    return new V_none(this->c_none);
+    return s1;
   } else {
     cout << "Really strange error!!" << endl;
     return new V_none(this->c_none);
@@ -486,39 +461,17 @@ inline typename C_SET<E>::T_Result C_SET<E>::v_difference(T_Result s1, T_Result 
   typedef typename C_SET<E>::V_single V_single;
   typedef typename C_SET<E>::V_none V_none;
 
-  if(s2->cons == this->c_append) {
-    V_append * n = (V_append *) s2;
-    return v_difference(v_difference(s1, n->v_l1), n->v_l2);
-  } else if(s2->cons == this->c_single){
-    V_single * n = (V_single *) s2;
-    if(s1->cons == this->c_append){
-      V_append * m = (V_append *) s1;
-      return new V_append(this->c_append,v_difference(m->v_l1,s2),
-			  v_difference(m->v_l2,s2));
-    }else if (s1->cons == this->c_single){
-      if(v_member(n->v_x,s2))
-	return new V_none(this->c_none);
-      else
-	return new V_single(this->c_single,((V_single*)s2)->v_x);
-    }else if(s1->cons == this->c_none){
+  if(s1->cons == this->c_append) {
+    V_append * n = (V_append *) s1;
+    return new V_append(this->c_append,v_difference(n->v_l1,s2),v_difference(n->v_l2, s2));
+  } else if(s1->cons == this->c_single){
+    V_single * n = (V_single *) s1;
+    if(v_member(n->v_x, s2)){
       return new V_none(this->c_none);
-    }else{
-      cout << "Really strange error!!" << endl;
-      return new V_none(this->c_none);
-    }
-  } else if(s2->cons == this->c_none){
-    if(s1->cons == this->c_append){
-      V_append * m = (V_append *) s1;
-      return new V_append(this->c_append,v_difference(m->v_l1,s2),
-			  v_difference(m->v_l2,s2));
-    }else if (s1->cons == this->c_single){
-      return new V_single(this->c_single,((V_single*)s2)->v_x);
-    }else if(s1->cons == this->c_none){
-      return new V_none(this->c_none);
-    }else{
-      cout << "Really strange error!!" << endl;
-      return new V_none(this->c_none);
-    }
+    }else
+      return s1;
+  } else if(s1->cons == this->c_none){
+    return s1;
   } else {
     cout << "Really strange error!!" << endl;
     return new V_none(this->c_none);
