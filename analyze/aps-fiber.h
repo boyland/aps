@@ -77,6 +77,7 @@ extern Declaration attr_ref_p(Expression);
 extern Declaration local_call_p(Expression);
 extern Declaration constructor_call_p(Expression);
 extern Declaration object_decl_p(Declaration);
+extern Declaration shared_use_p(Expression expr);
 
 extern Expression field_ref_object(Expression); /* also good for attr_ref's */
 #define attr_ref_object(expr) field_ref_object(expr)
