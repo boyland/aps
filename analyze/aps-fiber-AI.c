@@ -3,9 +3,8 @@
 // Yu Wang
 
 #include <stdio.h>
-#include <jbb.h>
-
-#include "alloc.h"
+#include "jbb.h"
+#include "jbb-alloc.h"
 #include "aps-ag.h"
 
 CALLSITE_SET next_cs = 1;

@@ -6,7 +6,7 @@
 
 #include <stdio.h>
 #include <jbb.h>
-#include "alloc.h"
+#include "jbb-alloc.h"
 #include "aps-ag.h"
 
 int cycle_debug = 0;

@@ -1,6 +1,6 @@
 #include <stdio.h>
-#include <jbb.h>
-#include "alloc.h"
+#include "jbb.h"
+#include "jbb-alloc.h"
 #include "aps-ag.h"
 
 int oag_debug;

@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include "alloc.h"
+#include "jbb-alloc.h"
 #include "aps-ag.h"
 
 enum CONDcompare cond_compare(CONDITION *cond1, CONDITION *cond2) {
