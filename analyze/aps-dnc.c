@@ -1155,6 +1155,11 @@ void record_condition_dependencies(VERTEX *sink, CONDITION *cond,
   }
 }
 
+static void set_value_for(VERTEX* sink, Expression rhs, AUG_GRAPH *aug_graph)
+{
+  Expression_info(rhs)->value_for = dep_vertex_instance(sink,NULL,aug_graph);
+}
+
 /** Add edges to the dependency graph to represent dependencies
  * from the rhs to the modified expression.
  * @param cond condition under which dependency holds
@@ -1183,11 +1188,11 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
   case KEYvalue_use:
     {
       Declaration decl = USE_DECL(value_use_use(lhs));
+      VERTEX sink;
+      MODIFIER new_mod;
+	
       if (shared_use_p(lhs) != NULL) {
 	/* Assignment of shared global (or a field of a shared global) */
-	VERTEX sink;
-	MODIFIER new_mod;
-	
 	new_mod.next = mod;
 	if (EXPR_IS_LHS(lhs)) {
 	  new_mod.field = reverse_field(decl);
@@ -1205,8 +1210,6 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
 	  phylum_shared_info_attribute(node_decl_phylum(sink.node),
 				       aug_graph->global_state);
 	sink.modifier = &new_mod;
-	record_expression_dependencies(&sink,cond,kind,NULL,rhs,aug_graph);
-	record_condition_dependencies(&sink,cond,aug_graph);
 	/* should also force a backwards depend on the shared info,
 	 * but shared info is actually uninteresting,
 	 * so I'll skip it...
@@ -1214,25 +1217,23 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
       } else if (Declaration_info(decl)->decl_flags &
 		 (ATTR_DECL_INH_FLAG|ATTR_DECL_SYN_FLAG)) {
 	/* a use of parameter or result (we hope) */
-	VERTEX sink;
 	sink.node = aug_graph->match_rule;
 	sink.attr = decl;
 	sink.modifier = mod;
-	record_expression_dependencies(&sink,cond,kind,NULL,rhs,aug_graph);
-	record_condition_dependencies(&sink,cond,aug_graph);
       } else {
-	VERTEX sink;
 	sink.node = 0;
 	sink.attr = decl;
 	sink.modifier = mod;
-	record_expression_dependencies(&sink,cond,kind,NULL,rhs,aug_graph);
-	record_condition_dependencies(&sink,cond,aug_graph);
       }
+      set_value_for(&sink,rhs,aug_graph);
+      record_expression_dependencies(&sink,cond,kind,NULL,rhs,aug_graph);
+      record_condition_dependencies(&sink,cond,aug_graph);
     }
     break;
   case KEYfuncall:
     {
       Declaration field, attr, fdecl, decl;
+      VERTEX sink;
       if ((field = field_ref_p(lhs)) != NULL) {
 	/* Assignment of a field, or a field of a field */
 	Expression object = field_ref_object(lhs);
@@ -1247,22 +1248,22 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
 	record_lhs_dependencies(object,cond,control_dependency,
 				&new_mod,object,aug_graph);
       } else if ((attr = attr_ref_p(lhs)) != NULL) {
-	VERTEX sink;
 	sink.node = attr_ref_node_decl(lhs);
 	sink.attr = attr;
 	sink.modifier = mod;
+	set_value_for(&sink,rhs,aug_graph);
 	record_expression_dependencies(&sink,cond,kind,NULL,rhs,aug_graph);
 	record_condition_dependencies(&sink,cond,aug_graph);
       } else if ((fdecl = local_call_p(lhs)) != NULL) {      
 	Declaration result = some_function_decl_result(decl);
 	Declaration proxy = Expression_info(lhs)->funcall_proxy;
-	VERTEX sink;
 	if (mod == NO_MODIFIER) {
 	  aps_error(lhs,"How can we assign the result of a function?");
 	}
 	sink.node = proxy;
 	sink.attr = result;
 	sink.modifier = mod;
+	set_value_for(&sink,rhs,aug_graph);
 	record_expression_dependencies(&sink,cond,kind,NULL,rhs,aug_graph);
 	record_condition_dependencies(&sink,cond,aug_graph);
       } else {
