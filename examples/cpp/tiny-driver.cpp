@@ -17,7 +17,7 @@ int main()
     
     m.finish();
 
-    cout << "result is " << m.v_leaves(w) << endl;
+    cout << "result is " << (w) << endl;
   } catch (exception& e) {
     cout << "Got error: " << e.what() << endl;
   }
