@@ -47,6 +47,7 @@ main(int argc,char **argv) {
 	    case 'p': fiber_debug |= PUSH_FIBER; break;
 	    case 'f': fiber_debug |= FIBER_INTRO; break;
 	    case 'F': fiber_debug |= FIBER_FINAL; break;
+	    case 's': fiber_debug |= CALLSITE_INFO; break;
 	    case 'i': analysis_debug |= CREATE_INSTANCE; break;
 	    case 'e': analysis_debug |= ADD_EDGE; break;
 	    case 'c': analysis_debug |= CLOSE_EDGE; break;
