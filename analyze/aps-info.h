@@ -131,6 +131,7 @@ extern struct Expression_info {
 extern struct Pattern_info {
   Pattern next_pattern_actual; /* in a sequence of args to a pattern call */
   Type pat_type;
+  void* pat_impl; /* how it is implemented */
 } *Pattern_info(Pattern);
 #define PAT_NEXT(pat) (Pattern_info(pat)->next_pattern_actual)
 
@@ -144,6 +145,10 @@ extern struct Type_info {
 extern struct Signature_info {
   void *binding_temporary;
 } *Signature_info(Signature);
+
+extern struct Def_info {
+  int unique_prefix; /* to distinguish local attributes */
+} *Def_info(Def);
 
 extern void set_tnode_parent(Program p);
 
