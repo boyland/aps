@@ -5,7 +5,7 @@ PROJECT-DIR=..
 APSAGOBJS= aps-bind.o aps-read.o aps-info.o aps-ag-util.o \
 	  aps-fiber.o aps-cond.o aps-dnc.o aps-cycle.o aps-oag.o \
 	  aps-analyze.o aps-debug.o aps-type.o table.o alist.o
-APSCOBJS= apsc.o ${APSAGOBJS} aps-fiber-callsite.o
+APSCOBJS= apsc.o ${APSAGOBJS} 
 APSCLIB= ${PROJECT-DIR}/aps/aps-lib.o
 
 all : apsc aps-ag.a

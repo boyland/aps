@@ -49,6 +49,10 @@ extern struct Declaration_info {
 #define FIELD_DECL_UNTRACKED_FLAG (1<<14)
 #define SELF_MANAGED_FLAG (1<<15)
 #define UP_DOWN_FLAG (1<<16)
+	OSET oset;				/* oset of the declaration */
+	USET uset;				/* uset of the declaration */
+	int	 index;			  /* represent the nodeis Qd and Qd(-) */
+										/* odd: Qd, even: Qd(-). such as (1,2) */
 } *Declaration_info(Declaration);
 
 #define DECL_NEXT(decl) (Declaration_info(decl)->next_decl)
@@ -118,6 +122,7 @@ extern struct Expression_info {
   Declaration funcall_proxy; /* This is a Decl that permits a funcall node to be an INSTANCE node */
 #define EXPR_LHS_FLAG 1
 #define EXPR_RHS_FLAG 2
+	int	 index;			// represent the nodes of Qe and Qe(-).
 } *Expression_info(Expression);
 #define EXPR_NEXT(expr) (Expression_info(expr)->next_expr)
 #define EXPR_IS_LHS(expr) (Expression_info(expr)->expr_flags&EXPR_LHS_FLAG)

@@ -94,3 +94,48 @@ extern Declaration shared_use_p(Expression);
 extern Declaration responsible_node_shared_info(void *,
 						struct analysis_state *);
 extern Declaration formal_in_case_p(Declaration);
+
+
+
+typedef struct oset {
+  struct oset *rest;
+  Declaration o;
+} *OSET;
+typedef struct uset {
+  struct uset *rest;
+  Expression u;
+  // f: field_ref_p(u)
+  // dot: if EXPR_IS_LHS(u)
+} *USET;
+#define EMPTY_OSET (OSET)NULL
+#define EMPTY_USET (USET)NULL
+
+/*
+typedef struct edges {
+  struct edges *rest;   // rest of esges
+  Declaration  edge;    // f or f. or empty(null).
+} *EDGES;           // list of edges
+
+typedef struct nodeset {
+  struct nodeset *rest;   // the rest nodes 
+  int            node;    // node's index number [1,enough large]
+} *NODESET;
+
+typedef struct   node_in_tree {
+  struct fiber as_fiber;
+  NODESET ns;       // a set of original nodes from FSA.
+  int     dir;      // BACKWARD or FOREWARD
+  int     index;    // the index number in the tree: from 1
+  int hash;
+} *NODE_IN_TREE;    // the node in the result tree
+
+typedef struct worklist {
+  struct worklist *rest;
+  NODE_IN_TREE    tree_node;
+} *WORKLIST;
+
+#define EMPTY_NODESET (NODESET)NULL
+#define EMPTY_OSET (OSET)NULL
+#define EMPTY_USET (USET)NULL
+*/
+
