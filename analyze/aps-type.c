@@ -45,10 +45,28 @@ static void* do_typechecking(void* ignore, void*node) {
       case KEYvalue_decl:
 	check_default_type(value_decl_default(decl),value_decl_type(decl));
 	break;
+	/* violated all over basic.aps
+      case KEYfunction_decl:
+	{
+	  Type ft = function_decl_type(decl);
+	  Declaration f = first_Declaration(function_type_formals(ft));
+
+	  for (; f; f = DECL_NEXT(f)) {
+	    if (type_is_phylum(infer_formal_type(f))) {
+	      aps_error(decl,"Cannot pass syntactic (phylum) types to functions");
+	    }
+	  }
+	}
+	break;
+	*/
       case KEYattribute_decl:
 	{
-	  Declarations rdecls =
-	    function_type_return_values(attribute_decl_type(decl));
+	  Type at = attribute_decl_type(decl);
+	  Declarations rdecls = function_type_return_values(at);
+	  Type nt = infer_formal_type(first_Declaration(function_type_formals(at)));
+	  if (!type_is_phylum(nt)) {
+	    aps_error(decl,"Can only attribute phyla");
+	  }
 	  check_default_type(attribute_decl_default(decl),
 			     value_decl_type(first_Declaration(rdecls)));
 	}
@@ -60,6 +78,17 @@ static void* do_typechecking(void* ignore, void*node) {
 	  check_pattern_type(pattern_decl_choices(decl),
 			     value_decl_type(first_Declaration(rdecls)));
 	  return 0;
+	}
+	break;
+
+      case KEYtype_decl:
+	if (type_is_phylum(type_decl_type(decl))) {
+	  aps_error(decl,"Cannot rename a phylum to a type");
+	}
+	break;
+      case KEYphylum_decl:
+	if (!type_is_phylum(phylum_decl_type(decl))) {
+	  aps_error(decl,"Cannot rename a type to a phylum");
 	}
 	break;
 
@@ -186,6 +215,7 @@ static void* do_typechecking(void* ignore, void*node) {
     }
     break;
   default:
+    break;
   }
   return ignore;
 }
@@ -469,6 +499,60 @@ Type sig_element_type(Signature sig)
   }
 }
 
+BOOL type_is_phylum(Type ty)
+{
+  switch (Type_KEY(ty)) {
+  case KEYtype_use:
+    {
+      Declaration td = USE_DECL(type_use_use(ty));
+      if (td == NULL) break;
+      switch (Declaration_KEY(td)) {
+      case KEYtype_decl:
+      case KEYtype_formal:
+	return FALSE;
+      case KEYphylum_decl:
+      case KEYphylum_formal:
+	return TRUE;
+      case KEYtype_renaming:
+	return type_is_phylum(type_renaming_old(td));
+      default:
+	aps_error(td,"internal error: unknown type declaration");
+      }
+    }
+  case KEYtype_inst:
+    {
+      Declaration md = USE_DECL(module_use_use(type_inst_module(ty)));
+      if (md == 0) break;
+      switch (Declaration_KEY(module_decl_result_type(md))) {
+      case KEYtype_decl:
+	return FALSE;
+      case KEYphylum_decl:
+	return TRUE;
+      default:
+	aps_error(md,"internal error: unknown result type declaration");
+      }
+    }
+  case KEYno_type:
+    {
+      Declaration p = (Declaration)tnode_parent(ty);
+      switch (Declaration_KEY(p)) {
+      case KEYtype_decl:
+	return FALSE;
+      case KEYphylum_decl:
+	return TRUE;
+      default:
+	aps_error(ty,"internal error: unknown no type type decl");
+      }
+    }
+  case KEYremote_type:
+  case KEYfunction_type:
+    return FALSE;
+  case KEYprivate_type:
+    return type_is_phylum(private_type_rep(ty));
+  }
+  return FALSE;
+}
+
 Type type_element_type(Type st)
 {
   for (;;) {
@@ -478,8 +562,6 @@ Type type_element_type(Type st)
       {
 	Use u = type_use_use(st);
 	Declaration decl = USE_DECL(u);
-
-	//! ignores type environment!
 
 	switch (Declaration_KEY(decl)) {
 	case KEYtype_renaming:
@@ -492,13 +574,14 @@ Type type_element_type(Type st)
 	  {
 	    Type ty = sig_element_type(some_type_formal_sig(decl));
 	    if (ty != 0)
-	      return ty;
+	      return type_subst(u,ty);
 	  }
 	  /* FALL THROUGH */
 	default:
 	  aps_error(decl,"not sure what sort of collection type this is");
 	  return error_type;
 	}
+	return type_subst(u,type_element_type(st));
       }
       break;
     case KEYtype_inst:
@@ -510,6 +593,8 @@ Type type_element_type(Type st)
 	return type_element_type(some_type_decl_type(rdecl));
       }
       break;
+    case KEYremote_type:
+      return type_element_type(remote_type_nodetype(st));
     default:
       aps_error(st,"not sure what sort of collection type this is");
       return error_type;
@@ -920,7 +1005,7 @@ Type infer_pfunction_return_type(Pattern f, PatternActuals args) {
 	return error_type;
 	break;
       }
-      return check_pattern_actuals(args,ty,u);
+      return check_pattern_actuals(args,type_subst(u,ty),u);
     }
 
   default:
@@ -978,6 +1063,17 @@ void check_pfunction_return_type(Pattern f, PatternActuals args, Type type) {
 
 
 void check_default_type(Default d, Type t) {
+  static Symbol underscore_symbol;
+  static Def anon_def;
+  static Direction dir;
+  static Default deft;
+  if (underscore_symbol == 0) {
+    underscore_symbol = intern_symbol("_");
+    anon_def = def(underscore_symbol,TRUE,FALSE);
+    dir = direction(FALSE,FALSE,FALSE);
+    deft = no_default();
+  }
+
   switch (Default_KEY(d)) {
   case KEYno_default:
     break;
@@ -986,6 +1082,20 @@ void check_default_type(Default d, Type t) {
     break;
   case KEYcomposite:
     check_expr_type(composite_initial(d),t);
+    {
+      // We create a function type and then check the combiner:
+      Declaration f1 = normal_formal(anon_def,t);
+      Declaration f2 = normal_formal(anon_def,t);
+      Declarations fs = append_Declarations(list_Declarations(f1),
+					    list_Declarations(f2));
+      Declaration rd = value_decl(anon_def,t,dir,deft);
+      Type ft = function_type(fs,list_Declarations(rd));
+
+      DECL_NEXT(f1) = f2;
+      DECL_NEXT(f2) = 0;
+
+      check_expr_type(composite_combiner(d),ft);
+    }
     break;
   default:
     aps_error(d,"warning: not checking more complicated defaults");
