@@ -5,16 +5,16 @@ module NAME_RESOLUTION[T :: var SIMPLE[]] extends T begin
   --- the local object types and their
   --- "fields" (attributes in APS).
   
+  -- shapes: used just for object identity
+  phylum ShapeStructure;
+  constructor shape(name : String) : ShapeStructure;
+  type Shape := remote ShapeStructure;
+  
   -- contours:
   phylum Contour;
   constructor contour() : Contour;
   type Scope := remote Contour;
   attribute Contour.enclosing : Scope; -- normally would be a constructor field
-  type Entities := BAG[EntityRef];
-  collection attribute Contour.entities : Entities;
-
-  pragma fiber_cyclic(enclosing);
-  pragma field_strict(enclosing);
   
   -- entities: AKA declarations
   phylum Entity;
@@ -27,11 +27,12 @@ module NAME_RESOLUTION[T :: var SIMPLE[]] extends T begin
   pragma fiber_untracked(entity_name,entity_shape);
   pragma field_strict(entity_name);
   
-  -- shapes: used just for object identity
-  phylum ShapeStructure;
-  constructor shape(name : String) : ShapeStructure;
-  type Shape := remote ShapeStructure;
-  
+  type Entities := BAG[EntityRef];
+  collection attribute Contour.entities : Entities;
+
+  pragma fiber_cyclic(enclosing);
+  pragma field_strict(enclosing);
+
   --- the globals
   type Messages := BAG[String];
   var collection msgs : Messages;
@@ -145,17 +146,39 @@ module NAME_RESOLUTION[T :: var SIMPLE[]] extends T begin
     endif;
   end;
   
-  procedure lookup(name : String; scope : Scope) : EntityRef begin
+  function find(name : String; entities : Entities) : EntityRef begin
+    case entities begin
+      match Entities$none() begin
+	result := nil;
+      end;
+      match Entities$single(?e) begin
+	if e.entity_name = name then
+	  result := e;
+	else
+	  result := nil;
+	endif;
+      end;
+      match Entities$append(?es1,?es2) begin
+	e1 : Entity := find(name,es1);
+	if e1 = nil then
+	  result := find(name,es2);
+	else
+	  result := e1;
+	endif;
+      end;
+    end;
+  end;
+
+  function lookup(name : String; scope : Scope) : EntityRef begin
     if scope = root_scope then
       result := not_found;
     else
-      case scope.entities begin
-	match {...,?e:EntityRef if e.entity_name=name,...} begin
-	  result := e;
-	end;
+      e : Entity := find(name,scope.entities);
+      if e /= nil then
+	result := e;
       else
 	result := lookup(name,scope.enclosing);
-      end;
+      endif;
     endif;
   end;
 end;
