@@ -9,6 +9,7 @@ extern "C" {
 #include <iostream>
 #include <fstream>
 #include "dump-cpp.h"
+#include "implement.h"
 
 using namespace std;
 
@@ -31,6 +32,9 @@ void usage() {
 extern void init_lexer(FILE*);
 extern int aps_yyparse(void);
 }
+
+Implementation* impl;
+bool static_schedule = 0;
 
 int main(int argc,char **argv) {
   argv0 = argv[0];
@@ -70,10 +74,15 @@ int main(int argc,char **argv) {
     type_Program(p);
     aps_check_error("type");
     if (static_schedule) {
+      impl = static_impl;
       analyze_Program(p);
       aps_check_error("analysis");
-      cerr << "Warning: static scheduling not implemented: reverting to dynamic..." << endl;
-      static_schedule = 0;
+      if (!impl) {
+	cerr << "Warning: static scheduling not implemented: reverting to dynamic..." << endl;
+	impl = dynamic_impl;
+      }
+    } else {
+      impl = dynamic_impl;
     }
     char* hfilename = str2cat(argv[i],".h");
     char* cppfilename = str2cat(argv[i],".cpp");
