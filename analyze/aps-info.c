@@ -12,8 +12,11 @@ struct info {
     struct Program_info program_info;
     struct Use_info use_info;
     struct Declaration_info declaration_info;
+    struct Match_info match_info;
     struct Expression_info expression_info;
     struct Pattern_info pattern_info;
+    struct Type_info type_info;
+    struct Signature_info signature_info;
   } var;
 };
 
@@ -59,6 +62,10 @@ struct Declaration_info *Declaration_info(Declaration _node) {
   return &(tnode_info(_node)->var.declaration_info);
 }
 
+struct Match_info *Match_info(Match _node) {
+  return &(tnode_info(_node)->var.match_info);
+}
+
 struct Expression_info *Expression_info(Expression _node) {
   return &(tnode_info(_node)->var.expression_info);
 }
@@ -67,6 +74,11 @@ struct Pattern_info *Pattern_info(Pattern _node) {
   return &(tnode_info(_node)->var.pattern_info);
 }
 
-/* After several weeks of working with this program and getting
-   results, I noticed none of the XXX_info functions returned
-   anything!!! */
+struct Type_info *Type_info(Type _node) {
+  return &(tnode_info(_node)->var.type_info);
+}
+
+struct Signature_info *Signature_info(Signature _node) {
+  return &(tnode_info(_node)->var.signature_info);
+}
+
