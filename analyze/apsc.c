@@ -20,7 +20,7 @@ main(int argc,char **argv) {
       char *options = argv[i]+1;
       if (*options == '\0') usage();
       if (*options == 'D') {
-	set_debug_flags(options);
+	set_debug_flags(options+1);
       }
     } else {
       Program p = find_Program(make_string(argv[i]));
