@@ -21,8 +21,14 @@ enum instance_direction {instance_local, instance_inward, instance_outward};
 enum instance_direction instance_direction(INSTANCE *);
 
 typedef enum { no_dependency, fiber_dependency, dependency } DEPENDENCY;
-#define NO_STRONGER(k1,k2) ((int)(k1) <= (int)(k2))
 #define STRONGER(k1,k2) ((int)(k1) > (int)(k2))
+#define NO_STRONGER(k1,k2) (!STRONGER(k2,k1))
+#define AT_MOST(k1,k2) ((int)(k1) <= (int)(k2))
+#define max_dependency dependency
+
+extern DEPENDENCY dependency_join(DEPENDENCY,DEPENDENCY);
+extern DEPENDENCY dependency_trans(DEPENDENCY,DEPENDENCY);
+extern DEPENDENCY dependency_indirect(DEPENDENCY);
 
 typedef struct edgeset {
   struct edgeset *rest;
@@ -75,6 +81,9 @@ typedef struct analysis_state {
 extern ATTRSET attrset_for(STATE *, Declaration);
 
 extern Declaration proc_call_p(Expression);
+
+extern int if_rule_p(void*);
+extern int if_rule_index(void*);
 
 extern STATE *compute_dnc(Declaration module);
 
