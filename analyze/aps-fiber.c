@@ -471,16 +471,24 @@ Declaration node_decl_phylum(Declaration decl) {
     /* special case for function decls */
     return decl;
   case KEYnormal_formal:
-    switch (Type_KEY(normal_formal_type(decl))) {
-    case KEYtype_use:
-      { Declaration phy = USE_DECL(type_use_use(normal_formal_type(decl)));
-	if (phy != NULL) {
-	  if (Declaration_KEY(phy) == KEYphylum_decl) return phy;
-	  else return NULL;
+    {
+      Type ty = infer_formal_type(decl);
+      switch (Type_KEY(ty)) {
+      case KEYtype_use:
+	{
+	  Declaration phy = USE_DECL(type_use_use(ty));
+	  if (phy != NULL) {
+	    if (Declaration_KEY(phy) == KEYphylum_decl) return phy;
+	    else return NULL;
+	  }
 	}
+	break;
+      default:
+	break;
       }
-      break;
     }
+    break;
+  default:
     break;
   }
   fatal_error("%d: cannot find phylum for %s",
@@ -493,8 +501,12 @@ Declaration node_decl_phylum(Declaration decl) {
  */
 Declaration responsible_node_shared_info(void *node, STATE *s) {
   Declaration decl = responsible_node_declaration(node);
+  Declaration phy = decl ? node_decl_phylum(decl) : 0;
   if (decl == NULL) return NULL;
-  return phylum_shared_info_attribute(node_decl_phylum(decl),s);
+  if (phy == NULL)
+    fatal_error("%d: cannot find phylum for responsible node %s",
+		tnode_line_number(node),decl_name(decl));
+  return phylum_shared_info_attribute(phy,s);
 }
 
 Declaration formal_in_case_p(Declaration formal) {
@@ -536,7 +548,7 @@ Declaration formal_in_case_p(Declaration formal) {
 Declaration attribute_decl_phylum(Declaration attr) {
   Declaration f =
     first_Declaration(function_type_formals(attribute_decl_type(attr)));
-  return USE_DECL(type_use_use(formal_type(f)));
+  return USE_DECL(type_use_use(infer_formal_type(f)));
 }
 
 /* A field in an attribute on a phylum not from the extension.
@@ -712,6 +724,25 @@ void *init_rhs_lhs(void *key, void *node) {
     break;
   }
   return key;
+}
+
+/* ensure all Declarations have clean fiber sets */
+void *preinitialize_fibersets(void *statep, void *node)
+{
+  FIBERSETS *fss = 0;
+  int i;
+  switch (ABSTRACT_APS_tnode_phylum(node)) {
+  case KEYDeclaration:
+    fss = &fibersets_for((Declaration)node);
+    break;
+  case KEYExpression:
+    fss = &expr_fibersets_for((Expression)node);
+    break;
+  }
+  if (fss)
+    for (i=0; i < 6; ++i)
+      fss->set[i] = 0;
+  return statep;
 }
 
 /* find all places where fibers spring into existence */
@@ -1718,7 +1749,8 @@ void fiber_module(Declaration module, STATE *s) {
   if (fiber_debug & CALLSITE_INFO) {
     callset_AI(module, s);
   }
-  
+
+  traverse_Declaration(preinitialize_fibersets,s,module);
   traverse_Declaration(initialize_fibersets,s,module);
   /* go through fiber worklist */
   { FIBERSET fs;
