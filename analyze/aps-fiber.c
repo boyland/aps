@@ -1853,10 +1853,6 @@ void fiber_module(Declaration module, STATE *s) {
   traverse_Declaration(init_rhs_lhs,s,module);
   /* set up initial fiber sets */
   
-  /* entry point of callsite AI */
-  if (fiber_debug & CALLSITE_INFO) {
-    callset_AI(module, s);
-  }
 
   traverse_Declaration(preinitialize_fibersets,s,module);
   traverse_Declaration(initialize_fibersets,s,module);
