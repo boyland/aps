@@ -1715,7 +1715,9 @@ void fiber_module(Declaration module, STATE *s) {
   /* set up initial fiber sets */
   
   /* entry point of callsite AI */
-  callset_AI(module, s);
+  if (fiber_debug & CALLSITE_INFO) {
+    callset_AI(module, s);
+  }
   
   traverse_Declaration(initialize_fibersets,s,module);
   /* go through fiber worklist */
