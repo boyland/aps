@@ -40,6 +40,8 @@ class Module {
 class C_NULL_TYPE : public Module {
   Type* type;
  public:
+  C_NULL_TYPE();
+
   struct Node {
     Type* type;
     Constructor* cons;
@@ -61,7 +63,8 @@ std::string operator+(const std::string&,C_NULL_TYPE::Node*);
 class C_NULL_PHYLUM : public Module {
   Phylum* phylum;
  public:
-  
+  C_NULL_PHYLUM();
+
   struct Node : public C_NULL_TYPE::Node {
     int index;
     Node* parent;
