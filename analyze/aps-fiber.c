@@ -100,6 +100,7 @@ static FIBERSET fiber_worklist_tail;
 Declaration field_ref_p(Expression);
 Declaration attr_ref_p(Expression);
 Declaration local_call_p(Expression);
+BOOL local_type_p(Type);
 
 Expression field_ref_object(Expression); /* also good for attr_ref's */
 
@@ -112,6 +113,23 @@ void add_to_fiberset(FIBER fiber, void *tnode, int fstype, FIBERSET *fsp) {
       fatal_error("%d:base fiber got into reverse set!",
 		  tnode_line_number(tnode));
     return;
+  }
+  if (ABSTRACT_APS_tnode_phylum(tnode) == KEYExpression) {
+    Expression e = (Expression)tnode;
+    Type ty = infer_expr_type(e);
+    if (!local_type_p(ty)) {
+      if (fiber_debug & ADD_FIBER) {
+	struct fiberset fss;
+	fss.rest = 0;
+	fss.fiber = fiber;
+	fss.tnode = tnode;
+	fss.fiberset_type = fstype;
+	printf("%d: Not adding ",tnode_line_number(tnode));
+	print_fiberset_entry(&fss,stdout);
+	printf(" (not of local type)\n");
+      }
+      return; /* should not have fibers */
+    }
   }
   while (*fsp != NULL) {
     if ((*fsp)->fiber == fiber) return; /* already there */
@@ -240,6 +258,25 @@ Declaration constructor_call_p(Expression expr) {
 Expression field_ref_object(Expression expr) {
   /* assume a field_ref */
   return first_Actual(funcall_actuals(expr));
+}
+
+BOOL local_type_p(Type ty) { /* could this type carry an object? */
+  switch (Type_KEY(ty)) {
+  default:
+    return TRUE;
+  case KEYtype_use:
+    {
+      Declaration d = USE_DECL(type_use_use(ty));
+      return (d != NULL && DECL_IS_LOCAL(d));
+    }
+    break;
+  case KEYremote_type:
+    return local_type_p(remote_type_nodetype(ty));
+  case KEYfunction_type:
+  case KEYno_type:
+    /* non-carrying */
+    return FALSE;
+  }
 }
 
 Declaration local_call_p(Expression expr) {
