@@ -108,11 +108,15 @@ TypeEnvironment instantiate_type_env(TypeEnvironment form)
 }
 
 static SCOPE add_env_item(SCOPE old, Declaration d) {
+  static Symbol underscore_symbol = 0;
+  if (underscore_symbol == 0) {
+    underscore_symbol = intern_symbol("_");
+  }
   switch (Declaration_KEY(d)) {
   case KEYdeclaration:
     {
       Symbol name = def_name(declaration_def(d));
-      if (name == NULL) {
+      if (name == NULL || name == underscore_symbol) {
 	return old;
       } else {
 	SCOPE new_entry=(SCOPE)HALLOC(sizeof(struct env_item));
@@ -121,6 +125,14 @@ static SCOPE add_env_item(SCOPE old, Declaration d) {
 	new_entry->name = name;
 	new_entry->namespaces = decl_namespaces(d);
 	new_entry->type_env = current_type_env;
+	/* check to see if already declared */
+	while (old && old->type_env == current_type_env) {
+	  if (old->name == name &&
+	      (old->namespaces & new_entry->namespaces) != 0) {
+	    aps_error(d,"Duplicate declaration");
+	  }
+	  old = old->next;
+	}
 	return new_entry;
       }
     }
@@ -780,6 +792,12 @@ static void *set_next_fields(void *ignore, void *node) {
       }
     }
     return NULL;
+  case KEYDeclaration:
+    if (Declaration_KEY((Declaration)node) == KEYtop_level_match) {
+      Declaration tlm = (Declaration)node;
+      Match_info(top_level_match_m(tlm))->header = tlm;
+    }
+    /* Fall through */
   default: break;
   }
   return ignore;
