@@ -849,12 +849,15 @@ void dump_some_attribute(Declaration d,
   char *cname = decl_name(oss.context);
   char *name = decl_name(d);
   bool is_col = direction_is_collection(dir);
+  bool is_cir = direction_is_circular(dir);
   string attr_class_name = string("A") + i + "_" + name;
 
   hs << indent(nesting_level-1) << " private:\n";
   hs << indent() << "class " << attr_class_name << " : public "
-     << (is_col ? "Collection" : "") << "Attribute<"
-     << as_sig(nt) << "," << as_sig(vt) << "> {\n";
+     << (is_col ? "Collection<" : "")
+     << (is_cir ? "Circular" : "") << "Attribute<"
+     << as_sig(nt) << "," << as_sig(vt)
+     << (is_col ? "> " : "") << "> {\n";
   ++nesting_level;
   output_streams noss(oss.context,hs,cpps,is,
 		      oss.prefix + attr_class_name + "::");
@@ -874,8 +877,10 @@ void dump_some_attribute(Declaration d,
     if (is_col) noss << ", " << vt << " init";
     noss << ")" << header_end();
     
-    bs << " : " << (is_col ? "Collection" : "") << "Attribute<"
-       << as_sig(nt) << "," << as_sig(vt) 
+    bs << " : " << (is_col ? "Collection<" : "")
+       << (is_cir ? "Circular" : "") << "Attribute<"
+       << as_sig(nt) << "," << as_sig(vt)
+       << (is_col ? "> " : "")
        << ">(nt,vt,\"" << i << name << "\""
        << (is_col ? ",init" : "") << "), context(c) {}\n";
   }
@@ -994,6 +999,82 @@ void dump_local_attributes(Block b, Type at, Implementation::ModuleInfo* info,
   }
 }
 
+#define EXPR_FUNCTION_IS_OK 256
+
+void dump_make_lattice_functions(Expression first_actual,
+				 const output_streams& oss)
+{
+  Expression bottom, compare, compare_equal, join, meet;
+  ostream& hs = oss.hs;
+  ostream& bs = inline_definitions? oss.hs : oss.cpps;
+  ostream& is = oss.is;
+
+  bottom = first_actual;
+  compare = EXPR_NEXT(bottom);
+  compare_equal = EXPR_NEXT(compare);
+  join = EXPR_NEXT(compare_equal);
+  meet = EXPR_NEXT(join);
+
+  {
+    hs << indent() << "T_Result v_bottom;\n";
+    is << ",\n    v_bottom(" << bottom << ")";
+  }
+
+  {
+    Expression_info(compare)->expr_flags |= EXPR_FUNCTION_IS_OK;
+    oss << header_return_type<Type>(0) << "T_Boolean "
+	<< header_function_name("v_compare")
+	<< "(T_Result v1, T_Result v2)"
+	<< header_end();
+    INDEFINITION;
+    bs << "{\n";
+    ++nesting_level;
+    bs << indent() << "return " << compare << "(v1,v2);\n";
+    --nesting_level;
+    bs << indent() << "}\n";
+  }
+  {
+    Expression_info(compare_equal)->expr_flags |= EXPR_FUNCTION_IS_OK;
+    oss << header_return_type<Type>(0) << "T_Boolean "
+	<< header_function_name("v_compare_equal")
+	<< "(T_Result v1, T_Result v2)"
+	<< header_end();
+    bs << "{\n";
+    INDEFINITION;
+    ++nesting_level;
+    bs << indent() << "return " << compare_equal << "(v1,v2);\n";
+    --nesting_level;
+    bs << indent() << "}\n";
+  }
+
+  {
+    Expression_info(join)->expr_flags |= EXPR_FUNCTION_IS_OK;
+    oss << header_return_type<string>("T_Result") << " "
+	<< header_function_name("v_join")
+	<< "(T_Result v1, T_Result v2)"
+	<< header_end();
+    bs << "{\n";
+    INDEFINITION;
+    ++nesting_level;
+    bs << indent() << "return " << join << "(v1,v2);\n";
+    --nesting_level;
+    bs << indent() << "}\n";
+  }
+  {
+    Expression_info(meet)->expr_flags |= EXPR_FUNCTION_IS_OK;
+    oss << header_return_type<string>("T_Result") << " "
+	<< header_function_name("v_meet")
+	<< "(T_Result v1, T_Result v2)"
+	<< header_end();
+    bs << "{\n";
+    INDEFINITION;
+    ++nesting_level;
+    bs << indent() << "return " << meet << "(v1,v2);\n";
+    --nesting_level;
+    bs << indent() << "}\n";
+  }
+}
+
 void dump_cpp_Declaration(Declaration decl,const output_streams& oss)
 {
   ostream& hs = oss.hs;
@@ -1051,8 +1132,36 @@ void dump_cpp_Declaration(Declaration decl,const output_streams& oss)
 	hs << ">\n";
       }
       hs << "class C_" << name << " : public ";
-      
+
       Type rut = some_type_decl_type(rdecl);
+
+      // hack for MAKE_LATTICE:
+      bool is_make_lattice = false;
+      Expression first_ml_actual = 0;
+      if (Type_KEY(rut) == KEYtype_inst) {
+	Use u = module_use_use(type_inst_module(rut));
+	Symbol sym;
+	switch (Use_KEY(u)) {
+	case KEYuse:
+	  sym = use_name(u);
+	  break;
+	case KEYqual_use:
+	  sym = qual_use_name(u);
+	  break;
+	}
+	static Symbol make_lattice_sym = intern_symbol("MAKE_LATTICE");
+	if (sym == make_lattice_sym) {
+	  is_make_lattice = true;
+	  first_ml_actual = first_Actual(type_inst_actuals(rut));
+	  rut = first_TypeActual(type_inst_type_actuals(rut));
+	  Declaration new_rdecl = type_decl(type_decl_def(rdecl),
+					    type_decl_sig(rdecl),
+					    rut);
+	  DECL_NEXT(new_rdecl) = DECL_NEXT(rdecl);
+	  rdecl = new_rdecl;
+	}
+      }
+      
       if (impl_type) {
 	Type_info(rut)->impl_type = impl_type;
       }
@@ -1107,6 +1216,10 @@ void dump_cpp_Declaration(Declaration decl,const output_streams& oss)
 
       Implementation::ModuleInfo *info = impl->get_module_info(decl);
       output_streams new_oss(decl,hs,bs,is,prefix+"C_"+name+"::");
+
+      if (is_make_lattice) {
+	dump_make_lattice_functions(first_ml_actual,new_oss);
+      }
       
       for (Declaration d = first_decl; d ; d = DECL_NEXT(d)) {
 	dump_cpp_Declaration(d,new_oss);
@@ -1968,11 +2081,12 @@ void dump_Expression(Expression e, ostream& o)
 	  // function values only legal in particular situations.
 	  Expression e2 = (Expression)tnode_parent(e);
 	  Declaration d2 = (Declaration)e2;
-	  if ((ABSTRACT_APS_tnode_phylum(e2) != KEYExpression ||
-	       Expression_KEY(e2) != KEYfuncall) &&
-	      (ABSTRACT_APS_tnode_phylum(d2) != KEYDeclaration ||
-	       Declaration_KEY(d2) != KEYvalue_renaming) &&
-	      (ABSTRACT_APS_tnode_phylum(d2) != KEYDefault)) {
+	  if ((Expression_info(e)->expr_flags & EXPR_FUNCTION_IS_OK) == 0 &&
+	      ((ABSTRACT_APS_tnode_phylum(e2) != KEYExpression ||
+		Expression_KEY(e2) != KEYfuncall) &&
+	       (ABSTRACT_APS_tnode_phylum(d2) != KEYDeclaration ||
+		Declaration_KEY(d2) != KEYvalue_renaming) &&
+	       (ABSTRACT_APS_tnode_phylum(d2) != KEYDefault))) {
 	    void *u = tnode_parent(d);
 	    if (ABSTRACT_APS_tnode_phylum(u) != KEYUnit) {
 	      aps_error(e,"Cannot generate code for functions used in this way");
