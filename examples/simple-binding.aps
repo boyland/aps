@@ -84,11 +84,11 @@ module NAME_RESOLUTION[T :: var SIMPLE[]] extends T begin
   end;
   
   match ?d:Decl=decl(?id:String,?ty:Type) begin
-    e : Entity := entity();
-    d.decl_scope.entities :> {e};
-    e.entity_name := id;
-    e.entity_shape := ty.type_shape;
-    if not e.entity_used then
+    ent : Entity := entity();
+    d.decl_scope.entities :> {ent};
+    ent.entity_name := id;
+    ent.entity_shape := ty.type_shape;
+    if not ent.entity_used then
       msgs :> {id ++ " is unused"};
     endif;
   end;
@@ -134,8 +134,11 @@ module NAME_RESOLUTION[T :: var SIMPLE[]] extends T begin
   end;
   
   match ?e:Expr=variable(?id:String) begin
-    decl : EntityRef;
-    decl := lookup(id,e.expr_scope);
+    --decl : EntityRef;
+    --decl := lookup(id,e.expr_scope);		-- // assignment
+    decl : EntityRef := lookup(id,e.expr_scope);
+	-- // this is regarded as an expression.
+
     if decl = not_found then
       msgs :> {id ++ " not declared"};
       e.expr_shape := no_shape;
@@ -145,7 +148,7 @@ module NAME_RESOLUTION[T :: var SIMPLE[]] extends T begin
     endif;
   end;
   
-  procedure lookup(name : String; scope : Scope) : EntityRef begin
+  function lookup(name : String; scope : Scope) : EntityRef begin
     if scope = root_scope then
       result := not_found;
     else
