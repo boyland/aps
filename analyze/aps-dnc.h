@@ -79,6 +79,7 @@ typedef struct summary_dependency_graph {
   struct summary_dependency_graph *next_in_phy_worklist;
   int *summary_schedule; /* one-d array, indexed by instance number */
 } PHY_GRAPH;
+extern char *phy_graph_name(PHY_GRAPH *);
   
 typedef VECTOR(struct cycle_description) CYCLES;
 
