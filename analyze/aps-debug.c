@@ -72,6 +72,7 @@ void set_debug_flags(char *options)
 {
   if (*options == '\0') usage();
   do {
+    /* fprintf(stderr,"debug option: '%c'\n",*options); */
     switch (*options++) {
     default: usage(); break;
     case 'H': list_debug_flags(); break;
