@@ -1,6 +1,6 @@
 #include "jbb.h"
-#include "alist.h"
-#include "alloc.h"
+#include "jbb-alist.h"
+#include "jbb-alloc.h"
 
 struct alist {
   ALIST next;
