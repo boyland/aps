@@ -62,6 +62,24 @@ enum instance_direction instance_direction(INSTANCE *i) {
 
 /*** FUNCTIONS FOR EDGES ***/
 
+DEPENDENCY dependency_join(DEPENDENCY k1, DEPENDENCY k2)
+{
+  if (AT_MOST(k1,k2)) return k2;
+  if (AT_MOST(k2,k1)) return k1;
+  fatal_error("dependencies aren't in a chain");
+}
+
+DEPENDENCY dependency_trans(DEPENDENCY k1, DEPENDENCY k2)
+{
+  if (k1 == no_dependency || k2 == no_dependency) return no_dependency;
+  return dependency_join(k1,k2);
+}
+
+DEPENDENCY dependency_indirect(DEPENDENCY k)
+{
+  return k;
+}
+
 int worklist_length(AUG_GRAPH *aug_graph) {
   int i = 0;
   EDGESET e;
@@ -175,7 +193,16 @@ void free_edgeset(EDGESET es, AUG_GRAPH *aug_graph) {
 DEPENDENCY edgeset_kind(EDGESET es) {
   DEPENDENCY max=no_dependency;
   for (; es != NULL; es=es->rest) {
-    if (NO_STRONGER(max,es->kind)) max=es->kind;
+    max=dependency_join(max,es->kind);
+  }
+  return max;
+}
+
+DEPENDENCY edgeset_lowerbound(EDGESET es) {
+  DEPENDENCY max=no_dependency;
+  for (; es != NULL; es=es->rest) {
+    if (es->cond.positive|es->cond.negative) continue;
+    max=dependency_join(max,es->kind);
   }
   return max;
 }
@@ -194,11 +221,11 @@ EDGESET add_edge(INSTANCE *source,
     enum CONDcompare comp = cond_compare(cond,&current->cond);
     if (current->source != source ||
 	current->sink != sink) fatal_error("edgeset mixup");
-    if (NO_STRONGER(kind,current->kind) &&
+    if (AT_MOST(kind,current->kind) &&
 	(comp == CONDlt || comp == CONDeq)) {
       /* already entailed (or equal) */
       return current;
-    } else if (NO_STRONGER(current->kind,kind) &&
+    } else if (AT_MOST(current->kind,kind) &&
 	       (comp == CONDgt || comp == CONDeq)) {
       /* current entry is entailed, so remove */
       EDGESET rest = current->rest;
@@ -263,8 +290,7 @@ void add_transitive_edge_to_graph(INSTANCE *source,
 				  DEPENDENCY kind2,
 				  AUG_GRAPH *aug_graph) {
   CONDITION cond;
-  DEPENDENCY kind=kind1;
-  if (NO_STRONGER(kind,kind2)) kind=kind2;
+  DEPENDENCY kind=dependency_trans(kind1,kind2);
   cond.positive = cond1->positive|cond2->positive;
   cond.negative = cond1->negative|cond2->negative;
   if (cond.positive & cond.negative) return;
@@ -372,11 +398,35 @@ static CONDITION* if_rule_cond(void *if_rule) {
   }
 }
 
+int if_rule_index(void *if_rule) {
+  switch (ABSTRACT_APS_tnode_phylum(if_rule)) {
+  case KEYDeclaration:
+    return Declaration_info((Declaration)if_rule)->if_index;
+  case KEYMatch:
+    return Match_info((Match)if_rule)->if_index;
+  default:
+    fatal_error("%d: unknown if_rule",tnode_line_number(if_rule));
+    /*NOTREACHED*/
+    return 0;
+  }
+}
+ 
+int if_rule_p(void *if_rule) {
+  switch (ABSTRACT_APS_tnode_phylum(if_rule)) {
+  case KEYDeclaration:
+    return Declaration_KEY(if_rule) == KEYif_stmt;
+  case KEYMatch:
+    return TRUE;
+  default:
+    return 0;
+  }
+}
+ 
 static void *init_decl_cond(void *vcond, void *node) {
   CONDITION *cond = (CONDITION *)vcond;
-  if (ABSTRACT_APS_tnode_phylum(node) == KEYDeclaration) {
-    Declaration decl = (Declaration)node;
-    
+  Declaration decl = (Declaration)node; /*but maybe not*/
+  switch (ABSTRACT_APS_tnode_phylum(node)) {
+  case KEYDeclaration:
     Declaration_info(decl)->decl_cond = *cond;
     switch (Declaration_KEY(decl)) {
     case KEYmodule_decl: return NULL;
@@ -405,6 +455,7 @@ static void *init_decl_cond(void *vcond, void *node) {
 	traverse_Matches(get_match_tests,&testvar,ms);
 	for (m = first_Match(ms); m; m=MATCH_NEXT(m)) {
 	  int index = Match_info(m)->if_index;
+	  Match_info(m)->match_cond = new_cond;
 	  new_cond.positive |= (1 << index); /* first set it */
 	  traverse_Block(init_decl_cond,&new_cond,matcher_body(m));
 	  new_cond.positive &= ~(1 << index); /* now clear it */
@@ -415,6 +466,8 @@ static void *init_decl_cond(void *vcond, void *node) {
       return NULL;
     default: break;
     }
+  default:
+    break;
   }
   return vcond;
 }
@@ -521,6 +574,8 @@ static void *get_instances(void *vaug_graph, void *node) {
     case KEYformal: case KEYvalue_decl:
       if (array == NULL) Declaration_info(decl)->instance_index = index;
       { Type ty = infer_some_value_decl_type(decl);
+      /*if (Type_KEY(ty) == KEYremote_type)
+	ty = remote_type_nodetype(ty); */
 	switch (Type_KEY(ty)) {
 	default:
 	  fprintf(stderr,"cannot handle type: ");
@@ -530,17 +585,26 @@ static void *get_instances(void *vaug_graph, void *node) {
 	  { Declaration tdecl = Use_info(type_use_use(ty))->use_decl;
 	    if (tdecl == NULL) fatal_error("%d:type not bound",
 					   tnode_line_number(ty));
+	    /*printf("%d: finding instances for %s",tnode_line_number(decl),
+	      decl_name(decl)); */
 	    /* first direct fibers (but not for nodes & parameters) */
 	    if (0 == (Declaration_info(decl)->decl_flags &
 		      (ATTR_DECL_INH_FLAG|ATTR_DECL_SYN_FLAG|
 		       DECL_LHS_FLAG|DECL_RHS_FLAG)))
 	    { FIBERSET fiberset;
 	      assign_instance(array,index++,decl,NULL,FALSE,NULL);
+	       /* printf("%s, first option: ",decl_name(decl));
+		 print_fiberset(fiberset_for(decl,FIBERSET_NORMAL_FINAL),
+		 stdout);
+		 printf("\n"); */
 	      for (fiberset = fiberset_for(decl,FIBERSET_NORMAL_FINAL);
 		   fiberset != NULL;
 		   fiberset=fiberset->rest) {
 		assign_instance(array,index++,decl,fiberset->fiber,FALSE,NULL);
 	      }
+	      /* printf(", ");
+		 print_fiberset(fiberset_for(decl,FIBERSET_REVERSE_FINAL),stdout);
+		 printf("\n"); */
 	      for (fiberset = fiberset_for(decl,FIBERSET_REVERSE_FINAL);
 		   fiberset != NULL;
 		   fiberset=fiberset->rest) {
@@ -549,6 +613,9 @@ static void *get_instances(void *vaug_graph, void *node) {
 	    }
 	    /* then fibers on attributes */
 	    { ATTRSET attrset=attrset_for(s,tdecl);
+	      /*printf(" Second option: ");
+	        print_attrset(attrset,stdout);
+	        printf("\n");*/
 	      for (; attrset != NULL; attrset=attrset->rest) {
 		Declaration attr = attrset->attr;
 		FIBERSET fiberset;
@@ -615,6 +682,9 @@ static void *get_instances(void *vaug_graph, void *node) {
     case KEYtype_decl:
     case KEYconstructor_decl:
       return NULL;
+    case KEYif_stmt:
+      /* don't mess with instance_index */
+      break;
     default:
       if (array == NULL) Declaration_info(decl)->instance_index = index;
     }
@@ -1142,13 +1212,11 @@ void record_condition_dependencies(INSTANCE *sink, CONDITION *cond,
       void* if_rule = aug_graph->if_rules.array[i];
       /* printf("Getting dependencies for condition %d\n",i); */
       CONDITION *cond2 = if_rule_cond(if_rule);
-      Expression expr;
-      for (expr = if_rule_test(if_rule);
-	   expr != NULL;
-	   expr = Expression_info(expr)->next_expr) {
-	record_expression_dependencies(sink,cond2,NULL,FALSE,dependency,FALSE,
-				       expr,aug_graph);
-      }
+      int index = if_rule_index(if_rule);
+      INSTANCE* if_instance = &aug_graph->instances.array[index];
+      if (index > 32 || if_instance->index != index) 
+	fatal_error("something is fishy");
+      add_edge_to_graph(if_instance,sink,cond2,dependency,aug_graph);
     }
   }
 }
@@ -1325,8 +1393,20 @@ static void *get_edges(void *vaug_graph, void *node) {
 	      INSTANCE *fsink = get_expression_instance(fiber,FALSE,
 							object,aug_graph);
 	      /* assignment also requires the object is ready to assign */
-	      if (osrc != fsink)
-		add_edge_to_graph(osrc,fsink,cond,dependency,aug_graph);
+	      if (osrc != fsink){ /* avoid untracked fibers */
+		/* tracked but strict fields must still be assigned
+		 * before object is created.
+		 */
+		if (FIELD_DECL_IS_STRICT(field))
+		  add_edge_to_graph(fsink,osrc,cond,dependency,aug_graph);
+		/* Otherwise they must be assigned *after*
+		 * the object is created.
+		 *?? Why 2002/3/7?
+		 *?? These edges seem unnecessary
+		 */
+		else
+		  add_edge_to_graph(osrc,fsink,cond,dependency,aug_graph);
+	      }
 	      record_condition_dependencies(sink,cond,aug_graph);
 	      record_expression_dependencies(sink,cond,NULL,FALSE,
 					     dependency,TRUE,rhs,aug_graph);
@@ -1387,7 +1467,36 @@ static void *get_edges(void *vaug_graph, void *node) {
 	}
 	break;
       case KEYif_stmt:
+	{
+	  int index = Declaration_info(decl)->if_index;
+	  INSTANCE* sink = &aug_graph->instances.array[index];
+	  Expression test = if_stmt_cond(decl);
+	  if (sink->index != index) fatal_error("%d:something is fishy",
+						tnode_line_number(decl));
+
+	  record_condition_dependencies(sink,cond,aug_graph);
+	  record_expression_dependencies(sink,cond,NULL,FALSE,
+					 dependency,FALSE,test,aug_graph);
+	}
+	break;
       case KEYcase_stmt:
+	{
+	  Match m;
+	  for (m=first_Match(case_stmt_matchers(decl)); m; m=MATCH_NEXT(m)) {
+	    int index = Match_info(m)->if_index;
+	    INSTANCE* sink = &aug_graph->instances.array[index];
+	    Expression test = Match_info(m)->match_test;
+
+	    if (sink->index != index) fatal_error("something is fishy");
+
+	    record_condition_dependencies(sink,cond,aug_graph);
+
+	    for (; test != 0; test = Expression_info(test)->next_expr) {
+	      record_expression_dependencies(sink,cond,NULL,FALSE,
+					     dependency,FALSE,test,aug_graph);
+	    }
+	  }
+	}
 	break;
       default:
 	printf("%d: don't handle this kind yet\n",tnode_line_number(decl));
@@ -1421,8 +1530,7 @@ static void *mark_local(void *ignore, void *node) {
   }
 }
 
-static void init_node_phy_graph(Declaration node, STATE *state) {
-  Type ty=infer_formal_type(node);
+static void init_node_phy_graph2(Declaration node, Type ty, STATE *state) { 
   switch (Type_KEY(ty)) {
   default:
     fprintf(stderr,"%d: cannot handle type: ",tnode_line_number(ty));
@@ -1454,7 +1562,16 @@ static void init_node_phy_graph(Declaration node, STATE *state) {
       }
     }
     break;
+  case KEYremote_type:
+    init_node_phy_graph2(node,remote_type_nodetype(ty),state);
+    break;
   }
+}
+
+
+static void init_node_phy_graph(Declaration node, STATE *state) {
+  Type ty=infer_formal_type(node);
+  init_node_phy_graph2(node,ty,state);
 }
 
 static void init_augmented_dependency_graph(AUG_GRAPH *aug_graph, 
@@ -1587,10 +1704,21 @@ static void init_augmented_dependency_graph(AUG_GRAPH *aug_graph,
   }
 
   /* initialize the instances vector */
-  { aug_graph->instances.length = 0;
+  { 
+    int i, n = aug_graph->if_rules.length;
+    aug_graph->instances.length = n; /* add ifs */
     aug_graph->instances.array = NULL;
     traverse_Declaration(get_instances,aug_graph,tlm);
     VECTORALLOC(aug_graph->instances,INSTANCE,aug_graph->instances.length);
+    for (i=0; i < n; ++i) {
+      INSTANCE* in = &aug_graph->instances.array[i];
+      in->fibered_attr.attr =
+	(Declaration)aug_graph->if_rules.array[i]; /* horible kludge */
+      in->fibered_attr.fiber = 0;
+      in->fibered_attr.fiber_is_reverse = 0;
+      in->node = 0;
+      in->index = i;
+    }
     traverse_Declaration(get_instances,aug_graph,tlm);
   }
 
@@ -1605,6 +1733,7 @@ static void init_augmented_dependency_graph(AUG_GRAPH *aug_graph,
 
   /* initialize the edge set array */
   traverse_Block(get_edges,aug_graph,body);
+
   /* add shared_info edges for rhs decls */
   if (aug_graph->first_rhs_decl != NULL) {
     Declaration lattr = phylum_shared_info_attribute
@@ -1899,10 +2028,14 @@ static void augment_dependency_graph_for_node(AUG_GRAPH *aug_graph,
   int phy_n;
   int i,j;
   PHY_GRAPH *phy_graph = Declaration_info(node)->node_phy_graph;
+  int max_debug = (Declaration_KEY(node) == KEYprocedure_decl);
 
   if (phy_graph == NULL) {
     /* a semantic child of a constructor */
     /* printf("No summary graph for %s\n",decl_name(node)); */
+    if (Declaration_KEY(node) == KEYprocedure_decl)
+      fatal_error("cannot find phy graph for procedure %s",
+		  decl_name(node));
     return;
   }
 
@@ -1939,12 +2072,6 @@ static void augment_dependency_graph_for_node(AUG_GRAPH *aug_graph,
   for (i=start; i < max; ++i) {
     INSTANCE *source = &aug_graph->instances.array[i];
     INSTANCE *phy_source = &phy_graph->instances.array[i-start];
-    enum instance_direction dir1 = instance_direction(source);
-    if (dir1 == instance_local) continue;
-    /* printf("Looking at instance ");
-     * print_instance(source,stdout);
-     * printf("\n");
-     */
     if (!fibered_attr_equal(&source->fibered_attr,
 			    &phy_source->fibered_attr)) {
       print_instance(source,stderr);
@@ -1955,56 +2082,34 @@ static void augment_dependency_graph_for_node(AUG_GRAPH *aug_graph,
     }
     for (j=start; j < max; ++j) {
       INSTANCE *sink = &aug_graph->instances.array[j];
-      enum instance_direction dir2 = instance_direction(sink);
-      /*DEBUG
-	if (edgeset_kind(aug_graph->graph[i*n+j]) != no_dependency) {
-	  printf("Considering dependency ");
+      int aug_index = i*n + j;
+      int sum_index = (i-start)*phy_n + (j-start);
+      DEPENDENCY kind=edgeset_kind(aug_graph->graph[aug_index]);
+      if (!AT_MOST(kind,phy_graph->mingraph[sum_index])) {
+	kind = dependency_indirect(kind); //! more precisely DNC artificial
+	kind = dependency_join(kind,phy_graph->mingraph[sum_index]);
+	if (analysis_debug & SUMMARY_EDGE) {
+	  printf("Adding to summary edge %d: ",kind);
 	  print_instance(source,stdout);
 	  printf(" -> ");
 	  print_instance(sink,stdout);
 	  printf("\n");
 	}
-       */
-      if (dir2 == instance_local) continue;
-      if (dir1 != dir2) {
-	int aug_index = i*n + j;
-	int sum_index = (i-start)*phy_n + (j-start);
-	if (dir1 == instance_inward) {
-	  DEPENDENCY kind=edgeset_kind(aug_graph->graph[aug_index]);
-	  /* we are looking at a dependency from an inward to an outward
-	   * instance, in other words, a local dependency path.  This
-	   * should be copied to the summary graph
-	   */
-	  if (STRONGER(kind,phy_graph->mingraph[sum_index])) {
-	    if (analysis_debug & SUMMARY_EDGE) {
-	      printf("Adding to summary edge %d: ",kind);
-	      print_instance(source,stdout);
-	      printf(" -> ");
-	      print_instance(sink,stdout);
-	      printf("\n");
-	    }
-	    phy_graph->mingraph[sum_index] = kind;
-	    /*?? put on a worklist somehow ? */
-	  }
-	} else { /* dir1 == instance_outward */
-	  DEPENDENCY kind = phy_graph->mingraph[sum_index];
-	  CONDITION cond;
-	  /* we are looking at a dependency from an outward to
-	   * an inward instance.  In other words, a contextual
-	   * dependency.  This should be copiued to the local graph.
-	   */
-	  cond.positive=0; cond.negative=0;
-	  if (kind != no_dependency) {
-	    if (analysis_debug & SUMMARY_EDGE_EXTRA) {
-	      printf("Possibly adding summary edge %d: ",kind);
-	      print_instance(source,stdout);
-	      printf(" -> ");
-	      print_instance(sink,stdout);
-	      printf("\n");
-	    }
-	    add_edge_to_graph(source,sink,&cond,kind,aug_graph);
-	  }
+	phy_graph->mingraph[sum_index] = kind;
+	/*?? put on a worklist somehow ? */
+      } else if (!AT_MOST(phy_graph->mingraph[sum_index],
+			  edgeset_lowerbound(aug_graph->graph[aug_index]))) {
+	CONDITION cond;
+	cond.positive=0; cond.negative=0;
+	kind = dependency_join(kind,phy_graph->mingraph[sum_index]);
+	if (analysis_debug & SUMMARY_EDGE_EXTRA) {
+	  printf("Possibly adding summary edge %d: ",kind);
+	  print_instance(source,stdout);
+	  printf(" -> ");
+	  print_instance(sink,stdout);
+	  printf("\n");
 	}
+	add_edge_to_graph(source,sink,&cond,kind,aug_graph);
       }
     }
   }
@@ -2131,20 +2236,18 @@ BOOL close_summary_dependency_graph(PHY_GRAPH *phy_graph) {
     for (i=0; i < n; ++i) {
       for (j=0; j < n; ++j) {
 	DEPENDENCY ij=phy_graph->mingraph[i*n+j];
-	if (ij != dependency) {
+	if (ij != max_dependency) {
 	  /* maybe could be made stronger */
 	  for (k=0; k<n; ++k) {
 	    DEPENDENCY ik = phy_graph->mingraph[i*n+k];
 	    DEPENDENCY kj = phy_graph->mingraph[k*n+j];
-	    DEPENDENCY tmpij = ik;
-	    if (STRONGER(tmpij,kj)) tmpij=kj;
-	    /* ij = min(ik,kj) */
-	    if (STRONGER(tmpij,ij)) {
-	      ij=tmpij;
+	    DEPENDENCY tmpij = dependency_trans(ik,kj);
+	    if (!AT_MOST(tmpij,ij)) {
+	      ij=dependency_join(tmpij,ij);
 	      changed = TRUE;
 	      any_changed = TRUE;
 	      phy_graph->mingraph[i*n+j] = ij;
-	      if (ij == dependency) break;
+	      if (ij == max_dependency) break;
 	    }
 	  }
 	}
@@ -2163,7 +2266,7 @@ DEPENDENCY analysis_state_cycle(STATE *s) {
     int n = phy_graph->instances.length;
     for (j=0; j < n; ++j) {
       DEPENDENCY k1 = phy_graph->mingraph[j*n+j];
-      if (STRONGER(k1,kind)) kind = k1;
+      kind = dependency_join(kind,k1);
     }
   }
   for (i=0; i < s->match_rules.length; ++i) {
@@ -2171,7 +2274,7 @@ DEPENDENCY analysis_state_cycle(STATE *s) {
     int n = aug_graph->instances.length;
     for (j=0; j < n; ++j) {
       DEPENDENCY k1 = edgeset_kind(aug_graph->graph[j*n+j]);
-      if (STRONGER(k1,kind)) kind = k1;
+      kind = dependency_join(kind,k1);
     }
   }
   return kind;
@@ -2227,7 +2330,10 @@ void print_attrset(ATTRSET s, FILE *stream) {
 
 void print_instance(INSTANCE *i, FILE *stream) {
   if (i->node != NULL) {
-    if (Declaration_KEY(i->node) == KEYnormal_assign) {
+    if (ABSTRACT_APS_tnode_phylum(i->node) != KEYDeclaration) {
+      fprintf(stream,"%d:?<%d>",tnode_line_number(i->node),
+	      ABSTRACT_APS_tnode_phylum(i->node));
+    } else if (Declaration_KEY(i->node) == KEYnormal_assign) {
       Declaration pdecl = proc_call_p(normal_assign_rhs(i->node));
       fputs(decl_name(pdecl),stream);
       fputc('@',stream);
@@ -2238,7 +2344,21 @@ void print_instance(INSTANCE *i, FILE *stream) {
   }
   if (i->fibered_attr.attr == NULL) {
     fputs("(nil)",stream);
-  } else {
+  } else if (ABSTRACT_APS_tnode_phylum(i->fibered_attr.attr) == KEYMatch) {
+    fprintf(stream,"<match@%d>",tnode_line_number(i->fibered_attr.attr));
+  } else switch(Declaration_KEY(i->fibered_attr.attr)) {
+  case KEYcollect_assign: {
+    Expression lhs = collect_assign_lhs(i->node);
+    Declaration field = field_ref_p(lhs);
+    fprintf(stream,"[%d:?.",tnode_line_number(i->fibered_attr.attr));
+    fputs(symbol_name(def_name(declaration_def(field))),stream);
+    fputs(":>?]",stream);
+  }
+  case KEYif_stmt:
+  case KEYcase_stmt:
+    fprintf(stream,"<cond@%d>",tnode_line_number(i->fibered_attr.attr));
+    break;
+  default:
     fputs(symbol_name(def_name(declaration_def(i->fibered_attr.attr))),stream);
   }
   if (i->fibered_attr.fiber != NULL) {
