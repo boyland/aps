@@ -120,7 +120,15 @@ CONDITION instance_condition(INSTANCE *in)
   Declaration ad = in->fibered_attr.attr;
   if (in->node != 0) {
     return Declaration_info(in->node)->decl_cond;
-  } else switch (ABSTRACT_APS_tnode_phylum(ad)) {
+  }
+  if (ad == 0) {
+    /* attribute removed in cyclic fibering. */
+    CONDITION c;
+    c.positive = -1;
+    c.negative = -1;
+    return c;
+  }
+  switch (ABSTRACT_APS_tnode_phylum(ad)) {
   case KEYMatch:
     return Match_info((Match)ad)->match_cond;
   default:
@@ -137,6 +145,7 @@ CTO_NODE* schedule_rest(AUG_GRAPH *aug_graph,
   int i;
   int n = aug_graph->instances.length;
   int needed_condition_bits;
+  int sane_remaining = 0;
   INSTANCE* in;
 
   /* If nothing more to do, we are done. */
@@ -149,11 +158,18 @@ CTO_NODE* schedule_rest(AUG_GRAPH *aug_graph,
     /* If already scheduled, then ignore. */
     if (aug_graph->schedule[i] != 0) continue;
 
+    ++sane_remaining;
+
     /* Look for a predecessor edge */
     for (j=0; j < n; ++j) {
       INSTANCE *in2 = &aug_graph->instances.array[j];
       int index = j*n+i;
-      EDGESET edges;
+      EDGESET edges = 0;
+
+      if (aug_graph->schedule[j] != 0) {
+	/* j is scheduled already, so we can ignore dependencies */
+	continue;
+      }
 
       /* Look at all dependencies from j to i */
       for (edges = aug_graph->graph[index]; edges != 0; edges=edges->rest) {
@@ -175,7 +191,7 @@ CTO_NODE* schedule_rest(AUG_GRAPH *aug_graph,
 	}
 
 	/* If j not scheduled, then i cannot be considered */
-	if (aug_graph->schedule[j] == 0) break; /* leave edges != 0 */
+	break; /* leave edges != 0 */
       }
 
       /* If a remaining edge, then i cannot be considered */
@@ -187,6 +203,50 @@ CTO_NODE* schedule_rest(AUG_GRAPH *aug_graph,
   }
 
   if (i == n) {
+    fflush(stdout);
+    if (sane_remaining != remaining) {
+      fprintf(stderr,"remaining out of sync %d != %d\n",
+	      sane_remaining, remaining);
+    }
+    fprintf(stderr,"Cannot make conditional total order!\n");
+    for (i=0; i < n; ++i) {
+      INSTANCE *in1 = &aug_graph->instances.array[i];
+      int j;
+
+      if (aug_graph->schedule[i] != 0) continue;
+
+      fprintf(stderr,"  ");
+      print_instance(in1,stderr);
+      fprintf(stderr," requires:\n");
+
+      for (j=0; j < n; ++j) {
+	INSTANCE *in2 = &aug_graph->instances.array[j];
+	int index = j*n+i;
+	EDGESET edges = 0;
+	
+	if (aug_graph->schedule[j] != 0) {
+	  /* j is scheduled already, so we can ignore dependencies */
+	  continue;
+	}
+
+	/* Look at all dependencies from j to i */
+	for (edges = aug_graph->graph[index]; edges != 0; edges=edges->rest) {
+	  CONDITION merged;
+	  merged.positive = cond.positive | edges->cond.positive;
+	  merged.negative = cond.negative | edges->cond.negative;
+	  
+	  /* if the merge condition is impossible, ignore this edge */
+	  if (merged.positive & merged.negative) continue;
+	  break; /* leave edges != 0 */
+	}
+
+	if (edges != 0) {
+	  fputs("    ",stderr);
+	  print_instance(in2,stderr);
+	  fputs("\n",stderr);
+	}
+      }
+    }
     fatal_error("Cannot make conditional total order!");
   }
 
@@ -252,6 +312,11 @@ void schedule_augmented_dependency_graph(AUG_GRAPH *aug_graph) {
 
   /** Now schedule graph: we need to generate a conditional total order. */
 
+  if (oag_debug & PROD_ORDER) {
+    printf("Scheduling conditional total order for %s\n",
+	   aug_graph_name(aug_graph));
+  }
+
   /* we use the schedule array as temp storage */
   for (i=0; i < n; ++i) {
     aug_graph->schedule[i] = 0; /* This means: not scheduled yet */
@@ -267,16 +332,28 @@ void compute_oag(Declaration module, STATE *s) {
   for (j=0; j < s->phyla.length; ++j) {
     schedule_summary_dependency_graph(&s->phy_graphs[j]);
   }
-  for (j=0; j < s->match_rules.length; ++j) {
-    if (analysis_debug & DNC_ITERATE) {
-      printf("Checking rule %d\n",j);
+
+  /* now perform closure */
+  {
+    int saved_analysis_debug = analysis_debug;
+    int j;
+    analysis_debug |= -1;
+  
+    for (j=0; j < s->match_rules.length; ++j) {
+      printf("OAG closing rule %s\n",aug_graph_name(&s->aug_graphs[j]));
+      (void)close_augmented_dependency_graph(&s->aug_graphs[j]);
     }
-    schedule_augmented_dependency_graph(&s->aug_graphs[j]);
+    (void)close_augmented_dependency_graph(&s->global_dependencies);
+    analysis_debug = saved_analysis_debug;
   }
-  if (analysis_debug & DNC_ITERATE) {
-    printf("Checking global dependencies\n",j);
+
+  if (!analysis_state_cycle(s)) {
+    for (j=0; j < s->match_rules.length; ++j) {
+      schedule_augmented_dependency_graph(&s->aug_graphs[j]);
+    }
+    schedule_augmented_dependency_graph(&s->global_dependencies);
   }
-  schedule_augmented_dependency_graph(&s->global_dependencies);
+
   if (analysis_debug & (DNC_ITERATE|DNC_FINAL)) {
     printf("*** FINAL OAG ANALYSIS STATE ***\n");
     print_analysis_state(s,stdout);
