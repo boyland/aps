@@ -11,65 +11,6 @@
 int analysis_debug = 0;
 
 
-/*** FUNCTIONS THAT BELONG IN FIBER MODULE ***/
-
-BOOL fiber_is_reverse(FIBER f)
-{
-  NODE_IN_TREE n = (NODE_IN_TREE)f;
-  if (n == 0) return FALSE;
-  return n->dir != 2;
-}
-
-/* The following function will not be necessary
- * Once the DFA graph is explicit encoded using fibers and not with
- * DFA_tree.
- */
-void print_fibers(STATE *s)
-{
-  int i, n;
-  n = s->fibers.length;
-  for (i=1; i < n; ++i) {
-    FIBER f = s->fibers.array[i]; 
-    ALIST l = f->longer;
-    printf("Fiber #%d: ",i);
-    print_fiber(f,stdout);
-    if (fiber_is_reverse(f))
-	puts(" BACKWARD");
-    else
-      puts("");
-    while (l != NULL) {
-      printf("  %s . this = ", decl_name((Declaration)alist_key(l)));
-      print_fiber((FIBER)alist_value(l),stdout);
-      printf("\n");
-      l = alist_next(l);
-    }
-  }
-}
-
-/* The following function should be done as part of fiber module.
- * Then we don't need to call this here.
- *
- * We shouldn't use static arrays at all, and better still would be
- * avoid global things as well, and put everything in the "STATE".
- */
-
-#define DONT_USE_CONSTANTS_LIKE_THIS 100
-void add_fibers_to_state(STATE *s)
-{
-  int n = 1;
-  int i;
-  for (i = 1; i < DONT_USE_CONSTANTS_LIKE_THIS; ++i) {
-    if (DFA[i] == 0) break;
-    ++n;
-  }
-  VECTORALLOC(s->fibers,FIBER,n);
-  s->fibers.array[0] = base_fiber;
-  for (i = 1; i < n; ++i) {
-    s->fibers.array[i] = &DFA[i]->as_fiber;
-  }
-  print_fibers(s);
-}
-
 /*** FUNCTIONS FOR INSTANCES */
 
 BOOL fibered_attr_equal(FIBERED_ATTRIBUTE *fa1, FIBERED_ATTRIBUTE *fa2) {
@@ -1466,12 +1407,12 @@ static void *get_edges(void *vaug_graph, void *node) {
 	    /* add edges to collect value */
 	    shared_info_fiber.modifier = &dot_mod;
 	    add_edges_to_graph(&shared_info_fiber,&this_decl,
-			       NULL,dependency,aug_graph);
+			       cond,dependency,aug_graph);
 
 	    /* add edges to broadcast value */
 	    shared_info_fiber.modifier = &nodot_mod;
 	    add_edges_to_graph(&this_decl,&shared_info_fiber,
-			       NULL,dependency,aug_graph);
+			       cond,dependency,aug_graph);
 	  }
 	}
 	break;
@@ -2430,6 +2371,7 @@ void dnc_close(STATE*s) {
 
 STATE *compute_dnc(Declaration module) {
   STATE *s=(STATE *)HALLOC(sizeof(STATE));
+  Declaration_info(module)->analysis_state = s;
   init_analysis_state(s,module);
   dnc_close(s);
   if (analysis_debug & (DNC_ITERATE|DNC_FINAL)) {
