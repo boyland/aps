@@ -489,6 +489,23 @@ static void assign_instance(INSTANCE *array, int index,
   }
 }
 
+static int assign_instances(INSTANCE *array, int index,
+			    Declaration attr, Declaration node) {
+  FIBERSET fiberset;
+  assign_instance(array,index++,attr,NULL,FALSE,node);
+  for (fiberset = fiberset_for(attr,FIBERSET_NORMAL_FINAL);
+       fiberset != NULL;
+       fiberset=fiberset->rest) {
+    assign_instance(array,index++,attr,fiberset->fiber,FALSE,node);
+  }
+  for (fiberset = fiberset_for(attr,FIBERSET_REVERSE_FINAL);
+       fiberset != NULL;
+       fiberset=fiberset->rest) {
+    assign_instance(array,index++,attr,fiberset->fiber,TRUE,node);
+  }
+  return index;
+}
+
 static Type infer_some_value_decl_type(Declaration d) {
   if (Declaration_KEY(d) == KEYnormal_formal) {
     return infer_formal_type(d);
@@ -504,15 +521,18 @@ static Type infer_some_value_decl_type(Declaration d) {
  * </ul>
  */
 static void *get_instances(void *vaug_graph, void *node) {
+  AUG_GRAPH *aug_graph = (AUG_GRAPH *)vaug_graph;
+  INSTANCE *array = aug_graph->instances.array;
+  STATE *s = aug_graph->global_state;
+  int index = -1;
+
+  if (array == NULL) {
+    index = aug_graph->instances.length;
+  }
+  
   if (ABSTRACT_APS_tnode_phylum(node) == KEYDeclaration) {
-    AUG_GRAPH *aug_graph = (AUG_GRAPH *)vaug_graph;
-    STATE *s = aug_graph->global_state;
     Declaration decl = (Declaration)node;
-    int index = Declaration_info(decl)->instance_index;
-    INSTANCE *array = aug_graph->instances.array;
-    if (array == NULL) {
-      index = aug_graph->instances.length;
-    }
+    if (index == -1) index = Declaration_info(decl)->instance_index;
     switch (Declaration_KEY(decl)) {
     case KEYmodule_decl:
       /* we let the module_decl represent the instance of the
@@ -648,18 +668,7 @@ static void *get_instances(void *vaug_graph, void *node) {
 	  { ATTRSET attrset=attrset_for(s,pdecl);
 	    for (; attrset != NULL; attrset=attrset->rest) {
 	      Declaration attr = attrset->attr;
-	      FIBERSET fiberset;
-	      assign_instance(array,index++,attr,NULL,FALSE,decl);
-	      for (fiberset = fiberset_for(attr,FIBERSET_NORMAL_FINAL);
-		   fiberset != NULL;
-		   fiberset=fiberset->rest) {
-		assign_instance(array,index++,attr,fiberset->fiber,FALSE,decl);
-	      }
-	      for (fiberset = fiberset_for(attr,FIBERSET_REVERSE_FINAL);
-		   fiberset != NULL;
-		   fiberset=fiberset->rest) {
-		assign_instance(array,index++,attr,fiberset->fiber,TRUE,decl);
-	      }
+	      index = assign_instances(array,index,attr,decl);
 	    }
 	  }
 	}
@@ -677,8 +686,43 @@ static void *get_instances(void *vaug_graph, void *node) {
     default:
       if (array == NULL) Declaration_info(decl)->instance_index = index;
     }
-    if (array == NULL) aug_graph->instances.length = index;
+  } else if (ABSTRACT_APS_tnode_phylum(node) == KEYExpression) {
+    Expression e = (Expression)node;
+    Declaration fdecl = NULL;
+    switch (Expression_KEY(e)) {
+    default:
+      break;
+    case KEYfuncall:
+      if ((fdecl = local_call_p(e)) != NULL) {
+	ATTRSET attrset=attrset_for(s,fdecl);
+	Declaration proxy = Expression_info(e)->funcall_proxy;
+
+	/* printf("%d: Found local function call of %s\n",
+	 *      tnode_line_number(e),decl_name(fdecl));
+	 */
+	if (array == NULL) {
+	  extern int aps_yylineno;
+	  aps_yylineno = tnode_line_number(e);
+	  proxy = pragma_call(def_name(function_decl_def(fdecl)),
+			      nil_Expressions());
+	  Expression_info(e)->funcall_proxy = proxy;
+	  Declaration_info(proxy)->instance_index = index;
+	  Declaration_info(proxy)->node_phy_graph = 
+	    summary_graph_for(s,fdecl);
+	  Declaration_info(proxy)->decl_flags |= DECL_RHS_FLAG;
+	} else {
+	  index =  Declaration_info(proxy)->instance_index;
+	}
+
+	for (; attrset != NULL; attrset=attrset->rest) {
+	  Declaration attr = attrset->attr;
+	  index = assign_instances(array,index,attr,proxy);
+	}
+      }
+      break;
+    }
   }
+  if (array == NULL) aug_graph->instances.length = index;
   return vaug_graph;
 }
 
@@ -1052,7 +1096,7 @@ INSTANCE *get_expression_instance(FIBER fiber, int frev,
 	  break;
 	}
 	if (fiber != NULL && fiber != base_fiber) {
-	  printf("Trying untested techniques\n");
+	  /*printf("Trying untested techniques\n");*/
 	  if (fiber->shorter == 0) fatal_error("What base fiber?");
 	  fiber = lengthen_fiber(decl,fiber);
 	  decl = ndecl;
@@ -1233,22 +1277,21 @@ static void record_expression_dependencies(INSTANCE *sink, CONDITION *cond,
 	    record_expression_dependencies(sink,cond,0,FALSE,dependency,FALSE,
 					   actual,aug_graph);
 	  }
-#ifdef UNDEF
-	  /* next we find the result in the summary dependency graph,
-	   * and find all the things that result$fiber depends on,
-	   * and map them back to the parameters.
-	   */
-	  printf("%d: looking at local funcation %s\n",
+
+	  /* attach to result, and somewhere else ? attach actuals */
+	  printf("%d: looking at local function %s\n",
 		 tnode_line_number(e),decl_name(decl));
 	  {
-	    PHY_GRAPH* phy_graph =
-	      summary_graph_for(aug_graph->global_state,decl);
+	    Declaration proxy = Expression_info(e)->funcall_proxy;
 	    Declaration rd = some_function_decl_result(decl);
-	    INSTANCE *ri = get_summary_instance(rd,fiber,frev,phy_graph);
+	    INSTANCE *source = get_instance(rd,fiber,frev,proxy,aug_graph);
 	    
-	    /*!!! HERE !!!*/
+	    if (carrying) {
+	      add_edges_to_graph(source,sink,cond,kind,aug_graph);
+	    } else {
+	      add_edge_to_graph(source,sink,cond,kind,aug_graph);
+	    }
 	  }
-#endif
 	}
       } else if ((decl = constructor_call_p(e)) != NULL) {
 	Expression actual = first_Actual(funcall_actuals(e));
@@ -1302,6 +1345,8 @@ void record_condition_dependencies(INSTANCE *sink, CONDITION *cond,
 static void *get_edges(void *vaug_graph, void *node) {
   AUG_GRAPH *aug_graph = (AUG_GRAPH *)vaug_graph;
   switch (ABSTRACT_APS_tnode_phylum(node)) {
+  default:
+    break;
   case KEYDeclaration:
     { Declaration decl = (Declaration)node;
       CONDITION *cond = &Declaration_info(decl)->decl_cond;
@@ -1588,6 +1633,58 @@ static void *get_edges(void *vaug_graph, void *node) {
 	break;
       }
     }
+    break;
+  case KEYExpression:
+    {
+      Expression e = (Expression) node;
+      Declaration fdecl;
+      
+      if ((fdecl = local_call_p(e)) != NULL &&
+	  Declaration_KEY(fdecl) == KEYfunction_decl) {
+	Declaration proxy = Expression_info(e)->funcall_proxy;
+	CONDITION *cond;
+	void *parent = tnode_parent(node);
+
+	while (ABSTRACT_APS_tnode_phylum(parent) != KEYDeclaration) {
+	  parent = tnode_parent(parent);
+	}
+	cond = &Declaration_info((Declaration)parent)->decl_cond;
+
+	/* connect result to conditions */
+	{
+	  Declaration rd = some_function_decl_result(fdecl);
+	  INSTANCE* sink = get_instance(rd,NULL,FALSE,proxy,aug_graph);
+	  record_condition_dependencies(sink,cond,aug_graph);
+	}
+
+	/* connect formals and actuals */
+	{
+	  Type ft = function_decl_type(fdecl);
+	  Declaration f = first_Declaration(function_type_formals(ft));
+	  Expression a = first_Actual(funcall_actuals(e));
+	  for (; f != NULL; f = DECL_NEXT(f), a = EXPR_NEXT(a)) {
+	    INSTANCE *sink = get_instance(f,NULL,FALSE,proxy,aug_graph);
+	    record_expression_dependencies(sink,cond,NULL,FALSE,
+					   dependency,TRUE,a,aug_graph);
+	    record_condition_dependencies(sink,cond,aug_graph);
+	  }
+	}
+
+	/* connect shared info */
+	{
+	  STATE *s = aug_graph->global_state;
+	  Declaration rnode = responsible_node_declaration(e);
+	  Declaration rnodephy = node_decl_phylum(rnode);
+	  Declaration lattr = phylum_shared_info_attribute(rnodephy,s);
+	  Declaration rattr = phylum_shared_info_attribute(fdecl,s);
+	  INSTANCE *source = get_instance(lattr,NULL,FALSE,rnode,aug_graph);
+	  INSTANCE *sink = get_instance(rattr,NULL,FALSE,proxy,aug_graph);
+	  add_edges_to_graph(source,sink,cond,dependency,aug_graph);
+	  record_condition_dependencies(sink,cond,aug_graph);
+	}
+      }
+    }
+    break;
   }
   return vaug_graph;
 }
@@ -1801,13 +1898,9 @@ static void init_augmented_dependency_graph(AUG_GRAPH *aug_graph,
     traverse_Declaration(get_instances,aug_graph,tlm);
     VECTORALLOC(aug_graph->instances,INSTANCE,aug_graph->instances.length);
     for (i=0; i < n; ++i) {
-      INSTANCE* in = &aug_graph->instances.array[i];
-      in->fibered_attr.attr =
-	(Declaration)aug_graph->if_rules.array[i]; /* horible kludge */
-      in->fibered_attr.fiber = 0;
-      in->fibered_attr.fiber_is_reverse = 0;
-      in->node = 0;
-      in->index = i;
+      assign_instance(aug_graph->instances.array, i,
+		      (Declaration)aug_graph->if_rules.array[i], /* kludge */
+		      0,0,0);
     }
     traverse_Declaration(get_instances,aug_graph,tlm);
   }
@@ -2110,22 +2203,16 @@ static void init_analysis_state(STATE *s, Declaration module) {
 
 /*** ANALYSIS ***/
 
-static void augment_dependency_graph_for_node(AUG_GRAPH *aug_graph,
-					      Declaration node) {
-  int start=Declaration_info(node)->instance_index;
+static void synchronize_dependency_graphs(AUG_GRAPH *aug_graph,
+					  int start,
+					  PHY_GRAPH *phy_graph) {
   int n=aug_graph->instances.length;
-  int max=n;
+  int max;
   int phy_n;
   int i,j;
-  PHY_GRAPH *phy_graph = Declaration_info(node)->node_phy_graph;
-  int max_debug = (Declaration_KEY(node) == KEYprocedure_decl);
 
   if (phy_graph == NULL) {
     /* a semantic child of a constructor */
-    /* printf("No summary graph for %s\n",decl_name(node)); */
-    if (Declaration_KEY(node) == KEYprocedure_decl)
-      fatal_error("cannot find phy graph for procedure %s",
-		  decl_name(node));
     return;
   }
 
@@ -2133,31 +2220,7 @@ static void augment_dependency_graph_for_node(AUG_GRAPH *aug_graph,
 
   /* discover when the instances for this node end.
    */
-  for (i=start; i < max; ++i) {
-    if (aug_graph->instances.array[i].node != node) {
-      /* DEBUG
-       *print_instance(&aug_graph->instances.array[i],stdout);
-       *printf(" does not refer to %s\n",
-       *     symbol_name(def_name(declaration_def(node))));
-       */
-      max = i;
-      break;
-    }
-  }
-
-  /*DEBUG*/
-  if (analysis_debug & SUMMARY_EDGE_EXTRA) {
-    switch (Declaration_KEY(node)) {
-    case KEYdeclaration:
-      printf("Looking for [%d,%d) summary edges for %s among:",
-	     start,max,symbol_name(def_name(declaration_def(node))));
-      for (i=start; i < max; ++i) {
-	printf(" ");
-	print_instance(&aug_graph->instances.array[i],stdout);
-      }
-      printf("\n");
-    }
-  }
+  max = start + phy_n;
   
   for (i=start; i < max; ++i) {
     INSTANCE *source = &aug_graph->instances.array[i];
@@ -2168,7 +2231,7 @@ static void augment_dependency_graph_for_node(AUG_GRAPH *aug_graph,
       fputs(" != ",stderr);
       print_instance(phy_source,stderr);
       fputc('\n',stderr);
-      fatal_error("instances in different order");
+      fatal_error("instances %d vs %d in different order",i,i-start);
     }
     for (j=start; j < max; ++j) {
       INSTANCE *sink = &aug_graph->instances.array[j];
@@ -2205,15 +2268,44 @@ static void augment_dependency_graph_for_node(AUG_GRAPH *aug_graph,
   }
 }
 
-/** Augment the dependencies between edges associated with a procedure call.
+static void augment_dependency_graph_for_node(AUG_GRAPH *aug_graph,
+					      Declaration node) {
+  int start=Declaration_info(node)->instance_index;
+  PHY_GRAPH *phy_graph = Declaration_info(node)->node_phy_graph;
+
+  synchronize_dependency_graphs(aug_graph,start,phy_graph);
+}
+
+/** Augment the dependencies between edges associated with a procedure call,
+ * or a function call.
  * @see traverse_Declaration
  */
-void *augment_dependency_graph_proc_calls(void *paug_graph, void *node) {
+void *augment_dependency_graph_func_calls(void *paug_graph, void *node) {
   AUG_GRAPH *aug_graph = (AUG_GRAPH *)paug_graph;
   switch (ABSTRACT_APS_tnode_phylum(node)) {
+  default:
+    break;
+  case KEYExpression:
+    {
+      Expression e = (Expression)node;
+      Declaration fdecl = 0;
+      if ((fdecl = local_call_p(e)) != NULL &&
+	  Declaration_KEY(fdecl) == KEYfunction_decl) {
+	Declaration proxy = Expression_info(e)->funcall_proxy;
+	if (proxy == NULL)
+	  fatal_error("missing funcall proxy");
+	augment_dependency_graph_for_node(aug_graph,proxy);
+      }
+    }
+    break;
   case KEYDeclaration:
     { Declaration decl = (Declaration)node;
       switch (Declaration_KEY(decl)) {
+      case KEYsome_function_decl:
+      case KEYtop_level_match:
+	/* don't look inside (unless its what we're doing the analysis for) */
+	if (aug_graph->match_rule != node) return NULL;
+	break;
       case KEYassign:
 	{ Declaration pdecl = proc_call_p(assign_rhs(decl));
 	  if (pdecl != NULL) {
@@ -2251,7 +2343,7 @@ void augment_dependency_graph(AUG_GRAPH *aug_graph) {
     break;
   }
   /* find procedure calls */
-  traverse_Declaration(augment_dependency_graph_proc_calls,
+  traverse_Declaration(augment_dependency_graph_func_calls,
 		       aug_graph,aug_graph->match_rule);
 }
 
@@ -2425,8 +2517,11 @@ void print_instance(INSTANCE *i, FILE *stream) {
 	      ABSTRACT_APS_tnode_phylum(i->node));
     } else if (Declaration_KEY(i->node) == KEYnormal_assign) {
       Declaration pdecl = proc_call_p(normal_assign_rhs(i->node));
-      fputs(decl_name(pdecl),stream);
-      fputc('@',stream);
+      fprintf(stream,"%s(...)@%d",decl_name(pdecl),
+	      tnode_line_number(i->node));
+    } else if (Declaration_KEY(i->node) == KEYpragma_call) {
+      fprintf(stream,"%s(...):%d",symbol_name(pragma_call_name(i->node)),
+	      tnode_line_number(i->node));
     } else {
       fputs(symbol_name(def_name(declaration_def(i->node))),stream);
     }
@@ -2648,6 +2743,7 @@ void print_cycles(STATE *s, FILE *stream) {
   int i,j;
   /** test for cycles **/
   for (i=0; i < s->phyla.length; ++i) {
+    BOOL fiber_cycle = FALSE;
     PHY_GRAPH *phy_graph = &s->phy_graphs[i];
     int n = phy_graph->instances.length;
     for (j=0; j < n; ++j) {
