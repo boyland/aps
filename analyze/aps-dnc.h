@@ -11,6 +11,8 @@ typedef struct fibered_attribute {
   BOOL fiber_is_reverse;
 } FIBERED_ATTRIBUTE;
 
+extern BOOL fibered_attr_equal(FIBERED_ATTRIBUTE*,FIBERED_ATTRIBUTE*);
+
 typedef struct attribute_instance {
   FIBERED_ATTRIBUTE fibered_attr;
   Declaration node; /* NULL for locals */
@@ -20,11 +22,25 @@ typedef struct attribute_instance {
 enum instance_direction {instance_local, instance_inward, instance_outward};
 enum instance_direction instance_direction(INSTANCE *);
 
-typedef enum { no_dependency, fiber_dependency, dependency } DEPENDENCY;
-#define STRONGER(k1,k2) ((int)(k1) > (int)(k2))
-#define NO_STRONGER(k1,k2) (!STRONGER(k2,k1))
-#define AT_MOST(k1,k2) ((int)(k1) <= (int)(k2))
+typedef unsigned DEPENDENCY;
+
+#define SOME_DEPENDENCY 1
+#define DEPENDENCY_NOT_JUST_FIBER 2
+#define DEPENDENCY_MAYBE_CARRYING 4
+#define DEPENDENCY_MAYBE_DIRECT 8
+
+#define no_dependency 0
+#define fiber_dependency (SOME_DEPENDENCY|DEPENDENCY_MAYBE_CARRYING|DEPENDENCY_MAYBE_DIRECT)
+#define dependency (SOME_DEPENDENCY|DEPENDENCY_NOT_JUST_FIBER|DEPENDENCY_MAYBE_CARRYING|DEPENDENCY_MAYBE_DIRECT)
+#define control_fiber_dependency (SOME_DEPENDENCY|DEPENDENCY_MAYBE_DIRECT)
+#define control_dependency (SOME_DEPENDENCY|DEPENDENCY_NOT_JUST_FIBER|DEPENDENCY_MAYBE_DIRECT)
+#define indirect_fiber_dependency (SOME_DEPENDENCY|DEPENDENCY_MAYBE_CARRYING)
+#define indirect_dependency (SOME_DEPENDENCY|DEPENDENCY_NOT_JUST_FIBER|DEPENDENCY_MAYBE_CARRYING)
+#define indirect_control_fiber_dependency (SOME_DEPENDENCY)
+#define indirect_control_dependency (SOME_DEPENDENCY|DEPENDENCY_NOT_JUST_FIBER)
 #define max_dependency dependency
+
+#define AT_MOST(k1,k2) (((k1)&~(k2))==0)
 
 extern DEPENDENCY dependency_join(DEPENDENCY,DEPENDENCY);
 extern DEPENDENCY dependency_trans(DEPENDENCY,DEPENDENCY);
@@ -78,12 +94,16 @@ typedef struct analysis_state {
   CYCLES cycles;
 } STATE;
 
+extern PHY_GRAPH* summary_graph_for(STATE *, Declaration);
 extern ATTRSET attrset_for(STATE *, Declaration);
 
 extern Declaration proc_call_p(Expression);
 
 extern int if_rule_p(void*);
 extern int if_rule_index(void*);
+
+extern INSTANCE *get_instance(Declaration attr, FIBER fiber, BOOL frev,
+			      Declaration node, AUG_GRAPH *aug_graph);
 
 extern STATE *compute_dnc(Declaration module);
 
