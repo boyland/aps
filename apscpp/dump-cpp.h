@@ -30,6 +30,7 @@ typedef void (*ASSIGNFUNC)(void *,Declaration,std::ostream&);
 void dump_Block(Block,ASSIGNFUNC,void*arg,std::ostream&);
 void dump_Type(Type,std::ostream&);
 void dump_Type_value(Type,std::ostream&);
+void dump_Type_signature(Type,std::ostream&);
 void dump_Typed_decl(Type,Declaration,char*prefix,std::ostream&);
 void dump_Expression(Expression,std::ostream&);
 void dump_Use(Use,char *prefix,std::ostream&);
