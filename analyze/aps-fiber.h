@@ -54,6 +54,8 @@ typedef struct fibersets {
 extern int fiberset_length(FIBERSET);
 extern int member_fiberset(FIBER,FIBERSET);
 
+struct analysis_state;
+
 extern void fiber_module(Declaration module, struct analysis_state *s);
 
 extern void print_fiber(FIBER,FILE *);
