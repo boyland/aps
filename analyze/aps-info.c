@@ -17,6 +17,7 @@ struct info {
     struct Pattern_info pattern_info;
     struct Type_info type_info;
     struct Signature_info signature_info;
+    struct Def_info def_info;
   } var;
 };
 
@@ -80,5 +81,9 @@ struct Type_info *Type_info(Type _node) {
 
 struct Signature_info *Signature_info(Signature _node) {
   return &(tnode_info(_node)->var.signature_info);
+}
+
+struct Def_info *Def_info(Def _node) {
+  return &(tnode_info(_node)->var.def_info);
 }
 
