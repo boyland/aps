@@ -23,16 +23,29 @@ static void *analyze_thing(void *ignore, void *node)
     case KEYmodule_decl:
       s = compute_dnc(decl);
       switch (analysis_state_cycle(s)) {
-      case dependency:
+      default:
 	aps_error(decl,"Cycle detected; Attribute grammar is not DNC");
 	break;
+      case indirect_control_fiber_dependency:
+      case control_fiber_dependency:
+      case indirect_fiber_dependency:
       case fiber_dependency:
-	printf("Fiber cycle detected: cycle being removed\n");
+	printf("Fiber cycle detected; cycle being removed\n");
 	break_fiber_cycles(decl,s);
 	/* fall through */
       case no_dependency:
 	compute_oag(decl,s);
+	switch (analysis_state_cycle(s)) {
+	case no_dependency:
+	  break;
+	default:
+	  aps_error(decl,"Cycle detected; Attribute grammar is not OAG");
+	  break;
+	}
 	break;
+      }
+      if (cycle_debug & PRINT_CYCLE) {
+	print_cycles(s,stdout);
       }
       Declaration_info(decl)->analysis_state = s;
       break;
