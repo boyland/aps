@@ -7,6 +7,7 @@
 #include <string>
 
 extern "C" {
+#include <stdio.h>
 #include "aps-ag.h"
 String get_code_name(Symbol);
 }
@@ -921,6 +922,9 @@ void dump_some_attribute(Declaration d,
 
   // dump the actual combiner:
   if (combiner) {
+    // C++ language semantics bug: private nested classes can't get
+    // get at private details:
+    noss << " public:\n"; 
     noss << header_return_type<Type>(vt) << " "
 	 << header_function_name(string("co")+i+"_"+name)
 	 << "(" << vt << " v1, " << vt << " v2)"
@@ -2231,9 +2235,6 @@ void debug_fibered_attr(FIBERED_ATTRIBUTE* fa, ostream& os)
     os << decl_name(fa->attr);
   if (fa->fiber == 0) return;
   os << "$";
-  if (fa->fiber_is_reverse) {
-    os << "R";
-  }
   debug_fiber(fa->fiber,os);
 }
 
@@ -2273,9 +2274,6 @@ void debug_Instance(INSTANCE *i, ostream& os) {
   }
   if (i->fibered_attr.fiber != NULL) {
     os << "$";
-    if (i->fibered_attr.fiber_is_reverse) {
-      os << "!";
-    }
     debug_fiber(i->fibered_attr.fiber,os);
   }
 }

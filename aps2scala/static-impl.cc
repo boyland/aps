@@ -18,8 +18,7 @@ int attribute_schedule(PHY_GRAPH *phy_graph, const FIBERED_ATTRIBUTE& key)
   int n = phy_graph->instances.length;
   for (int i=0; i < n; ++i) {
     const FIBERED_ATTRIBUTE& fa = phy_graph->instances.array[i].fibered_attr;
-    if (fa.attr == key.attr && fa.fiber == key.fiber &&
-	fa.fiber_is_reverse == key.fiber_is_reverse)
+    if (fa.attr == key.attr && fa.fiber == key.fiber)
       return phy_graph->summary_schedule[i];
   }
   fatal_error("Could not find summary schedule for instance");
