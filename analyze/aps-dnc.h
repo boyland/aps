@@ -39,7 +39,7 @@ typedef struct augmented_dependency_graph {
   Declaration match_rule;
   struct analysis_state *global_state;
   Declaration syntax_decl, lhs_decl, first_rhs_decl;
-  VECTOR(Declaration) if_rules;
+  VECTOR(void*) if_rules;
   VECTOR(INSTANCE) instances;
   EDGESET *graph; /* two-d array, indexed by instance number */
   EDGESET worklist_head, worklist_tail;
