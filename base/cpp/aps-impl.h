@@ -12,69 +12,85 @@ class Debug {
   ~Debug(); // decrease indentation
   // there are no private instance data members so we don't need to overload =
 
-  Debug(const string&); // increase indendation and print entry string
-  void returns(const string&); // return value
+  Debug(const std::string&); // increase indendation and print entry string
+  void returns(const std::string&); // return value
 
-  ostream& out(); // print a debugging comment
-  static ostream& out(ostream&); // change the debugging stream
+  std::ostream& out(); // print a debugging comment
+  static std::ostream& out(std::ostream&); // change the debugging stream
  private:
   static int depth;
-  static ostream* output;
+  static std::ostream* output;
 };
 
-class Phylum;
 class Type;
+class Phylum;
 class Constructor;
 
-struct Node {
-  Type* type;
-  Constructor* cons;
-  int index;
-  Node* parent;
-  void set_parent(Node* n) { parent = n; }
-  Node(Constructor*);
-  virtual ~Node() {}
-  virtual string to_string();
-};
-
-ostream& operator<<(ostream&,Node*);
-string operator+(const string&,Node*);
+typedef std::string T_String;
 
 class Module {
  protected:
   bool complete;
-  string name;
  public:
-  Module *t_Result;
   Module();
-  Module(string name);
   virtual ~Module() {}
   virtual void finish();
-  virtual string v_string(Node *n);
-  virtual string v_string(bool) { return "stub_error"; }
-  virtual string v_string(int) { return "stub_error"; }
-  virtual string v_string(string) { return "stub_error"; }
 };
 
-class Type : virtual public Module {
-  std::string name;
+class C_NULL_TYPE : public Module {
+  Type* type;
+ public:
+  struct Node {
+    Type* type;
+    Constructor* cons;
+    Node(Constructor*);
+    virtual ~Node() {}
+    virtual T_String to_string();
+  };
+
+  typedef Node *T_Result;
+
+  Type* get_type();
+
+  virtual T_String v_string(Node *n);
+};
+
+std::ostream& operator<<(std::ostream&,C_NULL_TYPE::Node*);
+std::string operator+(const std::string&,C_NULL_TYPE::Node*);
+
+class C_NULL_PHYLUM : public Module {
+  Phylum* phylum;
+ public:
+  
+  struct Node : public C_NULL_TYPE::Node {
+    int index;
+    Node* parent;
+    void set_parent(Node* n) { parent = n; }
+    Node(Constructor*);
+    virtual T_String to_string();
+  };
+
+  typedef Node *T_Result;
+  
+  Phylum* get_phylum();
+  Type* get_type() { return (Type*)get_phylum(); }
+
+  virtual T_String v_string(Node *n);
+};
+
+class Type {
   std::vector<Constructor*> constructors;
  public:
   Type();
-  Type(std::string);
-  std::string get_name() const;
-  virtual int install(Constructor*);
-  virtual int install(Node*);
-  void finish();
-  int size();
+  int install(Constructor*);
 };
 
-class Phylum : virtual public Type {
+class Phylum : public Type {
+  typedef C_NULL_PHYLUM::Node Node;
   std::vector<Node*> nodes;
   bool complete;
  public:
   Phylum();
-  Phylum(std::string);
   int install(Node*);
   void finish();
   int size();
@@ -94,39 +110,55 @@ class Constructor {
 
 enum EvalStatus { UNINITIALIZED, UNEVALUATED, CYCLE, EVALUATED, ASSIGNED };
 
-class too_late_error : public runtime_error {
+class too_late_error : public std::runtime_error {
  public:
-  too_late_error() : runtime_error("too late") {}
-  too_late_error(const string& what) : runtime_error(what) {}
+  too_late_error() : std::runtime_error("too late") {}
+  too_late_error(const std::string& what) : std::runtime_error(what) {}
 };
 
-class UndefinedAttributeException : public runtime_error {
+class UndefinedAttributeException : public std::runtime_error {
  public:
-  UndefinedAttributeException() : runtime_error("Undefined attribute") {}
-  UndefinedAttributeException(const string& w) : runtime_error("Undefined Attribute: "+w) {}
+  UndefinedAttributeException() : std::runtime_error("Undefined attribute") {}
+  UndefinedAttributeException(const std::string& w) : std::runtime_error("Undefined Attribute: "+w) {}
 };
 
-template<class P,class V> 
+class stub_error : public std::runtime_error {
+ public:
+  stub_error() : std::runtime_error("stub error") {}
+  stub_error(const std::string& s) : std::runtime_error(s) {}
+};
+
+class assertion_error : public std::logic_error {
+ public:
+  assertion_error(const std::string& s) : std::logic_error(s) {}
+};
+
+template<class C_P, class C_V> 
 class Attribute {
+ public:
+  typedef typename C_P::T_Result node_type;
+  typedef typename C_V::T_Result value_type;
+ protected:
+  C_P* nodes;
+  C_V* values;
   Phylum* phylum;
-  Module* values;
+ private:
   bool evaluation_started;
   bool complete;
-  string name;
+  std::string name;
+  std::vector<value_type> value_array;
+  std::vector<EvalStatus> status_array;
  public:
-  Attribute(Phylum* p, Module*vt, string n)
-    : phylum(p), values(vt), evaluation_started(false),complete(false) , name(n)
+  Attribute(C_P*nt, C_V*vt, std::string n) :
+    nodes(nt), values(vt), phylum(nt->get_phylum()),
+    evaluation_started(false), complete(false) , name(n)
     {}
   virtual ~Attribute() {}
-  typedef P node_type;
-  typedef V value_type;
 
   void assign(node_type n,value_type v) {
-    Debug d(phylum->v_string(n) + "." + name + ":=" + values->v_string(v));
-    check_phylum(n);
+    Debug d(nodes->v_string(n) + "." + name + ":=" + values->v_string(v));
     if (evaluation_started) throw too_late_error("cannot assign to attribute once evaluation has started");
-    value_array[n->index] = v;
-    status_array[n->index] = ASSIGNED;
+    set(n,v);
   }
     
   void finish() {
@@ -135,19 +167,20 @@ class Attribute {
       value_array.resize(n);
       status_array.resize(n);
       for (int i=0; i < n; ++i) {
-	(void)evaluate((P)phylum->node(i));
+	(void)evaluate((node_type)(phylum->node(i)));
       }
     }
     complete = true;
   }
+
   value_type evaluate(node_type n) {
-    Debug d(phylum->v_string(n) + string(".") + name);
+    Debug d(nodes->v_string(n) + std::string(".") + name);
     check_phylum(n);
     evaluation_started = true;
     switch (status_array[n->index]) {
     case CYCLE: 
       {
-	throw runtime_error("cycle in attribute computation for "+name+"."+n);
+	throw std::runtime_error("cycle in attribute computation for "+name+"."+n);
       }
       break;
     case UNINITIALIZED:
@@ -161,7 +194,7 @@ class Attribute {
       /* fall through */
     default:
       {
-	value_type v = value_array[n->index];
+	value_type v = get(n);
 	d.returns(values->v_string(v));
 	return v;
       }
@@ -170,79 +203,43 @@ class Attribute {
  protected:
   void check_phylum(node_type n) {
     if (n->cons->get_type() != phylum)
-      throw invalid_argument("node not of correct phylum");
+      throw std::invalid_argument("node not of correct phylum");
     if (n->index >= (int)value_array.size()) {
       value_array.resize(n->index+1);
       status_array.resize(n->index+1);
     }
   }
+  void set(node_type n, value_type v) {
+    check_phylum(n);
+    value_array[n->index] = v;
+    status_array[n->index] = ASSIGNED;
+  }
+  value_type get(node_type n) {
+    check_phylum(n); // paranoia
+    if (status_array[n->index] < EVALUATED)
+      throw assertion_error("get used illegally");
+    return value_array[n->index];
+  }
+
   virtual value_type compute(node_type n) = 0;
 #ifdef UNDEF
   {
-    throw UndefinedAttributeException(string("") + n + "." + name);
+    throw UndefinedAttributeException(std::string("") + n + "." + name);
   }
 #endif
- private:
-  vector<value_type> value_array;
-  vector<EvalStatus> status_array;
-};
-
-template <class T>
-struct TypeTraits {};
-
-template <class T>
-struct TypeTraits<T*> {
-  typedef T ModuleType;
-};
-
-template <>
-struct TypeTraits<void> {
-  typedef Module ModuleType;
-};
-
-class C_NULL_TYPE : virtual public Type { typedef Node* T_Result; };
-class C_NULL_PHYLUM : virtual public Phylum { typedef Node* T_Result; };
-
-class C_BOOLEAN;
-template<>
-struct TypeTraits<bool> {
-  typedef C_BOOLEAN ModuleType;
-};
-typedef bool T_Boolean;
-extern C_BOOLEAN *t_Boolean;
-
-class C_INTEGER;
-template<>
-struct TypeTraits<int> {
-  typedef C_INTEGER ModuleType;
-};
-// typedef int T_Integer;
-// extern C_INTEGER *t_Integer;
-
-class C_IEEE;
-template<>
-struct TypeTraits<double> {
-  typedef C_IEEE ModuleType;
-};
-
-class C_CHARACTER;
-template<>
-struct TypeTraits<char> {
-  typedef C_CHARACTER ModuleType;
 };
 
 class C_STRING;
-template<>
-struct TypeTraits<string> {
-  typedef C_STRING ModuleType;
-};
-typedef string T_String;
+typedef C_STRING C_String;
+// already mentioned above:
+// typedef std::string T_String;
 extern C_STRING *t_String;
 
-class stub_error : public runtime_error {
- public:
-  stub_error(){}
-  stub_error(const string& s) : runtime_error(s) {}
-};
+typedef class C_BOOLEAN C_Boolean;
+typedef bool T_Boolean;
+extern C_Boolean *t_Boolean;
+
+template <class T_T>
+std::string s_string(T_T n);
 
 #endif
