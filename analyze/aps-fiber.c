@@ -1713,6 +1713,10 @@ void fiber_module(Declaration module, STATE *s) {
   /* initialize EXPR_IS_RHS and EXPR_IS_LHS */
   traverse_Declaration(init_rhs_lhs,s,module);
   /* set up initial fiber sets */
+  
+  /* entry point of callsite AI */
+  callset_AI(module, s);
+  
   traverse_Declaration(initialize_fibersets,s,module);
   /* go through fiber worklist */
   { FIBERSET fs;
