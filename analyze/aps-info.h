@@ -112,6 +112,7 @@ extern struct Expression_info {
   int expr_flags;
   int expr_helper_num; /* used in incremental impl. */
   struct attribute_instance* value_for; /* This is the RHS that gives value to this instance */
+  Declaration funcall_proxy; /* This is a Decl that permits a funcall node to be an INSTANCE node */
 #define EXPR_LHS_FLAG 1
 #define EXPR_RHS_FLAG 2
 } *Expression_info(Expression);
