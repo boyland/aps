@@ -64,20 +64,25 @@ enum instance_direction instance_direction(INSTANCE *i) {
 
 DEPENDENCY dependency_join(DEPENDENCY k1, DEPENDENCY k2)
 {
-  if (AT_MOST(k1,k2)) return k2;
-  if (AT_MOST(k2,k1)) return k1;
-  fatal_error("dependencies aren't in a chain");
+  return k1 | k2;
 }
 
 DEPENDENCY dependency_trans(DEPENDENCY k1, DEPENDENCY k2)
 {
+  // complicated because fiber trans non-fiber = non-fiber
+  // but maybe-carrying trans non-carrying = non-carrying
+  // and trans never gives direct.
   if (k1 == no_dependency || k2 == no_dependency) return no_dependency;
-  return dependency_join(k1,k2);
+  return (((k1 & DEPENDENCY_NOT_JUST_FIBER)|
+	   (k2 & DEPENDENCY_NOT_JUST_FIBER)) |
+	  ((k1 & DEPENDENCY_MAYBE_CARRYING)&
+	   (k2 & DEPENDENCY_MAYBE_CARRYING)) |
+	  SOME_DEPENDENCY);
 }
 
 DEPENDENCY dependency_indirect(DEPENDENCY k)
 {
-  return k;
+  return k&~DEPENDENCY_MAYBE_DIRECT;
 }
 
 int worklist_length(AUG_GRAPH *aug_graph) {
@@ -261,23 +266,7 @@ void add_edge_to_graph(INSTANCE *source,
 		       DEPENDENCY kind,
 		       AUG_GRAPH *aug_graph) {
   int index = source->index*(aug_graph->instances.length)+sink->index;
-  /* Wrong place for this debugging output
-  if (analysis_debug & ADD_EDGE) {
-    print_instance(source,stdout);
-    fputs("->",stdout);
-    print_instance(sink,stdout);
-    fputc(':',stdout);
-    switch (kind) {
-    case no_dependency: fputc('!',stdout); break;
-    case fiber_dependency: fputc('(',stdout); break;
-    }
-    print_condition(cond,stdout);
-    switch (kind) {
-    case no_dependency: fputc('!',stdout); break;
-    case fiber_dependency: fputc(')',stdout); break;
-    }
-    fputc('\n',stdout);
-  }*/
+
   aug_graph->graph[index] =
     add_edge(source,sink,cond,kind,aug_graph->graph[index],aug_graph);
 }
@@ -712,8 +701,8 @@ static INSTANCE *get_instance_or_null(Declaration attr, FIBER fiber, BOOL frev,
   return NULL;
 }
 
-static INSTANCE *get_instance(Declaration attr, FIBER fiber, BOOL frev,
-			      Declaration node, AUG_GRAPH *aug_graph)
+INSTANCE *get_instance(Declaration attr, FIBER fiber, BOOL frev,
+		       Declaration node, AUG_GRAPH *aug_graph)
 {
   INSTANCE *instance = get_instance_or_null(attr,fiber,frev,node,aug_graph);
   if (instance != NULL) return instance;
@@ -729,6 +718,55 @@ static INSTANCE *get_instance(Declaration attr, FIBER fiber, BOOL frev,
     in.node = node;
 
     fputs("Looking for ",stderr);
+    print_instance(&in,stderr);
+    fputc('\n',stderr);
+    for (i=0; i < n; ++i) {
+      print_instance(&array[i],stderr);
+      if (i < start) fputs(" (ignored)",stderr);
+      fputc('\n',stderr);
+    }
+  }
+  fatal_error("Could not get instance");
+  return NULL;
+}
+
+static INSTANCE *get_summary_instance_or_null(Declaration attr, FIBER fiber, 
+					      BOOL frev, PHY_GRAPH* phy_graph)
+{
+  int i;
+  INSTANCE *array = phy_graph->instances.array;
+  int n = phy_graph->instances.length;
+  int start = Declaration_info(attr)->instance_index;
+
+  if (fiber == base_fiber) fiber = NULL;
+
+  for (i=start; i < n; ++i) {
+    if (array[i].fibered_attr.attr == attr &&
+	array[i].fibered_attr.fiber == fiber &&
+	array[i].fibered_attr.fiber_is_reverse == frev &&
+	array[i].node == NULL) return &array[i];
+  }
+  return NULL;
+}
+
+INSTANCE *get_summary_instance(Declaration attr, FIBER fiber, BOOL frev,
+			       PHY_GRAPH *phy_graph)
+{
+  INSTANCE *instance =
+    get_summary_instance_or_null(attr,fiber,frev,phy_graph);
+  if (instance != NULL) return instance;
+  { INSTANCE in;
+    int i;
+    INSTANCE *array = phy_graph->instances.array;
+    int n = phy_graph->instances.length;
+    int start = Declaration_info(attr)->instance_index;
+    
+    in.fibered_attr.attr = attr;
+    in.fibered_attr.fiber = fiber;
+    in.fibered_attr.fiber_is_reverse = frev;
+    in.node = NULL;
+
+    fputs("Looking for summary ",stderr);
     print_instance(&in,stderr);
     fputc('\n',stderr);
     for (i=0; i < n; ++i) {
@@ -816,6 +854,12 @@ void add_edges_to_graph(INSTANCE *source,
 	  array[i2].node == node2)) break;
   }
   max2 = i2;
+
+  /*
+  printf("Dependencies (%d,%d) -> [%d,%d), [%d,%d) -> (%d,%d)\n",
+	 start1,mid1,mid2,max2,
+	 mid1,max1,start2,mid2);
+  */
 
   /* The range (start,mid) holds regular fibered attributes, and
    * the range [mid,max) holds reverse fibered attributes.
@@ -1007,6 +1051,13 @@ INSTANCE *get_expression_instance(FIBER fiber, int frev,
 	  ndecl = USE_DECL(value_use_use(node));
 	  break;
 	}
+	if (fiber != NULL && fiber != base_fiber) {
+	  printf("Trying untested techniques\n");
+	  if (fiber->shorter == 0) fatal_error("What base fiber?");
+	  fiber = lengthen_fiber(decl,fiber);
+	  decl = ndecl;
+	  ndecl = NULL;
+	}
 	return get_instance(decl,fiber,frev,ndecl,aug_graph);
       } else {
 	fatal_error("%d: Cannot get expression instance",tnode_line_number(e));
@@ -1080,13 +1131,19 @@ static void record_expression_dependencies(INSTANCE *sink, CONDITION *cond,
    */
   switch (Expression_KEY(e)) {
   default:
-    fatal_error("%d: cannot handle this expression",tnode_line_number(e));
+    fprintf(stderr,"fatal_error: %d: cannot handle this expression (%d)\n",
+		tnode_line_number(e), Expression_KEY(e));
+    repeat_expr(e); /* force crash */
     break;
   case KEYinteger_const:
   case KEYreal_const:
   case KEYstring_const:
   case KEYchar_const:
     /* nothing to do */
+    break;
+  case KEYrepeat:
+    record_expression_dependencies(sink,cond,fiber,frev,kind,carrying,
+				   repeat_expr(e),aug_graph);
     break;
   case KEYvalue_use:
     { Declaration decl=Use_info(value_use_use(e))->use_decl;
@@ -1149,7 +1206,7 @@ static void record_expression_dependencies(INSTANCE *sink, CONDITION *cond,
 	  add_edge_to_graph(source,sink,cond,kind,aug_graph);
 	}
 	/* and also depend on object itself (not a carrying dependency) */
-	add_edge_to_graph(osrc,sink,cond,kind,aug_graph);
+	add_edge_to_graph(osrc,sink,cond,kind&~DEPENDENCY_MAYBE_CARRYING,aug_graph);
       } else if ((decl = local_call_p(e)) != NULL) {
 	Declaration result = some_function_decl_result(decl);
 	Expression actual = first_Actual(funcall_actuals(e));
@@ -1171,11 +1228,27 @@ static void record_expression_dependencies(INSTANCE *sink, CONDITION *cond,
 		      tnode_line_number(e));
 	  break;
 	case KEYfunction_decl:
-	  /*!!! HERE !!!*/
+	  /* first depend on the arguments (not carrying, no fibers) */
 	  for (; actual != NULL; actual=Expression_info(actual)->next_actual) {
-	    record_expression_dependencies(sink,cond,fiber,frev,kind,carrying,
+	    record_expression_dependencies(sink,cond,0,FALSE,dependency,FALSE,
 					   actual,aug_graph);
 	  }
+#ifdef UNDEF
+	  /* next we find the result in the summary dependency graph,
+	   * and find all the things that result$fiber depends on,
+	   * and map them back to the parameters.
+	   */
+	  printf("%d: looking at local funcation %s\n",
+		 tnode_line_number(e),decl_name(decl));
+	  {
+	    PHY_GRAPH* phy_graph =
+	      summary_graph_for(aug_graph->global_state,decl);
+	    Declaration rd = some_function_decl_result(decl);
+	    INSTANCE *ri = get_summary_instance(rd,fiber,frev,phy_graph);
+	    
+	    /*!!! HERE !!!*/
+	  }
+#endif
 	}
       } else if ((decl = constructor_call_p(e)) != NULL) {
 	Expression actual = first_Actual(funcall_actuals(e));
@@ -1216,7 +1289,7 @@ void record_condition_dependencies(INSTANCE *sink, CONDITION *cond,
       INSTANCE* if_instance = &aug_graph->instances.array[index];
       if (index > 32 || if_instance->index != index) 
 	fatal_error("something is fishy");
-      add_edge_to_graph(if_instance,sink,cond2,dependency,aug_graph);
+      add_edge_to_graph(if_instance,sink,cond2,control_dependency,aug_graph);
     }
   }
 }
@@ -1328,6 +1401,11 @@ static void *get_edges(void *vaug_graph, void *node) {
 		      /* And put the instance between */
 		      add_edge_to_graph(source,between,cond,dependency,aug_graph);
 		      add_edge_to_graph(between,sink,cond,dependency,aug_graph);
+		      /* but also add a direct fiber dependency
+		       * so we know we have a direct dependency
+		       * between them (pure incremental purposes)
+		       */
+		      add_edge_to_graph(source,sink,cond,fiber_dependency,aug_graph);
 		    } else {
 		      /*
 		      printf("Avoiding extra edges ");
@@ -1382,6 +1460,7 @@ static void *get_edges(void *vaug_graph, void *node) {
 	    if (direction_is_collection(attribute_decl_direction(field))) {
 	      INSTANCE *sink = get_expression_instance(fiber,TRUE,
 						       object,aug_graph);
+	      Expression_info(rhs)->value_for = sink;
 	      /* assignment requires the object is ready to assign */
 	      add_edge_to_graph(osrc,sink,cond,dependency,aug_graph);
 	      record_condition_dependencies(sink,cond,aug_graph);
@@ -1392,8 +1471,9 @@ static void *get_edges(void *vaug_graph, void *node) {
 						       lhs,aug_graph);
 	      INSTANCE *fsink = get_expression_instance(fiber,FALSE,
 							object,aug_graph);
+	      Expression_info(rhs)->value_for = sink;
 	      /* assignment also requires the object is ready to assign */
-	      if (osrc != fsink){ /* avoid untracked fibers */
+	      if (osrc != fsink) { /* avoid untracked fibers */
 		/* tracked but strict fields must still be assigned
 		 * before object is created.
 		 */
@@ -1410,6 +1490,8 @@ static void *get_edges(void *vaug_graph, void *node) {
 	      record_condition_dependencies(sink,cond,aug_graph);
 	      record_expression_dependencies(sink,cond,NULL,FALSE,
 					     dependency,TRUE,rhs,aug_graph);
+	      record_expression_dependencies(fsink,cond,NULL,FALSE,
+					     dependency,TRUE,rhs,aug_graph);
 	      add_edge_to_graph(sink,fsink,cond,dependency,aug_graph);
 	    }
 	  } else if ((field = shared_use_p(lhs)) != NULL) {
@@ -1420,6 +1502,7 @@ static void *get_edges(void *vaug_graph, void *node) {
 					   aug_graph->global_state);
 	    FIBER fiber = lengthen_fiber(field,base_fiber);
 	    INSTANCE *sink = get_instance(sattr,fiber,TRUE,node,aug_graph);
+	    Expression_info(rhs)->value_for = sink;
 	    record_condition_dependencies(sink,cond,aug_graph);
 	    record_expression_dependencies(sink,cond,NULL,FALSE,
 					   dependency,TRUE,rhs,aug_graph);
@@ -1434,6 +1517,7 @@ static void *get_edges(void *vaug_graph, void *node) {
 	    /* connect the result */
 	    { INSTANCE *sink = get_expression_instance(NULL,FALSE,lhs,aug_graph);
 	      INSTANCE *src = get_instance(result,NULL,FALSE,decl,aug_graph);
+	      Expression_info(rhs)->value_for = sink;
 	      record_condition_dependencies(sink,cond,aug_graph);
 	      add_edges_to_graph(src,sink,cond,dependency,aug_graph);
 	    }
@@ -1460,6 +1544,7 @@ static void *get_edges(void *vaug_graph, void *node) {
 	    }
 	  } else {
 	    INSTANCE *sink = get_expression_instance(NULL,FALSE,lhs,aug_graph);
+	    Expression_info(rhs)->value_for = sink;
 	    record_condition_dependencies(sink,cond,aug_graph);
 	    record_expression_dependencies(sink,cond,NULL,FALSE,
 					   dependency,TRUE,rhs,aug_graph);
@@ -1476,7 +1561,7 @@ static void *get_edges(void *vaug_graph, void *node) {
 
 	  record_condition_dependencies(sink,cond,aug_graph);
 	  record_expression_dependencies(sink,cond,NULL,FALSE,
-					 dependency,FALSE,test,aug_graph);
+					 control_dependency,FALSE,test,aug_graph);
 	}
 	break;
       case KEYcase_stmt:
@@ -1493,7 +1578,7 @@ static void *get_edges(void *vaug_graph, void *node) {
 
 	    for (; test != 0; test = Expression_info(test)->next_expr) {
 	      record_expression_dependencies(sink,cond,NULL,FALSE,
-					     dependency,FALSE,test,aug_graph);
+					     control_dependency,FALSE,test,aug_graph);
 	    }
 	  }
 	}
@@ -1509,6 +1594,19 @@ static void *get_edges(void *vaug_graph, void *node) {
 
 
 /*** AUXILIARY FUNCTIONS FOR SUMMARY INFORMATION AND FOR PHYLA ***/
+
+PHY_GRAPH* summary_graph_for(STATE *state, Declaration pdecl)
+{
+  int i;
+  for (i=0; i < state->phyla.length; ++i) {
+    if (state->phyla.array[i] == pdecl) {
+      return &state->phy_graphs[i];
+    }
+  }
+  fatal_error("could not find summary graph for %s",decl_name(pdecl));
+  /*NOTREACHED*/
+  return 0;
+}
 
 ATTRSET attrset_for(STATE *s, Declaration phylum) {
   return (ATTRSET)get(s->phylum_attrset_table,phylum);
@@ -1543,16 +1641,8 @@ static void init_node_phy_graph2(Declaration node, Type ty, STATE *state) {
 	fatal_error("%d: unbound type",tnode_line_number(ty));
       switch (Declaration_KEY(phylum)) {
       case KEYphylum_decl:
-	{ int i;
-	  for (i=0; i < state->phyla.length; ++i) {
-	    if (state->phyla.array[i] == phylum) {
-	      Declaration_info(node)->node_phy_graph =
-		&state->phy_graphs[i];
-	      return;
-	    }
-	  }
-	  aps_error(node,"could not find summary graph");
-	}
+	Declaration_info(node)->node_phy_graph =
+	  summary_graph_for(state,phylum);
 	break;
       case KEYtype_decl:
 	break;
@@ -2370,20 +2460,30 @@ void print_instance(INSTANCE *i, FILE *stream) {
   }
 }
 
+void print_edge_helper(EDGESET e, FILE* stream) {
+  switch (e->kind) {
+  case no_dependency: fputc('!',stream); break;
+  case indirect_control_fiber_dependency:
+  case indirect_fiber_dependency: fputc('?',stream); /* fall through */
+  case control_fiber_dependency:
+  case fiber_dependency: fputc('(',stream); break;
+  case indirect_control_dependency:
+  case indirect_dependency: fputc('?',stream); /* fall through */
+  case control_dependency:
+  case dependency: break;
+  }
+  print_condition(&e->cond,stream);
+  if ((e->kind & DEPENDENCY_NOT_JUST_FIBER) == 0) {
+    fputc(')',stream);
+  }
+}
+
 void print_edge(EDGESET e, FILE *stream) {
   print_instance(e->source,stream);
   fputs("->",stream);
   print_instance(e->sink,stream);
   fputc(':',stream);
-  switch (e->kind) {
-  case no_dependency: fputc('!',stream); break;
-  case fiber_dependency: fputc('(',stream); break;
-  }
-  print_condition(&e->cond,stream);
-  switch (e->kind) {
-  case no_dependency: fputc('!',stream); break;
-  case fiber_dependency: fputc(')',stream); break;
-  }
+  print_edge_helper(e,stream);
   fputc('\n',stream);
 }
   
@@ -2403,15 +2503,7 @@ void print_edgeset(EDGESET e, FILE *stream) {
 	fputs("!!SINK=",stream);
 	print_instance(tmp->sink,stream);
       }
-      switch (tmp->kind) {
-      case no_dependency: fputc('!',stream); break;
-      case fiber_dependency: fputc('(',stream); break;
-      }
-      print_condition(&tmp->cond,stream);
-      switch (tmp->kind) {
-      case no_dependency: fputc('!',stream); break;
-      case fiber_dependency: fputc(')',stream); break;
-      }
+      print_edge_helper(tmp,stream);
       tmp = tmp->rest;
       if (tmp != NULL) fputc(',',stream);
     }
@@ -2561,15 +2653,18 @@ void print_cycles(STATE *s, FILE *stream) {
     for (j=0; j < n; ++j) {
       switch (phy_graph->mingraph[j*n+j]) {
       case no_dependency: break;
+      case indirect_control_fiber_dependency:
+      case control_fiber_dependency:
+      case indirect_fiber_dependency:
       case fiber_dependency:
 	fprintf(stream,"fiber ");
 	/* fall through */
-      case dependency:
+      default:
 	fprintf(stream,"summary cycle involving %s.",
 		symbol_name(def_name(declaration_def(phy_graph->phylum))));
 	print_instance(&phy_graph->instances.array[j],stdout);
 	fprintf(stream,"\n");
-	  break;
+	break;
       }
     }
   }
@@ -2579,10 +2674,13 @@ void print_cycles(STATE *s, FILE *stream) {
     for (j=0; j < n; ++j) {
       switch (edgeset_kind(aug_graph->graph[j*n+j])) {
       case no_dependency: break;
+      case indirect_control_fiber_dependency:
+      case control_fiber_dependency:
+      case indirect_fiber_dependency:
       case fiber_dependency:
 	fprintf(stream,"fiber ");
 	/* fall through */
-      case dependency:
+      default:
 	fprintf(stream,"local cycle for %s involving ",
 		aug_graph_name(aug_graph));
 	print_instance(&aug_graph->instances.array[j],stdout);
