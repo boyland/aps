@@ -59,6 +59,8 @@ class C_NULL_TYPE : public Module {
 
 std::ostream& operator<<(std::ostream&,C_NULL_TYPE::Node*);
 std::string operator+(const std::string&,C_NULL_TYPE::Node*);
+std::string operator+(const std::string&,int);
+std::string operator+(const std::string&,bool);
 
 extern int aps_impl_lineno;
 
@@ -122,10 +124,21 @@ class too_late_error : public std::runtime_error {
   too_late_error(const std::string& what) : std::runtime_error(what) {}
 };
 
+class null_constructor : public std::runtime_error {
+ public:
+  null_constructor() : std::runtime_error("null constructor") {}
+};
+
 class UndefinedAttributeException : public std::runtime_error {
  public:
   UndefinedAttributeException() : std::runtime_error("Undefined attribute") {}
   UndefinedAttributeException(const std::string& w) : std::runtime_error("Undefined Attribute: "+w) {}
+};
+
+class CyclicAttributeException : public std::runtime_error {
+ public:
+  CyclicAttributeException() : std::runtime_error("Cyclic attribute") {}
+  CyclicAttributeException(const std::string& w) : std::runtime_error("Cyclic Attribute: "+w) {}
 };
 
 class stub_error : public std::runtime_error {
@@ -186,7 +199,7 @@ class Attribute {
     switch (status_array[n->index]) {
     case CYCLE: 
       {
-	throw std::runtime_error("cycle in attribute computation for "+name+"."+n);
+	throw CyclicAttributeException(name+"."+n);
       }
       break;
     case UNINITIALIZED:
@@ -206,7 +219,7 @@ class Attribute {
       }
     }
   }
- protected:
+
   void check_phylum(node_type n) {
     if (n->cons->get_type() != phylum)
       throw std::invalid_argument("node not of correct phylum");
@@ -215,24 +228,53 @@ class Attribute {
       status_array.resize(n->index+1);
     }
   }
-  void set(node_type n, value_type v) {
+  virtual void set(node_type n, value_type v) {
     check_phylum(n);
     value_array[n->index] = v;
     status_array[n->index] = ASSIGNED;
   }
-  value_type get(node_type n) {
+  virtual value_type get(node_type n) {
     check_phylum(n); // paranoia
-    if (status_array[n->index] < EVALUATED)
-      throw assertion_error("get used illegally");
+    if (status_array[n->index] < EVALUATED) {
+      value_array[n->index] = get_default(n);
+      status_array[n->index] = EVALUATED;
+    }
     return value_array[n->index];
   }
 
-  virtual value_type compute(node_type n) = 0;
-#ifdef UNDEF
+ protected:
+  value_type get_default(node_type n) {
+    throw UndefinedAttributeException(std::string("") + n + "." + name);
+  }
+
+  virtual value_type compute(node_type n)
   {
     throw UndefinedAttributeException(std::string("") + n + "." + name);
   }
-#endif
+};
+
+template <class C_P, class C_V>
+class CollectionAttribute : public Attribute<C_P,C_V> {
+ public:
+  typedef typename C_P::T_Result node_type;
+  typedef typename C_V::T_Result value_type;
+ protected:
+  value_type initial;
+
+ public:
+  CollectionAttribute(C_P*nt, C_V*vt, std::string n, value_type init)
+    : Attribute<C_P,C_V>(nt,vt,name), initial(init) {}
+
+  virtual void set(node_type n, value_type v) {
+    Attribute<C_P,C_V>::set(n,combine(get(n),v));
+  }
+
+ protected:
+  virtual value_type get_default(node_type n) {
+    return initial;
+  }
+
+  virtual value_type combine(value_type v1, value_type v2) = 0;
 };
 
 class C_STRING : public C_NULL_TYPE
