@@ -64,10 +64,6 @@ class Implementation {
   // not sure what to do here
   // virtual void implement_procedure(Declaration p, output_streams&) = 0;
 
-  // if an attribute use is detecte3d when dumping an expression,
-  // we use this technique:
-  virtual void implement_attr_call(Declaration ad, Expression node, ostream&) = 0;
-
   // if a Declaration has an implementation mark on it,
   // this function is called to implement its use:
   virtual void implement_value_use(Declaration vd, ostream&) = 0;
@@ -77,5 +73,12 @@ extern Implementation *dynamic_impl;
 extern Implementation *static_impl;
 
 #define IMPLEMENTATION_MARKS (127<<24)
+
+// an implementation may wish to use these flags:
+#define LOCAL_ATTRIBUTE_FLAG (1<<24)
+#define VAR_VALUE_DECL_FLAG (1<<25)
+#define ATTRIBUTE_DECL_FLAG (1<<26)
+
+void clear_implementation_marks(Declaration d);
 
 #endif
