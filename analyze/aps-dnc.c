@@ -274,13 +274,20 @@ void add_transitive_edge_to_graph(INSTANCE *source,
 
 static void *count_if_rules(void *pint, void *node) {
   int *count = (int *)pint;
+  Match m;
   if (ABSTRACT_APS_tnode_phylum(node) == KEYDeclaration) {
     Declaration decl = (Declaration)node;
     switch (Declaration_KEY(decl)) {
     case KEYmodule_decl: return NULL;
-    case KEYif_stmt: case KEYcase_stmt:
+    case KEYif_stmt:
       Declaration_info(decl)->if_index = *count;
       ++*count;
+      break;
+    case KEYcase_stmt:
+      for (m = first_Match(case_stmt_matchers(decl)); m; m=MATCH_NEXT(m)) {
+	Match_info(m)->if_index = *count;
+	++*count;
+      }
       break;
     default: break;
     }
@@ -288,13 +295,20 @@ static void *count_if_rules(void *pint, void *node) {
   return pint;
 }
 
-static void *get_if_rules(void *array, void *node) {
+static void *get_if_rules(void *varray, void *node) {
+  void** array = (void**)varray;
+  Match m;
   if (ABSTRACT_APS_tnode_phylum(node) == KEYDeclaration) {
     Declaration decl = (Declaration)node;
     switch (Declaration_KEY(decl)) {
     case KEYmodule_decl: return NULL;
-    case KEYif_stmt: case KEYcase_stmt:
-      ((Declaration *)array)[Declaration_info(decl)->if_index] = decl;
+    case KEYif_stmt:
+      array[Declaration_info(decl)->if_index] = decl;
+      break;
+    case KEYcase_stmt:
+      for (m = first_Match(case_stmt_matchers(decl)); m; m=MATCH_NEXT(m)) {
+	array[Match_info(m)->if_index] = m;
+      }
       break;
     default: break;
     }
@@ -302,12 +316,18 @@ static void *get_if_rules(void *array, void *node) {
   return array;
 }
 
-static void *get_case_conds(void *vcase, void *node) {
+/* link together all the conditions in a case */
+static void *get_match_tests(void *vpexpr, void *node)
+{
+  Expression* pexpr = (Expression*)vpexpr;
   switch (ABSTRACT_APS_tnode_phylum(node)) {
   default:
     return NULL;
-  case KEYMatches:
   case KEYMatch:
+    traverse_Pattern(get_match_tests,vpexpr,matcher_pat((Match)node));
+    Match_info((Match)node)->match_test = *pexpr;
+    return NULL;
+  case KEYMatches:
   case KEYPatternActuals:
     break;
   case KEYPattern:
@@ -315,24 +335,38 @@ static void *get_case_conds(void *vcase, void *node) {
       switch (Pattern_KEY(pat)) {
       case KEYcondition:
 	{ Expression cond = condition_e(pat);
-	  Expression expr = case_stmt_expr((Declaration)vcase);
-	  /* printf("Found case cond\n"); */
-	  Expression_info(cond)->next_expr = Expression_info(expr)->next_expr;
-	  Expression_info(expr)->next_expr = cond;
+	  Expression expr = *pexpr;
+	  Expression_info(cond)->next_expr = expr;
+	  *pexpr = cond;
 	}
+	break;
+      default:
+	break;
       }
     }
-    break;
   }
-  return vcase;
+  return vpexpr;
 }
 
-static Expression if_rule_cond(Declaration if_rule) {
-  switch (Declaration_KEY(if_rule)) {
+static Expression if_rule_test(void* if_rule) {
+  switch (ABSTRACT_APS_tnode_phylum(if_rule)) {
+  case KEYDeclaration:
+    return if_stmt_cond((Declaration)if_rule);
+  case KEYMatch:
+    return Match_info((Match)if_rule)->match_test;
   default:
     fatal_error("%d: unknown if_rule",tnode_line_number(if_rule));
-  case KEYif_stmt: return if_stmt_cond(if_rule);
-  case KEYcase_stmt: return case_stmt_expr(if_rule);
+  }
+}
+
+static CONDITION* if_rule_cond(void *if_rule) {
+  switch (ABSTRACT_APS_tnode_phylum(if_rule)) {
+  case KEYDeclaration:
+    return &Declaration_info((Declaration)if_rule)->decl_cond;
+  case KEYMatch:
+    return &Match_info((Match)if_rule)->match_cond;
+  default:
+    fatal_error("%d: unknown if_rule",tnode_line_number(if_rule));
   }
 }
 
@@ -340,55 +374,44 @@ static void *init_decl_cond(void *vcond, void *node) {
   CONDITION *cond = (CONDITION *)vcond;
   if (ABSTRACT_APS_tnode_phylum(node) == KEYDeclaration) {
     Declaration decl = (Declaration)node;
-    Block if_true = NULL;
-    Block if_false = NULL;
     
     Declaration_info(decl)->decl_cond = *cond;
     switch (Declaration_KEY(decl)) {
     case KEYmodule_decl: return NULL;
     case KEYif_stmt:
-      if_true = if_stmt_if_true(decl);
-      if_false = if_stmt_if_false(decl);
-      break;
-    case KEYcase_stmt:
-      { Matches ms = case_stmt_matchers(decl);
-	switch (Matches_KEY(ms)) {
-	case KEYlist_Matches:
-	  { Match m = list_Matches_elem(ms);
-	    if_true = matcher_body(m);
-	    if_false = case_stmt_default(decl); }
-	  break;
-	case KEYappend_Matches:
-	  { Matches ms1 = append_Matches_l1(ms);
-	    Matches ms2 = append_Matches_l2(ms);
-	    if (Matches_KEY(ms1) == KEYnil_Matches &&
-		Matches_KEY(ms2) == KEYlist_Matches) {
-	      Match m = list_Matches_elem(ms2);
-	      if_true = matcher_body(m);
-	      if_false = case_stmt_default(decl);
-	      break;
-	    }
-	  }
-	  /* fall through */
-	default:
-	  fatal_error("%d:cannot handle this case",tnode_line_number(decl));
-	  break;
-	}
+      {
+	Block if_true = if_stmt_if_true(decl);
+	Block if_false = if_stmt_if_false(decl);
+	int index = Declaration_info(decl)->if_index;
+	CONDITION new_cond;
+	new_cond.positive = cond->positive | (1 << index);
+	new_cond.negative = cond->negative;
+	traverse_Block(init_decl_cond,&new_cond,if_true);
+	new_cond.positive = cond->positive;
+	new_cond.negative = cond->negative | (1 << index);
+	traverse_Block(init_decl_cond,&new_cond,if_false);
       }
-      traverse_Matches(get_case_conds,decl,case_stmt_matchers(decl));
-      break;
-    default: break;
-    }
-    if (if_true != NULL) {
-      int index = Declaration_info(decl)->if_index;
-      CONDITION new_cond;
-      new_cond.positive = cond->positive | (1 << index);
-      new_cond.negative = cond->negative;
-      traverse_Block(init_decl_cond,&new_cond,if_true);
-      new_cond.positive = cond->positive;
-      new_cond.negative = cond->negative | (1 << index);
-      traverse_Block(init_decl_cond,&new_cond,if_false);
       return NULL;
+    case KEYcase_stmt:
+      {
+	Matches ms = case_stmt_matchers(decl);
+	Expression testvar = case_stmt_expr(decl);
+	CONDITION new_cond = *cond;
+	Match m;
+
+	Expression_info(testvar)->next_expr = 0;
+	traverse_Matches(get_match_tests,&testvar,ms);
+	for (m = first_Match(ms); m; m=MATCH_NEXT(m)) {
+	  int index = Match_info(m)->if_index;
+	  new_cond.positive |= (1 << index); /* first set it */
+	  traverse_Block(init_decl_cond,&new_cond,matcher_body(m));
+	  new_cond.positive &= ~(1 << index); /* now clear it */
+	  new_cond.negative |= (1 << index); /* set negative for rest */
+	}
+	traverse_Block(init_decl_cond,&new_cond,case_stmt_default(decl));
+      }
+      return NULL;
+    default: break;
     }
   }
   return vcond;
@@ -405,16 +428,6 @@ Declaration proc_call_p(Expression e) {
     return NULL;
 }
 
-static Type some_value_decl_type(Declaration decl) {
-  switch (Declaration_KEY(decl)) {
-  case KEYformal: return formal_type(decl);
-  case KEYvalue_decl: return value_decl_type(decl);
-  default:
-    fatal_error("%d: cannot handle this value decl",tnode_line_number(decl));
-  }
-  return NULL;
-}
-
 static void assign_instance(INSTANCE *array, int index,
 			    Declaration attr, FIBER fiber, BOOL frev,
 			    Declaration node) {
@@ -429,6 +442,14 @@ static void assign_instance(INSTANCE *array, int index,
     printf("Created instance %d: ", index);
     print_instance(&array[index],stdout);
     printf("\n");
+  }
+}
+
+static Type infer_some_value_decl_type(Declaration d) {
+  if (Declaration_KEY(d) == KEYnormal_formal) {
+    return infer_formal_type(d);
+  } else {
+    return some_value_decl_type(d);
   }
 }
 
@@ -497,9 +518,12 @@ static void *get_instances(void *vaug_graph, void *node) {
       break;
     case KEYformal: case KEYvalue_decl:
       if (array == NULL) Declaration_info(decl)->instance_index = index;
-      { Type ty = some_value_decl_type(decl);
+      { Type ty = infer_some_value_decl_type(decl);
 	switch (Type_KEY(ty)) {
-	default: fatal_error("%d:cannot infer type",tnode_line_number(ty));
+	default:
+	  fprintf(stderr,"cannot handle type: ");
+	  print_Type(ty,stderr);
+	  fatal_error("\n%d:abort",tnode_line_number(ty));
 	case KEYtype_use:
 	  { Declaration tdecl = Use_info(type_use_use(ty))->use_decl;
 	    if (tdecl == NULL) fatal_error("%d:type not bound",
@@ -1102,11 +1126,11 @@ void record_condition_dependencies(INSTANCE *sink, CONDITION *cond,
   for (i=0; i < aug_graph->if_rules.length; ++i) {
     int mask = (1 << i);
     if (mask & bits) {
-      Declaration if_rule = aug_graph->if_rules.array[i];
+      void* if_rule = aug_graph->if_rules.array[i];
       /* printf("Getting dependencies for condition %d\n",i); */
-      CONDITION *cond2 = &Declaration_info(if_rule)->decl_cond;
+      CONDITION *cond2 = if_rule_cond(if_rule);
       Expression expr;
-      for (expr = if_rule_cond(if_rule);
+      for (expr = if_rule_test(if_rule);
 	   expr != NULL;
 	   expr = Expression_info(expr)->next_expr) {
 	record_expression_dependencies(sink,cond2,NULL,FALSE,dependency,FALSE,
@@ -1350,9 +1374,13 @@ static void *mark_local(void *ignore, void *node) {
 }
 
 static void init_node_phy_graph(Declaration node, STATE *state) {
-  Type ty=formal_type(node);
+  Type ty=infer_formal_type(node);
   switch (Type_KEY(ty)) {
-  default: fatal_error("%d: unknown node type",tnode_line_number(ty));
+  default:
+    fprintf(stderr,"%d: cannot handle type: ",tnode_line_number(ty));
+    print_Type(ty,stderr);
+    fputc('\n',stderr);
+    fatal_error("Abort");
   case KEYtype_use:
     { Declaration phylum=Use_info(type_use_use(ty))->use_decl;
       if (phylum == NULL)
@@ -1502,7 +1530,7 @@ static void init_augmented_dependency_graph(AUG_GRAPH *aug_graph,
     if (num_if_rules > 32)
       fatal_error("Can handle up to 32 conditionals (got %d)",num_if_rules);
 
-    VECTORALLOC(aug_graph->if_rules,Declaration,num_if_rules);
+    VECTORALLOC(aug_graph->if_rules,void*,num_if_rules);
     traverse_Declaration(get_if_rules,aug_graph->if_rules.array,tlm);
     /* now initialize the decl_cond on every Declaration */
     cond.positive = 0;
@@ -1664,6 +1692,8 @@ static void init_analysis_state(STATE *s, Declaration module) {
 	  }
 	}
       }
+      if (s->start_phylum == NULL)
+	fatal_error("no root_phylum indicated");
       /* we count functions and procedures as *both* phyla
        * and match rules (for convenience).  Here we count them as phyla:
        */
@@ -1743,6 +1773,11 @@ static void init_analysis_state(STATE *s, Declaration module) {
     for (; decl != NULL; decl = Declaration_info(decl)->next_decl) {
       switch (Declaration_KEY(decl)) {
       case KEYattribute_decl:
+	if (!ATTR_DECL_IS_SYN(decl) && !ATTR_DECL_IS_INH(decl)) {
+	  aps_error(decl,"%s not declared either synthesized or inherited",
+		    decl_name(decl));
+	  Declaration_info(decl)->decl_flags |= ATTR_DECL_SYN_FLAG;
+	}
 	{ Type ftype = attribute_decl_type(decl);
 	  Declaration formal = first_Declaration(function_type_formals(ftype));
 	  Type ntype = formal_type(formal);
@@ -2265,6 +2300,8 @@ void print_aug_graph(AUG_GRAPH *aug_graph, FILE *stream) {
       case KEYpattern_call:
 	switch (Pattern_KEY(pattern_call_func(pat))) {
 	case KEYpattern_use:
+	  print_Use(pattern_use_use(pattern_call_func(pat)),stdout);
+#ifdef UNDEF
 	  { Declaration decl =
 	      Use_info(pattern_use_use(pattern_call_func(pat)))->use_decl;
 	    if (decl != NULL)
@@ -2272,6 +2309,7 @@ void print_aug_graph(AUG_GRAPH *aug_graph, FILE *stream) {
 	    else
 	      fputs("unbound pattern use",stream);
 	  }
+#endif
 	break;
 	default:
 	  fputs("unknown pattern function",stream);
@@ -2315,7 +2353,7 @@ void print_phy_graph(PHY_GRAPH *phy_graph, FILE *stream) {
   int j=0;
   int n=phy_graph->instances.length;
   
-  fprintf(stream,"Summary dependency graph for %s\n",
+  fprintf(stream,"\nSummary dependency graph for %s\n",
 	  symbol_name(def_name(declaration_def(phy_graph->phylum))));
   for (i=0; i < n; ++i) {
     print_instance(&phy_graph->instances.array[i],stream);
