@@ -152,9 +152,11 @@ class assertion_error : public std::logic_error {
   assertion_error(const std::string& s) : std::logic_error(s) {}
 };
 
-template<class C_P, class C_V> 
+template<class _C_P, class _C_V> 
 class Attribute {
  public:
+  typedef _C_P C_P;
+  typedef _C_V C_V;
   typedef typename C_P::T_Result node_type;
   typedef typename C_V::T_Result value_type;
  protected:
@@ -192,16 +194,17 @@ class Attribute {
     complete = true;
   }
 
-  value_type evaluate(node_type n) {
+  virtual value_type evaluate(node_type n) {
     Debug d(nodes->v_string(n) + std::string(".") + name);
     check_phylum(n);
     evaluation_started = true;
     switch (status_array[n->index]) {
     case CYCLE: 
       {
-	throw CyclicAttributeException(name+"."+n);
+	value_type v=cycle_evaluate(n);
+	d.returns(values->v_string(v));
+	return v;
       }
-      break;
     case UNINITIALIZED:
     case UNEVALUATED:
       status_array[n->index] = CYCLE;
@@ -220,6 +223,10 @@ class Attribute {
     }
   }
 
+  virtual value_type cycle_evaluate(node_type n) {
+    throw CyclicAttributeException(name+"."+n);
+  }
+
   void check_phylum(node_type n) {
     if (n->cons->get_type() != phylum)
       throw std::invalid_argument("node not of correct phylum");
@@ -235,9 +242,9 @@ class Attribute {
   }
   virtual value_type get(node_type n) {
     check_phylum(n); // paranoia
-    if (status_array[n->index] < EVALUATED) {
+    if (status_array[n->index] == UNINITIALIZED) {
       value_array[n->index] = get_default(n);
-      status_array[n->index] = EVALUATED;
+      status_array[n->index] = UNEVALUATED;
     }
     return value_array[n->index];
   }
@@ -247,23 +254,145 @@ class Attribute {
     throw UndefinedAttributeException(std::string("") + n + "." + name);
   }
 
+ public:
   virtual value_type compute(node_type n)
   {
     throw UndefinedAttributeException(std::string("") + n + "." + name);
   }
 };
 
+class Circular {
+  typedef std::vector<Circular*> Pending;
+  static Pending pending;
+
+ protected:
+  virtual ~Circular() {}
+  virtual bool eval_changed() = 0;
+
+ public:
+
+  static bool any_pending() {
+    return !pending.empty();
+  }
+
+  static void add_pending(Circular *c) {
+    pending.push_back(c);
+  }
+
+  static void clear_pending() {
+    unsigned n;
+    do {
+      n = 0;
+      for (Pending::iterator i = pending.begin(); i != pending.end(); ++i)
+	if (!(*i)->eval_changed()) ++n;
+    } while (n < pending.size());
+    for (Pending::iterator i = pending.begin(); i != pending.end(); ++i)
+      delete (*i);
+    pending.clear();
+  }
+
+  class CheckPending {
+    static int num_checks;
+  public:
+    CheckPending() {
+      ++num_checks;
+    }
+    ~CheckPending() {
+      --num_checks;
+    }
+
+    bool operator!() {
+      return num_checks == 1;
+    }
+  };
+};
+
+template <class C_V>
+class TypedCircular : public Circular {
+ protected:
+  C_V *values;
+ public:
+  typedef typename C_V::T_Result value_type;
+
+  TypedCircular(C_V *vt) : values(vt) {}
+
+  bool eval_changed() {
+    value_type old_val = get();
+    value_type new_val = values->v_join(old_val,eval());
+    if (values->v_equal(old_val,new_val)) {
+      return false;
+    } else {
+      set(new_val);
+      return true;
+    }
+  }
+
+  virtual value_type get() = 0;
+  virtual value_type eval() = 0;
+  virtual void set(value_type) = 0;
+};
+
 template <class C_P, class C_V>
-class CollectionAttribute : public Attribute<C_P,C_V> {
+class CircularAttributeHelper : public TypedCircular<C_V> {
  public:
   typedef typename C_P::T_Result node_type;
   typedef typename C_V::T_Result value_type;
+
+ private:
+  Attribute<C_P,C_V> *attr;
+  node_type node;
+  
+ public:
+  CircularAttributeHelper(C_P*,C_V*vt, Attribute<C_P,C_V> *a, node_type n)
+    : TypedCircular<C_V>(vt), attr(a), node(n) {  }
+
+  value_type get() { return attr->get(node); }
+  value_type eval() { return attr->compute(node); }
+  void set(value_type val) { attr->set(node,val); }
+};
+
+//! This definition of circular attributes is incorrect because
+//! it assumes all dependencies are monotone.
+template <class C_P, class C_V>
+class CircularAttribute : public Attribute<C_P,C_V> {
+ public:
+  typedef typename C_P::T_Result node_type;
+  typedef typename C_V::T_Result value_type;
+
+  CircularAttribute(C_P*nt, C_V*vt, std::string n)
+    : Attribute<C_P,C_V>(nt,vt,n) {}
+
+  virtual value_type cycle_evaluate(node_type n) {
+    CircularAttributeHelper<C_P,C_V> *cah = 
+	new CircularAttributeHelper<C_P,C_V>(nodes,values,this,n);
+    Circular::add_pending(cah);
+    Attribute<C_P,C_V>::set(n,values->v_bottom);
+    return values->v_bottom;
+  }
+
+  virtual value_type evaluate(node_type n) {
+    Circular::CheckPending cp;
+    value_type val = Attribute<C_P,C_V>::evaluate(n);
+    if (!cp) {
+      Circular::clear_pending();
+      val = get(n);
+    }
+    return val;
+  }
+};
+
+template <class A>
+class Collection : public A {
+  typedef typename A::C_P C_P;
+  typedef typename A::C_V C_V;
+  typedef typename A::node_type node_type;
+  typedef typename A::value_type value_type;
  protected:
   value_type initial;
 
  public:
-  CollectionAttribute(C_P*nt, C_V*vt, std::string n, value_type init)
-    : Attribute<C_P,C_V>(nt,vt,n), initial(init) {}
+  Collection(C_P*nt, C_V*vt, std::string n, value_type init)
+    : A(nt,vt,n), initial(init) {}
 
   virtual void set(node_type n, value_type v) {
     Attribute<C_P,C_V>::set(n,combine(get(n),v));
