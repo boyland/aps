@@ -7,6 +7,7 @@
 #include "aps-ag-util.h"
 #include "aps-read.h"
 #include "aps-bind.h"
+#include "aps-type.h"
 #include "aps-cond.h"
 #include "aps-fiber.h"
 #include "aps-fiber-callsite.h"
