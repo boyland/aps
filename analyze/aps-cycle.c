@@ -9,7 +9,7 @@
 #include "alloc.h"
 #include "aps-ag.h"
 
-int cycle_debug = PRINT_CYCLE;
+int cycle_debug = 0;
 
 /* We use a union-find algorithm to detect strongly connected components.
  * We use a dynamically allocated array to hold the pointers,
@@ -111,7 +111,7 @@ static void get_fiber_cycles(STATE *s) {
       }
     }
   }
-  if (cycle_debug & PRINT_CYCLE) {
+  if (cycle_debug & PRINT_UP_DOWN) {
     printf("%d independent fiber cycle%s found\n",num_sets,num_sets>1?"s":"");
     for (i=0; i < s->cycles.length; ++i) {
       CYCLE *cyc = &s->cycles.array[i];
