@@ -48,6 +48,7 @@ extern void check_function_return_type(Expression,Actuals,Type);
 extern Type infer_pfunction_return_type(Pattern,PatternActuals);
 extern void check_pfunction_return_type(Pattern,PatternActuals,Type);
 
+extern BOOL type_is_phylum(Type);
 extern Type type_element_type(Type);
 
 /* return true is environment is ready to use
