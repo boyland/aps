@@ -77,6 +77,7 @@ void impl_module(char *mname, char*type)
 
 bool incremental = false; //! unused
 int verbose = 0;
+int debug = 0;
 
 int inline_definitions = 0;
 
@@ -174,8 +175,47 @@ void dump_function_prototype(string prefix,char *name, Type ft, ostream&hs)
   hs << ")";
 }
 
+void dump_function_prototype(char *name, Type ft, const output_streams& oss)
+{
+  Declarations formals = function_type_formals(ft);
+  Declaration returndecl = first_Declaration(function_type_return_values(ft));
+  Type rt;
+  if (returndecl == 0) {
+    rt = 0;
+  } else {
+    rt = value_decl_type(returndecl);
+    if (DECL_NEXT(returndecl)) {
+      aps_error(ft,"cannot handle multiple return values");
+    }
+  }
+  oss << header_return_type<Type>(rt) << " "
+      << header_function_name("v_") << name << "(";
+  for (Declaration formal = first_Declaration(formals);
+       formal != NULL;
+       formal = DECL_NEXT(formal)) {
+    if (formal != first_Declaration(formals))
+      oss << ",";
+    oss << infer_formal_type(formal) << " v_" << decl_name(formal);
+  }
+  oss << ")" << header_end();
+}
+
+void dump_function_debug(char *name, Type ft, ostream& os)
+{
+  Declarations formals = function_type_formals(ft);
+  os << indent() << "Debug debug(std::string(\"" << name << "(\")";
+  bool started = false;
+  for (Declaration formal = first_Declaration(formals);
+       formal != NULL;
+       formal = DECL_NEXT(formal)) {
+    if (started) os << "+\",\""; else started = true;
+    os << "+v_" << decl_name(formal);
+  }
+  os << "+\")\");\n";
+}
+
 int nesting_level = 0;
-string indent() { return string(indent_multiple*nesting_level,' '); }
+string indent(int nl) { return string(indent_multiple*nl,' '); }
 
 // Output code to test if pattern matches node (no binding)
 // As a side-effect, information is left in place to enable
@@ -363,6 +403,16 @@ void dump_Pattern_bindings(Pattern p, ostream& os)
   case KEYcondition:
     break;
   }
+}
+
+string matcher_bindings(string node, Match m)
+{
+  Pattern p = matcher_pat(m);
+  ostringstream os1, os2;
+  dump_Pattern_cond(p,node,os1);
+  dump_Pattern_bindings(p,os2);
+  // ignore os1 contents
+  return os2.str();
 }
 
 
@@ -779,76 +829,126 @@ void dump_Type_service_transfers(ServiceRecord& sr,
   }
 }
 
-void dump_local_attribute(Declaration d,
-			  Type at,
-			  const output_streams& oss)
+void dump_some_attribute(Declaration d,
+			 string i,
+			 Type nt, Type vt,
+			 Direction dir,
+			 Default deft,
+			 Implementation::ModuleInfo *info,
+			 const output_streams& oss)
 {
   ostream& hs = oss.hs;
   ostream& cpps = oss.cpps;
   ostream& is = oss.is;
-  // ostream& bs = inline_definitions ? hs : cpps;
-  string prefix = oss.prefix;
+  ostream& bs = inline_definitions ? hs : cpps;
 
+  char *cname = decl_name(oss.context);
   char *name = decl_name(d);
-  static int unique = 0;
-  LOCAL_UNIQUE_PREFIX(d) = ++unique;
-  int i = LOCAL_UNIQUE_PREFIX(d);
-  Type lt = value_decl_type(d);
-	
-      
-  hs << " private:\n"
-     << "  class A" << i << "_" << name << " : public Attribute<";
-  dump_Type_signature(at,hs);
-  hs << ",";
-  dump_Type_signature(lt,hs);
-  hs << "> {\n";
-  hs << "    C_" << decl_name(oss.context) << "* context;\n";
-  hs << "  public:\n";
-  hs << "    A" << i << "_" << name << "(C_" << decl_name(oss.context) << "*c,";
-  dump_Type_signature(at,hs);
-  hs << " *nt, ";
-  dump_Type_signature(lt,hs);
-  hs << " *vt)";
-  if (!inline_definitions) {
-    hs << ";\n";
-    cpps << "\n" << prefix << "A" << i << "_" << name
-	 << "::A" << i << "_" << name
-	 << "(C_" << decl_name(oss.context) << "*c,";
-    dump_Type_signature(at,cpps);
-    cpps << " *nt, ";
-    dump_Type_signature(lt,cpps);
-    cpps << " *vt)";
-  }
-  cpps << " : Attribute<";
-  dump_Type_signature(at,cpps);
-  cpps << ",";
-  dump_Type_signature(lt,cpps);
-  cpps << ">(nt,vt,\"local " << i << "(" << name << ")\"), context(c) {}\n";
-  hs << "    ";
-  dump_Type(lt,hs);
-  hs << " compute(";
-  dump_Type(at,hs);
-  hs << " node)";
-  if (!inline_definitions) {
-    hs << ";\n";
-    dump_Type(lt,cpps);
-    cpps << " " << prefix << "A" << i << "_" << name << "::compute(";
-    dump_Type(at,cpps);
-    cpps << " node)";
-  }
-  cpps << "{ return context->c" << i << "_" << name << "(node); }\n";
-  hs << "};\n public:\n";
+  bool is_col = direction_is_collection(dir);
+  string attr_class_name = string("A") + i + "_" + name;
 
-  hs << "  A" << i << "_" << name << " *a" << i << "_" << name << ";\n";
-      
-  is << ",\n    a" << i << "_" << name << "(new A" << i << "_" << name << "(";
-  is << "this,";
-  dump_Type_value(at,is);
-  is << ",";
-  dump_Type_value(lt,is);
+  hs << indent(nesting_level-1) << " private:\n";
+  hs << indent() << "class " << attr_class_name << " : public "
+     << (is_col ? "Collection" : "") << "Attribute<"
+     << as_sig(nt) << "," << as_sig(vt) << "> {\n";
+  ++nesting_level;
+  output_streams noss(oss.context,hs,cpps,is,
+		      oss.prefix + attr_class_name + "::");
+  hs << indent() << "typedef " << nt << " node_type;\n";
+  hs << indent() << "typedef " << vt << " value_type;\n";
+  hs << "\n";
+  hs << indent() << "C_" << cname << "* context;\n";
+  hs << indent(nesting_level-1) << " public:\n";
+
+  // dump the constructor:
+  {
+    noss << header_return_type<Type>(0)
+	 << header_function_name(attr_class_name)
+	 << "(C_" << cname << "*c, "
+	 << as_sig(nt) << " *nt, "
+	 << as_sig(vt) << " *vt";
+    if (is_col) noss << ", " << vt << " init";
+    noss << ")" << header_end();
+    
+    bs << " : " << (is_col ? "Collection" : "") << "Attribute<"
+       << as_sig(nt) << "," << as_sig(vt) 
+       << ">(nt,vt,\"" << i << name << "\""
+       << (is_col ? ",init" : "") << "), context(c) {}\n";
+  }
+
+  hs << "   protected:\n";
+
+  // dump "combine"
+  Expression combiner = NULL;
+  if (is_col) {
+    noss << header_return_type<string>("value_type") << " "
+	 << header_function_name("combine")
+	 << "(value_type v1, value_type v2)"
+	 << header_end();
+    INDEFINITION;
+    bs << "{\n";
+    ++nesting_level;
+    switch (Default_KEY(deft)) {
+    default:
+      bs << indent() << "return values->v_combine(v1,v2);\n";
+      break;
+    case KEYcomposite:
+      combiner = composite_combiner(deft);
+      bs << indent() << "return context->co" << i << "_" << name
+	 << "(v1,v2);\n";
+    }
+    --nesting_level;
+    bs << "}\n";
+  }
+
+  if (Declaration_KEY(d) == KEYvalue_decl) {
+    info->note_local_attribute(d,noss);
+  } else {
+    info->note_attribute_decl(d,noss);
+  }
+
+  --nesting_level;
+  hs << indent() << "};\n\n";
+
+  // dump the actual combiner:
+  if (combiner) {
+    noss << header_return_type<Type>(vt) << " "
+	 << header_function_name(string("co")+i+"_"+name)
+	 << "(" << vt << " v1, " << vt << "v2)"
+	 << header_end();
+    INDEFINITION;
+    bs << " {\n";
+    ++nesting_level;
+    bs << indent() << "return " << combiner << "(v1,v2);\n";
+    --nesting_level;
+    bs << "}\n";
+  }
+
+  if (direction_is_input(dir))
+    hs << indent(nesting_level-1) << " public:\n";
+  hs << indent() << attr_class_name << " *a" << i << "_" << name << ";\n\n";
+  if (!direction_is_input(dir))
+    hs << indent(nesting_level-1) << " public:\n";
+  
+  is << ",\n    a" << i << "_" << name << "(new " << attr_class_name << "(";
+  is << "this," << as_val(nt) << "," << as_val(vt);
+  if (is_col) {
+    is << ",";
+    switch (Default_KEY(deft)) {
+    case KEYsimple:
+      is << simple_value(deft);
+      break;
+    case KEYcomposite:
+      is << composite_initial(deft);
+      break;
+    default:
+      is << as_val(vt) << "->initial";
+      break;
+    }
+  }
   is << "))";
 }
-
+  
 void dump_local_attributes(Block b, Type at, Implementation::ModuleInfo* info,
 			   const output_streams& oss)
 {
@@ -858,8 +958,15 @@ void dump_local_attributes(Block b, Type at, Implementation::ModuleInfo* info,
       aps_error(d,"Cannot handle this kind of statement");
       break;
     case KEYvalue_decl:
-      dump_local_attribute(d,at,oss);
-      info->note_local_attribute(d,oss);
+      {
+	static int unique = 0;
+	LOCAL_UNIQUE_PREFIX(d) = ++unique;
+	ostringstream ns;
+	ns << unique;
+	dump_some_attribute(d,ns.str(),at,value_decl_type(d),
+			    value_decl_direction(d),
+			    value_decl_default(d),info,oss);
+      }
       break;
     case KEYassign:
       break;
@@ -1001,7 +1108,23 @@ void dump_cpp_Declaration(Declaration decl,const output_streams& oss)
 	dump_cpp_Declaration(d,new_oss);
 	switch (Declaration_KEY(d)) {
 	case KEYattribute_decl:
-	  info->note_attribute_decl(d,new_oss);
+	  {
+	    Type fty = attribute_decl_type(d);
+	    Declaration f = first_Declaration(function_type_formals(fty));
+	    Declarations rdecls = function_type_return_values(fty);
+	    Declaration rdecl = first_Declaration(rdecls);
+
+	    dump_some_attribute(d,"",infer_formal_type(f),
+				value_decl_type(rdecl),
+				attribute_decl_direction(d),
+				attribute_decl_default(d),info,new_oss);
+
+	    new_oss << header_return_type<Type>(value_decl_type(rdecl)) << " "
+		    << header_function_name(string("v_") + decl_name(d))
+		    << "(" << infer_formal_type(f) << " anode)"
+		    << header_end();
+	    bs << "{ return a_" << decl_name(d) << "->evaluate(anode); }\n";
+	  }
 	  break;
 	case KEYtop_level_match:
 	  {
@@ -1328,84 +1451,13 @@ void dump_cpp_Declaration(Declaration decl,const output_streams& oss)
       } else {
 	// in module
 	is << ",\n    v_" << name << "(";
-	dump_Default(value_decl_default(decl),is);
+	dump_vd_Default(decl,is);
 	is << ")";
       }
     }
     break;
   case KEYattribute_decl:
-    {
-      Declarations afs = function_type_formals(attribute_decl_type(decl));
-      Declaration af = first_Declaration(afs);
-      Type at = formal_type(af);
-      // Declaration pd = USE_DECL(type_use_use(at));
-      Declarations rdecls = function_type_return_values(attribute_decl_type(decl));
-      Type rt = value_decl_type(first_Declaration(rdecls));
-      
-      hs << " private:\n";
-      hs << "  class A_" << name << " : public Attribute<";
-      dump_Type_signature(at,hs);
-      hs << ",";
-      dump_Type_signature(rt,hs);
-      hs << "> {\n";
-      hs << "    C_" << decl_name(context) << "* context;\n";
-      hs << "  public:\n";
-      hs << "    A_" << name << "(C_" << decl_name(context) << "*c,";
-      dump_Type_signature(at,hs);
-      hs << " *nt, ";
-      dump_Type_signature(rt,hs);
-      hs << " *vt)";
-      if (!inline_definitions) {
-	hs << ";\n";
-	cpps << "\n" << prefix << "A_" << name << "::A_" << name
-	     << "(C_" << decl_name(context) << "*c,";
-	dump_Type_signature(at,cpps);
-	cpps << " *nt, ";
-	dump_Type_signature(rt,cpps);
-	cpps << " *vt)";
-      }
-      cpps << " : Attribute<";
-      dump_Type_signature(at,cpps);
-      cpps << ",";
-      dump_Type_signature(rt,cpps);
-      cpps << ">(nt,vt,\"" << name << "\"), context(c) {}\n";
-      hs << "    ";
-      dump_Type(rt,hs);
-      hs << " compute(";
-      dump_Type(at,hs);
-      hs << " node)";
-      if (!inline_definitions) {
-	hs << ";\n";
-	dump_Type(rt,cpps);
-	cpps << " " << prefix << "A_" << name << "::compute(";
-	dump_Type(at,cpps);
-	cpps << " node)";
-      }
-      cpps << "{ return context->c_" << name << "(node); }\n";
-      hs << indent() << "};\n public:\n";
-
-      hs << "  A_" << name << " *a_" << name << ";\n";
-      
-      is << ",\n    a_" << name << "(new A_" << name << "(";
-      is << "this,";
-      dump_Type_value(at,is);
-      is << ",";
-      dump_Type_value(rt,is);
-      is << "))";
-
-      hs << "  ";
-      dump_function_prototype("",name,attribute_decl_type(decl),hs);
-      if (!inline_definitions) {
-	hs << ";\n" << endl; 
-	dump_function_prototype(prefix,name,attribute_decl_type(decl),cpps);
-      }
-      cpps << " {\n";
-      //if (inline_definitions) hs << "    ";
-      //cpps << "  finish();\n";
-      cpps << indent() << "  return a_" << name << "->evaluate(v_";
-      cpps << decl_name(af) << ");\n";
-      cpps << indent() << "}\n" << endl; 
-    }
+    // must be handled by the surrounding module
     break;
   case KEYfunction_decl:
     {
@@ -1418,35 +1470,47 @@ void dump_cpp_Declaration(Declaration decl,const output_streams& oss)
 	hs << ";\n" << endl;
       }
       // three kinds of definitions:
-      // 1. simple default
-      if (rdecl) {
+      // 1. the whole thing: a non-empty body:
+      if (first_Declaration(block_body(b))) {
+	if (!inline_definitions) {
+	  dump_function_prototype(prefix,name,fty,cpps);
+	}
+	INDEFINITION;
+	cpps << "{\n";
+	++nesting_level;
+	if (debug)
+	  dump_function_debug(name,fty,cpps);
+	impl->implement_function_body(decl,cpps);
+	--nesting_level;
+	cpps << indent() << "}\n" << endl;
+	return;
+      } else if (rdecl) {
+	// 2. simple default
 	switch (Default_KEY(value_decl_default(rdecl))) {
 	case KEYsimple:
-	  if (!inline_definitions) {
-	    dump_function_prototype(prefix,name,fty,cpps);
+	  {
+	    if (!inline_definitions) {
+	      dump_function_prototype(prefix,name,fty,cpps);
+	    }
+	    cpps << "{\n";
+	    INDEFINITION;
+	    ++nesting_level;
+	    if (debug)
+	      dump_function_debug(decl_name(decl),fty,cpps);
+	    cpps << indent() << "return "
+		 << simple_value(value_decl_default(rdecl)) << ";\n";
+	    --nesting_level;
+	    cpps << indent() << "}\n";
+	    return;
 	  }
-	  cpps << "{ return ";
-	  dump_Expression(simple_value(value_decl_default(rdecl)),cpps);
-	  cpps << "; }\n";
-	  return;
 	default:
 	  break;
 	}
       }
-      if (first_Declaration(block_body(b))) {
-	// 2. non-empty body
-	if (!inline_definitions) {
-	  dump_function_prototype(prefix,name,fty,cpps);
-	}
-	cpps << "{\n";
-	++nesting_level;
-	impl->implement_function_body(decl,cpps);
-	--nesting_level;
-	cpps << indent() << "}\n" << endl;
-      } else {
-	// cout << name << " has no body.\n";
-	if (inline_definitions) hs << ";\n";
-	// 3. nothing -- leave to native code
+      // cout << name << " has no body.\n";
+      // 3. nothing -- leave to native code
+      if (inline_definitions) {
+	hs << ";\n";
       }
     }
     break;
@@ -1753,17 +1817,27 @@ void dump_Type_value(Type t, ostream& o)
   }
 }
 
-void dump_Default(Default d, ostream& o)
+void dump_vd_Default(Declaration d, ostream& o)
 {
-  switch (Default_KEY(d)) {
+  Type vt = value_decl_type(d);
+  Direction dir = value_decl_direction(d);
+  Default deft = value_decl_default(d);
+  switch (Default_KEY(deft)) {
   case KEYsimple:
-    dump_Expression(simple_value(d),o);
+    dump_Expression(simple_value(deft),o);
     break;
   case KEYcomposite:
-    dump_Expression(composite_initial(d),o);
+    dump_Expression(composite_initial(deft),o);
     break;
   default:
-    /*? print nothing ?*/
+    if (direction_is_collection(dir)) {
+      o << as_val(vt) << "->v_initial";
+    } else if (direction_is_circular(dir)) {
+      o << as_val(vt) << "->v_bottom";
+    } else {
+      /*? print something ?*/
+      o << 0;
+    }
     break;
   }
 }
@@ -1879,7 +1953,8 @@ void dump_Expression(Expression e, ostream& o)
 	  if ((ABSTRACT_APS_tnode_phylum(e2) != KEYExpression ||
 	       Expression_KEY(e2) != KEYfuncall) &&
 	      (ABSTRACT_APS_tnode_phylum(d2) != KEYDeclaration ||
-	       Declaration_KEY(d2) != KEYvalue_renaming)) {
+	       Declaration_KEY(d2) != KEYvalue_renaming) &&
+	      (ABSTRACT_APS_tnode_phylum(d2) != KEYDefault)) {
 	    void *u = tnode_parent(d);
 	    if (ABSTRACT_APS_tnode_phylum(u) != KEYUnit) {
 	      aps_error(e,"Cannot generate code for functions used in this way");
@@ -1979,4 +2054,80 @@ void dump_Use(Use u, char *prefix, ostream& os)
   }
   dump_poly_inst(u,USE_TYPE_ENV(u),os);
   os << prefix << sym;
+}
+
+void debug_fiber(FIBER fiber, ostream& os) {
+  while (fiber != NULL && fiber->field != NULL) {
+    if (FIELD_DECL_IS_REVERSE(fiber->field)) {
+      os << "X" << decl_name(reverse_field(fiber->field));
+    } else {
+      os << decl_name(fiber->field);
+    }
+    fiber = fiber->shorter;
+    if (fiber->field != NULL) os << "_";
+  }
+}
+
+void debug_fibered_attr(FIBERED_ATTRIBUTE* fa, ostream& os)
+{
+  if (ATTR_DECL_IS_SHARED_INFO(fa->attr))
+    os << "__global";
+  else
+    os << decl_name(fa->attr);
+  if (fa->fiber == 0) return;
+  os << "$";
+  if (fa->fiber_is_reverse) {
+    os << "R";
+  }
+  debug_fiber(fa->fiber,os);
+}
+
+void debug_Instance(INSTANCE *i, ostream& os) {
+  if (i->node != NULL) {
+    if (ABSTRACT_APS_tnode_phylum(i->node) != KEYDeclaration) {
+      os << tnode_line_number(i->node) << ":?<" 
+	 << ABSTRACT_APS_tnode_phylum(i->node) << ">";
+    } else if (Declaration_KEY(i->node) == KEYnormal_assign) {
+      Declaration pdecl = proc_call_p(normal_assign_rhs(i->node));
+      os << decl_name(pdecl) << "@";
+    } else if (Declaration_KEY(i->node) == KEYpragma_call) {
+      os << pragma_call_name(i->node) << "(...):" 
+	 << tnode_line_number(i->node);
+    } else {
+      os << symbol_name(def_name(declaration_def(i->node)));
+    }
+    os << ".";
+  }
+  if (i->fibered_attr.attr == NULL) {
+    os << "(nil)";
+  } else if (ABSTRACT_APS_tnode_phylum(i->fibered_attr.attr) == KEYMatch) {
+    os << "<match@" << tnode_line_number(i->fibered_attr.attr) << ">";
+  } else switch(Declaration_KEY(i->fibered_attr.attr)) {
+  case KEYcollect_assign: {
+    Expression lhs = collect_assign_lhs(i->node);
+    Declaration field = field_ref_p(lhs);
+    os << "<collect[" << decl_name(field) << "]@"
+       << tnode_line_number(i->fibered_attr.attr) << ">";
+  }
+  case KEYif_stmt:
+  case KEYcase_stmt:
+    os << "<cond@" << tnode_line_number(i->fibered_attr.attr) << ">";
+    break;
+  default:
+    os << symbol_name(def_name(declaration_def(i->fibered_attr.attr)));
+  }
+  if (i->fibered_attr.fiber != NULL) {
+    os << "$";
+    if (i->fibered_attr.fiber_is_reverse) {
+      os << "!";
+    }
+    debug_fiber(i->fibered_attr.fiber,os);
+  }
+}
+
+string operator+(string s, int i)
+{
+  ostringstream os;
+  os << s << i;
+  return os.str();
 }
