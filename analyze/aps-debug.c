@@ -59,6 +59,8 @@ static void list_debug_flags() {
   fprintf(stderr,"\tD  DNC_FINAL\n");
   fprintf(stderr,"\tI  DNC_ITERATE\n");
   fprintf(stderr,"\tC  PRINT_CYCLE\n");
+  fprintf(stderr,"\tu  DEBUG_UP_DOWN\n);
+  fprintf(stderr,"\tU  PRINT_UP_DOWN\n);
   fprintf(stderr,"\to  DEBUG_ORDER\n");
   fprintf(stderr,"\tO  TOTAL_ORDER\n");
   fprintf(stderr,"\tT  PROD_ORDER\n");
@@ -92,6 +94,8 @@ void set_debug_flags(char *options)
     case 'D': analysis_debug |= DNC_FINAL; break;
     case 'I': analysis_debug |= DNC_ITERATE; break;
     case 'C': cycle_debug |= PRINT_CYCLE; break;
+    case 'u': cycle_debug |= DEBUG_UP_DOWN; break;
+    case 'U': cycle_debug |= PRINT_UP_DOWN; break;
     case 'o': oag_debug |= DEBUG_ORDER; break;
     case 'O': oag_debug |= TOTAL_ORDER; break;
     case 'T': oag_debug |= PROD_ORDER; break;
