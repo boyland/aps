@@ -318,7 +318,7 @@ static void make_cycles(STATE *s) {
 SYMBOL make_up_down_name(char *n, int num,BOOL up) {
   char name[80];
   sprintf(name,"%s[%s]-%d",up?"UP":"DOWN",n,num);
-  printf("Creating symbol %s\n",name);
+  /* printf("Creating symbol %s\n",name); */
   return intern_symbol(name);
 }
 
@@ -543,11 +543,13 @@ static void add_up_down_attributes(STATE *s) {
 	}
 	if (found > 0) {
 	  if (found == 1) downindex = upindex;
+	  /*
 	  printf("up = ");
 	  print_instance(&array[upindex],stdout);
 	  printf(" down = ");
 	  print_instance(&array[downindex],stdout);
 	  printf("\n");
+	  */
 	  /* redo dependencies */
 	  for (k = 0; k < n; ++k)
 	    if (parent_index[k+constructor_index] == cyc->internal_info)
@@ -623,20 +625,19 @@ void break_fiber_cycles(Declaration module,STATE *s) {
   get_fiber_cycles(s);
   add_up_down_attributes(s);
   release(mark);
-  if (analysis_debug & DNC_ITERATE) {
-    printf("\n**** After introduction of up/down attributes:\n\n");
-    print_analysis_state(s,stdout);
-  }
-
   {
     int saved_analysis_debug = analysis_debug;
-    int j;
-    analysis_debug |= -1;
-    for (j=0; j < s->match_rules.length; ++j) {
-      printf("UP/DOWN closing rule %s\n",aug_graph_name(&s->aug_graphs[j]));
-      (void)close_augmented_dependency_graph(&s->aug_graphs[j]);
+    
+    if (cycle_debug & DEBUG_UP_DOWN) {
+      analysis_debug |= TWO_EDGE_CYCLE;
     }
-    (void)close_augmented_dependency_graph(&s->global_dependencies);
+
+    if (analysis_debug & DNC_ITERATE) {
+      printf("\n**** After introduction of up/down attributes:\n\n");
+    }
+
+    dnc_close(s);
+
     analysis_debug = saved_analysis_debug;
   }
 
