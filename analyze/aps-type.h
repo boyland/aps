@@ -27,6 +27,7 @@ extern void type_Program(Program);
 extern Type infer_expr_type(Expression);
 extern void check_expr_type(Expression,Type);
 extern Type infer_element_type(Expression); /* must be seq, ret elem type */
+extern void check_element_type(Expression,Type);
 extern Type check_actuals(Actuals args, Type ftype, Use type_envs);
 
 extern Type infer_pattern_type(Pattern);
