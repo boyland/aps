@@ -246,7 +246,7 @@ void dump_seq_function(Type et, Type st, string func_name, ostream& os)
 void dump_seq_Pattern_cond(Pattern pa, Type st, string node, ostream& os)
 {
   if (pa == 0) {
-    dump_seq_function(st,type_element_type(st),"empty",os);
+    dump_seq_function(type_element_type(st),st,"empty",os);
     os << "(" << node << ")";
   } else {
     Pattern next_pa = PAT_NEXT(pa);
@@ -269,14 +269,18 @@ void dump_seq_Pattern_cond(Pattern pa, Type st, string node, ostream& os)
       }
       break;
     default:
-      {
+      {	
+	Type pat = infer_pattern_type(pa);
+	os << "!";
+	dump_seq_function(pat,st,"empty",os);
+	os << "(" << node << ")&&";
 	ostringstream ns;
-	dump_seq_function(infer_pattern_type(pa),st,"first",ns);
+	dump_seq_function(pat,st,"first",ns);
 	ns << "(" << node << ")";	
 	dump_Pattern_cond(pa,ns.str(),os);
 	os << "&&";
 	ostringstream rs;
-	dump_seq_function(infer_pattern_type(pa),st,"butfirst",rs);
+	dump_seq_function(pat,st,"butfirst",rs);
 	rs << "(" << node << ")";
 	dump_seq_Pattern_cond(next_pa,st,rs.str(),os);
       }
@@ -914,14 +918,14 @@ void dump_some_attribute(Declaration d,
   if (combiner) {
     noss << header_return_type<Type>(vt) << " "
 	 << header_function_name(string("co")+i+"_"+name)
-	 << "(" << vt << " v1, " << vt << "v2)"
+	 << "(" << vt << " v1, " << vt << " v2)"
 	 << header_end();
     INDEFINITION;
     bs << " {\n";
     ++nesting_level;
     bs << indent() << "return " << combiner << "(v1,v2);\n";
     --nesting_level;
-    bs << "}\n";
+    bs << indent() << "}\n";
   }
 
   if (direction_is_input(dir))
@@ -942,7 +946,7 @@ void dump_some_attribute(Declaration d,
       is << composite_initial(deft);
       break;
     default:
-      is << as_val(vt) << "->initial";
+      is << as_val(vt) << "->v_initial";
       break;
     }
   }
@@ -1276,9 +1280,13 @@ void dump_cpp_Declaration(Declaration decl,const output_streams& oss)
 	  if (context) hs << "  "; else hs << "extern ";
 	  hs << "C_" << name << " *t_" << name << ";\n";
 	  if (!context) {
-	    cpps << "C_" << name << " *t_" << name << " = ";
-	    dump_Type_value(type,cpps);
-	    cpps << ";\n";
+	    hs << "C_" << name << " *get_" << name << "();\n";
+	    cpps << "C_" << name << " *t_" << name
+		 << " = get_" << name << "();\n";
+	    cpps << "C_" << name << " *get_" << name << "() {\n"
+		 << "  static C_" << name << " *t_" << name
+		 << " = " << as_val(type) << ";\n"
+		 << "  return t_" << name << ";\n" << "}\n";
 	  }
 	  hs << endl;
 	}
@@ -1785,7 +1793,17 @@ void dump_Type_value(Type t, ostream& o)
 {
   switch (Type_KEY(t)) {
   case KEYtype_use:
-    dump_Use(type_use_use(t),"t_",o);
+    {
+      void *p = tnode_parent(USE_DECL(type_use_use(t)));
+      if (p != 0 && ABSTRACT_APS_tnode_phylum(p) == KEYUnit) {
+	// A top-level type!
+	// To avoid problems, we call the "get" function
+	dump_Use(type_use_use(t),"get_",o);
+	o << "()";
+      } else {
+	dump_Use(type_use_use(t),"t_",o);
+      }
+    }
     break;
   case KEYtype_inst:
     {
