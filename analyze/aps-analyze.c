@@ -24,7 +24,7 @@ static void *analyze_thing(void *ignore, void *node)
       s = compute_dnc(decl);
       switch (analysis_state_cycle(s)) {
       case dependency:
-	printf("Cycle detected; Attribute grammar is not DNC\n");
+	aps_error(decl,"Cycle detected; Attribute grammar is not DNC");
 	break;
       case fiber_dependency:
 	printf("Fiber cycle detected: cycle being removed\n");
@@ -34,6 +34,8 @@ static void *analyze_thing(void *ignore, void *node)
 	compute_oag(decl,s);
 	break;
       }
+      Declaration_info(decl)->analysis_state = s;
+      break;
     }
     return NULL;
   }
