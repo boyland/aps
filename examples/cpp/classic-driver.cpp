@@ -18,7 +18,7 @@ void print_bag(C_BAG<C_String>* type, C_BAG<C_String>::T_Result a_bag)
     print_bag(type,n->v_l2);
   } else if (a_bag->cons == type->c_single) {
     C_BAG<C_String>::V_single *n = (C_BAG<C_String>::V_single*)a_bag;
-    cout << n->v_x;
+    cout << n->v_x << endl;
   } else if (a_bag->cons == type->c_none) {
   } else {
     cout << "Badly typed?\n";
