@@ -60,6 +60,8 @@ class C_NULL_TYPE : public Module {
 std::ostream& operator<<(std::ostream&,C_NULL_TYPE::Node*);
 std::string operator+(const std::string&,C_NULL_TYPE::Node*);
 
+extern int aps_impl_lineno;
+
 class C_NULL_PHYLUM : public Module {
   Phylum* phylum;
  public:
@@ -68,6 +70,7 @@ class C_NULL_PHYLUM : public Module {
   struct Node : public C_NULL_TYPE::Node {
     int index;
     Node* parent;
+    int lineno;
     void set_parent(Node* n) { parent = n; }
     Node(Constructor*);
     virtual T_String to_string();
@@ -232,7 +235,32 @@ class Attribute {
 #endif
 };
 
-class C_STRING;
+class C_STRING : public C_NULL_TYPE
+{
+ public:
+  typedef std::string T_Result;
+  void v_assert(T_Result) {}
+  bool v_equal(T_Result l1,T_Result l2) { return l1 == l2; }
+  T_Result v_concatenate(T_Result l1,T_Result l2) { return l1 + l2; }
+  T_Result v_append(T_Result l1, T_Result l2) { return l1 + l2; }
+  T_Result v_single(char c) { return T_Result(1,c); }
+  T_Result v_none() { return ""; }
+  bool v_member(char x,T_Result l) { return l.find(x) < l.size(); }
+  char v_nth(int i,T_Result l) { return l.at(i); }
+  char v_nth_from_end(int i,T_Result l) { return l.at(l.size()-i-1); }
+  int v_position(char x,T_Result l) { return l.find(x); }
+  int v_position_from_end(char x,T_Result l) { return l.rfind(x); }
+  T_Result v_subseq(T_Result l,int s,int f) { return l.substr(s,f); }
+  T_Result v_subseq_from_end(T_Result l,int s,int f);
+  T_Result v_butsubseq(T_Result l,int start,int finish);
+  T_Result v_butsubseq_from_end(T_Result l,int start,int finish);
+  bool v_less(T_Result x,T_Result y) { return x < y; }
+  bool v_less_equal(T_Result x,T_Result y) { return x <= y; }
+  T_Result v_string(T_Result x) { return x; }
+
+  void finish() {}
+};
+
 typedef C_STRING C_String;
 // already mentioned above:
 // typedef std::string T_String;
