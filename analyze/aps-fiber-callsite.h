@@ -12,17 +12,16 @@
 
 
 int callset_AI(Declaration, struct analysis_state*);
-CALLSITE_SET interpret(void *node) ;
-void* traverser(void *changed, void *node) ;
+CALLSITE_SET interpret(void *) ;
+void* traverser(void *changed, void *) ;
 void* locater(void *node) ;
 void* call_sites_report(void*, void*) ;
-void *count_things(void *ref_num, void *node) ;
-void *init_things(void *ref_num, void *node) ;
-void INCLUDE(CALLSITE_SET*, CALLSITE_SET);
+void *count_things(void *, void *) ;
+void *init_things(void *, void *) ;
 Declaration sth_use_p(Expression);
+Declaration local_use_p(Expression) ;
 
-Declaration local_use_p(Expression expr) ;
-void *check_all_decls(void *nouse, void * node) ;
-void expr_type(Expression e) ;
-void decl_type(Declaration d) ;
-void value_use_decl_type(Expression e) ;
+int callsite_set_empty_p(CALLSITE_SET) ;
+CALLSITE_SET empty_callsite_set() ;
+void INCLUDE(CALLSITE_SET*, CALLSITE_SET);
+int assign_sets(CALLSITE_SET , void* , CALLSITE_SET ) ;
