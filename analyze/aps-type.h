@@ -48,6 +48,9 @@ extern void check_function_return_type(Expression,Actuals,Type);
 extern Type infer_pfunction_return_type(Pattern,PatternActuals);
 extern void check_pfunction_return_type(Pattern,PatternActuals,Type);
 
+extern void check_type_signatures(void*,Type,Use,Signature);
+extern void check_type_actuals(TypeActuals,Declarations,Use);
+
 extern BOOL type_is_phylum(Type);
 extern Type type_element_type(Type);
 
