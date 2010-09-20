@@ -14,11 +14,18 @@ aps-lex.c : aps.lex
 
 aps2lisp : ${APSCOBJS}
 	${CC} ${CFLAGS} ${APSCOBJS} -o aps2lisp
-	
+
 apsc.o ${APSLIBOBJS} : aps.tab.h jbb.h jbb-symbol.h jbb-string.h jbb-alloc.h
 
 aps.tab.h aps.tab.c : aps.y
 	bison -d -p aps_yy aps.y
 
-clean :
+install : aps-lib.o
+	mv aps-lib.o ../lib
+
+clean:
 	rm -f *.o aps.tab.* aps2lisp core aps-lex.c
+
+realclean: clean
+
+.PHONY: all install clean realclean
