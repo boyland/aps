@@ -1315,6 +1315,7 @@ static void *get_edges(void *vaug_graph, void *node) {
       case KEYpragma_call:
       case KEYphylum_decl:
       case KEYtype_decl:
+      case KEYtype_renaming:
       case KEYconstructor_decl:
 	/* Don't look in nested things */
 	return NULL;
