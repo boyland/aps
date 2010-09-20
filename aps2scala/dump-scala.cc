@@ -305,6 +305,9 @@ void dump_Pattern_cond(Pattern p, string node, ostream& os)
   case KEYpattern_call:
     {
       static Symbol seq_symbol = intern_symbol("{}");
+      static Symbol append_symbol = intern_symbol("append");
+      static Symbol single_symbol = intern_symbol("single");
+      static Symbol none_symbol = intern_symbol("none");
       Pattern pf = pattern_call_func(p);
       Type rt = infer_pattern_type(p);
       Type pft = infer_pattern_type(pf);
@@ -319,12 +322,16 @@ void dump_Pattern_cond(Pattern p, string node, ostream& os)
 	break;
       }
       Declaration pfdecl = USE_DECL(pfuse);
-      if (def_name(declaration_def(pfdecl)) == seq_symbol) {
+      Symbol pfname = def_name(declaration_def(pfdecl));
+      if (pfname == seq_symbol) {
 	dump_seq_Pattern_cond(first_PatternActual(pactuals),rt,node,os);
 	return;
       } else if (Declaration_KEY(pfdecl) != KEYconstructor_decl) {
-	aps_error(pfuse,"Cannot handle calls to pattern functions");
-	return;
+	if (pfname != append_symbol &&
+	    pfname != single_symbol &&
+	    pfname != none_symbol) {
+	  aps_error(pfuse,"Cannot handle calls to pattern functions");
+	}
       }
       os << node << "->cons==";
       dump_Use(pfuse,"c_",os);
@@ -638,6 +645,9 @@ void dump_type_inst_construct(Type t, ostream& o)
     (Type,tact,TypeActuals,tacts,
      if (started) o << ","; else started = true;
      dump_Type_value(tact,o);
+     if (tf == 0) {
+       aps_error(tact,"too many formal parameters");
+     }
      tf = DECL_NEXT(tf));
   FOR_SEQUENCE
     (Expression, act, Actuals, type_inst_actuals(t),
@@ -2066,6 +2076,9 @@ void dump_Expression(Expression e, ostream& o)
   switch (Expression_KEY(e)) {
   case KEYinteger_const:
     o << integer_const_token(e);
+    break;
+  case KEYreal_const:
+    o << real_const_token(e);
     break;
   case KEYstring_const:
     o << string_const_token(e);
