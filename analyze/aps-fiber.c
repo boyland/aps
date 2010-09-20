@@ -1420,13 +1420,13 @@ OSET add_to_oset(Declaration decl, OSET oset)
 // The result may include parts of either argument.
 OSET oset_union(OSET os1, OSET os2)
 {
+	OSET p, q;	
+
 	if (os1 == EMPTY_OSET) 
 		return os2;
 	else if (os2 == EMPTY_OSET)
 		return os1;
 	
-	OSET p, q;	
-
 	for (q = os2; q != NULL; q = q->rest) {
 		for (p = os1; p!=NULL; p=p->rest){
 			if (p->o == q->o)
@@ -1446,13 +1446,13 @@ OSET oset_union(OSET os1, OSET os2)
 // The result may include parts of either argument.
 USET uset_union(USET us1, USET us2)
 {
+	USET p, q;	
+
 	if (us1 == EMPTY_USET) 
 		return us2;
 	else if (us2 == EMPTY_USET)
 		return us1;
 	
-	USET p, q;	
-
 	for (q = us2 ; q != NULL; q = q->rest) {
 		for (p = us1; p!=NULL; p=p->rest){
 			if (p->u == q->u)
@@ -1531,9 +1531,10 @@ USET doUO(Expression e, OSET oset) {
 		  Expression object = field_ref_object(e);
 
 		  USET newuset = (USET)malloc(sizeof(struct uset));
+		  OSET o_w; 
 		  newuset->rest = NULL;
 		  newuset->u = e;
-		  OSET o_w = doOU(object, newuset);
+		  o_w = doOU(object, newuset);
 			RETURN EMPTY_USET;
 		}
 		}  // case funcall
@@ -1694,9 +1695,10 @@ OSET doOU(Expression e, USET uset)
 	    Expression object = field_ref_object(e);
 	    
 	    USET newuset = (USET)malloc(sizeof(struct uset));
+	    OSET o_w; 
 	    newuset->rest = NULL;
 	    newuset->u = e;
-	    OSET o_w = doOU(object, newuset);
+	    o_w = doOU(object, newuset);
 
 	    /*
 	    if (fiber_debug & ALL_FIBERSETS) {
@@ -1705,6 +1707,7 @@ OSET doOU(Expression e, USET uset)
 	    }
 	    */
 
+          {
 	    OSET p; 
 	    oset = EMPTY_OSET;
 	    for (p = o_w; p != NULL; p = p->rest){
@@ -1721,7 +1724,7 @@ OSET doOU(Expression e, USET uset)
 	      } // for q
 	    } // for p
 	    RETURN oset;	
-	    
+	   } 
 	  } else if ((fdecl = local_call_p(e)) != NULL) {
 	    // local function
 
@@ -1738,6 +1741,7 @@ OSET doOU(Expression e, USET uset)
 			add_to_uset(rsi, get_uset(fsi));
 
       // normal stuff
+ 	   {
 	    Expression arg;
 	    Declaration result = some_function_decl_result(fdecl);
 	    
@@ -1751,6 +1755,7 @@ OSET doOU(Expression e, USET uset)
 	    }
 	    add_to_uset(result,uset);
 	    RETURN get_oset(result);
+           }
 	    
 	  } else	{	// primiive: how to get decl? don't need.
 	    OSET oset = EMPTY_OSET;
@@ -1823,6 +1828,7 @@ int id_decl_node(Declaration decl) {
   if (Declaration_info(decl)->index > 0)
     return Declaration_info(decl)->index;
 
+ {
   int index = FSA_next_node_index;
   FSA_next_node_index += 2;
 
@@ -1834,6 +1840,7 @@ int id_decl_node(Declaration decl) {
   omega = add_to_nodeset(omega, index);
   omega = add_to_nodeset(omega, index+1);
   return index;
+ }
 }
 
 // identify the expr node
@@ -1842,6 +1849,7 @@ int id_expr_node(Expression expr) {
     return Expression_info(expr)->index;
 		// expr node has been identified: 
 
+ {
   int index = FSA_next_node_index;
   FSA_next_node_index += 2;
 
@@ -1853,6 +1861,7 @@ int id_expr_node(Expression expr) {
   }
   Expression_info(expr)->index = index;
   return index;
+ }
 }
 
 EDGES all_fields_list = NULL;
@@ -2111,11 +2120,11 @@ void add_FSA_edge(int, int, Declaration);
 void add_edges_oset(Declaration decl, Declaration edge){
   int from = Declaration_info(decl)->index;
   OSET oset = Declaration_info(decl)->oset;
+  OSET p;
   /// QQQ oset is always empty. ???
   if (oset == NULL) printf("oset for %s is empty.\n", decl_name(decl));
   if (from == 0) fatal_error("%d: No index for %s.",
 			     tnode_line_number(decl), decl_name(decl));
-  OSET p;
   for (p = oset; p!= NULL; p = p->rest){
     add_FSA_edge(from, Declaration_info(p->o)->index, edge);
   }
@@ -2186,7 +2195,8 @@ void *build_FSA(void *vstate, void *node)
 			 Declaration_info(fdecl)->index, //Qf 
 			 fdecl);
 	  }
-	  
+
+	 {
 	  USET uset = Declaration_info(decl)->uset;
 	  USET q;
 	  for (q = uset; q != NULL; q = q->rest) {
@@ -2194,6 +2204,7 @@ void *build_FSA(void *vstate, void *node)
 			 Expression_info(q->u)->index,   //Qu
 			 NULL );
 	  }
+	 }
 	} else { // not object
 	  Default def = value_decl_default(decl) ;
 	  Expression expr = 0;
@@ -2363,9 +2374,9 @@ int get_node_expr(Expression expr){
 
 // construct the nodeset with only one node.
 NODESET set_of_node(int node) {
+  NODESET ns = (NODESET)malloc(sizeof(struct nodeset));
   if (node == 0) node = FSA_default_node;
   if (node == 1) node = FSA_default_node+1;
-  NODESET ns = (NODESET)malloc(sizeof(struct nodeset));
   ns->rest = NULL;
   ns->node = node;
   return ns;
@@ -2401,13 +2412,15 @@ NODESET add_to_nodelist(NODESET list, int node){
 
 // add the node (represented as an int ) into the nodeset.
 NODESET add_to_nodeset(NODESET ns, int node){
-	if ((ns!=NULL) && (ns->node == node))
-		return ns;
-	NODESET newset = (NODESET)malloc(sizeof(struct nodeset));
-	newset->rest = ns;
-	newset->node = node;
-
-	return newset;
+  if ((ns!=NULL) && (ns->node == node))
+    return ns;
+  {
+    NODESET newset = (NODESET)malloc(sizeof(struct nodeset));
+    newset->rest = ns;
+    newset->node = node;
+    
+    return newset;
+  }
 }
 // Given oset, get a nodeset = {Qb | b in oset}
 NODESET oset_to_nodeset(OSET oset) {
@@ -2461,8 +2474,10 @@ NODESET link_expr_rhs(Expression e, NODESET ns){
 	  // the edge is reverse_field(fdecl);
 	} // for end
 	
-	OSET oset = doOU(e, EMPTY_USET);
-	return oset_to_nodeset(oset);
+	{ 
+	  OSET oset = doOU(e, EMPTY_USET);
+	  return oset_to_nodeset(oset);
+	}
 	
       } else {
 	return set_of_node(get_node_decl(decl)); // {Qd}
@@ -2485,11 +2500,14 @@ NODESET link_expr_rhs(Expression e, NODESET ns){
 	      // Qe(-) to n: bar node is even number.
 	      // the edge is reverse_field(fdecl);
 	    } // for end
-	    Expression object = field_ref_object(e);
-	    link_expr_rhs(object, set_of_node(get_node_expr(e)+1));	// Qe(-)
-	    
-	    OSET oset = doOU(e, EMPTY_USET);
-	    return oset_to_nodeset(oset);
+	    {
+	      Expression object = field_ref_object(e);
+	      link_expr_rhs(object, set_of_node(get_node_expr(e)+1));	// Qe(-)
+	      {
+		OSET oset = doOU(e, EMPTY_USET);
+		return oset_to_nodeset(oset);
+	      }
+	    }
 	    
 	  } else if ((fdecl = local_call_p(e)) != NULL) { // local call
 			//! need to deal with local call
@@ -2554,8 +2572,10 @@ NODESET link_expr_lhs(Expression e, NODESET ns) {
 	// Qe(-) to n: bar node is even number.
 	// the edge is reverse_field(fdecl);
       } // for end
-      USET uset = doUO(e, EMPTY_OSET);
-      return uset_to_nodeset(uset);
+      {
+	USET uset = doUO(e, EMPTY_OSET);
+	return uset_to_nodeset(uset);
+      }
 
     } //if 
     return set_of_node(get_node_decl(decl)+1);  // Qd(-)
@@ -2575,12 +2595,15 @@ NODESET link_expr_lhs(Expression e, NODESET ns) {
 	      // Qe(-) to n: bar node is even number.
 	      // the edge is reverse_field(fdecl);
 	    } // for end
-	    Expression object = field_ref_object(e);
-	    link_expr_lhs(object, set_of_node(get_node_expr(e)+1) );	// Qe(-)
-	    
-	    USET uset = doUO(e, EMPTY_OSET);
-	    //				printf("DEBUG: after doUO in link_expr.\n");
-	    return uset_to_nodeset(uset);
+	    {
+	      Expression object = field_ref_object(e);
+	      link_expr_lhs(object, set_of_node(get_node_expr(e)+1) );	// Qe(-)
+	      {
+		USET uset = doUO(e, EMPTY_OSET);
+		// printf("DEBUG: after doUO in link_expr.\n");
+		return uset_to_nodeset(uset);
+	      }
+	    }
 	  } // if end
 	  break;
 	}	// KEYfuncall
@@ -2615,8 +2638,8 @@ NODESET beclose(NODESET N){
   NODESET tail = NULL;
   BOOL done;
   do {
-    done = TRUE;
     NODESET next_tail = head;
+    done = TRUE;
     for (p=head; p != tail; p=p->rest) {
       int node = p->node;
       EDGES es;
@@ -2646,10 +2669,10 @@ int nodeset_hash(NODESET p)
 NODE_IN_TREE makeNode(NODE_IN_TREE T, Declaration f, BOOL reverse) {
   NODESET result = NULL;
   NODE_IN_TREE ret = NULL;
+  NODESET p;
   
   if (T == NULL) return NULL;
   
-  NODESET p;
   for (p = T->ns; p; p=p->rest) {
     EDGES ns;
     for (ns = FSA_graph[p->node]; ns != NULL; ns=ns->rest) {
@@ -2676,28 +2699,31 @@ NODE_IN_TREE makeNode(NODE_IN_TREE T, Declaration f, BOOL reverse) {
 
 // if two DFA node are same: have the same number and node states
 int same_DFA_node(NODE_IN_TREE t1, NODE_IN_TREE t2){
-	if (t1 == NULL || t2 == NULL) return 0;	// either empty
-	if (t1->dir != t2->dir) return 0;
-	if (t1->hash != t2->hash) return 0;
+  if (t1 == NULL || t2 == NULL) return 0;	// either empty
+  if (t1->dir != t2->dir) return 0;
+  if (t1->hash != t2->hash) return 0;
 
-	NODESET ns1 = t1->ns;
-	NODESET ns2 = t2->ns;
-
-	if (ns1 == NULL || ns2 == NULL) return 0;
-
-	NODESET p = ns1;
-	while (p) {
-		if (node_in_set(ns2, p->node)) 
-			p = p->rest;
-		else return 0;
-	}
-	p = ns2;
-	while(p) {
-		if (node_in_set(ns1, p->node)) 
-			p = p->rest;
-		else return 0;
-	}
-	return 1;
+  {
+    NODESET ns1 = t1->ns;
+    NODESET ns2 = t2->ns;
+    
+    if (ns1 == NULL || ns2 == NULL) return 0;
+    {
+      NODESET p = ns1;
+      while (p) {
+	if (node_in_set(ns2, p->node)) 
+	  p = p->rest;
+	else return 0;
+      }
+      p = ns2;
+      while(p) {
+	if (node_in_set(ns1, p->node)) 
+	  p = p->rest;
+	else return 0;
+      }
+      return 1;
+    }
+  }
 }
 
 // look for the same node from created node list: DFA[]
@@ -2717,33 +2743,37 @@ NODE_IN_TREE get_same(NODE_IN_TREE t){
 
 // whether t is in worklist wl?
 int in_worklist(NODE_IN_TREE t, WORKLIST wl){
-	if (t == NULL) return 1;	// empty is always in worklist; 
-														// then in makeDFA(), we will do nothing.
-	if (wl == NULL) return 0;	// worklist is empty; 
+  if (t == NULL) return 1;	// empty is always in worklist; 
+  // then in makeDFA(), we will do nothing.
+  if (wl == NULL) return 0;	// worklist is empty; 
 
-	WORKLIST p = wl;
-	while (p) {
-		if (same_DFA_node(t, p->tree_node)) return 1;
-		p = p->rest;
-	}
-	return 0;
+  {
+    WORKLIST p = wl;
+    while (p) {
+      if (same_DFA_node(t, p->tree_node)) return 1;
+      p = p->rest;
+    }
+    return 0;
+  }
 }
 
 void print_DFA_node(int);
 
 // add the DFA tree node to the worklist
 WORKLIST add_to_DFA_worklist(WORKLIST wl, NODE_IN_TREE t) {
-	if (t== NULL) return wl;		// never add empty node to worklist
-	if (fiber_debug & ADD_FIBER) {
-	  //printf("Adding %d to worklist:\n",t->index);
-	  printf("#%d: ",t->index);
-	  print_fiber(&t->as_fiber,stdout);
-          printf("\n");
-	}
-	WORKLIST new = (WORKLIST)malloc(sizeof(struct worklist));
-	new->tree_node = t;
-	new->rest = wl;
-	return new;	
+  if (t== NULL) return wl;		// never add empty node to worklist
+  if (fiber_debug & ADD_FIBER) {
+    //printf("Adding %d to worklist:\n",t->index);
+    printf("#%d: ",t->index);
+    print_fiber(&t->as_fiber,stdout);
+    printf("\n");
+  }
+  {
+    WORKLIST new = (WORKLIST)malloc(sizeof(struct worklist));
+    new->tree_node = t;
+    new->rest = wl;
+    return new;	
+  }
 }
 
 /* Return true is this state is in the fiber set
@@ -2766,26 +2796,28 @@ NODE_IN_TREE check_transition(NODE_IN_TREE to, Declaration trans,
 {
   if (to != NULL) {
     to->ns = beclose(to->ns);
-    
-    NODE_IN_TREE old = get_same(to);	
-    if (old != NULL) {		// same node already exist. 
-      DFA_tree[old->index][from->index] = trans;
-    }
-    else if (is_reachable(to)) { // this is a new node
-      // create one node for DFA
-      if (++DFA_node_number >= MAX_DFA_NUMBER) {
-	fatal_error("Cannot handle more than %d DFA nodes!",
-		    MAX_DFA_NUMBER);
+
+    {    
+      NODE_IN_TREE old = get_same(to);	
+      if (old != NULL) {		// same node already exist. 
+	DFA_tree[old->index][from->index] = trans;
       }
-      //printf("debug: create one node: %d\n", DFA_node_number);
-      to->index = DFA_node_number;
-      (to->as_fiber).field = trans;
-      (to->as_fiber).shorter = &(from->as_fiber); // create shorter of fiber
-      DFA[DFA_node_number] = to;
-      DFA_tree[to->index][from->index] = trans;
-      return to;
+      else if (is_reachable(to)) { // this is a new node
+	// create one node for DFA
+	if (++DFA_node_number >= MAX_DFA_NUMBER) {
+	  fatal_error("Cannot handle more than %d DFA nodes!",
+		      MAX_DFA_NUMBER);
+	}
+	//printf("debug: create one node: %d\n", DFA_node_number);
+	to->index = DFA_node_number;
+	(to->as_fiber).field = trans;
+	(to->as_fiber).shorter = &(from->as_fiber); // create shorter of fiber
+	DFA[DFA_node_number] = to;
+	DFA_tree[to->index][from->index] = trans;
+	return to;
+      };
     };
-  };
+  }
   return NULL;
 }
 
@@ -2805,11 +2837,11 @@ void makeDFA(){
   
   while (wl !=  NULL) {
     //		printf("debug: working on worklist\n");
+    EDGES e = all_fields_list;
     T = wl->tree_node;
     wl = wl->rest;	// remove the first node
-    EDGES e = all_fields_list;
     for (; e != NULL; e = e->rest){
-      Declaration f = e->edge;;
+      Declaration f = e->edge;
       NODE_IN_TREE Nf = makeNode(T, f, 0);
       NODE_IN_TREE Nfd = makeNode(T, reverse_field(f), 1);
 
@@ -2821,9 +2853,10 @@ void makeDFA(){
 
 // print the all FSA nodes in one DFA node
 void print_DFA_node(int i){
-	printf("# %d: ",i);
 	NODESET ns = DFA[i]->ns;
 	int dir = DFA[i]->dir;
+
+	printf("# %d: ",i);
 
 	while (ns) {
 		printf("%d,", ns->node);
@@ -2878,19 +2911,19 @@ void *DFA_fiber_set(void *u, void *node)
   case KEYDeclaration:
     {
       Declaration decl = (Declaration)node;
+      FIBERSETS*  decl_fsets;
+      int i;
       
       // for any x
       int index = Declaration_info(decl)->index ;
       if (index == 0) break;		// not the interested x
       
       // init NORMAL and REVERSE of FINAL fibersets here
-      FIBERSETS*  decl_fsets;
       decl_fsets = &(Declaration_info(decl)->decl_fibersets);
       
       decl_fsets->set[FIBERSET_NORMAL_FINAL] = NULL;
       decl_fsets->set[FIBERSET_REVERSE_FINAL] = NULL;
       
-      int i;
       if (fiber_debug & FIBER_FINAL) {
 	printf("fiber set for %s /%d is: ", decl_name(decl), 
 	       Declaration_info(decl)->index);
@@ -3020,40 +3053,46 @@ void fiber_module(Declaration module, STATE *s) {
 //  traverse_Declaration(initialize_fibersets,s,module);
 
   // initialize the O set of the start phylum's shared_info
-  OSET p = newblock(struct oset);
-  p->o = module;
-  p->rest = NULL;
-  add_to_oset(module,p);
-  Declaration spsi = phylum_shared_info_attribute(s->start_phylum,s);
-  add_to_oset(spsi,p);
+  {
+    OSET p = newblock(struct oset);
+    p->o = module;
+    p->rest = NULL;
+    add_to_oset(module,p);
+    {
+      Declaration spsi = phylum_shared_info_attribute(s->start_phylum,s);
+      add_to_oset(spsi,p);
 
-  /* computing the O and U set */ 
-  // printf("new fiber program begin.\n");
-
-	// testing the function: test_add_oset()
-  // printf("testing add_to_oset.......\n");
-  // traverse_Declaration(test_add_oset, module, module);
-
-  done = FALSE;
-  while (!done) {
-    done = TRUE;
-    traverse_Declaration(compute_OU, module, module);
-    add_to_uset(module,get_uset(spsi));
-  }
-
-  // print all ou set of any Decl node.
-  if (fiber_debug & ALL_FIBERSETS) {
-    traverse_Declaration(print_all_ou, module, module);
-
-    // print OU of shared_info
-    printf("starting print OU set of shared_info.\n");
-    Declaration instance =
-      POLYMORPHIC_INSTANCES(MODULE_SHARED_INFO_POLYMORPHIC(module));
-    while (instance != NULL) {
-      Declaration si = list_Declarations_elem(block_body(polymorphic_body(instance)));
-      // printf("For %s\n",decl_name(si));
-      print_all_ou(NULL, si);	
-      instance = DECL_NEXT(instance);
+      /* computing the O and U set */ 
+      // printf("new fiber program begin.\n");
+      
+      // testing the function: test_add_oset()
+      // printf("testing add_to_oset.......\n");
+      // traverse_Declaration(test_add_oset, module, module);
+      
+      done = FALSE;
+      while (!done) {
+	done = TRUE;
+	traverse_Declaration(compute_OU, module, module);
+	add_to_uset(module,get_uset(spsi));
+      }
+      
+      // print all ou set of any Decl node.
+      if (fiber_debug & ALL_FIBERSETS) {
+	traverse_Declaration(print_all_ou, module, module);
+	
+	// print OU of shared_info
+	printf("starting print OU set of shared_info.\n");
+	{
+	  Declaration instance =
+	    POLYMORPHIC_INSTANCES(MODULE_SHARED_INFO_POLYMORPHIC(module));
+	  while (instance != NULL) {
+	    Declaration si = list_Declarations_elem(block_body(polymorphic_body(instance)));
+	    // printf("For %s\n",decl_name(si));
+	    print_all_ou(NULL, si);	
+	    instance = DECL_NEXT(instance);
+	  }
+	}
+      }
     }
   }
 
@@ -3120,13 +3159,15 @@ void fiber_module(Declaration module, STATE *s) {
 	}
 
 	traverse_Declaration(DFA_fiber_set, module, module);
-	Declaration instance =
-	  POLYMORPHIC_INSTANCES(MODULE_SHARED_INFO_POLYMORPHIC(module));
-	while (instance != NULL) {
-	  Declaration si = list_Declarations_elem(block_body(polymorphic_body(instance)));
-	  // printf("For %s\n",decl_name(si));
-	  DFA_fiber_set(NULL, si);	
-	  instance = DECL_NEXT(instance);
+	{
+	  Declaration instance =
+	    POLYMORPHIC_INSTANCES(MODULE_SHARED_INFO_POLYMORPHIC(module));
+	  while (instance != NULL) {
+	    Declaration si = list_Declarations_elem(block_body(polymorphic_body(instance)));
+	    // printf("For %s\n",decl_name(si));
+	    DFA_fiber_set(NULL, si);	
+	    instance = DECL_NEXT(instance);
+	  }
 	}
 
 	if (fiber_debug & ALL_FIBERSETS) {
