@@ -274,10 +274,12 @@ static SYMBOL intern_special(char *text) {
 
   sym = intern_symbol(text);
   make_code_name(sym,1);
-/*
- * printf("interned: %s (codename = %s, infix = %d)\n",
- * 	 text,get_code_name(sym),get_infix(sym));
- */
+
+#ifdef DEBUGLEX
+  printf("interned: %s (codename = %s, infix = %d)\n",
+  	 text,get_code_name(sym),get_infix(sym));
+#endif
+
   return sym;
 }
 
@@ -317,7 +319,7 @@ static char *impl_reserved_names[] = {
 static void init_lexer_tables()
 {
   int i,j;
-  int code;
+  int code = 0;
   for (i=0; i < 256; ++i) {
     if ('a' <= i && i <= 'z' ||
 	'A' <= i && i <= 'Z' ||
