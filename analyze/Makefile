@@ -6,11 +6,11 @@ APSAGOBJS= aps-bind.o aps-read.o aps-info.o aps-ag-util.o \
 	  aps-fiber.o aps-cond.o aps-dnc.o aps-cycle.o aps-oag.o \
 	  aps-analyze.o aps-debug.o aps-type.o table.o alist.o
 APSCOBJS= apsc.o ${APSAGOBJS} 
-APSCLIB= ${PROJECT-DIR}/aps/aps-lib.o
+APSCLIB= ${PROJECT-DIR}/lib/aps-lib.o
 
 all : apsc aps-ag.a
 
-CFLAGS= -I${PROJECT-DIR}/aps -g
+CFLAGS= -I${PROJECT-DIR}/parse -g
 apsc : ${APSCOBJS} ${APSCLIB}
 	${CC} ${CFLAGS} -o apsc ${APSCOBJS} ${APSCLIB}
 
@@ -25,11 +25,16 @@ aps-oag.o : aps-oag.h
 aps-cycle.o aps-dnc.o : aps-cycle.h
 aps-debug.o : aps-debug.h
 
-bin.install: apsc
-	cp apsc /users/classes/cs754/bin/.`uname -m`-`uname -s`/apssched
+install: apsc aps-ag.a
+	mv apsc ../bin/apssched
+	mv aps-ag.a ../lib/.
 
 clean :
 	rm -f *.o apsc core *.a
+
+realclean : clean
+
+.PHONY: install clean realclean
 
 % : RCS/%,v
 	co $*
