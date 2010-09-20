@@ -201,6 +201,8 @@ static void* do_typechecking(void* ignore, void*node) {
 	  USE_TYPE_ENV(u) = te;
 	  USE_DECL(u) = rdecl;
 	  aps_yylineno = tnode_line_number(mdecl);
+	  check_type_actuals(type_inst_type_actuals(ty),
+			     module_decl_type_formals(mdecl),u);
 	  fty = function_type
 	    (module_decl_value_formals(mdecl),
 	     list_Declarations(value_decl(copy_Def(rdef),
@@ -612,6 +614,21 @@ void check_element_type(Expression e, Type type)
 {
   /* For now, just be lazy */
   check_type_equal(e,type,infer_element_type(e));
+}
+
+void check_type_actuals(TypeActuals tacts, Declarations tfs, Use type_envs)
+{
+  Type tact;
+  Declaration tf;
+  for (tact = first_TypeActual(tacts), tf = first_Declaration(tfs);
+       tact != 0 && tf != 0; tact = TYPE_NEXT(tact), tf = DECL_NEXT(tf)) {
+    check_type_signatures(tact,tact,type_envs,some_type_formal_sig(tf));
+  }
+  if (tf != 0) {
+    aps_error(tacts,"too few type actuals");
+  } else if (tact != 0) {
+    aps_error(tact,"too many type actuals");
+  }
 }
 
 /* check actuals, possibly side-effecting type_env.
@@ -1800,7 +1817,7 @@ static int check_declarations_type_subst
     aps_error(node,"type mismatch: function formal number"); /* probably */
 }
 
-static void check_type_signatures(void *node, Type t, Use type_envs, Signature sig)
+void check_type_signatures(void *node, Type t, Use type_envs, Signature sig)
 {
   /*! Horrible hack!  -- only used for element type signatures*/
   switch (Signature_KEY(sig)) {
@@ -1886,8 +1903,11 @@ void check_type_subst(void *node, Type t1, Use type_envs, Type t2)
       while (type_env != 0 && type_env->source != parent)
 	type_env = type_env->outer;
       if (type_env == 0) {
+	/*
+	 * See comment in type_subst
 	aps_error(t2,"qualification fetches outer type ? (internal error)");
-	return;
+	*/
+	check_type_equal(node,t1,t2);
       }
       switch (Declaration_KEY(tdecl)) {
       case KEYsome_type_formal:
