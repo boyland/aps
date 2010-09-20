@@ -129,7 +129,8 @@ static SCOPE add_env_item(SCOPE old, Declaration d) {
 	while (old && old->type_env == current_type_env) {
 	  if (old->name == name &&
 	      (old->namespaces & new_entry->namespaces) != 0) {
-	    aps_error(d,"Duplicate declaration");
+	    aps_error(d,"Duplicate declaration (previously seen line %d)",
+		      tnode_line_number(old->decl));
 	  }
 	  old = old->next;
 	}
@@ -603,9 +604,19 @@ static void *do_bind(void *vscope, void *node) {
     }
     break;
   case KEYExpression:
-    switch (Expression_KEY((Expression)node)) {
-    case KEYvalue_use:
-      bind_Use(value_use_use((Expression)node),NAME_VALUE,scope);
+    {
+      SCOPE new_scope = scope;
+      Expression e = (Expression)node;
+      switch (Expression_KEY(e)) {
+      case KEYvalue_use:
+	bind_Use(value_use_use(e),NAME_VALUE,scope);
+	break;
+      case KEYcontrolled:
+	traverse_Expression(do_bind,new_scope,controlled_set(e));
+	new_scope = bind_Declaration(new_scope,controlled_formal(e));
+	traverse_Expression(do_bind,new_scope,controlled_expr(e));
+	return NULL;
+      }
     }
     break;
   case KEYUse:
