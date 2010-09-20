@@ -277,7 +277,8 @@ static bool implement_visit_function(AUG_GRAPH* aug_graph,
 	field = field_ref_p(lhs);
 	if (field == 0) fatal_error("what sort of assignment lhs: %d",
 				    tnode_line_number(assign));
-	os << "a_" << decl_name(field) << "->set";
+	os << "a_" << decl_name(field) << "->";
+	if (debug) os << "assign"; else os << "set";
 	os << "(" << field_ref_object(lhs) << "," << rhs << ");\n";
 	break;
       default:
@@ -293,7 +294,8 @@ static bool implement_visit_function(AUG_GRAPH* aug_graph,
       if (rhs) {
 	if (Declaration_info(ad)->decl_flags & LOCAL_ATTRIBUTE_FLAG) {
 	  os << "a" << LOCAL_UNIQUE_PREFIX(ad) << "_" << asym << "->";
-	  os << "set(anchor," << rhs << ");\n";
+	  if (debug) os << "assign"; else os << "set";
+	  os << "(anchor," << rhs << ");\n";
 	} else {
 	  int i = LOCAL_UNIQUE_PREFIX(ad);
 	  if (i == 0)
@@ -331,7 +333,9 @@ static bool implement_visit_function(AUG_GRAPH* aug_graph,
 	      os << "v" << i << "_" << asym << " = " << rhs << ";\n";
 	  }
 	} else {
-	  os << "a_" << asym << "->set(v_" << decl_name(in->node)
+	  os << "a_" << asym << "->";
+	  if (debug) os << "assign"; else os << "set";
+	  os << "(v_" << decl_name(in->node)
 	     << "," << rhs << ");\n";
 	}
       } else {
@@ -343,7 +347,9 @@ static bool implement_visit_function(AUG_GRAPH* aug_graph,
     } else if (Declaration_KEY(in->node) == KEYvalue_decl) {
       if (rhs) {
 	// assigning field of object
-	os << "a_" << asym << "->set(v_" << decl_name(in->node)
+	os << "a_" << asym << "->";
+	if (debug) os << "assign"; else os << "set";
+	os << "(v_" << decl_name(in->node)
 	   << "," << rhs << ");\n";
       } else {
 	os << "// " << in << " is ready now.\n";
