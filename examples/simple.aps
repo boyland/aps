@@ -26,8 +26,7 @@ module SIMPLE[] begin
   constructor strconstant(s : String) : Expr;
   constructor variable(id : String) : Expr;
 end;
-  
-[T :: PHYLUM[]] function lineno(x : T) : Integer;
+
   
   
 
