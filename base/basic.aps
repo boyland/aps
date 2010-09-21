@@ -142,6 +142,8 @@ function odd(_ : Integer) : Boolean;
 [T :: NUMERIC[]] function (^)(x : T; y : Integer) : T begin
   if y = 0 then
     result := T$one;
+  elsif y < 0 then
+    result := T$one / x ^ (-y);
   elsif y = 1 then
     result := x;
   elsif odd(y) then
@@ -184,7 +186,7 @@ type IEEEsingle := IEEE[];
 function IEEEwiden(x : IEEEsingle) : IEEEdouble;
 function IEEEnarrow(x : IEEEdouble) : IEEEsingle;
 
-type Real = IEEEdouble; -- a pseudonym
+type Real := IEEEdouble; -- a pseudonym
 
 private module CHARACTER[] :: ORDERED[],PRINTABLE[] begin
   function assert(_ : Result);
@@ -308,7 +310,7 @@ module MAKE_LATTICE[L :: BASIC[]](default : L;
 				  comparef,compare_equalf 
 				      : function(_,_:L) : Boolean;
 				  joinf,meetf : function (_,_:L) : L)
-    :: COMBINABLE[], LATTICE[] Lattice extends L
+    :: COMBINABLE[], LATTICE[] extends L
 begin
   -- Lattices are also convenient as types for collection attributes:
   initial = default;
@@ -520,7 +522,7 @@ end;
   function (\)(x : T; elem : E) : T := T$difference(x,T${elem});
 end;
 
-module SET[ElemType :: BASIC[]](test : function(x,y : ElemType) : Boolean)
+module SET[ElemType :: BASIC[]]
     :: BASIC[], COMPARABLE[], COLLECTION[ElemType], ABSTRACT_SET[ElemType], 
        COMBINABLE[]
     := private BAG[ElemType] 
@@ -546,7 +548,6 @@ begin
 end;
 
 module MULTISET[ElemType :: BASIC[]]
-    (test : function(x,y : ElemType) : Boolean)
     :: BASIC[], COMPARABLE[], COLLECTION[ElemType], ABSTRACT_SET[ElemType], 
        COMBINABLE[]
     -- NB: MULTISETs are not useful for circular attributes
@@ -569,11 +570,9 @@ begin
   function combine(x,y : Result) : Result := union(x,y);
 end;
 
-module ORDERED_SET[ElemType :: BASIC[]]
-    (test : function(x,y : ElemType) : Boolean;
-     compare : function(x,y : ElemType) : Boolean)
+module ORDERED_SET[ElemType :: ORDERED[]]
     :: ORDERED_COLLECTION[ElemType] -- and SET[ElemType] too
-    := private SET[ElemType](test)
+    := private SET[ElemType]
 begin
   -- equality can be checked cheaper than for SET
   function equal(_,_ : Result) : Boolean;
@@ -603,11 +602,9 @@ begin
   function butsubseq_from_end(l : Result; start,finish : Integer) : Result;
 end;
 
-module ORDERED_MULTISET[ElemType :: BASIC[]]
-    (test : function(x,y : ElemType) : Boolean;
-     compare : function(x,y : ElemType) : Boolean)
+module ORDERED_MULTISET[ElemType :: ORDERED[]]
     :: ORDERED_COLLECTION[ElemType] -- and ABSTRACT_SET[ElemType] too
-    := private MULTISET[ElemType](test)
+    := private MULTISET[ElemType]
 begin
   -- equality can be checked cheaper than for MULTISET
   function equal(_,_ : Result) : Boolean;
@@ -692,3 +689,6 @@ end;
 
 -- for debugging, no guarantee on what gets printed.
 [T] function debug_output(x : T) : String;
+
+-- get the line number:
+[Node :: PHYLUM[]] function lineno(x : Node) : Integer;
