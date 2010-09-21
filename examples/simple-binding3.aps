@@ -146,8 +146,8 @@ module NAME_RESOLUTION[T :: var SIMPLE[]] extends T begin
     endif;
   end;
   
-  function find(name : String; entities : Entities) : EntityRef begin
-    case entities begin
+  function find(name : String; es : Entities) : EntityRef begin
+    case es begin
       match Entities$none() begin
 	result := nil;
       end;
@@ -166,6 +166,8 @@ module NAME_RESOLUTION[T :: var SIMPLE[]] extends T begin
 	  result := e1;
 	endif;
       end;
+    else
+      result := nil;
     end;
   end;
 
