@@ -1,18 +1,18 @@
 CPP=g++ 
 CPPFLAGS=-Wall -g -DUSING_CXX -I../parse -I../analyze
 
-APSCPPOBJS = apscpp.o dump-cpp.o implement.o dyn-impl.o static-impl.o
-APSCPPLIBS = ../lib/aps-lib.o ../lib/aps-ag.a
-apscpp : ${APSCPPOBJS} ${APSCPPLIBS}
-	${CPP} ${CPPFLAGS} ${APSCPPOBJS} ${APSCPPLIBS} -o apscpp
+APS2SCALAOBJS = aps2scala.o dump-scala.o implement.o dyn-impl.o static-impl.o
+APS2SCALALIBS = ../lib/aps-lib.o ../lib/aps-ag.a
+aps2scala : ${APS2SCALAOBJS} ${APS2SCALALIBS}
+	${CPP} ${CPPFLAGS} ${APS2SCALAOBJS} ${APS2SCALALIBS} -o aps2scala
 
-${APSCPPOBJS} : implement.h dump-cpp.h
+${APS2SCALAOBJS} : implement.h dump-scala.h
 
-install: apscpp
-	mv apscpp ../bin/.
+install: aps2scala
+	mv aps2scala ../bin/.
 
 clean:
-	rm -f apscpp *.o core
+	rm -f aps2scala *.o core
 
 realclean: clean
 
