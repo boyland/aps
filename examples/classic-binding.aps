@@ -1,8 +1,5 @@
 with "simple";
 
--- needs to be global to avoid method problem
-function string_equal(x,y : String) : Boolean := x=y;
-
 module NAME_RESOLUTION[T :: var SIMPLE[]] extends T begin
 
   -- shapes: used just for object identity
@@ -34,7 +31,7 @@ module NAME_RESOLUTION[T :: var SIMPLE[]] extends T begin
   pragma inherited(block_env,stmts_env,stmt_env,expr_env);
   
   -- use sets
-  type Used := SET[String](string_equal);
+  type Used := SET[String];
   
   attribute Block.block_used : Used;
   attribute Decls.decls_uin : Used;
@@ -161,10 +158,10 @@ module NAME_RESOLUTION[T :: var SIMPLE[]] extends T begin
   end;
   
   match ?expr:Expr=variable(?id:String) begin
-    shape : Shape := lookup(id,expr.expr_env);
-    expr.expr_shape := shape;
+    sh : Shape := lookup(id,expr.expr_env);
+    expr.expr_shape := sh;
     expr.expr_used := Used$single(id);
-    if shape = not_found then
+    if sh = not_found then
       expr.expr_msgs := Messages$single(id ++ " not declared");
     else
       expr.expr_msgs := Messages$none();
