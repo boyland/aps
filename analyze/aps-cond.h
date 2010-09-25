@@ -4,5 +4,5 @@ typedef struct condition {
 } CONDITION;
 #define ONE_BIT(v) (((v)&((v)-1)) == 0)
 
-extern enum CONDcompare { CONDeq, CONDgt, CONDlt, CONDcomp, CONDnone }
-cond_compare(CONDITION *, CONDITION *);
+enum CONDcompare { CONDeq, CONDgt, CONDlt, CONDcomp, CONDnone };
+extern enum CONDcompare cond_compare(CONDITION *, CONDITION *);

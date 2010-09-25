@@ -4,22 +4,24 @@
  * we need a new slot.
  */
 
-extern struct Program_info {
+struct Program_info {
   unsigned program_flags;
 #define PROGRAM_BOUND_FLAG 1
 #define PROGRAM_TYPED_FLAG 2
-} *Program_info(Program);
+};
+extern struct Program_info *Program_info(Program);
 #define PROGRAM_IS_BOUND(p) (Program_info(p)->program_flags&PROGRAM_BOUND_FLAG)
 #define PROGRAM_IS_TYPED(p) (Program_info(p)->program_flags&PROGRAM_TYPED_FLAG)
 
-extern struct Use_info {
+struct Use_info {
   Declaration use_decl;
   TypeEnvironment use_type_env;
-} *Use_info(Use);
+};
+extern struct Use_info *Use_info(Use);
 #define USE_DECL(u) (Use_info(u)->use_decl)
 #define USE_TYPE_ENV(u) (Use_info(u)->use_type_env)
 
-extern struct Declaration_info {
+struct Declaration_info {
   Declaration next_decl; /* in a sequence of Declarations */
   Declaration next_field_decl; /* next field (init'ed in aps-fiber) */
   Declaration dual_decl; /* a declaration created out of nowhere */
@@ -53,7 +55,8 @@ extern struct Declaration_info {
 	USET uset;				/* uset of the declaration */
 	int	 index;			  /* represent the nodeis Qd and Qd(-) */
 										/* odd: Qd, even: Qd(-). such as (1,2) */
-} *Declaration_info(Declaration);
+};
+extern struct Declaration_info *Declaration_info(Declaration);
 
 #define DECL_NEXT(decl) (Declaration_info(decl)->next_decl)
 #define NEXT_FIELD(decl) (Declaration_info(decl)->next_field_decl)
@@ -100,17 +103,18 @@ extern struct Declaration_info {
 #define fibersets_for(decl) (Declaration_info(decl)->decl_fibersets)
 #define fiberset_for(decl,fstype) (fibersets_index(fibersets_for(decl),fstype))
 
-extern struct Match_info {
+struct Match_info {
   Declaration header; /* for, case or top-level-match */
   Match next_match;
   int if_index; /* count of if_stmt within a top-level match */
   CONDITION match_cond; /* condition that must be satisfied to take effect */
   Expression match_test; /* last expression that must be evaluated,
 			   expr_next points to previous, back to first */
-} *Match_info(Match);
+};
+extern struct Match_info *Match_info(Match);
 #define MATCH_NEXT(m) Match_info(m)->next_match
   
-extern struct Expression_info {
+struct Expression_info {
   Expression next_actual; /* in a sequence of args to a function call */
 #define next_expr next_actual
   Type expr_type; /* current not computed or used */
@@ -123,7 +127,8 @@ extern struct Expression_info {
 #define EXPR_LHS_FLAG 1
 #define EXPR_RHS_FLAG 2
 	int	 index;			// represent the nodes of Qe and Qe(-).
-} *Expression_info(Expression);
+};
+extern struct Expression_info *Expression_info(Expression);
 #define EXPR_NEXT(expr) (Expression_info(expr)->next_expr)
 #define EXPR_IS_LHS(expr) (Expression_info(expr)->expr_flags&EXPR_LHS_FLAG)
 #define EXPR_IS_RHS(expr) (Expression_info(expr)->expr_flags&EXPR_RHS_FLAG)
@@ -133,27 +138,31 @@ extern struct Expression_info {
   (fibersets_index(expr_fibersets_for(expr),fstype))
 #define expr_helper_for(expr) (Expression_info(expr)->expr_helper_num)
 
-extern struct Pattern_info {
+struct Pattern_info {
   Pattern next_pattern_actual; /* in a sequence of args to a pattern call */
   Type pat_type;
   void* pat_impl; /* how it is implemented */
-} *Pattern_info(Pattern);
+};
+extern struct Pattern_info *Pattern_info(Pattern);
 #define PAT_NEXT(pat) (Pattern_info(pat)->next_pattern_actual)
 
-extern struct Type_info {
+struct Type_info {
   Type next_type_actual; /* in a series of type actuals */
   void *binding_temporary;
   char *impl_type;
-} *Type_info(Type);
+};
+extern struct Type_info *Type_info(Type);
 #define TYPE_NEXT(type) (Type_info(type)->next_type_actual)
 
-extern struct Signature_info {
+struct Signature_info {
   void *binding_temporary;
-} *Signature_info(Signature);
+};
+extern struct Signature_info *Signature_info(Signature);
 
-extern struct Def_info {
+struct Def_info {
   int unique_prefix; /* to distinguish local attributes */
-} *Def_info(Def);
+};
+extern struct Def_info *Def_info(Def);
 
 extern void set_tnode_parent(Program p);
 
