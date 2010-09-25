@@ -16,7 +16,7 @@ main(int argc,char **argv) {
   int i;
   argv0 = argv[0];
   for (i=1; i < argc; ++i) {
-	printf("argv[%d] = %s\n",i,argv[i]);
+	/* printf("argv[%d] = %s\n",i,argv[i]); */
     if (argv[i][0] == '-') {
       char *options = argv[i]+1;
       if (*options == '\0') usage();
