@@ -3,7 +3,7 @@ extern "C" {
 #include <stdio.h>
 #include "aps-ag.h"
 }
-#include "dump-cpp.h"
+#include "dump-scala.h"
 #include "implement.h"
 
 Implementation::ModuleInfo::ModuleInfo(Declaration module)
@@ -11,25 +11,25 @@ Implementation::ModuleInfo::ModuleInfo(Declaration module)
 {}
 
 void Implementation::ModuleInfo::note_top_level_match(Declaration tlm,
-						 const output_streams&)
+						 ostream&)
 {
   top_level_matches.push_back(tlm);
 }
 
 void Implementation::ModuleInfo::note_var_value_decl(Declaration vd,
-						const output_streams&)
+						ostream&)
 {
   var_value_decls.push_back(vd);
 }
 
 void Implementation::ModuleInfo::note_local_attribute(Declaration ld,
-						 const output_streams&)
+						 ostream&)
 {
   local_attributes.push_back(ld);
 }
 
 void Implementation::ModuleInfo::note_attribute_decl(Declaration ad,
-						     const output_streams&)
+						     ostream&)
 {
   attribute_decls.push_back(ad);
 }

@@ -17,8 +17,6 @@
 using std::ostream;
 using std::vector;
 
-class output_streams;
-
 #define LOCAL_UNIQUE_PREFIX(ld) Def_info(value_decl_def(ld))->unique_prefix
 
 // Abstract class:
@@ -39,21 +37,21 @@ class Implementation {
     virtual ~ModuleInfo() {};
 
     virtual void note_top_level_match(Declaration tlm,
-				      const output_streams& oss);
+				      ostream& oss);
 
     virtual void note_local_attribute(Declaration la,
-				      const output_streams& oss);
+				      ostream& oss);
 
     virtual void note_attribute_decl(Declaration ad,
-				     const output_streams& oss);
+				     ostream& oss);
 
     // Declaration will be declared by caller, but not initialized
     // unless this function desires to:
     virtual void note_var_value_decl(Declaration vd,
-				     const output_streams& oss);
+				     ostream& oss);
 
     // implement tlm's and var value decls, and generate finish() routine.
-    virtual void implement(const output_streams& oss) = 0;
+    virtual void implement(ostream& oss) = 0;
   };
 
   virtual ModuleInfo* get_module_info(Declaration module) = 0;
@@ -62,7 +60,7 @@ class Implementation {
   virtual void implement_function_body(Declaration f, ostream&) = 0;
 
   // not sure what to do here
-  // virtual void implement_procedure(Declaration p, output_streams&) = 0;
+  // virtual void implement_procedure(Declaration p, ostream&) = 0;
 
   // if a Declaration has an implementation mark on it,
   // this function is called to implement its use:

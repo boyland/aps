@@ -6,7 +6,7 @@ extern "C" {
 #include <stdio.h>
 #include "aps-ag.h"
 }
-#include "dump-cpp.h"
+#include "dump-scala.h"
 #include "implement.h"
 
 // Dynamic implementation of attribute grammars in APS syntax
@@ -156,13 +156,10 @@ static void dump_context_open(void *c, ostream& os) {
     {
       Match m = (Match)c;
       Pattern p = matcher_pat(m);
-      Declaration header = Match_info(m)->header;
-      bool is_exclusive = Declaration_KEY(header) == KEYcase_stmt;
-      os << indent() << (is_exclusive ? "else if (" : "if (");
-      dump_Pattern_cond(p,"node",os);
-      os << ") {\n";
-      nesting_level+=1;
-      dump_Pattern_bindings(p,os);
+      // Declaration header = Match_info(m)->header;
+      // bool is_exclusive = Declaration_KEY(header) == KEYcase_stmt;
+      os << indent() << "case " << p << "=> {";
+      ++nesting_level;
       return;
     }
   default:
@@ -188,6 +185,13 @@ static void pop_attr_context(ostream& os)
     --nesting_level;
     os << indent() << "}\n";
   }
+}
+
+static void dump_init_collection(Declaration vd, ostream& os)
+{
+  os << indent() << "var collection : " << value_decl_type(vd) << " = ";
+  dump_vd_Default(vd,os);
+  os << ";\n";
 }
 
 static void dump_attr_assign(void *vdecl, Declaration ass, ostream& os)
@@ -253,8 +257,8 @@ bool depends_on(void *vdecl, Declaration local, Block b)
 void dump_local_decl(void *, Declaration local, ostream& o)
 {
   activate_attr_context(o);
-  o << indent();
-  dump_Typed_decl(value_decl_type(local),local,"v_",o);
+  o << indent() << "var v_" << decl_name(local)
+    << " : " << value_decl_type(local);
   o << " = ";
   Default init = value_decl_default(local);
   switch (Default_KEY(init)) {
@@ -378,7 +382,6 @@ string local_attribute_context_bindings(Declaration d)
 	  aps_error(header,"Cannot handle this header for Match");
 	  break;
 	}
-	bindings = matcher_bindings(hs.str(),m) + bindings;
       }
       break;
     }
@@ -388,14 +391,8 @@ string local_attribute_context_bindings(Declaration d)
 }
 
 void implement_local_attributes(vector<Declaration>& local_attributes,
-				const output_streams& oss)
+				ostream& oss)
 {
-  ostream& hs = oss.hs;
-  ostream& cpps = oss.cpps;
-  // ostream& is = oss.is;
-  ostream& bs = inline_definitions ? hs : cpps;
-  string prefix = oss.prefix;
-
   int n = local_attributes.size();
   for (int j=0; j <n; ++j) {
     Declaration d = local_attributes[j];
@@ -404,43 +401,26 @@ void implement_local_attributes(vector<Declaration>& local_attributes,
     char *name = decl_name(d);
     bool is_col = direction_is_collection(value_decl_direction(d));
     
-    hs << indent() << value_decl_type(d)
-       << " c" << i << "_" << name << "(C_PHYLUM::Node* anchor)";
-    INDEFINITION;
-    if (!inline_definitions) {
-      hs << ";\n";
-      dump_Type_prefixed(value_decl_type(d),cpps);
-      cpps << " " << prefix << "c" << i << "_" << name 
-	   << "(C_PHYLUM::Node* anchor)";
-    }
-    bs << " {\n";
+    oss << indent() << "def c" << i << "_" << name << "(anchor : Phylum)"
+	<< value_decl_type(d) << " = {\n";
     ++nesting_level;
-    bs << local_attribute_context_bindings(d);
+    oss << local_attribute_context_bindings(d);
     if (is_col) {
-      bs << "\n"
-	 << indent() << value_decl_type(d) << " collection = ";
-      dump_vd_Default(d,bs);
-      bs << ";\n";
+      dump_init_collection(d,oss);
     }
-    bs << "\n"; // blank line
-    dump_Block(b,dump_attr_assign,d,bs);
+    oss << "\n"; // blank line
+    dump_Block(b,dump_attr_assign,d,oss);
     dump_default_return(value_decl_default(d),value_decl_direction(d),
-			string("\"local ")+name+"\"",bs);
+			string("\"local ")+name+"\"",oss);
     --nesting_level;
-    bs << indent() << "}\n";
+    oss << indent() << "}\n";
   }
 }
 
 void implement_attributes(const vector<Declaration>& attrs,
 			  const vector<Declaration>& tlms,
-			  const output_streams& oss)
+			  ostream& oss)
 {
-  ostream& hs = oss.hs;
-  ostream& cpps = oss.cpps;
-  // ostream& is = oss.is;
-  ostream& bs = inline_definitions ? hs : cpps;
-  string prefix = oss.prefix;
-
   int n = attrs.size();
   for (int i=0; i <n; ++i) {
     Declaration ad = attrs[i];
@@ -454,27 +434,21 @@ void implement_attributes(const vector<Declaration>& attrs,
     Type rt = value_decl_type(rdecl);
     bool inh = (ATTR_DECL_IS_INH(ad) != 0);
     bool is_col = direction_is_collection(attribute_decl_direction(ad));
-    
-    oss << header_return_type<Type>(rt) << " "
-	<< header_function_name(string("c_")+name)
-	<< "(" << at << " anode)" << header_end();
-    INDEFINITION;
-    bs << " {\n";  
+
+    oss << indent() << "def c_" << name << "(anode : " << at << ") : "
+	<< rt << " = {\n";
     ++nesting_level;
     if (is_col) {
-      bs << indent() << rt << " collection = ";
-      dump_vd_Default(rdecl,bs);
-      bs << ";\n";
+      dump_init_collection(rdecl,oss);
     } else {
       if (inh) {
-	bs << indent() << "C_PHYLUM::Node* node=anode->parent;\n";
-	bs << indent() << "if (node != 0) {\n";
+	oss << indent() << "val node : Phylum = anode.parent;\n";
+	oss << indent() << "if (node != 0) {\n";
 	++nesting_level;
       } else {
-	bs << indent() << "C_PHYLUM::Node* node = anode;\n";
+	oss << indent() << "val node : Phylum = anode;\n";
       }
-      bs << indent() << "C_PHYLUM::Node* anchor = node;\n";
-      bs << indent() << "Constructor* cons = node->cons;\n";
+      oss << indent() << "val anchor : Phylum = node;\n";
     }
     for (vector<Declaration>::const_iterator i = tlms.begin();
 	 i != tlms.end(); ++i) {
@@ -482,32 +456,26 @@ void implement_attributes(const vector<Declaration>& attrs,
       Match m = top_level_match_m(*i);
       push_attr_context(m);
       Block body = matcher_body(m);
-      dump_Block(body,dump_attr_assign,ad,bs);
-      pop_attr_context(bs);
-      if (is_col) pop_attr_context(bs);
+      dump_Block(body,dump_attr_assign,ad,oss);
+      pop_attr_context(oss);
+      if (is_col) pop_attr_context(oss);
     }
     if (inh & !is_col) {
       --nesting_level;
-      bs << indent() << "}\n";
+      oss << indent() << "}\n";
     }
     dump_default_return(attribute_decl_default(ad),
 			attribute_decl_direction(ad),
-			string("anode->to_string()+\".") + name + "\"", bs);
+			string("anode.toString()+\".") + name + "\"", oss);
     --nesting_level;
-    bs << indent() << "}\n";
+    oss << indent() << "}\n";
   }
 }
 
 void implement_var_value_decls(const vector<Declaration>& vvds,
 			       const vector<Declaration>& tlms,
-			       const output_streams& oss)
+			       ostream& oss)
 {
-  ostream& hs = oss.hs;
-  ostream& cpps = oss.cpps;
-  // ostream& is = oss.is;
-  ostream& bs = inline_definitions ? hs : cpps;
-  string prefix = oss.prefix;
-
   int n = vvds.size();
   for (int i=0; i <n; ++i) {
     Declaration vvd = vvds[i];
@@ -515,25 +483,20 @@ void implement_var_value_decls(const vector<Declaration>& vvds,
     Type vt = value_decl_type(vvd);
     bool is_col = direction_is_collection(value_decl_direction(vvd));
 
-    oss << header_return_type<Type>(vt) << " "
-	<< header_function_name(string("c_")+name)
-	<< "()" << header_end();
-    INDEFINITION;
-    bs << " {\n";  
+    oss << indent() << "def c_" << name << "() : " << vt << " = {\n";
     ++nesting_level;
-    bs << indent() << "if (s_" << name << " >= EVALUATED) "
-       << "return v_" << name << ";\n";
-    bs << indent() << "if (s_" << name << " == CYCLE) "
-       << "throw CyclicAttributeException(\"" << name << "\");\n";
+    oss << indent() << "if (s_" << name << " >= EVALUATED) "
+	<< "return v_" << name << ";\n";
+    oss << indent() << "if (s_" << name << " == CYCLE) "
+	<< "throw CyclicAttributeException(\"" << name << "\");\n";
     if (debug) {
-      bs << indent() << "Debug debug(\"" << name << "\");\n";
+      oss << indent() << "Debug.start(\"" << name << "\");\n";
+      oss << indent() << "try {\n";
+      ++nesting_level;
     }
-    bs << indent() << "s_" << name << " = CYCLE;\n";
+    oss << indent() << "s_" << name << " = CYCLE;\n";
     if (is_col) {
-      bs << "\n"
-	 << indent() << vt << " collection = ";
-      dump_vd_Default(vvd,bs);
-      bs << ";\n";
+      dump_init_collection(vvd,oss);
     }
     for (vector<Declaration>::const_iterator i = tlms.begin();
 	 i != tlms.end(); ++i) {
@@ -541,23 +504,25 @@ void implement_var_value_decls(const vector<Declaration>& vvds,
       Match m = top_level_match_m(*i);
       push_attr_context(m);
       Block body = matcher_body(m);
-      dump_Block(body,dump_attr_assign,vvd,bs);
-      pop_attr_context(bs);
-      pop_attr_context(bs);
+      dump_Block(body,dump_attr_assign,vvd,oss);
+      pop_attr_context(oss);
+      pop_attr_context(oss);
     }
     if (is_col) {
       if (debug) {
-	bs << indent() << "debug.returns(" << as_val(vt)
-	   << "->v_string(collection));\n";
+	oss << indent() << "Debug.returns(collection.toString());\n";
       }
-      bs << indent() << "v_" << name << " = collection;\n";
+      oss << indent() << "v_" << name << " = collection;\n";
     }
-    bs << indent() << "s_" << name << " = EVALUATED;\n";
+    oss << indent() << "s_" << name << " = EVALUATED;\n";
     dump_default_return(value_decl_default(vvd),
 			value_decl_direction(vvd),
-			string("\"") + name + "\"", bs);
+			string("\"") + name + "\"", oss);
+    if (debug) {
+      dump_debug_end(oss);
+    }
     --nesting_level;
-    bs << indent() << "}\n";
+    oss << indent() << "}\n";
   }
 }
 
@@ -569,65 +534,46 @@ public:
   public:
     ModuleInfo(Declaration mdecl) : Implementation::ModuleInfo(mdecl) {}
 
-    void note_top_level_match(Declaration tlm, const output_streams& oss) {
+    void note_top_level_match(Declaration tlm, ostream& oss) {
       Super::note_top_level_match(tlm,oss);
     }
 
-    void dump_compute(string cfname, const output_streams& oss) {
-      ostream& bs = inline_definitions ? oss.hs : oss.cpps;
-
-      oss << header_return_type<string>("value_type") << " "
-	  << header_function_name("compute")
-	  << "(node_type node)"
-	  << header_end();
-      INDEFINITION;
-      bs << "{ \n";
-      ++nesting_level;
-      bs << indent() << "return context->" << cfname << "(node);\n";
-      --nesting_level;
-      bs << indent() << "}\n";
+    void dump_compute(string cfname, ostream& oss) {
+      oss << indent() << "def compute(node : NodeType) : ValueType = "
+	  << cfname << "(node);\n";
     }
     
-    void note_local_attribute(Declaration ld, const output_streams& oss) {
+    void note_local_attribute(Declaration ld, ostream& oss) {
       Super::note_local_attribute(ld,oss);
       Declaration_info(ld)->decl_flags |= LOCAL_ATTRIBUTE_FLAG;
       int i = LOCAL_UNIQUE_PREFIX(ld);
       dump_compute(string("c")+i+"_"+decl_name(ld),oss);
     }
     
-    void note_attribute_decl(Declaration ad, const output_streams& oss) {
+    void note_attribute_decl(Declaration ad, ostream& oss) {
       Super::note_attribute_decl(ad,oss);
       dump_compute(string("c_")+decl_name(ad),oss);
     }
     
-    void note_var_value_decl(Declaration vd, const output_streams& oss) {
+    void note_var_value_decl(Declaration vd, ostream& oss) {
       Super::note_var_value_decl(vd,oss);
       Declaration_info(vd)->decl_flags |= VAR_VALUE_DECL_FLAG;
       char *name = decl_name(vd);
-      oss.hs << indent() << "EvalStatus s_" << name << ";\n";
-      oss.is << ",\n    s_" << name << "(UNEVALUATED)";
+      oss << indent() << "var s_" << name << ": EvalStatus = " 
+	  << "UNEVALUATED;\n";
     }
 
-    void implement(const output_streams& oss) {
+    void implement(ostream& oss) {
       implement_local_attributes(local_attributes,oss);
       implement_attributes(attribute_decls,top_level_matches,oss);
       implement_var_value_decls(var_value_decls,top_level_matches,oss);
 
-      ostream& hs = oss.hs;
-      ostream& cpps = oss.cpps;
-      ostream& bs = inline_definitions ? hs : cpps;
       // char *name = decl_name(module_decl);
 
       Declarations ds = block_body(module_decl_contents(module_decl));
       
       // Implement finish routine:
-      hs << indent() << "void finish()";
-      if (!inline_definitions) {
-	hs << ";\n";
-	cpps << "void " << oss.prefix << "finish()";
-      }
-      INDEFINITION;
-      bs << " {\n";
+      oss << indent() << "def finish() : Unit = {\n";
       ++nesting_level;
       //? not sure how to do this:
       //? we don't want to force these to finish in the wrong order.
@@ -637,13 +583,13 @@ public:
 	  break;
 	case KEYvalue_decl:
 	  if (!def_is_constant(value_decl_def(d))) {
-	    bs << indent() << "(void)c_" << decl_name(d) << "();\n";
+	    oss << indent() << "c_" << decl_name(d) << "();\n";
 	  }
 	  break;
 	}
       }
       --nesting_level;
-      bs << indent() << "}\n\n";
+      oss << indent() << "}\n\n";
       clear_implementation_marks(module_decl);
     }
   };
@@ -653,7 +599,6 @@ public:
   }
 
   void implement_function_body(Declaration f, ostream& os) {
-    // os << indent() << "// Indent = " << nesting_level*2 << endl;
     Type fty = function_decl_type(f);
     Declaration rdecl = first_Declaration(function_type_return_values(fty));
     Block b = function_decl_body(f);
@@ -661,10 +606,7 @@ public:
     char *name = decl_name(f);
     
     if (is_col) {
-      os << "\n"
-	 << indent() << value_decl_type(rdecl) << " collection = ";
-      dump_vd_Default(rdecl,os);
-      os << ";\n";
+      dump_init_collection(rdecl,os);
     }
     os << "\n"; // blank line
 
@@ -678,13 +620,13 @@ public:
     int flags = Declaration_info(vd)->decl_flags;
     if (flags & LOCAL_ATTRIBUTE_FLAG) {
       os << "a" << LOCAL_UNIQUE_PREFIX(vd) << "_"
-	 << decl_name(vd) << "->evaluate(anchor)"; 
+	 << decl_name(vd) << ".evaluate(anchor)"; 
     } else if (flags & VAR_VALUE_DECL_FLAG) {
       os << "c_" << decl_name(vd) << "()";
     } else if (flags & ATTRIBUTE_DECL_FLAG) {
       // not currently active:
       // (but should work just fine)
-      os << "a" << "_" << decl_name(vd) << "->evaluate";
+      os << "a" << "_" << decl_name(vd) << ".evaluate";
     } else {
       aps_error(vd,"internal_error: What is special about this?");
     }

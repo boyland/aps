@@ -3,7 +3,7 @@ extern "C" {
 #include <stdio.h>
 #include "aps-ag.h"
 }
-#include "dump-cpp.h"
+#include "dump-scala.h"
 #include "implement.h"
 
 #define LOCAL_VALUE_FLAG (1<<28)
@@ -182,11 +182,9 @@ static bool implement_visit_function(AUG_GRAPH* aug_graph,
 	  Type ty = infer_expr_type(e);
 	  os << indent() << ty << " node=" << e << ";\n";
 	}
-	os << indent() << "if (";
-	dump_Pattern_cond(p,"node",os);
-	os << ") {\n";
+	os << indent() << "node match {\n";
+	os << indent() << "case " << p << " => {\n";
 	nesting_level+=1;
-	dump_Pattern_bindings(p,os);
 	if_true = matcher_body(m);
 	if (MATCH_NEXT(m)) {
 	  if_false = 0; //? Why not the nxt match ?
@@ -207,7 +205,11 @@ static bool implement_visit_function(AUG_GRAPH* aug_graph,
 			       nch,children,child_phase,os);
       delete[] true_assignment;
       --nesting_level;
-      os << indent() << "} else {\n";
+      if (is_match) {
+	os << indent() << "case _ => {\n";
+      } else {
+	os << indent() << "} else {\n";
+      }
       ++nesting_level;
       Expression* false_assignment = if_false
 	? make_instance_assignment(aug_graph,if_false,instance_assignment)
@@ -218,7 +220,11 @@ static bool implement_visit_function(AUG_GRAPH* aug_graph,
 					   nch,children,child_phase,os);
       if (if_false) delete[] false_assignment;
       --nesting_level;
-      os << indent() << "}\n";
+      if (is_match) {
+	os << indent() << "}}\n";
+      } else {
+	os << indent() << "}\n";
+      }
       return cont;
     }
 
@@ -268,7 +274,7 @@ static bool implement_visit_function(AUG_GRAPH* aug_graph,
 	  os << composite_combiner(value_decl_default(field));
 	  break;
 	default:
-	  os << as_val(value_decl_type(field)) << "->v_combine";
+	  os << as_val(value_decl_type(field)) << ".v_combine";
 	  break;
 	}
 	os << "(v_" << decl_name(field) << "," << rhs << ");\n";
@@ -277,7 +283,7 @@ static bool implement_visit_function(AUG_GRAPH* aug_graph,
 	field = field_ref_p(lhs);
 	if (field == 0) fatal_error("what sort of assignment lhs: %d",
 				    tnode_line_number(assign));
-	os << "a_" << decl_name(field) << "->";
+	os << "a_" << decl_name(field) << ".";
 	if (debug) os << "assign"; else os << "set";
 	os << "(" << field_ref_object(lhs) << "," << rhs << ");\n";
 	break;
@@ -293,7 +299,7 @@ static bool implement_visit_function(AUG_GRAPH* aug_graph,
     if (in->node == 0 && ad != 0) {
       if (rhs) {
 	if (Declaration_info(ad)->decl_flags & LOCAL_ATTRIBUTE_FLAG) {
-	  os << "a" << LOCAL_UNIQUE_PREFIX(ad) << "_" << asym << "->";
+	  os << "a" << LOCAL_UNIQUE_PREFIX(ad) << "_" << asym << ".";
 	  if (debug) os << "assign"; else os << "set";
 	  os << "(anchor," << rhs << ");\n";
 	} else {
@@ -333,7 +339,7 @@ static bool implement_visit_function(AUG_GRAPH* aug_graph,
 	      os << "v" << i << "_" << asym << " = " << rhs << ";\n";
 	  }
 	} else {
-	  os << "a_" << asym << "->";
+	  os << "a_" << asym << ".";
 	  if (debug) os << "assign"; else os << "set";
 	  os << "(v_" << decl_name(in->node)
 	     << "," << rhs << ");\n";
@@ -347,7 +353,7 @@ static bool implement_visit_function(AUG_GRAPH* aug_graph,
     } else if (Declaration_KEY(in->node) == KEYvalue_decl) {
       if (rhs) {
 	// assigning field of object
-	os << "a_" << asym << "->";
+	os << "a_" << asym << ".";
 	if (debug) os << "assign"; else os << "set";
 	os << "(v_" << decl_name(in->node)
 	   << "," << rhs << ");\n";
@@ -365,16 +371,11 @@ static bool implement_visit_function(AUG_GRAPH* aug_graph,
 // dump visit functions for constructors
 void dump_visit_functions(PHY_GRAPH *phy_graph,
 			  AUG_GRAPH *aug_graph,
-			  const output_streams& oss)
+			  ostream& oss)
 {
   Declaration tlm = aug_graph->match_rule;
   Match m = top_level_match_m(tlm);
   Block block = matcher_body(m);
-
-  ostream& hs = oss.hs;
-  ostream& cpps = oss.cpps;
-  // ostream& is = oss.is;
-  ostream& bs = inline_definitions ? hs : cpps;
 
   int pgn = PHY_GRAPH_NUM(phy_graph);
   int j = Declaration_info(aug_graph->syntax_decl)->instance_index;
@@ -404,22 +405,17 @@ void dump_visit_functions(PHY_GRAPH *phy_graph,
   while (total_order) {
     ++phase;
 
-    oss << header_return_type<Type>(0) << "void "
-	<< header_function_name("visit_") << pgn << "_" << phase << "_" << j
-	<< "(C_PHYLUM::Node* anchor)" << header_end();
-    INDEFINITION;
-    bs << " {\n";
+    oss << indent() << "def visit_" << pgn << "_" << phase << "_" << j
+	<< "(anchor : Phylum) : Unit = {\n";
     ++nesting_level;
-    bs << matcher_bindings("anchor",m);
-    bs << "\n";
 
     bool cont =
       implement_visit_function(aug_graph,phase,0,total_order,
 			       instance_assignment,
-			       nch,children,child_phase,bs);
+			       nch,children,child_phase,oss);
 
     --nesting_level;
-    bs << indent() << "}\n" << endl;
+    oss << indent() << "}\n" << endl;
 
     if (!cont) break;
   }
@@ -427,15 +423,10 @@ void dump_visit_functions(PHY_GRAPH *phy_graph,
   delete[] instance_assignment;
 }
 
-void dump_visit_functions(PHY_GRAPH *pg, const output_streams& oss)
+void dump_visit_functions(PHY_GRAPH *pg, ostream& oss)
 {
   STATE *s = pg->global_state;
   int pgn = PHY_GRAPH_NUM(pg);
-
-  ostream& hs = oss.hs;
-  ostream& cpps = oss.cpps;
-  // ostream& is = oss.is;
-  ostream& bs = inline_definitions ? hs : cpps;
 
   int max_phase = 0;
   for (int i=0; i < pg->instances.length; ++i) {
@@ -472,7 +463,7 @@ void dump_visit_functions(PHY_GRAPH *pg, const output_streams& oss)
     if (Declaration_KEY(d) == KEYconstructor_decl) {
       for (int j=0; j < num_cons; ++j) {
 	if (aug_graphs[j]->syntax_decl == d) {
-	  Declaration_info(d)->instance_index = cons_num;
+	  Declaration_info(d)->instance_index = cons_num; //? why not j ?
 	  ++cons_num;
 	  break;
 	}
@@ -485,29 +476,22 @@ void dump_visit_functions(PHY_GRAPH *pg, const output_streams& oss)
   }
   
   for (int ph = 1; ph <= max_phase; ++ph) {
-    oss << header_return_type<Type>(0) << "void "
-	<< header_function_name("visit_") << pgn << "_" << ph
-	<< "(C_PHYLUM::Node* node)" << header_end();
-    INDEFINITION;
-    bs << " {\n";
+    oss << indent() << "def visit_" << pgn << "_" << ph
+	<< "(node : Phylum) : Unit = node match {\n";
     ++nesting_level;
-    bs << indent() << "switch (node->cons->get_index()) {\n";
     for (int j=0; j < num_cons; ++j) {
-      bs << indent() << "case " << j << ":\n";
-      ++nesting_level;
-      bs << indent() << "visit_" << pgn << "_" << ph << "_" << j
-	 << "(node);\n";
-      bs << indent() << "break;\n";
-      --nesting_level;
+      Declaration cd = aug_graphs[j]->syntax_decl;
+      oss << indent() << "case " << decl_name(cd) << "(";
+      Declarations fs = function_type_formals(constructor_decl_type(cd));
+      bool started = false;
+      for (Declaration f = first_Declaration(fs); f; f=DECL_NEXT(f)) {
+	if (started) oss << ","; else started = false;
+	oss << "_";
+      }
+      oss << ") => " << "visit_" << pgn << "_" << ph << "_" << j << "(node);\n";
     }
-    bs << indent() << "default:\n";
-    ++nesting_level;
-    bs << indent()
-       << "throw std::runtime_error(\"bad constructor index\");\n";
     --nesting_level;
-    bs << indent() << "}\n";
-    --nesting_level;
-    bs << indent() << "}\n";
+    oss << indent() << "};\n";
   }
 
   // Now spit out visit procedures for each constructor
@@ -518,13 +502,8 @@ void dump_visit_functions(PHY_GRAPH *pg, const output_streams& oss)
   oss << "\n"; // some blank lines
 }
 
-void dump_visit_functions(STATE*s, const output_streams& oss)
+void dump_visit_functions(STATE*s, ostream& oss)
 {
-  ostream& hs = oss.hs;
-  ostream& cpps = oss.cpps;
-  // ostream& is = oss.is;
-  ostream& bs = inline_definitions ? hs : cpps;
-
   // first dump all visit functions for each phylum:
   int nphy = s->phyla.length;
   for (int j=0; j < nphy; ++j) {
@@ -535,15 +514,10 @@ void dump_visit_functions(STATE*s, const output_streams& oss)
   }
   
   Declaration sp = s->start_phylum;
-  oss << header_return_type<Type>(0) << "void "
-      << header_function_name("visit") << "()" << header_end();
-  INDEFINITION;
-  bs << " {\n";
+  oss << indent() << "visit() : Unit = {\n";
   ++nesting_level;
-  bs << indent() << "Phylum* phylum = t_" << decl_name(sp) //! bug sometimes
-     << "->get_phylum();\n";
-  bs << indent() << "int n_roots = phylum->size();\n";
-  bs << "\n"; // blank line
+  oss << indent() << "val n_roots = t_" << decl_name(sp) << ".size();\n";
+  oss << "\n"; // blank line
 
   int phase = 1;
   Declaration root_decl[1] ;
@@ -558,13 +532,13 @@ void dump_visit_functions(STATE*s, const output_streams& oss)
   while (implement_visit_function(&s->global_dependencies,phase,0,
 				  s->global_dependencies.total_order,
 				  instance_assignment,
-				  1,root_decl,root_phase,bs))
+				  1,root_decl,root_phase,oss))
     ++phase;
 
   delete[] instance_assignment;
 
   --nesting_level;
-  bs << indent() << "}\n\n";
+  oss << indent() << "}\n\n";
 }
 
 static void* dump_scheduled_local(void *pbs, void *node) {
@@ -644,64 +618,54 @@ public:
   public:
     ModuleInfo(Declaration mdecl) : Implementation::ModuleInfo(mdecl) {}
 
-    void note_top_level_match(Declaration tlm, const output_streams& oss) {
+    void note_top_level_match(Declaration tlm, ostream& oss) {
       Super::note_top_level_match(tlm,oss);
     }
 
-    void note_local_attribute(Declaration ld, const output_streams& oss) {
+    void note_local_attribute(Declaration ld, ostream& oss) {
       Super::note_local_attribute(ld,oss);
       Declaration_info(ld)->decl_flags |= LOCAL_ATTRIBUTE_FLAG;
     }
     
-    void note_attribute_decl(Declaration ad, const output_streams& oss) {
+    void note_attribute_decl(Declaration ad, ostream& oss) {
       Declaration_info(ad)->decl_flags |= ATTRIBUTE_DECL_FLAG;
       Super::note_attribute_decl(ad,oss);
     }
     
-    void note_var_value_decl(Declaration vd, const output_streams& oss) {
+    void note_var_value_decl(Declaration vd, ostream& oss) {
       Super::note_var_value_decl(vd,oss);
     }
 
-    void implement(const output_streams& oss) {
+    void implement(ostream& oss) {
       STATE *s = (STATE*)Declaration_info(module_decl)->analysis_state;
 
-      ostream& hs = oss.hs;
-      ostream& cpps = oss.cpps;
-      ostream& bs = inline_definitions ? hs : cpps;
-      // char *name = decl_name(module_decl);
 
       Declarations ds = block_body(module_decl_contents(module_decl));
       
       dump_visit_functions(s,oss);
 
       // Implement finish routine:
-      hs << indent() << "void finish()";
-      if (!inline_definitions) {
-	hs << ";\n";
-	cpps << "void " << oss.prefix << "finish()";
-      }
-      INDEFINITION;
-      bs << " {\n";
+      oss << indent() << "def finish() : Unit = {\n";
       ++nesting_level;
-      bs << indent() << "visit();\n";
+      oss << indent() << "visit();\n";
       // types actually should be scheduled...
       for (Declaration d = first_Declaration(ds); d; d = DECL_NEXT(d)) {
 	char* kind = NULL;
 	switch(Declaration_KEY(d)) {
 	case KEYphylum_decl:
 	case KEYtype_decl:
-	  kind = "t_";
+	  kind = "m_";
 	  break;
 	default:
 	  break;
 	}
 	if (kind != NULL) {
 	  char *n = decl_name(d);
-	  bs << indent() << kind << n << "->finish();\n";
+	  oss << indent() << kind << n << ".finish();\n";
 	}
       }
       --nesting_level;
-      bs << indent() << "}\n\n";
+      oss << indent() << "}\n\n";
 
       clear_implementation_marks(module_decl);
     }
