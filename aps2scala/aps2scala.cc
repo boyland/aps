@@ -8,7 +8,7 @@ extern "C" {
 }
 #include <iostream>
 #include <fstream>
-#include "dump-cpp.h"
+#include "dump-scala.h"
 #include "implement.h"
 
 using namespace std;
@@ -17,10 +17,10 @@ extern "C" {
 
 int callset_AI(Declaration module, STATE *s) { return 0; }
 
-static char* argv0 = "apscpp";
+static char* argv0 = "aps2scala";
 void usage() {
   fprintf(stderr,"%s: usage: %s [-SVG] [-D...] <file.aps>\n",argv0,argv0);
-  fprintf(stderr,"             compile APS to C++\n");
+  fprintf(stderr,"             compile APS to Scala\n");
   /*fprintf(stderr,"    -I    generate an incremental implementation\n");*/
   fprintf(stderr,"    -S    generate a scheduled implementation\n");
   fprintf(stderr,"    -D... turn on indicated debugging flags\n");
@@ -92,13 +92,10 @@ int main(int argc,char **argv) {
     } else {
       impl = dynamic_impl;
     }
-    char* hfilename = str2cat(argv[i],".h");
-    char* cppfilename = str2cat(argv[i],".cpp");
+    char* outfilename = str2cat(argv[i],".scala");
 
-    cout << "hfile = " << hfilename << ", cppfile = " << cppfilename << endl;
-    ofstream header(hfilename);
-    ofstream body(cppfilename);
-    dump_cpp_Program(p,header,body);
+    ofstream out(outfilename);
+    dump_scala_Program(p,out);
   }
   exit(0);
 }
