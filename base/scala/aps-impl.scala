@@ -43,11 +43,11 @@ object Debug {
   }
 }
 
-class Module(val name : String) {
+class Module(val mname : String) {
   var complete : Boolean = false;
   def finish() : Unit = {
     if (Debug.active) {
-      println("Module " + name + " is now complete.");
+      println("Module " + mname + " is now complete.");
     }
     complete = true; 
   }
@@ -55,10 +55,10 @@ class Module(val name : String) {
  
 abstract class Type
 {
-  def getType : C_TYPE[Type];
+  def getType : C_TYPE[_];
 }
 
-trait C_TYPE[+T_Result] extends C_BASIC[T_Result] with C_PRINTABLE[T_Result]
+trait C_TYPE[T_Result] extends C_BASIC[T_Result] with C_PRINTABLE[T_Result]
 {
   val v_assert : (T_Result) => Unit;
   val v_equal : (T_Result,T_Result) => Boolean;
@@ -83,7 +83,7 @@ class I_TYPE[T_Result] extends C_TYPE[T_Result] {
     
 class M_TYPE extends Module("<anonymous type>") {
   class T_Result extends Type {
-    def getType() = t_Result;
+    def getType : C_TYPE[_] = t_Result;
   }
   object t_Result extends I_TYPE[T_Result] {}
 }
@@ -94,7 +94,7 @@ object PARSE {
 
 abstract class Phylum extends Type
 {
-  def getType : C_PHYLUM[Phylum];
+  def getType : C_PHYLUM[_];
   val lineNumber = PARSE.lineNumber;
   private var _nodeNumber : Int = 0;
   val nodeNumber = _nodeNumber;
@@ -111,9 +111,9 @@ abstract class Phylum extends Type
 }
 
 trait C_PHYLUM[T_Result] extends C_TYPE[T_Result] {
-  def v_identical(x1 : T_Result, x2 : T_Result) : Boolean;
-  def v_object_id(x : T_Result) : Int;
-  def v_object_id_less(x1 : T_Result, x2 : T_Result) : Boolean;
+  val v_identical : (T_Result,T_Result) => Boolean;
+  val v_object_id : (T_Result) => Int;
+  val v_object_id_less: (T_Result, T_Result) => Boolean;
   val v_nil : T_Result;
 }
 
@@ -151,7 +151,8 @@ abstract class I_PHYLUM[T_Result >: Null]
 class M_PHYLUM extends Module("<anonymous phylum>")
 {
   class T_Result extends Phylum {
-    def getType() : I_PHYLUM[T_Result] = t_Result;
+    def getType : I_PHYLUM[_] = t_Result;
+    def children : List[Phylum] = List();
   }
   object t_Result extends I_PHYLUM[T_Result] {
     def isComplete : Boolean = complete;
@@ -188,7 +189,7 @@ object Evaluation {
 
 class Attribute[T_P,T_V]
                (val t_P : C_PHYLUM[T_P],
-		val t_V : C_BASIC[T_V],
+		val t_V : Any, // unused
 		val name : String) 
 extends Module("Attribute " + name)
 {
@@ -207,11 +208,11 @@ extends Module("Attribute " + name)
     Debug.end();
   }
     
-  def finish() : Unit = {
+  override def finish() : Unit = {
     if (!complete) {
       val n = t_P.asInstanceOf[I_PHYLUM[Phylum]].size;
       for (i <- 0 until n) {
-	evaluate(t_P.asInstanceOf[I_PHYLUM[NodeType]].get(i));
+	evaluate(t_P.asInstanceOf[I_PHYLUM[Phylum]].get(i).asInstanceOf[NodeType]);
       }
     }
     super.finish();
