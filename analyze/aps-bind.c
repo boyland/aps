@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include "jbb-alloc.h"
 #include "aps-ag.h"
 
@@ -635,6 +636,23 @@ static void *do_bind(void *vscope, void *node) {
 
 /************* setting the next_decl field **************/
 
+static Unit units_set_next_unit(Units units, Unit next) {
+  switch (Units_KEY(units)) {
+  case KEYnil_Units: return next;
+  case KEYlist_Units:
+    { Unit prev = list_Units_elem(units);
+      Unit_info(prev)->next_unit = next;
+      return prev; }
+  case KEYappend_Units:
+    { Units some = append_Units_l1(units);
+      Units more = append_Units_l2(units);
+      Unit middle = units_set_next_unit(more,next);
+      return units_set_next_unit(some,middle); }
+  }
+  fatal_error("control reached end of units_set_next_unit");
+  return NULL;
+}
+
 static Declaration decls_set_next_decl(Declarations decls, Declaration next) {
   switch (Declarations_KEY(decls)) {
   case KEYnil_Declarations: return next;
@@ -722,6 +740,23 @@ static Pattern pattern_actuals_set_next_pattern_actual(PatternActuals pattern_ac
   return NULL;
 }
 
+static Pattern patterns_set_next_pattern(Patterns patterns, Pattern next) {
+  switch (Patterns_KEY(patterns)) {
+  case KEYnil_Patterns: return next;
+  case KEYlist_Patterns:
+    { Pattern prev = list_Patterns_elem(patterns);
+      Pattern_info(prev)->next_pattern = next;
+      return prev; }
+  case KEYappend_Patterns:
+    { Patterns some = append_Patterns_l1(patterns);
+      Patterns more = append_Patterns_l2(patterns);
+      Pattern middle = patterns_set_next_pattern(more,next);
+      return patterns_set_next_pattern(some,middle); }
+  }
+  fatal_error("control reached end of patterns_set_next_pattern");
+  return NULL;
+}
+
 static Type type_actuals_set_next_type_actual(TypeActuals type_actuals, Type next) {
   switch (TypeActuals_KEY(type_actuals)) {
   case KEYnil_TypeActuals: return next;
@@ -758,6 +793,13 @@ static Match matches_set_next_match(Matches matches, Match next) {
 
 static void *set_next_fields(void *ignore, void *node) {
   switch (ABSTRACT_APS_tnode_phylum(node)) {
+  case KEYUnits:
+    { Unit unit = units_set_next_unit((Units)node,NULL);
+      for (; unit != NULL; unit=Unit_info(unit)->next_unit) {
+	traverse_Unit(set_next_fields,ignore,unit);
+      }
+    }
+    return NULL;
   case KEYDeclarations:
     { Declaration decl = decls_set_next_decl((Declarations)node,NULL);
       for (; decl != NULL; decl=Declaration_info(decl)->next_decl) {
@@ -776,6 +818,13 @@ static void *set_next_fields(void *ignore, void *node) {
     { Expression expr = exprs_set_next_expr((Expressions)node,NULL);
       for (; expr != NULL; expr=Expression_info(expr)->next_expr) {
 	traverse_Expression(set_next_fields,ignore,expr);
+      }
+    }
+    return NULL;
+  case KEYPatterns:
+    { Pattern pattern = patterns_set_next_pattern((Patterns)node,NULL);
+      for (; pattern != NULL; pattern=Pattern_info(pattern)->next_pattern) {
+	traverse_Pattern(set_next_fields,ignore,pattern);
       }
     }
     return NULL;
@@ -812,6 +861,19 @@ static void *set_next_fields(void *ignore, void *node) {
   default: break;
   }
   return ignore;
+}
+
+Unit first_Unit(Units l) {
+  switch (Units_KEY(l)) {
+  case KEYlist_Units:
+    return list_Units_elem(l);
+  case KEYappend_Units:
+    { Unit first = first_Unit(append_Units_l1(l));
+      if (first != NULL) return first;
+      return first_Unit(append_Units_l2(l)); }
+  default:
+    return NULL;
+  }
 }
 
 /* potentially useful later */
@@ -862,6 +924,19 @@ Pattern first_PatternActual(PatternActuals l) {
     { Pattern first = first_PatternActual(append_PatternActuals_l1(l));
       if (first != NULL) return first;
       return first_PatternActual(append_PatternActuals_l2(l)); }
+  default:
+    return NULL;
+  }
+}
+
+Pattern first_Pattern(Patterns l) {
+  switch (Patterns_KEY(l)) {
+  case KEYlist_Patterns:
+    return list_Patterns_elem(l);
+  case KEYappend_Patterns:
+    { Pattern first = first_Pattern(append_Patterns_l1(l));
+      if (first != NULL) return first;
+      return first_Pattern(append_Patterns_l2(l)); }
   default:
     return NULL;
   }
