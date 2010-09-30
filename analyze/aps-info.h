@@ -13,6 +13,12 @@ extern struct Program_info *Program_info(Program);
 #define PROGRAM_IS_BOUND(p) (Program_info(p)->program_flags&PROGRAM_BOUND_FLAG)
 #define PROGRAM_IS_TYPED(p) (Program_info(p)->program_flags&PROGRAM_TYPED_FLAG)
 
+struct Unit_info {
+  Unit next_unit;
+#define UNIT_NEXT(u) Unit_info(u)->next_unit
+};
+extern struct Unit_info *Unit_info(Unit);
+
 struct Use_info {
   Declaration use_decl;
   TypeEnvironment use_type_env;
@@ -140,6 +146,7 @@ extern struct Expression_info *Expression_info(Expression);
 
 struct Pattern_info {
   Pattern next_pattern_actual; /* in a sequence of args to a pattern call */
+#define next_pattern next_pattern_actual
   Type pat_type;
   void* pat_impl; /* how it is implemented */
 };
