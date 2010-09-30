@@ -58,26 +58,15 @@ static void dump_context_open(void *c, ostream& os) {
       Declaration decl = (Declaration)c;
       switch (Declaration_KEY(decl)) {
       case KEYif_stmt:
-	os << indent() << "{ bool cond = ";
+	os << indent() << "{ val cond = ";
 	++nesting_level;
 	dump_Expression(if_stmt_cond(decl),os);
 	os << ";\n";
 	return;
       case KEYcase_stmt:
 	{
-	  Type ty = infer_expr_type(case_stmt_expr(decl));
-	  os << indent() << "{ ";
+	  os << indent() << case_stmt_expr(decl) << " match {\n";
 	  ++nesting_level;
-	  dump_Type(ty,os);
-	  os << " node = ";
-	  dump_Expression(case_stmt_expr(decl),os);
-	  os << ";\n";
-	  os << indent() << "Constructor* cons = node->cons;\n";
-	  //os << indent() << "if (cons == 0) throw std::runtime_exception"
-	  // We need an if so each case can use else:
-	  os << indent() << "if (0) {}\n";
-	  //! BUG
-	  //! We should then test all cases up to the one we are matching.
 	}
 	return;
       case KEYfor_stmt:
@@ -95,6 +84,7 @@ static void dump_context_open(void *c, ostream& os) {
 	return;
       case KEYfor_in_stmt:
 	{
+	  aps_error(decl,"Still generating C++ here...");
 	  Declaration f = for_in_stmt_formal(decl);
 	  Type ty = infer_formal_type(f);
 	  os << indent() << "for (CollectionIterator<";
@@ -111,6 +101,7 @@ static void dump_context_open(void *c, ostream& os) {
 	return;
       case KEYtop_level_match:
 	{
+	  aps_error(decl,"Still generating C++ here...");
 	  Type ty = infer_pattern_type(matcher_pat(top_level_match_m(decl)));
 	  static int unique = 0;
 	  int i = ++unique;
@@ -158,7 +149,7 @@ static void dump_context_open(void *c, ostream& os) {
       Pattern p = matcher_pat(m);
       // Declaration header = Match_info(m)->header;
       // bool is_exclusive = Declaration_KEY(header) == KEYcase_stmt;
-      os << indent() << "case " << p << "=> {";
+      os << indent() << "case " << p << " => {\n";
       ++nesting_level;
       return;
     }
@@ -354,40 +345,59 @@ Block local_attribute_block(Declaration d)
   return (Block)p;
 }
 
-string local_attribute_context_bindings(Declaration d)
+static void dump_local_context_begin(void *p, Declaration d, ostream& os)
 {
-  string bindings = "";
-  void *p = d;
-  while ((p = tnode_parent(p)) != 0) {
-    switch (ABSTRACT_APS_tnode_phylum(p)) {
-    default:
-      break;
+  if (p == 0) aps_error(d,"internal error: reached null parent!");
+  else switch (ABSTRACT_APS_tnode_phylum(p)) {
     case KEYDeclaration:
-      if (Declaration_KEY((Declaration)p) == KEYtop_level_match)
-	return bindings;
+      if (Declaration_KEY((Declaration)p) == KEYtop_level_match) return;
+      /* FALL THROUGH */
+    default:
+      dump_local_context_begin(tnode_parent(p),d,os);
       break;
-    case KEYMatch:
+    case KEYMatch: 
+      dump_local_context_begin(tnode_parent(p),d,os);
       {
 	Match m = (Match)p;
 	Declaration header = Match_info(m)->header;
-	ostringstream hs;
 	switch (Declaration_KEY(header)) {
 	case KEYtop_level_match:
-	  hs << "anchor";
+	  os << indent() << "anchor";
 	  break;
 	case KEYcase_stmt:
-	  hs << case_stmt_expr(header);
+	  os << indent() << case_stmt_expr(header);
 	  break;
 	default:
 	  aps_error(header,"Cannot handle this header for Match");
 	  break;
 	}
+	os << " match {\n";
+	++nesting_level;
+	os << indent() << "case " << matcher_pat(m) << " => {\n";
+	++nesting_level;
       }
       break;
     }
-  }
-  aps_error(d,"internal error: reached null parent!");
-  return bindings;
+}
+
+static void dump_local_context_end(void *p, Declaration d, ostream& os)
+{
+  if (p == 0) aps_error(d,"internal error: reached null parent!");
+  else switch (ABSTRACT_APS_tnode_phylum(p)) {
+    case KEYDeclaration:
+      if (Declaration_KEY((Declaration)p) == KEYtop_level_match) return;
+      /* FALL THROUGH */
+    default:
+      dump_local_context_end(tnode_parent(p),d,os);
+      break;
+    case KEYMatch: 
+      --nesting_level;
+      os << indent() << "}\n";
+      --nesting_level;
+      os << indent() << "}\n";
+      dump_local_context_end(tnode_parent(p),d,os);
+      break;
+    }
 }
 
 void implement_local_attributes(vector<Declaration>& local_attributes,
@@ -401,17 +411,17 @@ void implement_local_attributes(vector<Declaration>& local_attributes,
     char *name = decl_name(d);
     bool is_col = direction_is_collection(value_decl_direction(d));
     
-    oss << indent() << "def c" << i << "_" << name << "(anchor : Phylum)"
+    oss << indent() << "def c" << i << "_" << name << "(anchor : Any) : "
 	<< value_decl_type(d) << " = {\n";
     ++nesting_level;
-    oss << local_attribute_context_bindings(d);
+    dump_local_context_begin(d,d,oss);
     if (is_col) {
       dump_init_collection(d,oss);
     }
-    oss << "\n"; // blank line
     dump_Block(b,dump_attr_assign,d,oss);
     dump_default_return(value_decl_default(d),value_decl_direction(d),
 			string("\"local ")+name+"\"",oss);
+    dump_local_context_end(d,d,oss);
     --nesting_level;
     oss << indent() << "}\n";
   }
@@ -440,16 +450,16 @@ void implement_attributes(const vector<Declaration>& attrs,
     ++nesting_level;
     if (is_col) {
       dump_init_collection(rdecl,oss);
-    } else {
-      if (inh) {
-	oss << indent() << "val node : Phylum = anode.parent;\n";
-	oss << indent() << "if (node != 0) {\n";
-	++nesting_level;
-      } else {
-	oss << indent() << "val node : Phylum = anode;\n";
-      }
-      oss << indent() << "val anchor : Phylum = node;\n";
     }
+    if (inh) {
+      oss << indent() << "val anchor = anode.asInstanceOf[Phylum].parent;\n";
+      oss << indent() << "if (anchor != null) {\n";
+      ++nesting_level;
+    } else {
+      oss << indent() << "val anchor = anode;\n";
+    }
+    oss << indent() << "anchor match {\n";
+    ++nesting_level;
     for (vector<Declaration>::const_iterator i = tlms.begin();
 	 i != tlms.end(); ++i) {
       if (is_col) push_attr_context(*i);
@@ -460,7 +470,9 @@ void implement_attributes(const vector<Declaration>& attrs,
       pop_attr_context(oss);
       if (is_col) pop_attr_context(oss);
     }
-    if (inh & !is_col) {
+    --nesting_level;
+    oss << indent() << "}\n";
+    if (inh) {
       --nesting_level;
       oss << indent() << "}\n";
     }
@@ -539,7 +551,7 @@ public:
     }
 
     void dump_compute(string cfname, ostream& oss) {
-      oss << indent() << "def compute(node : NodeType) : ValueType = "
+      oss << indent() << "override def compute(node : NodeType) : ValueType = "
 	  << cfname << "(node);\n";
     }
     
@@ -588,6 +600,7 @@ public:
 	  break;
 	}
       }
+      // oss << indent() << "super.finish();\n";
       --nesting_level;
       oss << indent() << "}\n\n";
       clear_implementation_marks(module_decl);
