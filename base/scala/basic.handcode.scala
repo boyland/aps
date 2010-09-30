@@ -1,11 +1,11 @@
-import Evaluation._;
+import APS._;
 
 object basic_implicit {
   val m_Boolean = new M_BOOLEAN;
   type T_Boolean = m_Boolean.T_Result;
   val t_Boolean = m_Boolean.t_Result;
-  var v_true:T_Boolean = true;
-  var v_false:T_Boolean = false;
+  val v_true:T_Boolean = true;
+  val v_false:T_Boolean = false;
   val v_and = f_and _;
   def f_and(v__23 : T_Boolean, v__24 : T_Boolean):T_Boolean = v__23 && v__24;
   val v_or = f_or _;
@@ -40,8 +40,8 @@ object basic_implicit {
   def f_char_code(v_x : T_Character):T_Integer = v_x;
   val v_int_char = f_int_char _;
   def f_int_char(v_x : T_Integer):T_Character = v_x.asInstanceOf[Char];
-  var v_tab:T_Character = v_int_char(9);
-  var v_newline:T_Character = v_int_char(10);
+  val v_tab:T_Character = v_int_char(9);
+  val v_newline:T_Character = v_int_char(10);
 
   val v_cand = f_cand _;
   def f_cand(v_x : T_Boolean, v_y : T_Boolean):T_Boolean = v_and(v_not(v_x),v_y);
@@ -126,8 +126,8 @@ trait C_ORDERED[T_Result] extends C_COMPARABLE[T_Result] {
 }
 
 trait C_NUMERIC[T_Result] extends C_BASIC[T_Result] {
-  val v_zero : T_Result;
-  val v_one : T_Result;
+  def v_zero : T_Result;
+  def v_one : T_Result;
   val v_plus : (T_Result,T_Result) => T_Result;
   val v_minus : (T_Result,T_Result) => T_Result;
   val v_times : (T_Result,T_Result) => T_Result;
@@ -220,8 +220,8 @@ class M_BOOLEAN extends Module("BOOLEAN") {
 
 trait C_INTEGER[T_Result] extends C_NUMERIC[T_Result] with C_ORDERED[T_Result] with C_PRINTABLE[T_Result] {
   val v_assert : (T_Result) => Unit;
-  val v_zero : T_Result;
-  val v_one : T_Result;
+  def v_zero : T_Result;
+  def v_one : T_Result;
   val v_equal : (T_Result,T_Result) => T_Boolean;
   val v_less : (T_Result,T_Result) => T_Boolean;
   val v_less_equal : (T_Result,T_Result) => T_Boolean;
@@ -531,12 +531,12 @@ class M__basic_10[T_T,T_U](t_T:C_PHYLUM[T_T],t_U:C_PHYLUM[T_U]) {
 */
 
 trait C_COMBINABLE[T_Result] {
-  val v_initial : T_Result;
+  def v_initial : T_Result;
   val v_combine : (T_Result,T_Result) => T_Result;
 }
 
 trait C_COMPLETE_PARTIAL_ORDER[T_Result] extends C_BASIC[T_Result] {
-  val v_bottom : T_Result;
+  def v_bottom : T_Result;
   val v_compare : (T_Result,T_Result) => T_Boolean;
   val v_compare_equal : (T_Result,T_Result) => T_Boolean;
 }
@@ -801,7 +801,10 @@ class M_SEQUENCE[T_ElemType <: Phylum](t_ElemType:C_PHYLUM[T_ElemType] with C_BA
       case c_single(e) => List(e)
       case c_none() => List()
     };
-    def u__op_AC(x:T_Result) : Seq[T_ElemType] = toList(x);
+    def u__op_AC(x:Any) : Option[Seq[T_ElemType]] = x match {
+      case x : T_Result => Some(toList(x));
+      case _ => None
+    };
     val p__op_AC = new PatternSeqFunction[T_ElemType,T_Result](u__op_AC);
     val v_nth = f_nth _;
     def f_nth(v_i : T_Integer, v_l : T_Result):T_ElemType = toList(v_l)(v_i);
@@ -822,7 +825,7 @@ class M_SEQUENCE[T_ElemType <: Phylum](t_ElemType:C_PHYLUM[T_ElemType] with C_BA
     }
     val v_append = f_append _;
     def f_append(v_l1 : T_Result, v_l2 : T_Result):T_Result = c_append(v_l1,v_l2);
-    def u_append(x:T_Result) : Option[(T_Result,T_Result)] = x match {
+    def u_append(x:Any) : Option[(T_Result,T_Result)] = x match {
       case c_append(v_l1,v_l2) => Some((v_l1,v_l2));
       case _ => None };
     val p_append = new PatternFunction[(T_Result,T_Result),T_Result](u_append);
@@ -832,7 +835,7 @@ class M_SEQUENCE[T_ElemType <: Phylum](t_ElemType:C_PHYLUM[T_ElemType] with C_BA
     }
     val v_single = f_single _;
     def f_single(v_x : T_ElemType):T_Result = c_single(v_x);
-    def u_single(x:T_Result) : Option[(T_ElemType)] = x match {
+    def u_single(x:Any) : Option[(T_ElemType)] = x match {
       case c_single(v_x) => Some((v_x));
       case _ => None };
     val p_single = new PatternFunction[(T_ElemType),T_Result](u_single);
@@ -842,7 +845,7 @@ class M_SEQUENCE[T_ElemType <: Phylum](t_ElemType:C_PHYLUM[T_ElemType] with C_BA
     }
     val v_none = f_none _;
     def f_none():T_Result = c_none();
-    def u_none(x:T_Result) : Option[Unit] = x match {
+    def u_none(x:Any) : Option[Unit] = x match {
       case c_none() => Some(());
       case _ => None };
     val p_none = new Pattern0Function[T_Result](u_none);
@@ -869,7 +872,7 @@ trait C_BAG[T_Result, T_ElemType] extends C_COLLECTION[T_Result,T_ElemType] with
   val v_single : (T_ElemType) => T_Result;
   val p_none : Pattern0Function[T_Result];
   val v_none : () => T_Result;
-  val v_initial : T_Result;
+  def v_initial : T_Result;
   val v_combine : (T_Result,T_Result) => T_Result;
 }
 
@@ -891,7 +894,10 @@ class I_BAG[T_ElemType] extends C_BAG[List[T_ElemType],T_ElemType] {
   def f__op_AC(v_l : T_ElemType*):T_Result = v_l.toList;
   
   val p__op_AC = new PatternSeqFunction[T_ElemType,T_Result](u__op_AC);
-  def u__op_AC(x:T_Result) : Seq[T_ElemType] = x;
+  def u__op_AC(x:Any) : Option[Seq[T_ElemType]] = x match {
+    case x:T_Result => Some(x)
+    case _ => None
+  };
   
   val v_member = f_member _;
   def f_member(v_e : T_ElemType, v_l : T_Result):T_Boolean =
@@ -899,21 +905,27 @@ class I_BAG[T_ElemType] extends C_BAG[List[T_ElemType],T_ElemType] {
   
   val v_append = f_append _;
   def f_append(v_l1 : T_Result, v_l2 : T_Result):T_Result = v_l1 ++ v_l2;
-  def u_append(x:T_Result) : Option[(T_Result,T_Result)] = x match {
-    case x::y::l => Some((List(x),y::l))
-    case _ => None };
+  def u_append(x:Any) : Option[(T_Result,T_Result)] = x match {
+    case x:T_Result => x match {
+      case x1::x2::l => Some((List(x1),x2::l))
+      case _ => None 
+    };
+    case _ => None;
+  }
   val p_append = new PatternFunction[(T_Result,T_Result),T_Result](u_append);
   
   val v_single = f_single _;
   def f_single(v_x : T_ElemType):T_Result = List(v_x);
-  def u_single(x:T_Result) : Option[(T_ElemType)] = x match {
-    case v_x::Nil => Some((v_x));
+  def u_single(x:Any) : Option[(T_ElemType)] = x match {
+    case x:T_Result => x match {
+      case v_x::Nil => Some((v_x));
+      case _ => None };
     case _ => None };
   val p_single = new PatternFunction[(T_ElemType),T_Result](u_single);
   
   val v_none = f_none _;
   def f_none():T_Result = Nil;
-  def u_none(x:T_Result) : Option[Unit] = x match {
+  def u_none(x:Any) : Option[Unit] = x match {
     case Nil => Some(());
     case _ => None };
   val p_none = new Pattern0Function[T_Result](u_none);
@@ -1066,7 +1078,10 @@ class M_SET[T_ElemType](t_ElemType:C_BASIC[T_ElemType]) extends Module("SET") {
     def f__op_AC(v_l : T_ElemType*):T_Result = ListSet(v_l:_*);
     
     val p__op_AC = new PatternSeqFunction[T_ElemType,T_Result](u__op_AC);
-    def u__op_AC(x:T_Result) : Seq[T_ElemType] = x.toSeq;
+    def u__op_AC(x:Any) : Option[Seq[T_ElemType]] = x match {
+      case x:T_Result => Some(x.toSeq);
+      case _ => None
+    };
     
     val v_member = f_member _;
     def f_member(v_e : T_ElemType, v_l : T_Result):T_Boolean =
@@ -1075,25 +1090,33 @@ class M_SET[T_ElemType](t_ElemType:C_BASIC[T_ElemType]) extends Module("SET") {
     val v_append = f_append _;
     def f_append(v_l1 : T_Result, v_l2 : T_Result):T_Result =
       v_l1 ++ v_l2;
-    def u_append(x:T_Result) : Option[(T_Result,T_Result)] =
-      if (x.size > 1) {
-	val y : T_ElemType = x.elements.next();
-	Some((ListSet(y),x - y))
-      } else {
-	None
-      };
+    def u_append(x:Any) : Option[(T_Result,T_Result)] = x match {
+      case x:T_Result =>
+	if (x.size > 1) {
+	  val y : T_ElemType = x.elements.next();
+	  Some((ListSet(y),x - y))
+	} else {
+	  None
+	};
+      case _ => None;
+    }
     val p_append = new PatternFunction[(T_Result,T_Result),T_Result](u_append);
     
     val v_single = f_single _;
     def f_single(v_x : T_ElemType):T_Result = ListSet(v_x);
-    def u_single(x:T_Result) : Option[(T_ElemType)] =
-      if (x.size == 1) Some(x.elements.next()) else None;
+    def u_single(x:Any) : Option[(T_ElemType)] = x match {
+      case x:T_Result => if (x.size == 1) Some(x.elements.next()) else None;
+      case _ => None
+    };
     val p_single = new PatternFunction[(T_ElemType),T_Result](u_single);
     
     val v_none = f_none _;
     def f_none():T_Result = ListSet();
-    def u_none(x:T_Result) : Option[Unit] =
-      if (x.size == 0) Some(()) else None;
+    def u_none(x:Any) : Option[Unit] = x match {
+      case x:T_Result =>
+	if (x.size == 0) Some(()) else None;
+      case _ => None
+    };
     val p_none = new Pattern0Function[T_Result](u_none);
 
     val v_initial = v_none();
@@ -1401,7 +1424,7 @@ class M_INTERSECTION_LATTICE[T_ElemType, T_ST](t_ElemType:Any,t_ST:C_SET[T_ST,T_
   }
 }
 
-trait C_PAIR[T_Result, T_T1, T_T2] {
+trait C_PAIR[T_Result, T_T1, T_T2] extends C_BASIC[T_Result] with C_TYPE[T_Result] {
   val p_pair : PatternFunction[(T_T1,T_T2),T_Result];
   val v_pair : (T_T1,T_T2) => T_Result;
   val v_fst : (T_Result) => T_T1;
@@ -1416,7 +1439,6 @@ class M_PAIR[T_T1, T_T2](t_T1:C_BASIC[T_T1],t_T2:C_BASIC[T_T2]) extends Module("
   type T_Result = T_tmp;
   object t_Result extends C_PAIR[T_Result,T_T1,T_T2] {
     val v_assert = t_tmp.v_assert;
-    val v_equal = t_tmp.v_equal;
     val v_node_equivalent = t_tmp.v_node_equivalent;
     val v_string = t_tmp.v_string;
 
@@ -1425,7 +1447,7 @@ class M_PAIR[T_T1, T_T2](t_T1:C_BASIC[T_T1],t_T2:C_BASIC[T_T2]) extends Module("
     }
     val v_pair = f_pair _;
     def f_pair(v_x : T_T1, v_y : T_T2):T_Result = c_pair(v_x,v_y);
-    def u_pair(x:T_Result) : Option[(T_T1,T_T2)] = x match {
+    def u_pair(x:Any) : Option[(T_T1,T_T2)] = x match {
       case c_pair(v_x,v_y) => Some((v_x,v_y));
       case _ => None };
     val p_pair = new PatternFunction[(T_T1,T_T2),T_Result](u_pair);
@@ -1443,6 +1465,21 @@ class M_PAIR[T_T1, T_T2](t_T1:C_BASIC[T_T1],t_T2:C_BASIC[T_T2]) extends Module("
 	case p_pair(_,v_y) => return v_y
 	case _ => throw UndefinedAttributeException("local snd")
       };
+
+    val v_equal = f_equal _;
+    def f_equal(v_x : T_Result, v_y : T_Result):T_Boolean = {
+      v_x match {
+        case p_pair(v_x1,v_x2) => {
+          v_y match {
+            case p_pair(v_y1,v_y2) => {
+              return v_and(new M__basic_2[ T_T1](t_T1).v__op_0(v_x1,v_y1),new 
+			   M__basic_2[ T_T2](t_T2).v__op_0(v_x2,v_y2));
+            }
+          }
+        }
+      }
+      throw UndefinedAttributeException("local equal");
+    }
 
     def finish() : Unit = {
     }
@@ -1479,7 +1516,10 @@ class M_STRING extends Module("STRING") {
     def f__op_AC(v_l : Char*):T_Result = (v_l :\ "")((c,s) => c + s);
     
     val p__op_AC = new PatternSeqFunction[Char,T_Result](u__op_AC);
-    def u__op_AC(x:T_Result) : Seq[Char] = new RichString(x);
+    def u__op_AC(x:Any) : Option[Seq[Char]] = x match {
+      case x:String => Some(new RichString(x));
+      case _ => None
+    };
     
     val v_member = f_member _;
     def f_member(v_e : Char, v_l : T_Result):T_Boolean =
@@ -1487,22 +1527,31 @@ class M_STRING extends Module("STRING") {
     
     val v_append = f_append _;
     def f_append(v_l1 : T_Result, v_l2 : T_Result):T_Result = v_l1 + v_l2;
-    def u_append(x:T_Result) : Option[(T_Result,T_Result)] =
-      if (x.length() > 1) Some((x.substring(0,1),x.substring(1)))
-      else None;
+    def u_append(x:Any) : Option[(T_Result,T_Result)] = x match {
+      case x:String  =>
+	if (x.length() > 1) Some((x.substring(0,1),x.substring(1)))
+	else None;
+      case _ => None
+    };
     val p_append = new PatternFunction[(T_Result,T_Result),T_Result](u_append);
     
     val v_single = f_single _;
     def f_single(v_x : Char):T_Result = "" + v_x;
-    def u_single(x:T_Result) : Option[(Char)] = 
-      if (x.length() == 1) Some(x.charAt(0))
-      else None;
+    def u_single(x:Any) : Option[(Char)] = x match {
+      case x:String =>
+	if (x.length() == 1) Some(x.charAt(0))
+	else None;
+      case _ => None
+    };
     val p_single = new PatternFunction[(Char),T_Result](u_single);
     
     val v_none = f_none _;
     def f_none():T_Result = "";
-    def u_none(x:T_Result) : Option[Unit] =
-      if (x.length() == 0) Some(()) else None;
+    def u_none(x:Any) : Option[Unit] = x match {
+      case x:String =>
+	if (x.length() == 0) Some(()) else None;
+      case _ => None
+    };
     val p_none = new Pattern0Function[T_Result](u_none);
 
     val v_cons = f_cons _;
