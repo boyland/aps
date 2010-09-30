@@ -18,7 +18,7 @@ aps-ag.a : ${APSAGOBJS}
 	${AR} -cr aps-ag.a ${APSAGOBJS}
 
 aps-info.o aps-bind.o aps-ag-util.o aps-fiber.o aps-fiber-callsite.o\
-aps-dnc.o aps-cycle.o aps-oag.o : aps-info.h
+aps-dnc.o aps-cycle.o aps-oag.o : aps-info.h aps-bind.h
 aps-dnc.o aps-cycle.o aps-oag.o\
 aps-fiber.o aps-fiber-callsite.o: aps-fiber.h aps-dnc.h aps-fiber-callsite.h
 aps-oag.o : aps-oag.h
