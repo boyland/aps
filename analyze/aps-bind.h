@@ -1,8 +1,10 @@
 extern void bind_Program(Program);
+extern Unit first_Unit(Units);
 extern Declaration first_Declaration(Declarations);
 extern Expression first_Actual(Actuals);
 extern Expression first_Expression(Expressions);
 extern Pattern first_PatternActual(PatternActuals);
+extern Pattern first_Pattern(Patterns);
 extern Type first_TypeActual(TypeActuals);
 extern Match first_Match(Matches);
 
