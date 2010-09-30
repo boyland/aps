@@ -641,7 +641,7 @@ module INTERSECTION_LATTICE[ElemType;ST :: SET[ElemType]](universe : ST)
 
 --- I may add a primitive pair constructor that
 --- is structurally typed.
-module PAIR[T1,T2 :: BASIC[]] begin
+module PAIR[T1,T2 :: BASIC[]] :: BASIC[] begin
   constructor pair(x:T1;y:T2) : Result;
   function fst(p : Result) : T1 begin
     case p begin
@@ -654,6 +654,17 @@ module PAIR[T1,T2 :: BASIC[]] begin
     case p begin
       match pair(?,?y) begin
 	result := y;
+      end;
+    end;
+  end;
+  function equal(x,y:Result) : Boolean begin
+    case x begin
+      match pair(?x1,?x2) begin
+        case y begin
+	  match pair(?y1,?y2) begin
+	    result := x1 = y1 and x2 = y2;
+	  end;
+	end;
       end;
     end;
   end;
