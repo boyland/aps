@@ -10,6 +10,7 @@ struct info {
   void *parent;
   union {
     struct Program_info program_info;
+    struct Unit_info unit_info;
     struct Use_info use_info;
     struct Declaration_info declaration_info;
     struct Match_info match_info;
@@ -53,6 +54,10 @@ void set_tnode_parent(Program p) {
 
 struct Program_info *Program_info(Program _node) {
   return &(tnode_info(_node)->var.program_info);
+}
+
+struct Unit_info *Unit_info(Unit _node) {
+  return &(tnode_info(_node)->var.unit_info);
 }
 
 struct Use_info *Use_info(Use _node) {
