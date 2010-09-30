@@ -15,7 +15,7 @@ object Debug {
   def activate() : Unit = _active = true;
 
   def indent() {
-    for (i <- 0 until 10)
+    for (i <- 0 until depth)
       print(' ');
   }
 
@@ -97,16 +97,17 @@ abstract class Phylum extends Type
   def getType : C_PHYLUM[_];
   val lineNumber = PARSE.lineNumber;
   private var _nodeNumber : Int = 0;
-  val nodeNumber = _nodeNumber;
+  def nodeNumber = _nodeNumber;
   private var _parent : Phylum = null;
-  def parent = _parent;
+  def parent : Phylum = _parent;
   def children : List[Phylum];
-  def register : Unit = {
-    getType.asInstanceOf[I_PHYLUM[Phylum]].registerNode(this);
+  def register : this.type = {
+    _nodeNumber = getType.asInstanceOf[I_PHYLUM[Phylum]].registerNode(this);
     for (ch <- children) {
       assert (ch.parent == null);
       ch._parent = this;
     }
+    this
   }
 }
 
@@ -114,16 +115,19 @@ trait C_PHYLUM[T_Result] extends C_TYPE[T_Result] {
   val v_identical : (T_Result,T_Result) => Boolean;
   val v_object_id : (T_Result) => Int;
   val v_object_id_less: (T_Result, T_Result) => Boolean;
-  val v_nil : T_Result;
+  def v_nil : T_Result;
 }
 
 abstract class I_PHYLUM[T_Result >: Null] 
 	 extends I_TYPE[T_Result] with C_PHYLUM[T_Result] 
 {
   private val allNodes : Buffer[T_Result] = new ListBuffer[T_Result];
-  def registerNode(x : Phylum) : Unit = {
+  def registerNode(x : Phylum) : Int = {
     assert (!isComplete);
+    val result = size;
     allNodes += x.asInstanceOf[T_Result];
+    // println("registering " + x + " as #" + result);
+    result
   };
   def size : Int = allNodes.size;
   def get(i : Int) : T_Result = allNodes(i);
@@ -160,10 +164,11 @@ class M_PHYLUM extends Module("<anonymous phylum>")
 }
 
 class Evaluation {
-  var inCycle : boolean = false;
+  var inCycle : Boolean = false;
 }
 
-object Evaluation {
+object APS {
+  // evaluation
   sealed trait EvalStatus;
 
   case object UNINITIALIZED extends EvalStatus;
@@ -184,6 +189,10 @@ object Evaluation {
   val pending : Stack[Evaluation] = new Stack();
   val acyclic : Evaluation = new Evaluation;
   pending.push(acyclic); // stack should never be empty
+
+  class P_AND[T] {
+    def unapply(x : T) : Option[(T,T)] = Some((x,x));
+  }
 }
 
 
@@ -195,7 +204,7 @@ extends Module("Attribute " + name)
 {
   type NodeType = T_P;
   type ValueType = T_V;
-  import Evaluation._;
+  import APS._;
 
   private val values : Buffer[ValueType] = new ArrayBuffer();
   private val status : Buffer[EvalStatus] = new ArrayBuffer();
@@ -243,7 +252,7 @@ extends Module("Attribute " + name)
   }
 
   def evaluate(n : NodeType) : ValueType = {
-    Debug.begin(n + "." + name);
+    Debug.begin(n + "#" + (n.asInstanceOf[Phylum].nodeNumber) + "." + name);
     try {
       evaluationStarted = true;
       val v = doEvaluate(n);
@@ -322,7 +331,7 @@ trait Collection[V_P,V_T] extends Attribute[V_P,V_T] {
 }
 
 trait Circular[V_P,V_T] extends Attribute[V_P,V_T] {
-  import Evaluation._;
+  import APS._;
 
   def lattice : C_LATTICE[ValueType];
 
@@ -374,6 +383,6 @@ class Pattern0Function[R](f : R => Option[Unit]) {
   def unapply(x : R) : Boolean = f(x) == Some(());
 }
 
-class PatternSeqFunction[A,R](f : R => Seq[A]) {
-  def unapplySeq(x : R) : Option[Seq[A]] = Some(f(x));
+class PatternSeqFunction[A,R](f : R => Option[Seq[A]]) {
+  def unapplySeq(x : R) : Option[Seq[A]] = f(x);
 }
