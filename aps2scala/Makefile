@@ -8,6 +8,12 @@ aps2scala : ${APS2SCALAOBJS} ${APS2SCALALIBS}
 
 ${APS2SCALAOBJS} : implement.h dump-scala.h
 
+%.cc : RCS/%.cc,v
+	co $<
+
+%.h : RCS/%.h,v
+	co $<
+
 install: aps2scala
 	mv aps2scala ../bin/.
 
