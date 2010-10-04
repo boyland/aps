@@ -172,7 +172,7 @@ class M_NULL_TYPE extends Module("NULL_TYPE") {
   class T_tmp extends Type {
     def getType = t_tmp;
   }
-  object t_tmp extends I_TYPE[T_tmp] {}
+  object t_tmp extends I_TYPE[T_tmp]("NULL") {}
   type T_Result = T_tmp;
   object t_Result extends C_NULL_TYPE[T_Result] {
     val v_assert = t_tmp.v_assert;
@@ -477,9 +477,7 @@ class M_NULL_PHYLUM extends Module("NULL_PHYLUM") {
     def getType : C_PHYLUM[_] = t_tmp;
     def children : List[Phylum] = List();
   }
-  object t_tmp extends I_PHYLUM[T_tmp] {
-    def isComplete : Boolean = complete;
-  }
+  object t_tmp extends I_PHYLUM[T_tmp]("null") {}
 
   type T_Result = T_tmp;
   object t_Result extends C_NULL_PHYLUM[T_Result] {
@@ -760,7 +758,7 @@ class M__basic_17[T_E,T_T](t_E:Any,t_T:C_ORDERED_COLLECTION[T_T,T_E]) {
   def f_butnth_from_end(v_n : T_Integer, v_x : T_T):T_T = t_T.v_butsubseq_from_end(v_x,v_n, new M__basic_4[ T_Integer](t_Integer).v__op_s(v_n,1));
 };
 
-trait C_SEQUENCE[T_Result, T_ElemType] extends C_READ_ONLY_ORDERED_COLLECTION[T_Result,T_ElemType] {
+trait C_SEQUENCE[T_Result, T_ElemType] extends C_READ_ONLY_ORDERED_COLLECTION[T_Result,T_ElemType] with C_PHYLUM[T_Result] {
   val v_assert : (T_Result) => Unit;
   val p__op_AC : PatternSeqFunction[(T_ElemType),T_Result];
   val v_nth : (T_Integer,T_Result) => T_ElemType;
@@ -780,14 +778,13 @@ class M_SEQUENCE[T_ElemType <: Phylum](t_ElemType:C_PHYLUM[T_ElemType] with C_BA
   abstract class T_tmp extends Phylum {
     def getType : C_PHYLUM[_] = t_tmp;
   }
-  object t_tmp extends I_PHYLUM[T_tmp] {
-    def isComplete : Boolean = complete;
-  }
+  object t_tmp extends I_PHYLUM[T_tmp]("Result") {}
 
   type T_Result = T_tmp;
   object t_Result extends C_SEQUENCE[T_Result,T_ElemType] {
     val v_assert = t_tmp.v_assert;
     val v_identical = t_tmp.v_identical;
+    val v_node_equivalent = t_tmp.v_node_equivalent;
     val v_equal = t_tmp.v_equal;
     val v_string = t_tmp.v_string;
     val v_object_id = t_tmp.v_object_id;
@@ -1435,7 +1432,7 @@ class M_PAIR[T_T1, T_T2](t_T1:C_BASIC[T_T1],t_T2:C_BASIC[T_T2]) extends Module("
   class T_tmp extends Type {
     def getType = t_tmp;
   }
-  object t_tmp extends I_TYPE[T_tmp] {}
+  object t_tmp extends I_TYPE[T_tmp]("Result") {}
   type T_Result = T_tmp;
   object t_Result extends C_PAIR[T_Result,T_T1,T_T2] {
     val v_assert = t_tmp.v_assert;
