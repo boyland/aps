@@ -44,13 +44,14 @@ object Debug {
 }
 
 class Module(val mname : String) {
-  var complete : Boolean = false;
+  private var complete : Boolean = false;
   def finish() : Unit = {
     if (Debug.active) {
       println("Module " + mname + " is now complete.");
     }
     complete = true; 
   }
+  def isComplete : Boolean = complete;
 };
  
 abstract class Type
@@ -66,7 +67,7 @@ trait C_TYPE[T_Result] extends C_BASIC[T_Result] with C_PRINTABLE[T_Result]
   val v_string : (T_Result) => String;
 }
 
-class I_TYPE[T_Result] extends C_TYPE[T_Result] {
+class I_TYPE[T_Result](n : String) extends Module(n) with C_TYPE[T_Result] {
   val v_assert = f_assert _;
   val v_equal = f_equal _;
   val v_node_equivalent = f_node_equivalent _;
@@ -85,7 +86,7 @@ class M_TYPE extends Module("<anonymous type>") {
   class T_Result extends Type {
     def getType : C_TYPE[_] = t_Result;
   }
-  object t_Result extends I_TYPE[T_Result] {}
+  object t_Result extends I_TYPE[T_Result]("<anonymous>") {}
 }
 
 object PARSE {
@@ -118,8 +119,8 @@ trait C_PHYLUM[T_Result] extends C_TYPE[T_Result] {
   def v_nil : T_Result;
 }
 
-abstract class I_PHYLUM[T_Result >: Null] 
-	 extends I_TYPE[T_Result] with C_PHYLUM[T_Result] 
+abstract class I_PHYLUM[T_Result >: Null](n : String)
+	 extends I_TYPE[T_Result](n) with C_PHYLUM[T_Result] 
 {
   private val allNodes : Buffer[T_Result] = new ListBuffer[T_Result];
   def registerNode(x : Phylum) : Int = {
@@ -138,7 +139,8 @@ abstract class I_PHYLUM[T_Result >: Null]
 
   override def f_equal(x : T_Result, y : T_Result) : Boolean = f_identical(x,y);
   def f_identical(x : T_Result, y : T_Result) : Boolean =
-    f_object_id(x) == f_object_id(y);
+    if (x == null || y == null) x == y
+    else f_object_id(x) == f_object_id(y);
   def f_object_id(x : T_Result) : Int = 
     x match {
       case n:Phylum => n.nodeNumber;
@@ -149,7 +151,6 @@ abstract class I_PHYLUM[T_Result >: Null]
     super.f_string(x) + "@" + f_object_id(x);
 
   val v_nil : T_Result = null;
-  def isComplete : Boolean;
 }
 
 class M_PHYLUM extends Module("<anonymous phylum>")
@@ -158,9 +159,11 @@ class M_PHYLUM extends Module("<anonymous phylum>")
     def getType : I_PHYLUM[_] = t_Result;
     def children : List[Phylum] = List();
   }
-  object t_Result extends I_PHYLUM[T_Result] {
-    def isComplete : Boolean = complete;
-  }  
+  object t_Result extends I_PHYLUM[T_Result]("anonymous") { }
+  override def finish() {
+    super.finish();
+    t_Result.finish();
+  }
 }
 
 class Evaluation {
@@ -190,13 +193,9 @@ object APS {
   val acyclic : Evaluation = new Evaluation;
   pending.push(acyclic); // stack should never be empty
 
-  class P_AND[T] {
-    def unapply(x : T) : Option[(T,T)] = Some((x,x));
-  }
 }
 
-
-class Attribute[T_P,T_V]
+class Attribute[T_P >: Null, T_V]
                (val t_P : C_PHYLUM[T_P],
 		val t_V : Any, // unused
 		val name : String) 
@@ -218,10 +217,11 @@ extends Module("Attribute " + name)
   }
     
   override def finish() : Unit = {
-    if (!complete) {
-      val n = t_P.asInstanceOf[I_PHYLUM[Phylum]].size;
+    if (!isComplete) {
+      val t_NodeType = t_P.asInstanceOf[I_PHYLUM[NodeType]];
+      val n = t_NodeType.size;
       for (i <- 0 until n) {
-	evaluate(t_P.asInstanceOf[I_PHYLUM[Phylum]].get(i).asInstanceOf[NodeType]);
+	evaluate(t_NodeType.get(i));
       }
     }
     super.finish();
@@ -251,11 +251,11 @@ extends Module("Attribute " + name)
     }
   }
 
-  def evaluate(n : NodeType) : ValueType = {
-    Debug.begin(n + "#" + (n.asInstanceOf[Phylum].nodeNumber) + "." + name);
+  def evaluate(n : Any) : ValueType = {
+    Debug.begin(n + "." + name);
     try {
       evaluationStarted = true;
-      val v = doEvaluate(n);
+      val v = doEvaluate(n.asInstanceOf[NodeType]);
       Debug.returns(v);
       v
     } finally {
@@ -319,7 +319,7 @@ extends Module("Attribute " + name)
   }
 }
 
-trait Collection[V_P,V_T] extends Attribute[V_P,V_T] {
+trait Collection[V_P >: Null, V_T] extends Attribute[V_P,V_T] {
   def initial : ValueType;
   def combine(v1 : ValueType, v2 : ValueType) : ValueType;
 
@@ -330,7 +330,7 @@ trait Collection[V_P,V_T] extends Attribute[V_P,V_T] {
   }
 }
 
-trait Circular[V_P,V_T] extends Attribute[V_P,V_T] {
+trait Circular[V_P >: Null, V_T] extends Attribute[V_P,V_T] {
   import APS._;
 
   def lattice : C_LATTICE[ValueType];
@@ -375,14 +375,20 @@ trait Circular[V_P,V_T] extends Attribute[V_P,V_T] {
   }
 }
 
-class PatternFunction[A,R](f : R => Option[A]) {
-  def unapply(x : R) : Option[A] = f(x);
+class PatternFunction[A,R](f : Any => Option[A]) {
+  def unapply(x : Any) : Option[A] = f(x);
 }
 
-class Pattern0Function[R](f : R => Option[Unit]) {
-  def unapply(x : R) : Boolean = f(x) == Some(());
+class Pattern0Function[R](f : Any => Option[Unit]) {
+  def unapply(x : Any) : Boolean = f(x) == Some(());
 }
 
-class PatternSeqFunction[A,R](f : R => Option[Seq[A]]) {
-  def unapplySeq(x : R) : Option[Seq[A]] = f(x);
+class PatternSeqFunction[A,R](f : Any => Option[Seq[A]]) {
+  def unapplySeq(x : Any) : Option[Seq[A]] = f(x);
 }
+
+object P_AND {
+  def unapply[T](x : T) : Option[(T,T)] = Some((x,x));
+}
+
+
