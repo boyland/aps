@@ -251,8 +251,6 @@ void dump_debug_end(ostream& os)
 }
 
 // Output Scala pattern for APS pattern
-void dump_Pattern(Pattern p, ostream& os);
-
 void dump_Pattern(Pattern p, ostream& os) 
 {
   switch (Pattern_KEY(p)) {
@@ -318,15 +316,11 @@ void dump_Pattern(Pattern p, ostream& os)
       dump_Expression(condition_e(and_pattern_p2(p)),os);
       return;
     }
-    switch (Pattern_KEY(and_pattern_p1(p))) {
-    default:
-      aps_error(p,"Cannot implement this kind of and pattern");
-      break;
-    case KEYpattern_var: break;
-    }
+    os << "P_AND(";
     dump_Pattern(and_pattern_p1(p),os);
-    os <<"@";
+    os << ",";
     dump_Pattern(and_pattern_p2(p),os);
+    os << ")";
     break;
 
   case KEYpattern_var:
@@ -335,13 +329,9 @@ void dump_Pattern(Pattern p, ostream& os)
       string n = symbol_name(def_name(formal_def(f)));
       if (n == "_") os << "_";
       else os << "v_" << n;
-      /*
-	SCALA can't handle x:T@xx(...)
-
       if (Pattern_info(p)->pat_type != 0) {
 	os << ":" << Pattern_info(p)->pat_type;
       }
-      */
     }
     break;
   }
@@ -773,13 +763,17 @@ void dump_some_class_decl(Declaration decl, ostream& oss)
   Declarations body = block_body(some_class_decl_contents(decl));
   for (Declaration d=first_Declaration(body); d; d=DECL_NEXT(d)) {
     char *n = decl_code_name(d);
+    bool is_phylum = false;
     switch (Declaration_KEY(d)) {
     default:
       aps_warning(d,"nested thing not handled in APS class");
       break;
     case KEYphylum_decl:
+      is_phylum = true;
+      /*FALLTHROUGH*/
     case KEYtype_decl:
-      oss << indent() << "type T_" << n << ";\n";
+      oss << indent() << "type T_" << n << (is_phylum ? " >: Null" : "")
+	  << ";\n";
       oss << indent() << "val t_" << n << " : ";
       dump_Type_Signature(some_type_decl_type(d),string("T_") + n,oss);
       oss << ";\n";
@@ -823,21 +817,34 @@ void dump_some_class_decl(Declaration decl, ostream& oss)
 
 static void dump_new_type(string n, ostream& oss)
 {
-  oss << indent() << "class T_" << n << " extends Type {\n"
-      << indent() << "  def getType = t_" << n << ";\n"
+  oss << indent() << "object m_" << n << " {\n";
+  ++nesting_level;
+  oss << indent() << "abstract class T_Result extends Type {\n"
+      << indent() << "  def getType = t_Result;\n"
       << indent() << "}\n"
-      << indent() << "object t_" << n << " extends I_TYPE[T_" << n << "] {}"
-      << endl;
+      << indent() << "object t_Result extends I_TYPE[T_Result](\""
+      << n << "\") {}\n"
+      << indent() << "def finish() : Unit = t_Result.finish();\n";
+  --nesting_level;
+  oss << indent() << "}\n";
+  oss << indent() << "type T_"<< n << " = m_" << n << ".T_Result\n";
+  oss << indent() << "val t_" << n << " = m_" << n << ".t_Result\n" << endl;
 }
 
 static void dump_new_phylum(string n, ostream& oss)
 {
-  oss << indent() << "abstract class T_" << n << " extends Phylum {\n"
-      << indent() << "  def getType = t_" << n << ";\n"
+  oss << indent() << "object m_" << n << " {\n";
+  ++nesting_level;
+  oss << indent() << "abstract class T_Result extends Phylum {\n"
+      << indent() << "  def getType = t_Result;\n"
       << indent() << "}\n"
-      << indent() << "object t_" << n << " extends I_PHYLUM[T_" << n << "] {\n" 
-      << indent() << "  def isComplete : Boolean = complete;\n"
-      << indent() << "}\n" << endl;
+      << indent() << "object t_Result extends I_PHYLUM[T_Result](\""
+      << n << "\") {}\n"
+      << indent() << "def finish() : Unit = t_Result.finish();\n";
+  --nesting_level;
+  oss << indent() << "}\n";
+  oss << indent() << "type T_"<< n << " = m_" << n << ".T_Result\n";
+  oss << indent() << "val t_" << n << " = m_" << n << ".t_Result\n" << endl;
 }
 
 static void dump_type_inst(string n, Type ti, ostream& oss)
@@ -1041,7 +1048,14 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
 
       for (Declaration d = first_decl; d ; d = DECL_NEXT(d)) {
 	string n = decl_code_name(d);
-	dump_scala_Declaration(d,oss);
+
+	// dump most declarations:
+	switch (Declaration_KEY(d)) {
+	case KEYtype_renaming: break;
+	default:
+	  dump_scala_Declaration(d,oss);
+	  break;
+	}
       
 	// now specific to module things:
 	switch (Declaration_KEY(d)) {
@@ -1191,7 +1205,7 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
       oss << ";\n";
 
       // the unconstructor function:
-      oss << indent() << "def u_" << name << "(x:"  << rt << ")";
+      oss << indent() << "def u_" << name << "(x:Any)";
       oss << " : Option[" << types << "] = x match {\n";
       oss << indent() << "  case c_" << name << args.str()
 	  << " => Some(" << args.str() << ");\n";
@@ -1355,7 +1369,7 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
       string types = started ? typess.str() : "Unit";
 
       // the unconstructor function:
-      oss << indent() << "def u_" << name << "(x:" << rt << ") : ";
+      oss << indent() << "def u_" << name << "(x:Any) : ";
       oss << " : Option[" << types << "] = x match {\n";
       switch (Pattern_KEY(body)) {
       case KEYno_pattern: break;
