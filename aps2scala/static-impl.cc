@@ -144,9 +144,9 @@ static bool implement_visit_function(AUG_GRAPH* aug_graph,
 	bool is_mod = Declaration_KEY(in->node) == KEYmodule_decl;
 
 	if (is_mod) {
-	  os << indent() << "for (int i=0; i < n_roots; ++i) {\n";
+	  os << indent() << "for (i <- 0 until n_roots) {\n";
 	  ++nesting_level;
-	  os << indent() << "C_PHYLUM::Node *root = phylum->node(i);\n";
+	  os << indent() << "val root = rootphy.get(i);\n";
 	}
 	os << indent() << "visit_" << PHY_GRAPH_NUM(npg)
 	   << "_" << ph << "(";	
@@ -179,8 +179,8 @@ static bool implement_visit_function(AUG_GRAPH* aug_graph,
 	// if first match in case, we evaluate variable:
 	if (m == first_Match(case_stmt_matchers(header))) {
 	  Expression e = case_stmt_expr(header);
-	  Type ty = infer_expr_type(e);
-	  os << indent() << ty << " node=" << e << ";\n";
+	  //Type ty = infer_expr_type(e);
+	  os << indent() << "val node = " << e << ";\n";
 	}
 	os << indent() << "node match {\n";
 	os << indent() << "case " << p << " => {\n";
@@ -206,6 +206,7 @@ static bool implement_visit_function(AUG_GRAPH* aug_graph,
       delete[] true_assignment;
       --nesting_level;
       if (is_match) {
+	os << indent() << "}\n";
 	os << indent() << "case _ => {\n";
       } else {
 	os << indent() << "} else {\n";
@@ -406,7 +407,10 @@ void dump_visit_functions(PHY_GRAPH *phy_graph,
     ++phase;
 
     oss << indent() << "def visit_" << pgn << "_" << phase << "_" << j
-	<< "(anchor : Phylum) : Unit = {\n";
+	<< "(anchor : T_" << decl_name(phy_graph->phylum)
+	<< ") : Unit = anchor match {\n";
+    ++nesting_level;
+    oss << indent() << "case " << matcher_pat(m) << " => {\n";
     ++nesting_level;
 
     bool cont =
@@ -415,12 +419,51 @@ void dump_visit_functions(PHY_GRAPH *phy_graph,
 			       nch,children,child_phase,oss);
 
     --nesting_level;
+    oss << indent() << "}\n";
+    --nesting_level;
     oss << indent() << "}\n" << endl;
 
     if (!cont) break;
   }
     
   delete[] instance_assignment;
+}
+
+void dump_constructor_owner(Declaration pd, ostream& os)
+{
+  switch (Declaration_KEY(pd)) {
+   default:
+      aps_error(pd,"cannot attribute this phylum");
+      break;
+  case KEYphylum_formal:
+    os << "t_" << decl_name(pd) << ".";
+    break;
+  case KEYphylum_decl:
+    switch (Type_KEY(phylum_decl_type(pd))) {
+    default:
+      aps_error(pd,"cannot attribute this phylum");
+      break;
+    case KEYno_type:
+      break;
+    case KEYtype_inst:
+      os << "t_" << decl_name(pd) << ".";
+      break;
+    case KEYtype_use:
+      dump_constructor_owner(USE_DECL(type_use_use(phylum_decl_type(pd))),os);
+      break;
+    }
+    break;
+  case KEYtype_renaming:
+    switch (Type_KEY(phylum_decl_type(pd))) {
+    default:
+      aps_error(pd,"cannot attribute this phylum");
+      break;
+    case KEYtype_use:
+      dump_constructor_owner(USE_DECL(type_use_use(phylum_decl_type(pd))),os);
+      break;
+    }
+    break;
+  }
 }
 
 void dump_visit_functions(PHY_GRAPH *pg, ostream& oss)
@@ -477,15 +520,18 @@ void dump_visit_functions(PHY_GRAPH *pg, ostream& oss)
   
   for (int ph = 1; ph <= max_phase; ++ph) {
     oss << indent() << "def visit_" << pgn << "_" << ph
-	<< "(node : Phylum) : Unit = node match {\n";
+	<< "(node : T_" << decl_name(pg->phylum)
+	<< ") : Unit = node match {\n";
     ++nesting_level;
     for (int j=0; j < num_cons; ++j) {
       Declaration cd = aug_graphs[j]->syntax_decl;
-      oss << indent() << "case " << decl_name(cd) << "(";
+      oss << indent() << "case ";
+      dump_constructor_owner(pg->phylum,oss);
+      oss << "p_" << decl_name(cd) << "(";
       Declarations fs = function_type_formals(constructor_decl_type(cd));
       bool started = false;
       for (Declaration f = first_Declaration(fs); f; f=DECL_NEXT(f)) {
-	if (started) oss << ","; else started = false;
+	if (started) oss << ","; else started = true;
 	oss << "_";
       }
       oss << ") => " << "visit_" << pgn << "_" << ph << "_" << j << "(node);\n";
@@ -514,9 +560,11 @@ void dump_visit_functions(STATE*s, ostream& oss)
   }
   
   Declaration sp = s->start_phylum;
-  oss << indent() << "visit() : Unit = {\n";
+  oss << indent() << "def visit() : Unit = {\n";
   ++nesting_level;
-  oss << indent() << "val n_roots = t_" << decl_name(sp) << ".size();\n";
+  oss << indent() << "val rootphy = t_" << decl_name(sp)
+      << ".asInstanceOf[I_PHYLUM[T_" << decl_name(sp) << "]];\n";
+  oss << indent() << "val n_roots = rootphy.size;\n";
   oss << "\n"; // blank line
 
   int phase = 1;
@@ -549,8 +597,10 @@ static void* dump_scheduled_local(void *pbs, void *node) {
       static int unique = 0;
       LOCAL_UNIQUE_PREFIX(d) = ++unique;
       Declaration_info(d)->decl_flags |= LOCAL_VALUE_FLAG;
-      bs << indent() << value_decl_type(d)
-	 << " v" << unique << "_" << decl_name(d) << ";\n";
+      bs << indent() << "var " << " v" << unique << "_" << decl_name(d)
+	 << " : " << value_decl_type(d)
+	 << " = null.asInstanceOf[" << value_decl_type(d) << "]" 
+	 << ";\n";
     }
   }
   return pbs;
@@ -654,8 +704,14 @@ public:
 	switch(Declaration_KEY(d)) {
 	case KEYphylum_decl:
 	case KEYtype_decl:
-	  kind = "m_";
-	  break;
+	  switch (Type_KEY(some_type_decl_type(d))) {
+	  case KEYno_type:
+	  case KEYtype_inst:
+	    kind = "m_";
+	    break;
+	  default:
+	    break;
+	  }
 	default:
 	  break;
 	}
@@ -692,9 +748,9 @@ public:
     int flags = Declaration_info(vd)->decl_flags;
     if (flags & LOCAL_ATTRIBUTE_FLAG) {
       os << "a" << LOCAL_UNIQUE_PREFIX(vd) << "_"
-	 << decl_name(vd) << "->get(anchor)"; 
+	 << decl_name(vd) << ".get(anchor)"; 
     } else if (flags & ATTRIBUTE_DECL_FLAG) {
-      os << "a" << "_" << decl_name(vd) << "->get";
+      os << "a" << "_" << decl_name(vd) << ".get";
     } else if (flags & LOCAL_VALUE_FLAG) {
       os << "v" << LOCAL_UNIQUE_PREFIX(vd) << "_" << decl_name(vd);
     } else {
