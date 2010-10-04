@@ -133,7 +133,7 @@ static void dump_context_open(void *c, ostream& os) {
 	++nesting_level;
 	break;
       case KEYcase_stmt:
-	os << "else {\n";
+	os << indent() << "case _ => {\n";
 	++nesting_level;
 	break;
       default:
@@ -453,8 +453,6 @@ void implement_attributes(const vector<Declaration>& attrs,
     }
     if (inh) {
       oss << indent() << "val anchor = anode.asInstanceOf[Phylum].parent;\n";
-      oss << indent() << "if (anchor != null) {\n";
-      ++nesting_level;
     } else {
       oss << indent() << "val anchor = anode;\n";
     }
@@ -472,10 +470,6 @@ void implement_attributes(const vector<Declaration>& attrs,
     }
     --nesting_level;
     oss << indent() << "}\n";
-    if (inh) {
-      --nesting_level;
-      oss << indent() << "}\n";
-    }
     dump_default_return(attribute_decl_default(ad),
 			attribute_decl_direction(ad),
 			string("anode.toString()+\".") + name + "\"", oss);
