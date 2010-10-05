@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-Wall -g -DYYDEBUG
+CFLAGS=-Wall -g -DYYDEBUG -DYY_SKIP_YYWRAP
 
 APSLIBOBJS= alloc.o string.o symbol.o \
 	    aps-tree.o aps-traverse.o aps-util.o \
