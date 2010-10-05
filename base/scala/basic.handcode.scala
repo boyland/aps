@@ -777,6 +777,13 @@ trait C_SEQUENCE[T_Result, T_ElemType] extends C_READ_ONLY_ORDERED_COLLECTION[T_
 class M_SEQUENCE[T_ElemType <: Phylum](t_ElemType:C_PHYLUM[T_ElemType] with C_BASIC[T_ElemType]) extends Module("SEQUENCE") {
   abstract class T_tmp extends Phylum {
     def getType : C_PHYLUM[_] = t_tmp;
+    // backward compatability to simple CS 654 level APS:
+    def size() : Int = 0;
+    def nth(i : Int) : T_ElemType = {
+      throw new java.util.NoSuchElementException("no more elements: " + i);
+    }
+    def concat(l : T_tmp) : T_tmp = t_Result.v_append(this,l);
+    def addcopy(x : T_ElemType) : T_tmp = concat(t_Result.v_single(x));
   }
   object t_tmp extends I_PHYLUM[T_tmp]("Result") {}
 
@@ -804,7 +811,7 @@ class M_SEQUENCE[T_ElemType <: Phylum](t_ElemType:C_PHYLUM[T_ElemType] with C_BA
     };
     val p__op_AC = new PatternSeqFunction[T_ElemType,T_Result](u__op_AC);
     val v_nth = f_nth _;
-    def f_nth(v_i : T_Integer, v_l : T_Result):T_ElemType = toList(v_l)(v_i);
+    def f_nth(v_i : T_Integer, v_l : T_Result):T_ElemType = v_l.nth(v_i);
     val v_nth_from_end = f_nth_from_end _;
     def f_nth_from_end(v_i : T_Integer, v_l : T_Result):T_ElemType =
       toList(v_l).reverse.apply(v_i);
@@ -818,7 +825,12 @@ class M_SEQUENCE[T_ElemType <: Phylum](t_ElemType:C_PHYLUM[T_ElemType] with C_BA
     def f_member(v_x : T_ElemType, v_l : T_Result):T_Boolean = 
       toList(v_l).contains(v_x);
     case class c_append(v_l1 : T_Result,v_l2 : T_Result) extends T_Result {
+      private val n1 : Int = v_l1.size();
+      private val n2 : Int = v_l2.size();
       def children : List[Phylum] = List(v_l1,v_l2);
+      override def size() : Int = n1 + n2;
+      override def nth(i : Int) : T_ElemType =
+	if (i < n1) v_l1.nth(i) else v_l2.nth(i-n1);
     }
     val v_append = f_append _;
     def f_append(v_l1 : T_Result, v_l2 : T_Result):T_Result = c_append(v_l1,v_l2);
@@ -829,6 +841,9 @@ class M_SEQUENCE[T_ElemType <: Phylum](t_ElemType:C_PHYLUM[T_ElemType] with C_BA
 
     case class c_single(v_x : T_ElemType) extends T_Result {
       def children : List[Phylum] = List(v_x);
+      override def size() : Int = 1;
+      override def nth(i : Int) : T_ElemType = 
+	if (i == 0) v_x else super.nth(i);
     }
     val v_single = f_single _;
     def f_single(v_x : T_ElemType):T_Result = c_single(v_x);
