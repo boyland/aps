@@ -1052,7 +1052,10 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
 
 	// dump most declarations:
 	switch (Declaration_KEY(d)) {
-	case KEYtype_renaming: break;
+	case KEYtype_renaming:
+	  oss << indent() << "val t_" << n << " = "
+	      << as_val(type_renaming_old(d)) << ";\n"; 
+	  break;
 	default:
 	  dump_scala_Declaration(d,oss);
 	  break;
@@ -1077,10 +1080,10 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
 		<< " = a_" << n << ".evaluate _;\n";
 
 	    if (direction_is_input(attribute_decl_direction(d))) {
-	      oss << indent() << "def s_" << name << "(node:"
+	      oss << indent() << "def s_" << n << "(node:"
 		  << infer_formal_type(f)
 		  << ", value:" << value_decl_type(rdecl)
-		  << ") = " << "a_" << name
+		  << ") = " << "a_" << n
 		  << ".assign(node,value);\n";
 	    }
 
