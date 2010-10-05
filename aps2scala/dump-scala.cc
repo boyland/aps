@@ -303,6 +303,7 @@ void dump_Pattern(Pattern p, ostream& os)
     } else {
       os << "_*";
     }
+    break;
 
   case KEYand_pattern:
     // we handle some common cases
@@ -1074,6 +1075,15 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
 	    oss << indent() << "val v_" << n << " : "
 		<< infer_formal_type(f) << " => " << value_decl_type(rdecl)
 		<< " = a_" << n << ".evaluate _;\n";
+
+	    if (direction_is_input(attribute_decl_direction(d))) {
+	      oss << indent() << "def s_" << name << "(node:"
+		  << infer_formal_type(f)
+		  << ", value:" << value_decl_type(rdecl)
+		  << ") = " << "a_" << name
+		  << ".assign(node,value);\n";
+	    }
+
 	  }
 	  break;
 	case KEYtop_level_match:
@@ -1232,7 +1242,11 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
 	dump_Expression(simple_value(value_decl_default(decl)),oss);
 	break;
       case KEYno_default:
-	aps_error(decl,"No default value?");
+	if (direction_is_circular(value_decl_direction(decl))) {
+	  oss << " = " << as_val(value_decl_type(decl)) << ".v_initial";
+	} else {
+	  aps_error(decl,"No default value?");
+	}
 	break;
       default:
 	aps_error(decl,"Cannot generate code for this");
@@ -1806,6 +1820,10 @@ void dump_Use(Use u, char *prefix, ostream& os)
       break;
     }
   }
+  /*NOT QUITE: we need to check that USE_TYPE_ENV is a polymrphic thing.
+   *if (prefix == string("p_") && USE_TYPE_ENV(u) ) {
+   *aps_error(u,"can't handle polymorphic patterns");
+  }*/
   dump_poly_inst(u,USE_TYPE_ENV(u),os);
   os << prefix << sym;
 }
