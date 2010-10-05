@@ -32,7 +32,7 @@ typedef struct PatternActuals__struct *PatternActuals;
 
 /* the phylum key */
 
-extern enum KEYTYPE_ABSTRACT_APS_Phylum {
+enum KEYTYPE_ABSTRACT_APS_Phylum {
   KEYSignature,
   KEYType,
   KEYExpression,
@@ -58,32 +58,35 @@ extern enum KEYTYPE_ABSTRACT_APS_Phylum {
   KEYTypeActuals,
   KEYPatternActuals,
   KEY_ABSTRACT_APS_None
-} ABSTRACT_APS_tnode_phylum(void *);
+};
+extern enum KEYTYPE_ABSTRACT_APS_Phylum ABSTRACT_APS_tnode_phylum(void *);
 
 /* Phyla, constructors and accessors */
 
-extern enum KEYTYPE_Signature {
+enum KEYTYPE_Signature {
   KEYsig_use,
   KEYsig_inst,
   KEYno_sig,
   KEYmult_sig,
   KEYfixed_sig
-} Signature_KEY(Signature);
+};
+extern enum KEYTYPE_Signature Signature_KEY(Signature);
 extern Signature copy_Signature(Signature);
 extern void assert_Signature(Signature);
 
-extern enum KEYTYPE_Type {
+enum KEYTYPE_Type {
   KEYtype_use,
   KEYtype_inst,
   KEYno_type,
   KEYremote_type,
   KEYprivate_type,
   KEYfunction_type
-} Type_KEY(Type);
+};
+extern enum KEYTYPE_Type Type_KEY(Type);
 extern Type copy_Type(Type);
 extern void assert_Type(Type);
 
-extern enum KEYTYPE_Expression {
+enum KEYTYPE_Expression {
   KEYvalue_use,
   KEYtyped_value,
   KEYinteger_const,
@@ -103,11 +106,12 @@ extern enum KEYTYPE_Expression {
   KEYrepeat,
   KEYcontrolled,
   KEYguarded
-} Expression_KEY(Expression);
+};
+extern enum KEYTYPE_Expression Expression_KEY(Expression);
 extern Expression copy_Expression(Expression);
 extern void assert_Expression(Expression);
 
-extern enum KEYTYPE_Pattern {
+enum KEYTYPE_Pattern {
   KEYpattern_use,
   KEYno_pattern,
   KEYtyped_pattern,
@@ -121,50 +125,57 @@ extern enum KEYTYPE_Pattern {
   KEYcondition,
   KEYpattern_function,
   KEYhole
-} Pattern_KEY(Pattern);
+};
+extern enum KEYTYPE_Pattern Pattern_KEY(Pattern);
 extern Pattern copy_Pattern(Pattern);
 extern void assert_Pattern(Pattern);
 
-extern enum KEYTYPE_Module {
+enum KEYTYPE_Module {
   KEYmodule_use
-} Module_KEY(Module);
+};
+extern enum KEYTYPE_Module Module_KEY(Module);
 extern Module copy_Module(Module);
 extern void assert_Module(Module);
 
-extern enum KEYTYPE_Class {
+enum KEYTYPE_Class {
   KEYclass_use
-} Class_KEY(Class);
+};
+extern enum KEYTYPE_Class Class_KEY(Class);
 extern Class copy_Class(Class);
 extern void assert_Class(Class);
 
-extern enum KEYTYPE_Def {
+enum KEYTYPE_Def {
   KEYdef
-} Def_KEY(Def);
+};
+extern enum KEYTYPE_Def Def_KEY(Def);
 extern Def copy_Def(Def);
 extern void assert_Def(Def);
 
-extern enum KEYTYPE_Use {
+enum KEYTYPE_Use {
   KEYqual_use,
   KEYuse
-} Use_KEY(Use);
+};
+extern enum KEYTYPE_Use Use_KEY(Use);
 extern Use copy_Use(Use);
 extern void assert_Use(Use);
 
-extern enum KEYTYPE_Program {
+enum KEYTYPE_Program {
   KEYprogram
-} Program_KEY(Program);
+};
+extern enum KEYTYPE_Program Program_KEY(Program);
 extern Program copy_Program(Program);
 extern void assert_Program(Program);
 
-extern enum KEYTYPE_Unit {
+enum KEYTYPE_Unit {
   KEYno_unit,
   KEYdecl_unit,
   KEYwith_unit
-} Unit_KEY(Unit);
+};
+extern enum KEYTYPE_Unit Unit_KEY(Unit);
 extern Unit copy_Unit(Unit);
 extern void assert_Unit(Unit);
 
-extern enum KEYTYPE_Declaration {
+enum KEYTYPE_Declaration {
   KEYno_decl,
   KEYclass_decl,
   KEYmodule_decl,
@@ -206,41 +217,47 @@ extern enum KEYTYPE_Declaration {
   KEYfor_in_stmt,
   KEYcase_stmt,
   KEYfor_stmt
-} Declaration_KEY(Declaration);
+};
+extern enum KEYTYPE_Declaration Declaration_KEY(Declaration);
 extern Declaration copy_Declaration(Declaration);
 extern void assert_Declaration(Declaration);
 
-extern enum KEYTYPE_Block {
+enum KEYTYPE_Block {
   KEYblock
-} Block_KEY(Block);
+};
+extern enum KEYTYPE_Block Block_KEY(Block);
 extern Block copy_Block(Block);
 extern void assert_Block(Block);
 
-extern enum KEYTYPE_Match {
+enum KEYTYPE_Match {
   KEYmatcher
-} Match_KEY(Match);
+};
+extern enum KEYTYPE_Match Match_KEY(Match);
 extern Match copy_Match(Match);
 extern void assert_Match(Match);
 
-extern enum KEYTYPE_Direction {
+enum KEYTYPE_Direction {
   KEYdirection
-} Direction_KEY(Direction);
+};
+extern enum KEYTYPE_Direction Direction_KEY(Direction);
 extern Direction copy_Direction(Direction);
 extern void assert_Direction(Direction);
 
-extern enum KEYTYPE_Default {
+enum KEYTYPE_Default {
   KEYsimple,
   KEYno_default,
   KEYcomposite
-} Default_KEY(Default);
+};
+extern enum KEYTYPE_Default Default_KEY(Default);
 extern Default copy_Default(Default);
 extern void assert_Default(Default);
 
-extern enum KEYTYPE_Units {
+enum KEYTYPE_Units {
   KEYnil_Units,
   KEYlist_Units,
   KEYappend_Units
-} Units_KEY(Units);
+};
+extern enum KEYTYPE_Units Units_KEY(Units);
 extern Units copy_Units(Units);
 extern void assert_Units(Units);
 
@@ -256,11 +273,12 @@ extern Units append_Units_l2(Units);
 #define xcons_Units(l,x) append_Units(l,list_Units(x))
 #define cons_Units(x,l) append_Units(list_Units(x),l)
 
-extern enum KEYTYPE_Declarations {
+enum KEYTYPE_Declarations {
   KEYnil_Declarations,
   KEYlist_Declarations,
   KEYappend_Declarations
-} Declarations_KEY(Declarations);
+};
+extern enum KEYTYPE_Declarations Declarations_KEY(Declarations);
 extern Declarations copy_Declarations(Declarations);
 extern void assert_Declarations(Declarations);
 
@@ -276,11 +294,12 @@ extern Declarations append_Declarations_l2(Declarations);
 #define xcons_Declarations(l,x) append_Declarations(l,list_Declarations(x))
 #define cons_Declarations(x,l) append_Declarations(list_Declarations(x),l)
 
-extern enum KEYTYPE_Matches {
+enum KEYTYPE_Matches {
   KEYnil_Matches,
   KEYlist_Matches,
   KEYappend_Matches
-} Matches_KEY(Matches);
+};
+extern enum KEYTYPE_Matches Matches_KEY(Matches);
 extern Matches copy_Matches(Matches);
 extern void assert_Matches(Matches);
 
@@ -296,11 +315,12 @@ extern Matches append_Matches_l2(Matches);
 #define xcons_Matches(l,x) append_Matches(l,list_Matches(x))
 #define cons_Matches(x,l) append_Matches(list_Matches(x),l)
 
-extern enum KEYTYPE_Types {
+enum KEYTYPE_Types {
   KEYnil_Types,
   KEYlist_Types,
   KEYappend_Types
-} Types_KEY(Types);
+};
+extern enum KEYTYPE_Types Types_KEY(Types);
 extern Types copy_Types(Types);
 extern void assert_Types(Types);
 
@@ -316,11 +336,12 @@ extern Types append_Types_l2(Types);
 #define xcons_Types(l,x) append_Types(l,list_Types(x))
 #define cons_Types(x,l) append_Types(list_Types(x),l)
 
-extern enum KEYTYPE_Expressions {
+enum KEYTYPE_Expressions {
   KEYnil_Expressions,
   KEYlist_Expressions,
   KEYappend_Expressions
-} Expressions_KEY(Expressions);
+};
+extern enum KEYTYPE_Expressions Expressions_KEY(Expressions);
 extern Expressions copy_Expressions(Expressions);
 extern void assert_Expressions(Expressions);
 
@@ -336,11 +357,12 @@ extern Expressions append_Expressions_l2(Expressions);
 #define xcons_Expressions(l,x) append_Expressions(l,list_Expressions(x))
 #define cons_Expressions(x,l) append_Expressions(list_Expressions(x),l)
 
-extern enum KEYTYPE_Patterns {
+enum KEYTYPE_Patterns {
   KEYnil_Patterns,
   KEYlist_Patterns,
   KEYappend_Patterns
-} Patterns_KEY(Patterns);
+};
+extern enum KEYTYPE_Patterns Patterns_KEY(Patterns);
 extern Patterns copy_Patterns(Patterns);
 extern void assert_Patterns(Patterns);
 
@@ -356,11 +378,12 @@ extern Patterns append_Patterns_l2(Patterns);
 #define xcons_Patterns(l,x) append_Patterns(l,list_Patterns(x))
 #define cons_Patterns(x,l) append_Patterns(list_Patterns(x),l)
 
-extern enum KEYTYPE_Actuals {
+enum KEYTYPE_Actuals {
   KEYnil_Actuals,
   KEYlist_Actuals,
   KEYappend_Actuals
-} Actuals_KEY(Actuals);
+};
+extern enum KEYTYPE_Actuals Actuals_KEY(Actuals);
 extern Actuals copy_Actuals(Actuals);
 extern void assert_Actuals(Actuals);
 
@@ -376,11 +399,12 @@ extern Actuals append_Actuals_l2(Actuals);
 #define xcons_Actuals(l,x) append_Actuals(l,list_Actuals(x))
 #define cons_Actuals(x,l) append_Actuals(list_Actuals(x),l)
 
-extern enum KEYTYPE_TypeActuals {
+enum KEYTYPE_TypeActuals {
   KEYnil_TypeActuals,
   KEYlist_TypeActuals,
   KEYappend_TypeActuals
-} TypeActuals_KEY(TypeActuals);
+};
+extern enum KEYTYPE_TypeActuals TypeActuals_KEY(TypeActuals);
 extern TypeActuals copy_TypeActuals(TypeActuals);
 extern void assert_TypeActuals(TypeActuals);
 
@@ -396,11 +420,12 @@ extern TypeActuals append_TypeActuals_l2(TypeActuals);
 #define xcons_TypeActuals(l,x) append_TypeActuals(l,list_TypeActuals(x))
 #define cons_TypeActuals(x,l) append_TypeActuals(list_TypeActuals(x),l)
 
-extern enum KEYTYPE_PatternActuals {
+enum KEYTYPE_PatternActuals {
   KEYnil_PatternActuals,
   KEYlist_PatternActuals,
   KEYappend_PatternActuals
-} PatternActuals_KEY(PatternActuals);
+};
+extern enum KEYTYPE_PatternActuals PatternActuals_KEY(PatternActuals);
 extern PatternActuals copy_PatternActuals(PatternActuals);
 extern void assert_PatternActuals(PatternActuals);
 
