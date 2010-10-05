@@ -101,17 +101,14 @@ static void dump_context_open(void *c, ostream& os) {
 	return;
       case KEYtop_level_match:
 	{
-	  aps_error(decl,"Still generating C++ here...");
 	  Type ty = infer_pattern_type(matcher_pat(top_level_match_m(decl)));
 	  static int unique = 0;
 	  int i = ++unique;
-	  os << indent() << "Phylum* phy" << i << " = "
-	     << as_val(ty) << "->get_phylum();\n";
-	  os << indent() << "for (int i=phy" << i << "->size()-1; i >= 0; --i) {\n";
+	  os << indent() << "val phy"<< i << " = " << as_val(ty)
+	     << ".asInstanceOf[I_PHYLUM[" << ty << "]];\n";
+	  os << indent() << "for (i <- 0 until phy" << i << ".size) {\n";
 	  ++nesting_level;
-	  os << indent() << ty << " anchor = phy" << i << "->node(i);\n";
-	  os << indent() << ty << " node = anchor;\n";
-	  os << indent() << "Constructor* cons = node->cons;\n";
+	  os << indent() << ty << " anchor = phy" << i << ".get(i);\n";
 	}
 	return;
       default:
@@ -468,6 +465,7 @@ void implement_attributes(const vector<Declaration>& attrs,
       pop_attr_context(oss);
       if (is_col) pop_attr_context(oss);
     }
+    oss << indent() << "case _ => {};\n";
     --nesting_level;
     oss << indent() << "}\n";
     dump_default_return(attribute_decl_default(ad),
