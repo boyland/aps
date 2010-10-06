@@ -831,9 +831,13 @@ class M_SEQUENCE[T_ElemType <: Phylum](t_ElemType:C_PHYLUM[T_ElemType] with C_BA
       override def size() : Int = n1 + n2;
       override def nth(i : Int) : T_ElemType =
 	if (i < n1) v_l1.nth(i) else v_l2.nth(i-n1);
+      override def toString() : String =
+	Debug.with_level {
+	  "append(" + v_l1 + "," + v_l2 + ")"
+	};
     }
     val v_append = f_append _;
-    def f_append(v_l1 : T_Result, v_l2 : T_Result):T_Result = c_append(v_l1,v_l2);
+    def f_append(v_l1 : T_Result, v_l2 : T_Result):T_Result = c_append(v_l1,v_l2).register;
     def u_append(x:Any) : Option[(T_Result,T_Result)] = x match {
       case c_append(v_l1,v_l2) => Some((v_l1,v_l2));
       case _ => None };
@@ -844,9 +848,13 @@ class M_SEQUENCE[T_ElemType <: Phylum](t_ElemType:C_PHYLUM[T_ElemType] with C_BA
       override def size() : Int = 1;
       override def nth(i : Int) : T_ElemType = 
 	if (i == 0) v_x else super.nth(i);
-    }
+      override def toString() : String =
+	Debug.with_level {
+	  "single(" + v_x + ")"
+	};
+     }
     val v_single = f_single _;
-    def f_single(v_x : T_ElemType):T_Result = c_single(v_x);
+    def f_single(v_x : T_ElemType):T_Result = c_single(v_x).register;
     def u_single(x:Any) : Option[(T_ElemType)] = x match {
       case c_single(v_x) => Some((v_x));
       case _ => None };
@@ -854,9 +862,13 @@ class M_SEQUENCE[T_ElemType <: Phylum](t_ElemType:C_PHYLUM[T_ElemType] with C_BA
 
     case class c_none() extends T_Result {
       def children : List[Phylum] = List();
+      override def toString() : String =
+	Debug.with_level {
+	  "none()"
+	};
     }
     val v_none = f_none _;
-    def f_none():T_Result = c_none();
+    def f_none():T_Result = c_none().register;
     def u_none(x:Any) : Option[Unit] = x match {
       case c_none() => Some(());
       case _ => None };
@@ -1456,6 +1468,10 @@ class M_PAIR[T_T1, T_T2](t_T1:C_BASIC[T_T1],t_T2:C_BASIC[T_T2]) extends Module("
 
     case class c_pair(v_x : T_T1,v_y : T_T2) extends T_Result {
       def children : List[Phylum] = List();
+      override def toString() : String =
+	Debug.with_level {
+	  "pair(" + v_x + "," + v_y + ")"
+	}
     }
     val v_pair = f_pair _;
     def f_pair(v_x : T_T1, v_y : T_T2):T_Result = c_pair(v_x,v_y);
