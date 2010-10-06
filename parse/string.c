@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include "jbb-alloc.h"
 #include "jbb-string.h"
 
@@ -59,7 +61,7 @@ def_global(error_string,12,"STRING-ERROR");
 
 #define TALLOC(t) (t *)HALLOC(sizeof(t))
 
-static int min(int x, int top) {
+int min(int x, int top) {
   return (x > top) ? top : x;
 }
 #define chop(x) min(x,255)
@@ -84,8 +86,6 @@ STRING make_string(char *s) {
     return (STRING)s;
   }
 }
-
-extern char *strcpy(char *, char *);
 
 STRING make_saved_string(char *s) {
   return make_string(strcpy((char *)HALLOC(strlen(s)+1),s));
@@ -128,8 +128,8 @@ STRING make_integer_string(int n, int base) {
 	 s->type == INTEGER_STRING || \
 	 s->type == CONC_STRING)) { \
     } else { \
-      fprintf(stderr,"%s: bad string argument (type = 0x%02x): 0x%08x\n", \
-	      name,(s == NULL) ? '0' : s->type,s); \
+      fprintf(stderr,"%s: bad string argument (type = 0x%02x): 0x%08lx\n", \
+	      name,(s == NULL) ? '0' : s->type,(unsigned long)s); \
       string_error(); return result; }
 
 STRING conc_string(STRING str1, STRING str2) {
@@ -202,6 +202,7 @@ static char *realize_integer_string(char *s, struct integer_string *p) {
     fprintf(stderr,"realize_integer_string: internal error\n");
     exit(1);
   }
+  return s;
 }
 
 char *realize_string_aux(char *s,STRING str) {
@@ -219,6 +220,7 @@ char *realize_string_aux(char *s,STRING str) {
       return realize_string_aux(realize_string_aux(s,p->str1),p->str2); }
   default:
     fprintf(stderr,"realize_string_aux: internal error\n");
+    exit(1);
   }
 }
 
