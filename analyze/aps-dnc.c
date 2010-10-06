@@ -2523,7 +2523,7 @@ void print_edgeset(EDGESET e, FILE *stream) {
   }
 }
 
-char *aug_graph_name(AUG_GRAPH *aug_graph) {
+const char *aug_graph_name(AUG_GRAPH *aug_graph) {
   switch (Declaration_KEY(aug_graph->match_rule)) {
   case KEYtop_level_match:
     { Pattern pat=matcher_pat(top_level_match_m(aug_graph->match_rule));
@@ -2622,7 +2622,7 @@ void print_aug_graph(AUG_GRAPH *aug_graph, FILE *stream) {
   fputc('\n',stream);
 }
 
-char *phy_graph_name(PHY_GRAPH *phy_graph) {
+const char *phy_graph_name(PHY_GRAPH *phy_graph) {
   return symbol_name(def_name(declaration_def(phy_graph->phylum)));
 }
 

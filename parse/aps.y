@@ -93,7 +93,7 @@ static Expression unop(char *name, Expression e) {
 }
 
 static Expression sunop(Symbol sym, Expression e1) {
-  char *s = symbol_name(sym);
+  const char *s = symbol_name(sym);
   char *us = (char *)malloc(strlen(s)+2);
   Expression result;
   if (us == NULL) {
