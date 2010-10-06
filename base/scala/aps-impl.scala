@@ -289,6 +289,11 @@ extends Module("Attribute " + name)
     n match {
       case p:Phylum => {
 	val num = p.nodeNumber;
+	val pp = p.getType.asInstanceOf[I_PHYLUM[NodeType]].get(num);
+	if (p != pp) {
+	  println("Got " + p + "'s number as " + num + ", but the node with that number is " + pp);
+	}
+	assert (p == pp);
 	while (num >= values.size) {
 	  values += null.asInstanceOf[ValueType];
 	  status += UNINITIALIZED;
