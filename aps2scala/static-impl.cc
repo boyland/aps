@@ -534,7 +534,8 @@ void dump_visit_functions(PHY_GRAPH *pg, ostream& oss)
 	if (started) oss << ","; else started = true;
 	oss << "_";
       }
-      oss << ") => " << "visit_" << pgn << "_" << ph << "_" << j << "(node);\n";
+      oss << ") => " << "visit_" << pgn << "_" << ph << "_"
+	  << Declaration_info(cd)->instance_index << "(node);\n";
     }
     --nesting_level;
     oss << indent() << "};\n";
