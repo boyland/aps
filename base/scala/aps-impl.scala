@@ -9,6 +9,7 @@ import scala.collection.mutable.ArrayBuffer;
 object Debug {
   private var depth : Int = 0;
   private var _active : Boolean = false;
+  private var print_level : Int = 3;
 
   def active = _active;
   
@@ -41,6 +42,18 @@ object Debug {
       println("=> " + s);
     }
   }
+
+  def with_level(s : => String) : String =
+    if (print_level <= 0) "#"
+    else {
+      try {
+	print_level -= 1;
+	s
+      } finally {
+	print_level += 1;
+      }
+    }
+      
 }
 
 class Module(val mname : String) {
@@ -210,7 +223,7 @@ extends Module("Attribute " + name)
   private var evaluationStarted : Boolean = false;
 
   def assign(n : NodeType, v : ValueType) : Unit = {
-    Debug.begin(n + "." + name + ":=" + v);
+    Debug.begin(t_P.v_string(n) + "." + name + ":=" + v);
     if (evaluationStarted) throw TooLateError;
     set(n,v);
     Debug.end();
