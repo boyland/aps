@@ -1188,6 +1188,19 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
 	}
       }
       oss << ");\n";
+      oss << indent()
+	  << "override def toString() : String = Debug.with_level {\n";
+      ++nesting_level;
+      oss << indent() << "\"" << name << "(\"";
+      started = false;
+      for (Declaration f = first_Declaration(formals); f; f = DECL_NEXT(f)) {
+	//TODO: do something different for remote. Type fty = formal_type(f);
+	if (started) oss << " + \",\""; else started = true;
+	oss << "+ v_" << decl_name(f);
+      }
+      oss << "+ \")\";\n";
+      --nesting_level;
+      oss << indent() << "}\n";
       --nesting_level;
       oss << indent() << "}\n";
 
