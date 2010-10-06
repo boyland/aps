@@ -20,10 +20,12 @@
 extern int yylineno;
 extern char *yyfilename;
 extern int yytoken;
+extern int yylex();
 
 extern int yydebug;
 #define YY_USER_ACTION if (yydebug) {printf("Lexed: \"%s\"\n",yytext);}
 
+extern void set_infix(Symbol sym, int kind);
 extern void set_code_name(Symbol sym, String s);
 extern String get_code_name(Symbol sym);
 
