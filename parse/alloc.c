@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "jbb-alloc.h"
 
@@ -42,7 +43,7 @@ static void release_to_block(struct heap_struct *hs, void *mark) {
     hs->current = NULL;
     return;
   }
-  while (hs->current != NULL && mark < hs_bottom(hs) || mark > hs_top(hs)) {
+  while ((hs->current != NULL && mark < hs_bottom(hs)) || mark > hs_top(hs)) {
     hs->current = hs->current->prev;
   }
   if (hs == NULL) {
