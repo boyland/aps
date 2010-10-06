@@ -14,9 +14,9 @@ typedef struct symbol *SYMBOL;
 extern void init_symbols(); /* call this before anything else,
 			       later calls OK, ignored. */
 
-extern SYMBOL find_symbol(char *text);
-extern SYMBOL intern_symbol(char *text);
-extern char *symbol_name(SYMBOL);
+extern SYMBOL find_symbol(const char *text);
+extern SYMBOL intern_symbol(const char *text);
+extern const char *symbol_name(SYMBOL);
 extern int symbol_id(SYMBOL);
 extern SYMBOL_INFO *symbol_info(SYMBOL);
 extern SYMBOL id_symbol(int);
