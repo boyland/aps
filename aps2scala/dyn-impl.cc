@@ -405,7 +405,7 @@ void implement_local_attributes(vector<Declaration>& local_attributes,
     Declaration d = local_attributes[j];
     Block b = local_attribute_block(d);
     int i = LOCAL_UNIQUE_PREFIX(d);
-    char *name = decl_name(d);
+    const char *name = decl_name(d);
     bool is_col = direction_is_collection(value_decl_direction(d));
     
     oss << indent() << "def c" << i << "_" << name << "(anchor : Any) : "
@@ -431,7 +431,7 @@ void implement_attributes(const vector<Declaration>& attrs,
   int n = attrs.size();
   for (int i=0; i <n; ++i) {
     Declaration ad = attrs[i];
-    char *name = decl_name(ad);
+    const char *name = decl_name(ad);
     Declarations afs = function_type_formals(attribute_decl_type(ad));
     Declaration af = first_Declaration(afs);
     Type at = formal_type(af);
@@ -483,7 +483,7 @@ void implement_var_value_decls(const vector<Declaration>& vvds,
   int n = vvds.size();
   for (int i=0; i <n; ++i) {
     Declaration vvd = vvds[i];
-    char *name = decl_name(vvd);
+    const char *name = decl_name(vvd);
     Type vt = value_decl_type(vvd);
     bool is_col = direction_is_collection(value_decl_direction(vvd));
 
@@ -562,7 +562,7 @@ public:
     void note_var_value_decl(Declaration vd, ostream& oss) {
       Super::note_var_value_decl(vd,oss);
       Declaration_info(vd)->decl_flags |= VAR_VALUE_DECL_FLAG;
-      char *name = decl_name(vd);
+      const char *name = decl_name(vd);
       oss << indent() << "var s_" << name << ": EvalStatus = " 
 	  << "UNEVALUATED;\n";
     }
@@ -572,7 +572,7 @@ public:
       implement_attributes(attribute_decls,top_level_matches,oss);
       implement_var_value_decls(var_value_decls,top_level_matches,oss);
 
-      // char *name = decl_name(module_decl);
+      // const char *name = decl_name(module_decl);
 
       Declarations ds = block_body(module_decl_contents(module_decl));
       
@@ -608,7 +608,7 @@ public:
     Declaration rdecl = first_Declaration(function_type_return_values(fty));
     Block b = function_decl_body(f);
     bool is_col = direction_is_collection(value_decl_direction(rdecl));
-    char *name = decl_name(f);
+    const char *name = decl_name(f);
     
     if (is_col) {
       dump_init_collection(rdecl,os);

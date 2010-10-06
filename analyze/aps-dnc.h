@@ -68,7 +68,7 @@ typedef struct augmented_dependency_graph {
   int *schedule; /* one-d array, indexed by instance number */
   struct cto_node *total_order;
 } AUG_GRAPH;
-extern char *aug_graph_name(AUG_GRAPH *);
+extern const char *aug_graph_name(AUG_GRAPH *);
 
 typedef struct summary_dependency_graph {
   Declaration phylum;
@@ -78,7 +78,7 @@ typedef struct summary_dependency_graph {
   struct summary_dependency_graph *next_in_phy_worklist;
   int *summary_schedule; /* one-d array, indexed by instance number */
 } PHY_GRAPH;
-extern char *phy_graph_name(PHY_GRAPH *);
+extern const char *phy_graph_name(PHY_GRAPH *);
   
 typedef VECTOR(struct cycle_description) CYCLES;
 

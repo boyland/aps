@@ -1,13 +1,14 @@
 #include <stdio.h>
 #include <stddef.h>
 #include <stdlib.h>
+#include <string.h>
 #include "jbb.h"
 #include "jbb-symbol.h"
 
 /* stupid slow version for now */
 
 struct symbol {
-  char *name;
+  const char *name;
 #ifdef __GNUC__
   void *info[0];
 #else
@@ -29,7 +30,7 @@ void init_symbols() {
   }
 }
 
-SYMBOL find_symbol(char *s) {
+SYMBOL find_symbol(const char *s) {
   int i;
   for (i=0; i < num_symbols; ++i) {
     if (streq(SYMBOL_NUM(i).name,s)) return &SYMBOL_NUM(i);
@@ -37,7 +38,7 @@ SYMBOL find_symbol(char *s) {
   return NULL;
 }
 
-static SYMBOL add_symbol(char *s) {
+static SYMBOL add_symbol(const char *s) {
   SYMBOL sym;
   if (num_symbols == MAX_SYMBOL) {
     fprintf(stderr,"symbol table full\n");
@@ -54,7 +55,7 @@ static SYMBOL add_symbol(char *s) {
   return sym;
 }
 
-SYMBOL intern_symbol(char *s) {
+SYMBOL intern_symbol(const char *s) {
   SYMBOL sym = find_symbol(s);
   if (sym == NULL) {
     return add_symbol(s);
@@ -63,7 +64,7 @@ SYMBOL intern_symbol(char *s) {
   }
 }
 
-char *symbol_name(SYMBOL s) {
+const char *symbol_name(SYMBOL s) {
   return s->name;
 }
 

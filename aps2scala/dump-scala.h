@@ -6,10 +6,10 @@ using std::ostream;
 using std::string;
 
 // don't generate any code for this declaration:
-void omit_declaration(char *name);
+void omit_declaration(const char *name);
 
 // The result type is as given:
-void impl_module(char *name, char *type);
+void impl_module(const char *name, const char *type);
 
 extern bool incremental;
 extern bool static_schedule;
@@ -42,7 +42,7 @@ void dump_Type(Type,ostream&);
 void dump_Type_value(Type,ostream&);
 void dump_Type_signature(Type,ostream&);
 void dump_Expression(Expression,ostream&);
-void dump_Use(Use,char *prefix,ostream&);
+void dump_Use(Use,const char *prefix,ostream&);
 void dump_vd_Default(Declaration,ostream&);
 
 void dump_function_prototype(string,Type ft, ostream& oss);

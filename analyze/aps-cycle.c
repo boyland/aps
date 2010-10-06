@@ -315,7 +315,7 @@ static void make_cycles(STATE *s) {
 
 /*** Add new instances and redo dependency graphs ***/
 
-SYMBOL make_up_down_name(char *n, int num,BOOL up) {
+SYMBOL make_up_down_name(const char *n, int num,BOOL up) {
   char name[80];
   sprintf(name,"%s[%s]-%d",up?"UP":"DOWN",n,num);
   /* printf("Creating symbol %s\n",name); */
@@ -324,7 +324,7 @@ SYMBOL make_up_down_name(char *n, int num,BOOL up) {
 
 static char danger[1000];
 
-static char *phylum_to_string(Declaration d)
+static const char *phylum_to_string(Declaration d)
 {
   switch (Declaration_KEY(d)) {
   default:

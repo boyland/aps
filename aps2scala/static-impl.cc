@@ -608,7 +608,7 @@ static void* dump_scheduled_local(void *pbs, void *node) {
 
 void dump_scheduled_function_body(Declaration fd, STATE*s, ostream& bs)
 {
-  char *name = decl_name(fd);
+  const char *name = decl_name(fd);
   Type ft = function_decl_type(fd);
 
   // dump any local values:
@@ -700,7 +700,7 @@ public:
       oss << indent() << "visit();\n";
       // types actually should be scheduled...
       for (Declaration d = first_Declaration(ds); d; d = DECL_NEXT(d)) {
-	char* kind = NULL;
+	const char* kind = NULL;
 	switch(Declaration_KEY(d)) {
 	case KEYphylum_decl:
 	case KEYtype_decl:
@@ -716,7 +716,7 @@ public:
 	  break;
 	}
 	if (kind != NULL) {
-	  char *n = decl_name(d);
+	  const char *n = decl_name(d);
 	  oss << indent() << kind << n << ".finish();\n";
 	}
       }

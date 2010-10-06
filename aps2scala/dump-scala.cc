@@ -1,4 +1,5 @@
 #include <iostream>
+#include <cstdlib>
 #include <cctype>
 #include <stack>
 #include <map>
@@ -58,18 +59,18 @@ void print_uppercase(String sn,ostream&os)
 
 // parameterizations and options:
 
-static char* omitted[80];
+static const char* omitted[80];
 static int omitted_number = 0;
 
-void omit_declaration(char *n)
+void omit_declaration(const char *n)
 {
   omitted[omitted_number++] = n;
 }
 
-static char*impl_types[80];
+static const char*impl_types[80];
 static int impl_number = 0;
 
-void impl_module(char *mname, char*type)
+void impl_module(const char *mname, const char*type)
 {
   impl_types[impl_number++] = mname;
   impl_types[impl_number++] = type;
@@ -228,7 +229,7 @@ void dump_pattern_prototype(string name, Type ft, ostream& oss)
   oss << rt << "]";
 }
 
-void dump_function_debug_start(char *name, Type ft, ostream& os)
+void dump_function_debug_start(const char *name, Type ft, ostream& os)
 {
   Declarations formals = function_type_formals(ft);
   os << indent() << "try {" << endl;
@@ -431,12 +432,12 @@ public:
   }
 };
 
-char* decl_code_name(Declaration decl)
+const char* decl_code_name(Declaration decl)
 {    
-  char *name = 0;
+  const char *name = 0;
   switch (Declaration_KEY(decl)) {
   case KEYdeclaration:
-    name = (char*)get_code_name(def_name(declaration_def(decl)));
+    name = (const char*)get_code_name(def_name(declaration_def(decl)));
     if (!name) name = decl_name(decl);
     return name;
   default: break;
@@ -606,7 +607,7 @@ void dump_some_attribute(Declaration d, string i,
 			 Implementation::ModuleInfo *info,
 			 ostream& oss)
 {
-  char *name = decl_name(d);
+  const char *name = decl_name(d);
   bool is_col = direction_is_collection(dir);
   bool is_cir = direction_is_circular(dir);
   bool is_attr = Declaration_KEY(d) == KEYattribute_decl;
@@ -763,7 +764,7 @@ void dump_some_class_decl(Declaration decl, ostream& oss)
   ++nesting_level;
   Declarations body = block_body(some_class_decl_contents(decl));
   for (Declaration d=first_Declaration(body); d; d=DECL_NEXT(d)) {
-    char *n = decl_code_name(d);
+    const char *n = decl_code_name(d);
     bool is_phylum = false;
     switch (Declaration_KEY(d)) {
     default:
@@ -853,7 +854,7 @@ static void dump_type_inst(string n, Type ti, ostream& oss)
   Module m = type_inst_module(ti);
   TypeActuals tas = type_inst_type_actuals(ti);
   Actuals as = type_inst_actuals(ti);
-  char *rname = "Result";
+  const char *rname = "Result";
   int u=0;
   for (Type ta = first_TypeActual(tas); ta ; ta = TYPE_NEXT(ta)) {
     switch (Type_KEY(ta)) {
@@ -932,10 +933,10 @@ static void dump_type_inst(string n, Type ti, ostream& oss)
 
 void dump_scala_Declaration(Declaration decl,ostream& oss)
 {
-  char *name = 0;
+  const char *name = 0;
   switch (Declaration_KEY(decl)) {
   case KEYdeclaration:
-    name = (char*)get_code_name(def_name(declaration_def(decl)));
+    name = (const char*)get_code_name(def_name(declaration_def(decl)));
     if (!name) name = decl_name(decl);
     cout << "dump_scala_Declaration(" << name << ")" << endl;
     break;
@@ -954,10 +955,10 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
     {
       Declarations body = block_body(module_decl_contents(decl));
       Declaration rdecl = module_decl_result_type(decl);
-      char *rname = decl_name(rdecl);
+      const char *rname = decl_name(rdecl);
       bool rdecl_is_phylum = (Declaration_KEY(rdecl) == KEYphylum_decl);
       Declaration first_decl = first_Declaration(body);
-      char *impl_type = 0;
+      const char *impl_type = 0;
 
       for (int j=0; j < impl_number; ++j)
 	if (streq(impl_types[j],name)) impl_type = impl_types[j+1];
@@ -988,7 +989,7 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
       ++nesting_level;
 
       Type rut = some_type_decl_type(rdecl);
-      char *source = "tmp";
+      const char *source = "tmp";
 
       // define T_Result:
       if (impl_type) {
@@ -1155,7 +1156,7 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
       Declarations rdecls = function_type_return_values(ft);
       Type rt = value_decl_type(first_Declaration(rdecls));
       bool is_syntax = false;
-      // char *base_type_name = decl_name(tdecl);
+      // const char *base_type_name = decl_name(tdecl);
       switch (Declaration_KEY(tdecl)) {
       case KEYphylum_decl:
 	is_syntax = true;
@@ -1808,7 +1809,7 @@ static void dump_poly_inst(Use u, TypeEnvironment type_env, ostream& os)
   os << ".";
 }
 
-void dump_Use(Use u, char *prefix, ostream& os)
+void dump_Use(Use u, const char *prefix, ostream& os)
 {
   Symbol sym;
   switch (Use_KEY(u)) {
