@@ -5,7 +5,7 @@
 #define yywrap() 1
 
 struct symbol_info {
-  struct string *code_name;
+  struct jbb_string *code_name;
   int infix_info;
 };
 
@@ -13,6 +13,8 @@ struct symbol_info {
 int symbol_info_size = sizeof(SYMBOL_INFO);
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include "jbb.h"
 #include "jbb-string.h"
 #include "jbb-symbol.h"
@@ -20,14 +22,18 @@ int symbol_info_size = sizeof(SYMBOL_INFO);
 #include "aps.tab.h"
 #include "aps-lex.h"
 
+extern void yyerror(char*);
+
 int yytoken = 0;
 int yylineno = 1;
 char *yyfilename = "<stdin>";
 FILE *yyin;
 
 static SYMBOL intern_special(char *);
-static SYMBOL intern_special_np(char *);
 static SYMBOL intern_symbol_np(char *);
+
+extern int symbol_token(SYMBOL s);
+extern int get_infix(Symbol sym);
 
 static int warned_about_underline = FALSE;
 
@@ -264,11 +270,6 @@ static void make_code_name(SYMBOL sym, int is_op) {
   set_code_name(sym,make_saved_string(is_op ? special_buf : (special_buf+3)));
 }
   
-static SYMBOL intern_special_np(char *text) {
-  text[strlen(text)-1] = '\0'; /* cut off final paren */
-  return intern_special(text+1);
-}
-
 static SYMBOL intern_special(char *text) {
   SYMBOL sym;
 
@@ -288,42 +289,14 @@ static SYMBOL intern_symbol_np(char *text) {
   return intern_symbol(text+1);
 }
 
-static char *impl_reserved_names[] = {
-  /* how strange I can't find a file of C keywords */
-  "auto",
-  "case",
-  "char",
-  "const",
-  "default",
-  "do",
-  "double",
-  "entry",
-  "extern",
-  "float",
-  "for",
-  "int",
-  "long",
-  "sizeof",
-  "static",
-  "struct",
-  "switch",
-  "typedef",
-  "union",
-  "virtual",
-  "void",
-  "while",
-  /* names we need to reserve, (that don't start with _) */
-  NULL,
-  };
-
 static void init_lexer_tables()
 {
   int i,j;
   int code = 0;
   for (i=0; i < 256; ++i) {
-    if ('a' <= i && i <= 'z' ||
-	'A' <= i && i <= 'Z' ||
-	'0' <= i && i <= '9') {
+    if (('a' <= i && i <= 'z') ||
+	('A' <= i && i <= 'Z') ||
+	('0' <= i && i <= '9')) {
       translate[i] = i; /* leave as is */
     } else {
       code = (code+1) % 62;
@@ -356,6 +329,7 @@ static void init_lexer_tables()
   intern_special("..");
 }
 
+extern void init_parser();
 void init_lexer(FILE *f) {
   static int inited = FALSE;
   yyrestart(f);
