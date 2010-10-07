@@ -12,3 +12,10 @@ aps-library.jar : aps-impl.scala basic.handcode.scala
 
 clean :
 	rm -f *.class aps-library.jar
+
+%.scala : RCS/%.scala,v
+	co $*.scala
+
+Makefile : RCS/Makefile,v
+	co Makefile
+
