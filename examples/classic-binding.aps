@@ -107,11 +107,11 @@ module NAME_RESOLUTION[T :: var SIMPLE[]] extends T begin
     endif;
   end;
   
-  match ?t:Type=integer() begin
+  match ?t:Type=integer_type() begin
     t.type_shape := int_shape;
   end;
   
-  match ?t:Type=string() begin
+  match ?t:Type=string_type() begin
     t.type_shape := str_shape;
   end;
   

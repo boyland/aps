@@ -16,8 +16,8 @@ module SIMPLE[] begin
   constructor no_decls() : Decls;
   constructor xcons_decls(ds : Decls; d : Decl) : Decls;
   constructor decl(id : String; ty : Type) : Decl;
-  constructor integer() : Type;
-  constructor string() : Type;
+  constructor integer_type() : Type;
+  constructor string_type() : Type;
   constructor no_stmts() : Stmts;
   constructor xcons_stmts(ss : Stmts; s : Stmt) : Stmts;
   constructor block_stmt(block : Block) : Stmt;
