@@ -1241,8 +1241,14 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
 	oss << " = ";
 	dump_Expression(simple_value(value_decl_default(decl)),oss);
 	break;
+      case KEYcomposite:
+	oss << " = ";
+	dump_Expression(composite_initial(value_decl_default(decl)),oss);
+	break;
       case KEYno_default:
 	if (direction_is_circular(value_decl_direction(decl))) {
+	  oss << " = " << as_val(value_decl_type(decl)) << ".v_bottom";
+	} else if (direction_is_collection(value_decl_direction(decl))) {
 	  oss << " = " << as_val(value_decl_type(decl)) << ".v_initial";
 	} else {
 	  aps_error(decl,"No default value?");
