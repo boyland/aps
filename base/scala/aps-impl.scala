@@ -60,16 +60,19 @@ class Module(val mname : String) {
   private var complete : Boolean = false;
   def finish() : Unit = {
     if (Debug.active) {
-      println("Module " + mname + " is now complete.");
+      println("Type " + mname + " is now finished.");
     }
     complete = true; 
   }
   def isComplete : Boolean = complete;
 };
  
-abstract class Type
+/**
+ * The class of all constructed APS values.
+ */
+abstract class Value extends AnyRef
 {
-  def getType : C_TYPE[_];
+  def getType : C_TYPE[_ <: Value];
 }
 
 trait C_TYPE[T_Result] extends C_BASIC[T_Result] with C_PRINTABLE[T_Result]
@@ -80,7 +83,7 @@ trait C_TYPE[T_Result] extends C_BASIC[T_Result] with C_PRINTABLE[T_Result]
   val v_string : (T_Result) => String;
 }
 
-class I_TYPE[T_Result](n : String) extends Module(n) with C_TYPE[T_Result] {
+class I_TYPE[T_Result] extends C_TYPE[T_Result] {
   val v_assert = f_assert _;
   val v_equal = f_equal _;
   val v_node_equivalent = f_node_equivalent _;
@@ -88,35 +91,35 @@ class I_TYPE[T_Result](n : String) extends Module(n) with C_TYPE[T_Result] {
 
   def f_assert(x : T_Result) : Unit =
     x match {
-      case t:Type => assert(t.getType == this)
+      case t:Value => assert(t.getType == this)
     };
   def f_equal(x : T_Result, y : T_Result) : Boolean = f_node_equivalent(x,y);
   def f_node_equivalent(x : T_Result, y : T_Result) : Boolean = x.equals(y);
   def f_string(x : T_Result) : String = x.toString();
 }
     
-class M_TYPE extends Module("<anonymous type>") {
-  class T_Result extends Type {
-    def getType : C_TYPE[_] = t_Result;
+class M_TYPE(name : String) extends Module(name) {
+  class T_Result extends Value {
+    def getType : C_TYPE[_ <: T_Result] = t_Result;
   }
-  object t_Result extends I_TYPE[T_Result]("<anonymous>") {}
+  object t_Result extends I_TYPE[T_Result] {}
 }
 
 object PARSE {
   var lineNumber : Int = 0;
 }
 
-abstract class Phylum extends Type
+abstract class Node extends Value
 {
-  def getType : C_PHYLUM[_];
+  def getType : C_PHYLUM[_ <: Node];
   val lineNumber = PARSE.lineNumber;
   private var _nodeNumber : Int = 0;
   def nodeNumber = _nodeNumber;
-  private var _parent : Phylum = null;
-  def parent : Phylum = _parent;
-  def children : List[Phylum];
+  private var _parent : Node = null;
+  def parent : Node = _parent;
+  def children : List[Node];
   def register : this.type = {
-    _nodeNumber = getType.asInstanceOf[I_PHYLUM[Phylum]].registerNode(this);
+    _nodeNumber = getType.nodes.add(this);
     for (ch <- children) {
       assert (ch.parent == null);
       ch._parent = this;
@@ -125,27 +128,33 @@ abstract class Phylum extends Type
   }
 }
 
-trait C_PHYLUM[T_Result] extends C_TYPE[T_Result] {
-  val v_identical : (T_Result,T_Result) => Boolean;
-  val v_object_id : (T_Result) => Int;
-  val v_object_id_less: (T_Result, T_Result) => Boolean;
-  def v_nil : T_Result;
-}
-
-abstract class I_PHYLUM[T_Result >: Null](n : String)
-	 extends I_TYPE[T_Result](n) with C_PHYLUM[T_Result] 
-{
+class Nodes[T_Result <: Node] extends Collection[T_Result] {
+  private var _frozen = false;
+  def freeze() : Unit = _frozen = true;
   private val allNodes : Buffer[T_Result] = new ListBuffer[T_Result];
-  def registerNode(x : Phylum) : Int = {
-    assert (!isComplete);
+  def add(x : Node) : Int = {
+    assert (!_frozen);
     val result = size;
     allNodes += x.asInstanceOf[T_Result];
     // println("registering " + x + " as #" + result);
     result
   };
   def size : Int = allNodes.size;
-  def get(i : Int) : T_Result = allNodes(i);
+  def apply(i : Int) : T_Result = allNodes(i);
+  def elements = allNodes.elements;
+}
 
+trait C_PHYLUM[T_Result <: Node] extends C_TYPE[T_Result] {
+  val v_identical : (T_Result,T_Result) => Boolean;
+  val v_object_id : (T_Result) => Int;
+  val v_object_id_less: (T_Result, T_Result) => Boolean;
+  def v_nil : T_Result;
+  val nodes : Nodes[T_Result];
+}
+
+abstract class I_PHYLUM[T_Result <: Node]
+	 extends I_TYPE[T_Result] with C_PHYLUM[T_Result] 
+{
   val v_identical = f_identical _;
   val v_object_id = f_object_id _;
   val v_object_id_less = f_object_id_less _;
@@ -156,26 +165,27 @@ abstract class I_PHYLUM[T_Result >: Null](n : String)
     else f_object_id(x) == f_object_id(y);
   def f_object_id(x : T_Result) : Int = 
     x match {
-      case n:Phylum => n.nodeNumber;
+      case n:Node => n.nodeNumber;
     };
   def f_object_id_less(x1 : T_Result, x2 : T_Result) : Boolean =
     f_object_id(x1) < f_object_id(x2);
   override def f_string(x : T_Result) : String = 
     super.f_string(x) + "@" + f_object_id(x);
 
-  val v_nil : T_Result = null;
+  val v_nil : T_Result = null.asInstanceOf[T_Result];
+  val nodes : Nodes[T_Result] = new Nodes();
 }
 
-class M_PHYLUM extends Module("<anonymous phylum>")
+class M_PHYLUM(name : String) extends Module(name)
 {
-  class T_Result extends Phylum {
-    def getType : I_PHYLUM[_] = t_Result;
-    def children : List[Phylum] = List();
+  class T_Result extends Node {
+    def getType : I_PHYLUM[T_Result] = t_Result;
+    def children : List[Node] = List();
   }
-  object t_Result extends I_PHYLUM[T_Result]("anonymous") { }
+  object t_Result extends I_PHYLUM[T_Result] { }
   override def finish() {
     super.finish();
-    t_Result.finish();
+    t_Result.nodes.freeze();
   }
 }
 
@@ -183,7 +193,7 @@ class Evaluation {
   var inCycle : Boolean = false;
 }
 
-object APS {
+object Evaluation {
   // evaluation
   sealed trait EvalStatus;
 
@@ -208,7 +218,7 @@ object APS {
 
 }
 
-class Attribute[T_P >: Null, T_V]
+class Attribute[T_P <: Node, T_V]
                (val t_P : C_PHYLUM[T_P],
 		val t_V : Any, // unused
 		val name : String) 
@@ -216,7 +226,7 @@ extends Module("Attribute " + name)
 {
   type NodeType = T_P;
   type ValueType = T_V;
-  import APS._;
+  import Evaluation._;
 
   private val values : Buffer[ValueType] = new ArrayBuffer();
   private val status : Buffer[EvalStatus] = new ArrayBuffer();
@@ -231,10 +241,8 @@ extends Module("Attribute " + name)
     
   override def finish() : Unit = {
     if (!isComplete) {
-      val t_NodeType = t_P.asInstanceOf[I_PHYLUM[NodeType]];
-      val n = t_NodeType.size;
-      for (i <- 0 until n) {
-	evaluate(t_NodeType.get(i));
+      for (n <- t_P.nodes) {
+	evaluate(n);
       }
     }
     super.finish();
@@ -243,7 +251,7 @@ extends Module("Attribute " + name)
   def evaluation : Evaluation = acyclic;
 
   private def doEvaluate(n : NodeType) : ValueType = {
-    val num = checkPhylum(n);
+    val num = checkNode(n);
     status(num) match {
       case CYCLE(d) => {
 	detectCycle(n,d);
@@ -284,33 +292,29 @@ extends Module("Attribute " + name)
     throw new CyclicAttributeException(n+"."+name);
   }
   
-  def checkPhylum(n : NodeType) : Int = {
+  def checkNode(n : NodeType) : Int = {
     t_P.v_assert(n);
-    n match {
-      case p:Phylum => {
-	val num = p.nodeNumber;
-	val pp = p.getType.asInstanceOf[I_PHYLUM[NodeType]].get(num);
-	if (p != pp) {
-	  println("Got " + p + "'s number as " + num + ", but the node with that number is " + pp);
-	}
-	assert (p == pp);
-	while (num >= values.size) {
-	  values += null.asInstanceOf[ValueType];
-	  status += UNINITIALIZED;
-	};
-	num
-      }
+    val num = n.nodeNumber;
+    val nn = n.getType.nodes(num);
+    if (n != nn) {
+      println("Got " + n + "'s number as " + num + ", but the node with that number is " + nn);
     }
+    assert (n == nn);
+    while (num >= values.size) {
+      values += null.asInstanceOf[ValueType];
+      status += UNINITIALIZED;
+    };
+    num
   }
   
   def set(n : NodeType, v : ValueType) : Unit = {
-    val num = checkPhylum(n);
+    val num = checkNode(n);
     values(num) = v;
     status(num) = ASSIGNED;
   }
 
   def get(n : NodeType) : ValueType = {
-    val i = checkPhylum(n);
+    val i = checkNode(n);
     if (status(i) == UNINITIALIZED) {
       values(i) = getDefault(n);
       status(i) = UNEVALUATED;
@@ -319,12 +323,12 @@ extends Module("Attribute " + name)
   }
   
   def getStatus(n : NodeType) : EvalStatus = {
-    val i = checkPhylum(n);
+    val i = checkNode(n);
     return status(i);
   }
   
   def setStatus(n : NodeType, es : EvalStatus) : Unit = {
-    val i = checkPhylum(n);
+    val i = checkNode(n);
     status(i) = es;
   }
   
@@ -337,7 +341,7 @@ extends Module("Attribute " + name)
   }
 }
 
-trait Collection[V_P >: Null, V_T] extends Attribute[V_P,V_T] {
+trait CollectionAttribute[V_P <: Node, V_T] extends Attribute[V_P,V_T] {
   def initial : ValueType;
   def combine(v1 : ValueType, v2 : ValueType) : ValueType;
 
@@ -348,8 +352,8 @@ trait Collection[V_P >: Null, V_T] extends Attribute[V_P,V_T] {
   }
 }
 
-trait Circular[V_P >: Null, V_T] extends Attribute[V_P,V_T] {
-  import APS._;
+trait CircularAttribute[V_P <: Node, V_T] extends Attribute[V_P,V_T] {
+  import Evaluation._;
 
   def lattice : C_LATTICE[ValueType];
 
