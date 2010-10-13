@@ -144,9 +144,8 @@ static bool implement_visit_function(AUG_GRAPH* aug_graph,
 	bool is_mod = Declaration_KEY(in->node) == KEYmodule_decl;
 
 	if (is_mod) {
-	  os << indent() << "for (i <- 0 until n_roots) {\n";
+	  os << indent() << "for (root <- roots) {\n";
 	  ++nesting_level;
-	  os << indent() << "val root = rootphy.get(i);\n";
 	}
 	os << indent() << "visit_" << PHY_GRAPH_NUM(npg)
 	   << "_" << ph << "(";	
@@ -563,10 +562,8 @@ void dump_visit_functions(STATE*s, ostream& oss)
   Declaration sp = s->start_phylum;
   oss << indent() << "def visit() : Unit = {\n";
   ++nesting_level;
-  oss << indent() << "val rootphy = t_" << decl_name(sp)
-      << ".asInstanceOf[I_PHYLUM[T_" << decl_name(sp) << "]];\n";
-  oss << indent() << "val n_roots = rootphy.size;\n";
-  oss << "\n"; // blank line
+  oss << indent() << "val roots = t_" << decl_name(sp)
+      << ".nodes;\n";
 
   int phase = 1;
   Declaration root_decl[1] ;
