@@ -564,6 +564,7 @@ Type type_element_type(Type st)
       {
 	Use u = type_use_use(st);
 	Declaration decl = USE_DECL(u);
+        Type rt;
 
 	switch (Declaration_KEY(decl)) {
 	case KEYtype_renaming:
@@ -583,7 +584,11 @@ Type type_element_type(Type st)
 	  aps_error(decl,"not sure what sort of collection type this is");
 	  return error_type;
 	}
-	return type_subst(u,type_element_type(st));
+	rt = type_element_type(st);
+	if (rt == error_type) {
+	  aps_error(st,"  used here");
+	}
+	return type_subst(u,rt);
       }
       break;
     case KEYtype_inst:
@@ -591,8 +596,14 @@ Type type_element_type(Type st)
 	Type ta = first_TypeActual(type_inst_type_actuals(st));
 	Declaration mdecl = USE_DECL(module_use_use(type_inst_module(st)));
 	Declaration rdecl = module_decl_result_type(mdecl);
+        Type rt;
+
 	if (ta) return ta; /*! Hack: assume first parameter is type */
-	return type_element_type(some_type_decl_type(rdecl));
+	rt =  type_element_type(some_type_decl_type(rdecl));
+	if (rt == error_type) {
+	  aps_error(st,"  used here");
+	}
+	return rt;
       }
       break;
     case KEYremote_type:
@@ -1836,6 +1847,9 @@ void check_type_signatures(void *node, Type t, Use type_envs, Signature sig)
     {
       Type t1 = type_element_type(t);
       Type t2 = sig_element_type(sig);
+      if (t1 == error_type) {
+        aps_error(node,"  used here");
+      }
       check_type_subst(node,t1,type_envs,t2);
     }
     break;
