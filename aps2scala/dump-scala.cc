@@ -97,7 +97,7 @@ void dump_scala_Program(Program p,std::ostream&oss)
   aps_yyfilename = (char *)program_name(p);
   string id = program_id(aps_yyfilename);
   // oss << "import edu.uwm.cs.aps._;" << endl;
-  oss << "import APS._;\n";
+  // oss << "import APS._;\n";
   oss << "import basic_implicit._;\n";
 
   // need to get implicit things first: import only works afterwards
@@ -699,6 +699,8 @@ void dump_local_attributes(Block b, Type at, Implementation::ModuleInfo* info,
 
 static void dump_TypeFormal(Declaration tf, ostream& os) {
   os << "T_" << decl_name(tf);
+  if (Declaration_KEY(tf) == KEYphylum_formal)
+    os <<" <: Node";
 }
 
 void dump_TypeFormals(TypeFormals tfs, ostream& os)
@@ -713,19 +715,17 @@ void dump_TypeFormals(TypeFormals tfs, ostream& os)
 }
 
 void dump_TypeFormal_value(Declaration tf, ostream& os) {
-  os << "val t_" << decl_name(tf) << ":";
-  switch (Signature_KEY(some_type_formal_sig(tf))) {
-  case KEYno_sig:
-    os << "Any";
-    break;
-  default: 
-    {
-      ostringstream ss;
-      ss << "T_" << decl_name(tf);
-      dump_Signature(some_type_formal_sig(tf),ss.str(),os);
-    }
-    break;
-  }
+  ostringstream ss;
+  ss << "T_" << decl_name(tf);
+  string tname = ss.str();
+
+  os << "val t_" << decl_name(tf) << " : ";  
+  if (Declaration_KEY(tf) == KEYphylum_formal)
+    os << "C_PHYLUM[" << tname << "]";
+  else
+    os << "C_TYPE[" << tname << "]";
+
+  dump_Signature(some_type_formal_sig(tf),tname,os);
 }
 
 void dump_Type_Signature(Type,string,ostream&);
@@ -740,26 +740,22 @@ void dump_some_class_decl(Declaration decl, ostream& oss)
     oss << ", ";
     dump_TypeFormal(tf,oss);
   }
-  oss << "]";
-  Signature p = some_class_decl_parent(decl);
-  bool extended = false;
-  switch (Signature_KEY(p)) {
-  case KEYno_sig: 
-  case KEYfixed_sig:
-    break;
-  default:
-    oss << " extends ";
-    dump_Signature(p,"T_Result",oss);
-    extended = true;
-  }
+  oss << "] extends ";
   switch (Declaration_KEY(decl)) {
-  default: break;
+  default:
+    oss << "C_NULL[T_Result]";
+    break;
   case KEYmodule_decl:
-    if (!extended) oss << " extends ";
-    dump_Type_Signature(some_type_decl_type(module_decl_result_type(decl)),
-			"T_Result",oss);
-    extended = true;
+    {
+      Declaration rdecl = module_decl_result_type(decl);
+      oss << "C_"
+	  << ((Declaration_KEY(rdecl) == KEYphylum_decl) ? "PHYLUM" : "TYPE")
+	  << "[T_Result]";
+      dump_Type_Signature(some_type_decl_type(rdecl),string("T_Result"),oss);
+    }
+    break;
   }
+  dump_Signature(some_class_decl_parent(decl),"T_Result",oss);
   oss << " {" << endl;
   ++nesting_level;
   Declarations body = block_body(some_class_decl_contents(decl));
@@ -774,16 +770,21 @@ void dump_some_class_decl(Declaration decl, ostream& oss)
       is_phylum = true;
       /*FALLTHROUGH*/
     case KEYtype_decl:
-      oss << indent() << "type T_" << n << (is_phylum ? " >: Null" : "")
+      oss << indent() << "type T_" << n << (is_phylum ? " <: Node" : "")
 	  << ";\n";
-      oss << indent() << "val t_" << n << " : ";
+      oss << indent() << "val t_" << n << " : C_"
+	  << (is_phylum ? "PHYLUM" : "TYPE")
+	  << "[T_" << n << "]";
       dump_Type_Signature(some_type_decl_type(d),string("T_") + n,oss);
       oss << ";\n";
       break;
     case KEYtype_renaming:
+      is_phylum = type_is_phylum(type_renaming_old(d));
       oss << indent() << "type T_" << n << " = "
 	  << type_renaming_old(d) << ";\n";
-      oss << indent() << "val t_" << n << " : ";
+      oss << indent() << "val t_" << n << " : C_"
+	  << (is_phylum ? "PHYLUM" : "TYPE")
+	  << "[T_" << n << "]";
       dump_Type_Signature(type_renaming_old(d),string("T_") + n,oss);
       oss << ";\n";
       break;
@@ -817,39 +818,7 @@ void dump_some_class_decl(Declaration decl, ostream& oss)
   oss << indent() << "}\n" << endl;
 }
 
-static void dump_new_type(string n, ostream& oss)
-{
-  oss << indent() << "object m_" << n << " {\n";
-  ++nesting_level;
-  oss << indent() << "abstract class T_Result extends Type {\n"
-      << indent() << "  def getType = t_Result;\n"
-      << indent() << "}\n"
-      << indent() << "object t_Result extends I_TYPE[T_Result](\""
-      << n << "\") {}\n"
-      << indent() << "def finish() : Unit = t_Result.finish();\n";
-  --nesting_level;
-  oss << indent() << "}\n";
-  oss << indent() << "type T_"<< n << " = m_" << n << ".T_Result\n";
-  oss << indent() << "val t_" << n << " = m_" << n << ".t_Result\n" << endl;
-}
-
-static void dump_new_phylum(string n, ostream& oss)
-{
-  oss << indent() << "object m_" << n << " {\n";
-  ++nesting_level;
-  oss << indent() << "abstract class T_Result extends Phylum {\n"
-      << indent() << "  def getType = t_Result;\n"
-      << indent() << "}\n"
-      << indent() << "object t_Result extends I_PHYLUM[T_Result](\""
-      << n << "\") {}\n"
-      << indent() << "def finish() : Unit = t_Result.finish();\n";
-  --nesting_level;
-  oss << indent() << "}\n";
-  oss << indent() << "type T_"<< n << " = m_" << n << ".T_Result\n";
-  oss << indent() << "val t_" << n << " = m_" << n << ".t_Result\n" << endl;
-}
-
-static void dump_type_inst(string n, Type ti, ostream& oss)
+static void dump_type_inst(string n, string nameArg, Type ti, ostream& oss)
 {
   Module m = type_inst_module(ti);
   TypeActuals tas = type_inst_type_actuals(ti);
@@ -863,7 +832,7 @@ static void dump_type_inst(string n, Type ti, ostream& oss)
       {
 	ostringstream ss;
 	ss << n << ++u;
-	dump_type_inst(ss.str(),ta,oss);
+	dump_type_inst(ss.str(),nameArg+"+\"$\"+"+ss.str(),ta,oss);
 	break;
       }
     }
@@ -898,14 +867,10 @@ static void dump_type_inst(string n, Type ti, ostream& oss)
     }
   }
   if (started) oss << "]";
-  started = false;
 
+  oss << "(" << nameArg;
   for (Type ta = first_TypeActual(tas); ta ; ta = TYPE_NEXT(ta)) {
-    if (started) oss << ",";
-    else {
-      oss << "(";
-      started = true;
-    }
+    oss << ",";
     switch (Type_KEY(ta)) {
     default:
       oss << as_val(ta);
@@ -918,17 +883,33 @@ static void dump_type_inst(string n, Type ti, ostream& oss)
     }
   }
   for (Expression a = first_Actual(as); a; a = EXPR_NEXT(a)) {
-    if (started) oss << ",";
-    else {
-      oss << "(";
-      started = true;
-    }
-    oss << a;
+    oss << "," << a;
   }
-  if (started) oss << ")";
-  oss << ";\n";
+  oss << ");\n";
   oss << indent() << "type T_" << n << " = m_" << n << ".T_" << rname << ";\n";
   oss << indent() << "val t_" << n << " = m_" << n << ".t_" << rname << ";\n\n";
+}
+
+static void dump_new_type(string n, string nameArg, ostream& oss)
+{
+  static Declaration type_module = find_basic_decl("TYPE");
+  static Symbol TYPE_sym = find_symbol("TYPE");
+  Use u = use(TYPE_sym);
+  USE_DECL(u) = type_module;
+  
+  Type inst = type_inst(module_use(u),nil_TypeActuals(),nil_Actuals());
+  dump_type_inst(n, nameArg, inst,oss);
+}
+
+static void dump_new_phylum(string n, string nameArg, ostream& oss)
+{
+  static Declaration phylum_module = find_basic_decl("PHYLUM");
+  static Symbol PHYLUM_sym = find_symbol("PHYLUM");
+  Use u = use(PHYLUM_sym);
+  USE_DECL(u) = phylum_module;
+  
+  Type inst = type_inst(module_use(u),nil_TypeActuals(),nil_Actuals());
+  dump_type_inst(n, nameArg, inst, oss);
 }
 
 void dump_scala_Declaration(Declaration decl,ostream& oss)
@@ -969,23 +950,21 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
       oss << indent() << "class M_" << def_name(some_class_decl_def(decl));
       TypeFormals tfs = some_class_decl_type_formals(decl);
       dump_TypeFormals(tfs,oss);
+      oss << "(name : String";
       {
-	bool started = false;
 	for (Declaration tf=first_Declaration(tfs); tf ; tf = DECL_NEXT(tf)) {
-	  if (started) oss << ",";
-	  else { started = true; oss << "("; }
+	  oss << ",";
 	  dump_TypeFormal_value(tf,oss);
 	}
 	Formals vfs = module_decl_value_formals(decl);
 	for (Declaration vf=first_Declaration(vfs); vf; vf = DECL_NEXT(vf)) {
-	  if (started) oss << ",";
-	  else { started = true; oss << "("; }
+	  oss << ",";
 	  dump_formal(vf,oss);
 	}
-	if (started) oss << ")";
+	oss << ")";
       }
 
-      oss << " extends Module(\"" << name << "\") {" << endl;
+      oss << " extends Module(name) {" << endl;
       ++nesting_level;
 
       Type rut = some_type_decl_type(rdecl);
@@ -999,20 +978,20 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
 	switch (Type_KEY(rut)) {
 	case KEYno_type:
 	  if (rdecl_is_phylum) {
-	    dump_new_phylum(source,oss);
+	    dump_new_phylum(source,"name",oss);
 	  } else {
-	    dump_new_type(source,oss);
+	    dump_new_type(source,"name",oss);
 	  }
 	  break;
 	case KEYtype_inst:
-	  dump_type_inst(source,rut,oss);
+	  dump_type_inst(source,"name",rut,oss);
 	  break;
 	case KEYprivate_type:
 	  {
 	    bool done = false;
 	    switch (Type_KEY(private_type_rep(rut))) {
 	    case KEYtype_inst:
-	      dump_type_inst(source,private_type_rep(rut),oss);
+	      dump_type_inst(source,"name",private_type_rep(rut),oss);
 	      done = true;
 	      break;
 	    default:
@@ -1044,6 +1023,9 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
 	sr.add(d);
       }
       dump_Type_service_transfers(sr,source,rdecl_is_phylum,rut,oss);
+      if (rdecl_is_phylum) {
+	oss << indent() << "val nodes = t_" << source << ".nodes;\n";
+      }
       oss << endl;
 
       Implementation::ModuleInfo *info = impl->get_module_info(decl);
@@ -1129,16 +1111,17 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
     {
       bool is_phylum = (KEYphylum_decl == Declaration_KEY(decl));
       Type type = some_type_decl_type(decl);
+      string qname = string("\"") + name + "\"";
       switch (Type_KEY(type)) {
       case KEYno_type:
 	if (is_phylum) {
-	  dump_new_phylum(name,oss);
+	  dump_new_phylum(name,qname,oss);
 	} else {
-	  dump_new_type(name,oss);
+	  dump_new_type(name,qname,oss);
 	}
 	break;
       case KEYtype_inst:
-	dump_type_inst(name,type,oss);
+	dump_type_inst(name,qname,type,oss);
 	break;
       default:
 	oss << indent() << "type T_" << name << " = " << type << ";\n";
@@ -1178,7 +1161,7 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
       }
       oss << ") extends " << rt << " {\n";
       ++nesting_level;
-      oss << indent() << "def children : List[Phylum] = List(";
+      oss << indent() << "override def children : List[Node] = List(";
       started = false;
       for (Declaration f = first_Declaration(formals); f; f = DECL_NEXT(f)) {
 	Type fty = formal_type(f);
@@ -1472,7 +1455,7 @@ void dump_Signature(Signature s, string n, ostream& o)
   case KEYsig_inst:
     {
       Class c = sig_inst_class(s);
-      o << "C_" << decl_name(USE_DECL(class_use_use(c))) << "[" << n;
+      o << " with C_" << decl_name(USE_DECL(class_use_use(c))) << "[" << n;
       TypeActuals tas = sig_inst_actuals(s);
       for (Type ta = first_TypeActual(tas); ta; ta=TYPE_NEXT(ta)) {
 	o << "," << ta;
@@ -1482,7 +1465,6 @@ void dump_Signature(Signature s, string n, ostream& o)
     break;
   case KEYmult_sig:
     dump_Signature(mult_sig_sig1(s),n,o);
-    o << " with "; //! BUG: what if one is a no_sig ot a fixed sig?
     dump_Signature(mult_sig_sig2(s),n,o);
     break;
   case KEYno_sig:
@@ -1521,7 +1503,7 @@ void dump_Type_Signature(Type t, string name, ostream& o)
       Module m = type_inst_module(t);
       TypeActuals tas = type_inst_type_actuals(t);
       Declaration mdecl = USE_DECL(module_use_use(m));
-      o << "C_" << decl_name(mdecl) << "[" << name;
+      o << "with C_" << decl_name(mdecl) << "[" << name;
       for (Type ta = first_TypeActual(tas); ta; ta = TYPE_NEXT(ta)) {
 	o << "," << ta;
       }
@@ -1536,12 +1518,7 @@ void dump_Type_Signature(Type t, string name, ostream& o)
     dump_Type_Signature(remote_type_nodetype(t),name,o);
     break;
   case KEYno_type:
-    if (no_type_is_phylum(t))
-      o << "C_PHYLUM[" << name << "]";
-    else o << "C_TYPE[" << name << "]";
-    break;
   case KEYfunction_type:
-    o << "C_NULL[" << name << "]";
     break;
   }
 }
