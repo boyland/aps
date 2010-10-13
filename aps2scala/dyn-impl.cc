@@ -102,13 +102,8 @@ static void dump_context_open(void *c, ostream& os) {
       case KEYtop_level_match:
 	{
 	  Type ty = infer_pattern_type(matcher_pat(top_level_match_m(decl)));
-	  static int unique = 0;
-	  int i = ++unique;
-	  os << indent() << "val phy"<< i << " = " << as_val(ty)
-	     << ".asInstanceOf[I_PHYLUM[" << ty << "]];\n";
-	  os << indent() << "for (i <- 0 until phy" << i << ".size) {\n";
+	  os << indent() << "for (anchor <- " << as_val(ty) << ".nodes) {\n";
 	  ++nesting_level;
-	  os << indent() << ty << " anchor = phy" << i << ".get(i);\n";
 	}
 	return;
       default:
@@ -150,6 +145,14 @@ static void dump_context_open(void *c, ostream& os) {
       ++nesting_level;
       return;
     }
+  case KEYType:
+    {
+      Type t = (Type)c;
+      os << indent() << "if (anchorNodes == " << as_val(t) 
+         << ".nodes) anchor match {\n";
+      ++nesting_level;
+      return;
+    }
   default:
     break;
   }
@@ -165,13 +168,24 @@ static void activate_attr_context(ostream& os)
   }
 }
 
+static void dump_context_close(void *c, ostream& os) {
+  switch (ABSTRACT_APS_tnode_phylum(c)) {
+    case KEYType:
+      os << indent() << "case _ => {}\n";
+      /*FALLTHROUGH*/
+    default:
+      --nesting_level;
+      os << indent() << "}\n";
+      break; 
+  }
+}
+
 static void pop_attr_context(ostream& os)
 {
   --attr_context_depth;
   while (attr_context_started > attr_context_depth) {
     --attr_context_started;
-    --nesting_level;
-    os << indent() << "}\n";
+    dump_context_close(attr_context[attr_context_started],os);
   }
 }
 
@@ -325,7 +339,7 @@ void dump_default_return(Default deft, Direction dir, string ns, ostream& os)
     os << indent() << "return collection;\n";
   } else switch (Default_KEY(deft)) {
   default:
-    os << indent() << "throw UndefinedAttributeException(" << ns << ");\n";
+    os << indent() << "throw Evaluation.UndefinedAttributeException(" << ns << ");\n";
     break;
   case KEYsimple:
     os << indent() << "return " << simple_value(deft) << ";\n";
@@ -449,25 +463,33 @@ void implement_attributes(const vector<Declaration>& attrs,
       dump_init_collection(rdecl,oss);
     }
     if (inh) {
-      oss << indent() << "val anchor = anode.asInstanceOf[Phylum].parent;\n";
+      oss << indent() << "val anchor = anode.parent;\n";
+      oss << indent() << "val anchorNodes = anchor.getType.nodes;\n";
     } else {
       oss << indent() << "val anchor = anode;\n";
     }
-    oss << indent() << "anchor match {\n";
-    ++nesting_level;
+    // apparent bug in scala: pattern matching doesn't work here
+    if (!inh) {
+      oss << indent() << "anchor match {\n";
+      ++nesting_level;
+    }
     for (vector<Declaration>::const_iterator i = tlms.begin();
 	 i != tlms.end(); ++i) {
-      if (is_col) push_attr_context(*i);
       Match m = top_level_match_m(*i);
+      if (inh) push_attr_context(infer_pattern_type(matcher_pat(m)));
+      if (is_col) push_attr_context(*i);
       push_attr_context(m);
       Block body = matcher_body(m);
       dump_Block(body,dump_attr_assign,ad,oss);
       pop_attr_context(oss);
       if (is_col) pop_attr_context(oss);
+      if (inh) pop_attr_context(oss);
     }
-    oss << indent() << "case _ => {};\n";
-    --nesting_level;
-    oss << indent() << "}\n";
+    if (!inh) {
+      oss << indent() << "case _ => {};\n";
+      --nesting_level;
+      oss << indent() << "}\n";
+    }
     dump_default_return(attribute_decl_default(ad),
 			attribute_decl_direction(ad),
 			string("anode.toString()+\".") + name + "\"", oss);
