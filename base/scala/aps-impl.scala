@@ -364,46 +364,60 @@ trait CollectionEvaluation[V_P, V_T] extends Evaluation[V_P,V_T] {
   }
 }
 
+class CircularHelper(var cycleLast : CircularEvaluation[_,_]) {
+  var modified : Boolean = false;
+  
+  {
+    Debug.out("Created cycle helper " + this + " for " + cycleLast.name);
+  }
+
+  def add(c : CircularEvaluation[_,_]) : Unit = {
+    Debug.out("Adding " + c.name + " to cycle " + this);
+    assert (cycleLast != null);
+    assert (c.cycleNext == null);
+    cycleLast.cycleNext = c;
+    cycleLast = c;
+  }
+  
+  def addAll(c : CircularEvaluation[_,_]) : Unit = {
+    {
+      Debug.out("Adding all from " + c.helper + " to cycle " + this);
+      var p = c;
+      while (p != null) {
+	Debug.out("  " + p.name);
+	p = p.cycleNext;
+      }
+    }
+    val other = c.helper;
+    if (other == this) return;
+    assert (other != null);
+    assert (cycleLast != null);
+    assert (cycleLast.cycleNext == null);
+    assert (other.cycleLast != null);
+    if (other.modified) modified = true;
+    cycleLast.cycleNext = c;
+    cycleLast = other.cycleLast;
+    other.cycleLast = null;
+  }
+}
+
 trait CircularEvaluation[V_P, V_T] extends Evaluation[V_P,V_T] {
   import Evaluation._;
 
   def lattice : C_LATTICE[ValueType];
   
-  private class Helper(var cycleLast : CircularEvaluation[_,_]) {
-    var modified : Boolean = false;
-
-    def add(c : CircularEvaluation[_,_]) : Unit = {
-      assert (cycleLast != null);
-      assert (c.cycleNext == null);
-      cycleLast.cycleNext = c;
-      cycleLast = c;
-    }
-
-    def addAll(c : CircularEvaluation[_,_]) : Unit = {
-      val other = c.helper;
-      if (other == this) return;
-      assert (other != null);
-      assert (cycleLast != null);
-      assert (cycleLast.cycleNext == null);
-      assert (other.cycleLast != null);
-      if (other.modified) modified = true;
-      cycleLast.cycleNext = c;
-      cycleLast = other.cycleLast;
-      other.cycleLast = null;
-    }
-  }
-
   // a union-find link
-  private var cycleParent :  CircularEvaluation[_,_] = null;
+  var cycleParent :  CircularEvaluation[_,_] = null;
 
   // keep a list of elements in cycle
-  private var cycleNext : CircularEvaluation[_,_] = null;
+  var cycleNext : CircularEvaluation[_,_] = null;
 
   // keep track of the whole list nodes in the cycle, and a modified flag
-  private var helper : Helper = null;
+  var helper : CircularHelper = null;
 
   override def inCycle : CircularEvaluation[_,_] = {
     var p = cycleParent;
+    if (p == null) return null;
     if (p != this) p = p.inCycle;
     if (p != cycleParent) cycleParent = p;
     p
@@ -423,9 +437,10 @@ trait CircularEvaluation[V_P, V_T] extends Evaluation[V_P,V_T] {
   override def getDefault : ValueType = lattice.v_bottom;
 
   override def detectedCycle : ValueType = {
+    Debug.out("Detected cycle for " + name);
     if (cycleParent == null) {
       value = getDefault;
-      helper = new Helper(this);
+      helper = new CircularHelper(this);
       cycleParent = this;
     }
     markPending();
