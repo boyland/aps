@@ -1,13 +1,15 @@
 .PHONY: all install clean
 
+SCALA= aps-impl.scala basic.handcode.scala table.handcode.scala
+
 all : aps-library.jar
 
 install : aps-library.jar
 	cp aps-library.jar ../../lib
 
-aps-library.jar : aps-impl.scala basic.handcode.scala
+aps-library.jar : ${SCALA}
 	@rm -f *.class
-	scalac -deprecation aps-impl.scala basic.handcode.scala
+	scalac -deprecation ${SCALA}
 	jar cvf aps-library.jar *.class
 
 clean :
