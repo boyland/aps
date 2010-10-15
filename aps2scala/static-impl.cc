@@ -304,10 +304,15 @@ static bool implement_visit_function(AUG_GRAPH* aug_graph,
 	  os << "(anchor," << rhs << ");\n";
 	} else {
 	  int i = LOCAL_UNIQUE_PREFIX(ad);
-	  if (i == 0)
-	    os << "v_" << asym << " = " << rhs << ";\n";
-	  else
+	  if (i == 0) {
+	    if (!def_is_constant(value_decl_def(ad))) {
+	      os << "v_" << asym << " = " << rhs << ";\n";
+	    } else {
+	      os << "// v_" << asym << " is initialized in module.\n";
+	    }
+	  } else {
 	    os << "v" << i << "_" << asym << " = " << rhs << ";\n";
+	  }
 	}
       } else {
 	if (Declaration_KEY(ad) == KEYvalue_decl &&
