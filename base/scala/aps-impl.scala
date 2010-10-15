@@ -189,17 +189,12 @@ class M_PHYLUM(name : String) extends Module(name)
   }
 }
 
-class Evaluation {
-  var inCycle : Boolean = false;
-}
-
 object Evaluation {
-  // evaluation
   sealed trait EvalStatus;
 
   case object UNINITIALIZED extends EvalStatus;
   case object UNEVALUATED extends EvalStatus;
-  case class CYCLE(d : Int) extends EvalStatus;
+  case object CYCLE extends EvalStatus;
   case object EVALUATED extends EvalStatus;
   case object ASSIGNED extends EvalStatus;
 
@@ -212,10 +207,78 @@ object Evaluation {
 
   import scala.collection.mutable.Stack;
 
-  val pending : Stack[Evaluation] = new Stack();
-  val acyclic : Evaluation = new Evaluation;
-  pending.push(acyclic); // stack should never be empty
+  val pending : Stack[Evaluation[_,_]] = new Stack();
+}
 
+class Evaluation[T_P, T_V](val anchor : T_P, val name : String)
+{
+  import Evaluation._;
+
+  type NodeType = T_P;
+  type ValueType = T_V;
+  import Evaluation._;
+
+  var status : EvalStatus = UNINITIALIZED;
+  var value : ValueType = null.asInstanceOf[ValueType];
+
+  def inCycle : CircularEvaluation[_,_] = null;
+  def setInCycle(ce : CircularEvaluation[_,_]) : Unit = {
+    throw new CyclicAttributeException(name);
+  }
+
+  private def doEvaluate : ValueType = {
+    status match {
+      case CYCLE => detectedCycle
+      case UNINITIALIZED | UNEVALUATED => {
+	status = CYCLE;
+	pending.push(this);
+        value = compute;
+	pending.pop();
+	if (inCycle != null) {
+	  evaluateCycle;
+	} else {
+	  status = EVALUATED;
+	}
+	value
+      }
+      case _ => value
+    }
+  }
+
+  def get : ValueType = {
+    Debug.begin(name);
+    try {
+      val v = doEvaluate;
+      Debug.returns(v);
+      v
+    } finally {
+      Debug.end();
+    }
+  }
+
+  def assign(v : ValueType) : Unit = {
+    Debug.out(name + " := " + v);
+    set(v);
+  }
+
+  def set(v : ValueType) : Unit = {
+    value = v;
+    status = ASSIGNED;
+  }
+
+  def evaluateCycle : Unit = {
+    throw new CyclicAttributeException("internal cyclic error: " + anchor+"."+name);
+  }
+  
+  def detectedCycle : ValueType = {
+    throw new CyclicAttributeException(anchor+"."+name);
+  }
+
+  def compute : ValueType = getDefault;
+
+  def getDefault : ValueType = {
+    throw new UndefinedAttributeException(anchor+"."+name);
+  };
 }
 
 class Attribute[T_P <: Node, T_V]
@@ -228,8 +291,7 @@ extends Module("Attribute " + name)
   type ValueType = T_V;
   import Evaluation._;
 
-  private val values : Buffer[ValueType] = new ArrayBuffer();
-  private val status : Buffer[EvalStatus] = new ArrayBuffer();
+  private val evaluations : Buffer[Evaluation[T_P,T_V]] = new ArrayBuffer();
   private var evaluationStarted : Boolean = false;
 
   def assign(n : NodeType, v : ValueType) : Unit = {
@@ -242,158 +304,181 @@ extends Module("Attribute " + name)
   override def finish() : Unit = {
     if (!isComplete) {
       for (n <- t_P.nodes) {
-	evaluate(n);
+	get(n);
       }
     }
     super.finish();
   }
 
-  def evaluation : Evaluation = acyclic;
-
-  private def doEvaluate(n : NodeType) : ValueType = {
-    val num = checkNode(n);
-    status(num) match {
-      case CYCLE(d) => {
-	detectCycle(n,d);
-      }
-      case UNINITIALIZED | UNEVALUATED => {
-	status(num) = CYCLE(pending.size);
-	pending.push(evaluation);
-        var v : ValueType = compute(n);
-        values(num) = v;
-	if (pending.pop().inCycle) {
-	  evaluateCycle(n);
-	  v = values(num);
-	}
-	status(num) = EVALUATED;
-	v
-      }
-      case _ => get(n)
-    }
-  }
-
-  def evaluate(n : Any) : ValueType = {
-    Debug.begin(n + "." + name);
-    try {
-      evaluationStarted = true;
-      val v = doEvaluate(n.asInstanceOf[NodeType]);
-      Debug.returns(v);
-      v
-    } finally {
-      Debug.end();
-    }
-  }
-
-  def evaluateCycle(n : NodeType) : Unit = {
-    throw new CyclicAttributeException("internal cyclic error: " + n+"."+name);
-  }
-  
-  def detectCycle(n : NodeType, d : Int) : ValueType = {
-    throw new CyclicAttributeException(n+"."+name);
-  }
-  
-  def checkNode(n : NodeType) : Int = {
+  def checkNode(n : NodeType) : Evaluation[T_P,T_V] = {
     t_P.v_assert(n);
     val num = n.nodeNumber;
-    val nn = n.getType.nodes(num);
-    if (n != nn) {
-      println("Got " + n + "'s number as " + num + ", but the node with that number is " + nn);
+    {
+      val nn = n.getType.nodes(num);
+      if (n != nn) {
+	println("Got " + n + "'s number as " + num + ", but the node with that number is " + nn);
+      }
+      assert (n == nn);
     }
-    assert (n == nn);
-    while (num >= values.size) {
-      values += null.asInstanceOf[ValueType];
-      status += UNINITIALIZED;
+    while (num >= evaluations.size) {
+      val nn = n.getType.nodes(evaluations.size);
+      evaluations += createEvaluation(nn.asInstanceOf[NodeType])
     };
-    num
+    evaluations(num)
   }
   
   def set(n : NodeType, v : ValueType) : Unit = {
-    val num = checkNode(n);
-    values(num) = v;
-    status(num) = ASSIGNED;
+    checkNode(n).set(v);
   }
 
   def get(n : NodeType) : ValueType = {
-    val i = checkNode(n);
-    if (status(i) == UNINITIALIZED) {
-      values(i) = getDefault(n);
-      status(i) = UNEVALUATED;
-    }
-    return values(i);
+    checkNode(n).get;
   }
   
-  def getStatus(n : NodeType) : EvalStatus = {
-    val i = checkNode(n);
-    return status(i);
-  }
-  
-  def setStatus(n : NodeType, es : EvalStatus) : Unit = {
-    val i = checkNode(n);
-    status(i) = es;
-  }
-  
-  def getDefault(n : NodeType) : ValueType = {
-    throw new UndefinedAttributeException(n + "." + name);
-  }
-  
-  def compute(n : NodeType) : ValueType = {
-    return getDefault(n);
+  def createEvaluation(anchor : NodeType) : Evaluation[NodeType,ValueType] = {
+    return new Evaluation(anchor, anchor + "." + name);
   }
 }
 
-trait CollectionAttribute[V_P <: Node, V_T] extends Attribute[V_P,V_T] {
-  def initial : ValueType;
+trait CollectionEvaluation[V_P, V_T] extends Evaluation[V_P,V_T] {
+  import Evaluation._;
+
+  def initial : ValueType = getDefault;
   def combine(v1 : ValueType, v2 : ValueType) : ValueType;
 
-  override def getDefault(n : NodeType) : ValueType = initial;
+  private def initialize : Unit = {
+    if (status == UNINITIALIZED) {
+      status = UNEVALUATED;
+      value = initial;
+    }
+  };
 
-  override def set(n : NodeType, v : ValueType) : Unit = {
-    super.set(n,combine(get(n),v));
+  override def get : ValueType = {
+    initialize;
+    super.get
+  }
+
+  override def set(v : ValueType) : Unit = {
+    initialize;
+    super.set(combine(value,v));
   }
 }
 
-trait CircularAttribute[V_P <: Node, V_T] extends Attribute[V_P,V_T] {
+trait CircularEvaluation[V_P, V_T] extends Evaluation[V_P,V_T] {
   import Evaluation._;
 
   def lattice : C_LATTICE[ValueType];
+  
+  private class Helper(var cycleLast : CircularEvaluation[_,_]) {
+    var modified : Boolean = false;
 
-  override def getDefault(n : NodeType) : ValueType = lattice.v_bottom;
+    def add(c : CircularEvaluation[_,_]) : Unit = {
+      assert (cycleLast != null);
+      assert (c.cycleNext == null);
+      cycleLast.cycleNext = c;
+      cycleLast = c;
+    }
 
-  override def detectCycle(n : NodeType, d : Int) : ValueType = {
-    markPending(d);
-    get(n)
+    def addAll(c : CircularEvaluation[_,_]) : Unit = {
+      val other = c.helper;
+      if (other == this) return;
+      assert (other != null);
+      assert (cycleLast != null);
+      assert (cycleLast.cycleNext == null);
+      assert (other.cycleLast != null);
+      if (other.modified) modified = true;
+      cycleLast.cycleNext = c;
+      cycleLast = other.cycleLast;
+      other.cycleLast = null;
+    }
   }
 
-  def markPending(d : Int) : Unit = {
-    var diff : Int = pending.size - d;
+  // a union-find link
+  private var cycleParent :  CircularEvaluation[_,_] = null;
+
+  // keep a list of elements in cycle
+  private var cycleNext : CircularEvaluation[_,_] = null;
+
+  // keep track of the whole list nodes in the cycle, and a modified flag
+  private var helper : Helper = null;
+
+  override def inCycle : CircularEvaluation[_,_] = {
+    var p = cycleParent;
+    if (p != this) p = p.inCycle;
+    if (p != cycleParent) cycleParent = p;
+    p
+  }
+
+  override def setInCycle(ce : CircularEvaluation[_,_]) : Unit = {
+    if (cycleParent == null) {
+      cycleParent = ce;
+      ce.helper.add(this);
+    } else {
+      val p = inCycle;
+      ce.helper.addAll(p);
+      p.cycleParent = ce;
+    }
+  }
+
+  override def getDefault : ValueType = lattice.v_bottom;
+
+  override def detectedCycle : ValueType = {
+    if (cycleParent == null) {
+      value = getDefault;
+      helper = new Helper(this);
+      cycleParent = this;
+    }
+    markPending();
+    value
+  }
+
+  def markPending() : Unit = {
+    val cycle = inCycle;
     for (e <- pending.reverse) {
-      if (diff == 0 || e.inCycle) return;
-      if (e == acyclic) {
-	throw new CyclicAttributeException("indirectly cyclic: " + name);	
-      }
-      e.inCycle = true;
-      diff -= 1;
+      if (e.inCycle == cycle) return;
+      e.setInCycle(cycle);
     }
   }
 
-  override def evaluateCycle(n : NodeType) : Unit = {
-    if (pending.top == acyclic) {
-      // it's our job to repeat evaluation until there is no change
-      var last = super.get(n);
-      pending.push(new Evaluation());
-      while (true) {
-	val next = compute(n);
-	if (lattice.v_equal(last,next)) {
-	  setStatus(n,EVALUATED);
-	  pending.pop();
-	  return;
-	}
-	if (!lattice.v_compare(last,next)) {
-	  throw new CyclicAttributeException("non-monotonic " + n+"."+name);
-	}
-	last = next;
+  override def evaluateCycle : Unit = {
+    if (cycleParent == this) {
+      // we're in charge
+      do {
+	helper.modified = false;
+	var c : CircularEvaluation[_,_] = this;
+	do {
+	  c.recompute();
+	  if (cycleParent != this) return; // no longer our responsibility
+	  c = c.cycleNext;
+	} while (c != null);
+      } while (helper.modified);
+      // now freeze all values:
+      var c : CircularEvaluation[_,_] = this;
+      do {
+	c.status = EVALUATED;
+	c = c.cycleNext;
+      } while (c != null);
+    }
+  }
+
+  private def check(newValue : ValueType) : Unit = {
+    if (!lattice.v_equal(value,newValue)) {
+      inCycle.helper.modified = true;
+      if (!lattice.v_compare(value,newValue)) {
+	throw new CyclicAttributeException("non-monotonic " + name);
       }
     }
+  };
+  
+  override def set(newValue : ValueType) : Unit = {
+    check(newValue);
+    super.set(newValue);
+  }
+  
+  def recompute() : Unit = {
+    val newValue = compute;
+    check(newValue);
+    value = newValue;
   }
 }
 
