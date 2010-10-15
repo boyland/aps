@@ -1,0 +1,22 @@
+module TINY[] begin
+  phylum Wood;
+  
+  constructor branch(x,y : Wood) : Wood;
+  constructor leaf(x : Integer) : Wood;
+  
+  type Integers := SET[Integer];
+  type IntegerLattice := UNION_LATTICE[Integer,Integers];
+
+  var circular collection leaves : IntegerLattice;
+  circular attribute Wood.partial : IntegerLattice;
+
+  match ?l=leaf(?x) begin
+    l.partial := (leaves \ x) \/ {x+1} ;
+    leaves :> {x-1};
+  end;
+  match ?b=branch(?x,?y) begin
+    b.partial := x.partial \/ y.partial;
+    leaves :> x.partial;
+  end;
+
+end;
