@@ -331,8 +331,8 @@ extends Module("Attribute " + name)
     checkNode(n).set(v);
   }
 
-  def get(n : NodeType) : ValueType = {
-    checkNode(n).get;
+  def get(n : Any) : ValueType = {
+    checkNode(n.asInstanceOf[NodeType]).get;
   }
   
   def createEvaluation(anchor : NodeType) : Evaluation[NodeType,ValueType] = {
