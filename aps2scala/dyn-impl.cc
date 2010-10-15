@@ -173,7 +173,6 @@ static void dump_context_close(void *c, ostream& os) {
   switch (ABSTRACT_APS_tnode_phylum(c)) {
   case KEYDeclaration:
     switch (Declaration_KEY((Declaration)c)) {      
-    case KEYcase_stmt:
     case KEYtop_level_match:
       os << indent() << "case _ => {}\n";
       /*FALLTHROUGH*/
