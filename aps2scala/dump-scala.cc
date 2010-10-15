@@ -562,6 +562,19 @@ void dump_Type_service_transfers(ServiceRecord& sr,
 	dump_Class_service_transfers(sr,from,USE_DECL(module_use_use(m)),oss);
 	break;
       }
+      /*
+      // if the extended type is one of the parameters, recurse through it
+      Type bt = type_inst_base(ty);
+      //cout << "base type: " << bt << endl;
+      TypeActuals tas = type_inst_type_actuals(ty);
+      for (Type ta = first_TypeActual(tas); ta; ta = TYPE_NEXT(ta)) {
+	//cout << "  actual: " << ta << endl;
+	if (ta == bt) {
+	  //cout << "    found match!" << endl;
+	  dump_Type_service_transfers(sr,from,is_phylum,ta,oss);
+	}
+      }
+      */
     }
     break;
   case KEYtype_use:
