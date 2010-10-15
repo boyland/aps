@@ -640,7 +640,7 @@ void dump_some_attribute(Declaration d, string i,
 
   oss << indent() << "private class E" << i << "_" << name
       << "(anchor : " << ntt << ") extends Evaluation" << typeargs 
-      << "(anchor," << (nt == 0 ? "" : "anchor+\".\"+")
+      << "(anchor," << (nt == 0 ? "" : "anchor.toString()+\".\"+")
       << "\"" << name << "\")"
       << (is_cir ? " with CircularEvaluation" + tmps.str() : "") 
       << (is_col ? " with CollectionEvaluation" + tmps.str() : "")
