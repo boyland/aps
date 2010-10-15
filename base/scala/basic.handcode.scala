@@ -492,7 +492,9 @@ class M__basic_13[T_T](t_T:C_ORDERED[T_T]) {
 
 };
 
-trait C_MAX_LATTICE[T_Result, T_TO] extends C_MAKE_LATTICE[T_Result,T_TO] {
+trait C_MAX_LATTICE[T_Result, T_TO] extends
+ C_MAKE_LATTICE[T_Result,T_TO] // with C_ORDERED[T_TO] 
+{
 }
 
 class M_MAX_LATTICE[T_TO]
@@ -517,6 +519,8 @@ class M_MAX_LATTICE[T_TO]
     val v_compare_equal = t_tmp.v_compare_equal;
     val v_join = t_tmp.v_join;
     val v_meet = t_tmp.v_meet;
+    val v_less = t_TO.v_less;
+    val v_less_equal = t_TO.v_less_equal;
   }
 
   override def finish() : Unit = {
@@ -524,7 +528,9 @@ class M_MAX_LATTICE[T_TO]
   }
 }
 
-trait C_MIN_LATTICE[T_Result, T_T] extends C_MAKE_LATTICE[T_Result,T_T] {
+trait C_MIN_LATTICE[T_Result, T_T] extends
+C_MAKE_LATTICE[T_Result,T_T] // with C_ORDERED[T_T]
+{
 }
 
 class M_MIN_LATTICE[T_T](name : String, t_T:C_ORDERED[T_T],v_max_element : T_T) extends Module("MIN_LATTICE") {
@@ -546,6 +552,8 @@ class M_MIN_LATTICE[T_T](name : String, t_T:C_ORDERED[T_T],v_max_element : T_T) 
     val v_compare_equal = t_tmp.v_compare_equal;
     val v_join = t_tmp.v_join;
     val v_meet = t_tmp.v_meet;
+    val v_less = t_T.v_less;
+    val v_less_equal = t_T.v_less_equal;
   }
 
   override def finish() : Unit = {
@@ -1165,7 +1173,8 @@ class M_ORDERED_MULTISET[T_ElemType](t_ElemType:C_ORDERED[T_ElemType] extends Mo
 */
 
 trait C_UNION_LATTICE[T_Result, T_ElemType, T_ST] 
-extends C_MAKE_LATTICE[T_Result, T_ST] {
+extends C_MAKE_LATTICE[T_Result, T_ST] with C_SET[T_Result,T_ElemType]
+{
 }
 
 class M_UNION_LATTICE[T_ElemType, T_ST](name : String, t_ElemType:Any,t_ST:C_SET[T_ST,T_ElemType]) extends Module(name) {
@@ -1187,6 +1196,23 @@ class M_UNION_LATTICE[T_ElemType, T_ST](name : String, t_ElemType:Any,t_ST:C_SET
     val v_compare_equal = t_tmp.v_compare_equal;
     val v_join = t_tmp.v_join;
     val v_meet = t_tmp.v_meet;
+    val v_less = t_ST.v_less;
+    val v_less_equal = t_ST.v_less_equal;
+    val v__op_AC = t_ST.v__op_AC;
+    val p__op_AC = t_ST.p__op_AC;
+    val p_append = t_ST.p_append;
+    val p_single = t_ST.p_single;
+    val p_none = t_ST.p_none;
+    val v_member = t_ST.v_member;
+    val v_append = t_ST.v_append;
+    val v_single = t_ST.v_single;
+    val v_none = t_ST.v_none;
+    val v_union = t_ST.v_union;
+    val v_intersect = t_ST.v_intersect;
+    val v_difference = t_ST.v_difference;
+    val v_string = t_ST.v_string;
+    val v_assert = t_ST.v_assert;
+    val v_node_equivalent = t_ST.v_node_equivalent;
   }
 
   override def finish() : Unit = {
@@ -1195,7 +1221,7 @@ class M_UNION_LATTICE[T_ElemType, T_ST](name : String, t_ElemType:Any,t_ST:C_SET
 }
 
 trait C_INTERSECTION_LATTICE[T_Result, T_ElemType, T_ST]
-extends C_MAKE_LATTICE[T_Result, T_ST]
+extends C_MAKE_LATTICE[T_Result, T_ST] with C_SET[T_Result,T_ElemType]
 {
 }
 
@@ -1218,6 +1244,23 @@ class M_INTERSECTION_LATTICE[T_ElemType, T_ST](name : String, t_ElemType:Any,t_S
     val v_compare_equal = t_tmp.v_compare_equal;
     val v_join = t_tmp.v_join;
     val v_meet = t_tmp.v_meet;
+    val v_less = t_ST.v_less;
+    val v_less_equal = t_ST.v_less_equal;
+    val v__op_AC = t_ST.v__op_AC;
+    val p__op_AC = t_ST.p__op_AC;
+    val p_append = t_ST.p_append;
+    val p_single = t_ST.p_single;
+    val p_none = t_ST.p_none;
+    val v_member = t_ST.v_member;
+    val v_append = t_ST.v_append;
+    val v_single = t_ST.v_single;
+    val v_none = t_ST.v_none;
+    val v_union = t_ST.v_union;
+    val v_intersect = t_ST.v_intersect;
+    val v_difference = t_ST.v_difference;
+    val v_string = t_ST.v_string;
+    val v_assert = t_ST.v_assert;
+    val v_node_equivalent = t_ST.v_node_equivalent;
   }
 
   override def finish() : Unit = {
