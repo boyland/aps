@@ -229,7 +229,7 @@ static void dump_attr_assign(void *vdecl, Declaration ass, ostream& os)
     activate_attr_context(os);
     dir = attribute_decl_direction(decl);
     def = attribute_decl_default(decl);
-    os << indent() << "if (anode == ";
+    os << indent() << "if (anode eq ";
     dump_Expression(first_Actual(funcall_actuals(lhs)),os);
     os << ") ";
     break;
@@ -469,15 +469,16 @@ void implement_attributes(const vector<Declaration>& attrs,
     ++nesting_level;
     if (is_col) {
       dump_init_collection(rdecl,oss);
-    }
-    if (inh) {
-      oss << indent() << "val anchor = anode.parent;\n";
-      oss << indent() << "val anchorNodes = anchor.getType.nodes;\n";
     } else {
-      oss << indent() << "val anchor = anode;\n";
+      if (inh) {
+	oss << indent() << "val anchor = anode.parent;\n";
+	oss << indent() << "val anchorNodes = anchor.getType.nodes;\n";
+      } else {
+	oss << indent() << "val anchor = anode;\n";
+      }
     }
     // apparent bug in scala: pattern matching doesn't work here
-    if (!inh) {
+    if (!inh && !is_col) {
       oss << indent() << "anchor match {\n";
       ++nesting_level;
     }
@@ -493,7 +494,7 @@ void implement_attributes(const vector<Declaration>& attrs,
       if (is_col) pop_attr_context(oss);
       if (inh) pop_attr_context(oss);
     }
-    if (!inh) {
+    if (!inh && !is_col) {
       oss << indent() << "case _ => {};\n";
       --nesting_level;
       oss << indent() << "}\n";
