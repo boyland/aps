@@ -6,13 +6,15 @@ SCALACFLAGS= ${SCALAFLAGS}
 APS2SCALA = ${APSTOP}/bin/aps2scala
 APS2SCALAFLAGS = -p ..:${APSTOP}/base -G
 
-SCALAGEN = simple.scala classic-binding.scala test-coll.scala
+SCALAGEN = simple.scala classic-binding.scala \
+	test-coll.scala test-cycle.scala
 
 .PHONY: all clean
 
 all : ${SCALAGEN}
 all : simple_implicit.class classic_binding_implicit.class Classic.class
-all : TestCollDriver.class
+all : test_coll_implicit.class TestCollDriver.class
+all : test_cycle_implicit.class TestCycleDriver.class
 
 %.scala : ../%.aps 
 	${APS2SCALA} ${APS2SCALAFLAGS} $*
@@ -34,6 +36,12 @@ test_coll_implicit.class : test-coll.scala
 
 TestCollDriver.class : test_coll_implicit.class test-coll-driver.scala
 	${SCALAC} ${SCALACFLAGS}  test-coll-driver.scala
+
+test_cycle_implicit.class : test-cycle.scala
+	${SCALAC} ${SCALACFLAGS} $<
+
+TestCycleDriver.class : test_cycle_implicit.class test-cycle-driver.scala
+	${SCALAC} ${SCALACFLAGS}  test-cycle-driver.scala
 
 .PHONY: %.run
 
