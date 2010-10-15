@@ -22,10 +22,10 @@ module NAME_RESOLUTION[T :: var SIMPLE[]] extends T begin
   constructor entity(name : String; shape : Shape) : Entity;
   collection attribute Entity.entity_used : OrLattice;
 
-  procedure entity_shape(e : EntityRef) : Shape begin
+  function entity_shape(e : EntityRef) : Shape begin
     case e begin
-      match entity(? : String, ?shape : Shape) begin
-	result := shape;
+      match entity(? : String, ?sh : Shape) begin
+	result := sh;
       end;
     end;
   end;
@@ -45,6 +45,7 @@ module NAME_RESOLUTION[T :: var SIMPLE[]] extends T begin
   
   int_shape : Shape := shape("integer");
   str_shape : Shape := shape("string");
+  no_shape : Shape := shape("<none>");
 
 
   --- Attributes on "nonterminals" (i.e. imported and fixed phyla)
@@ -91,11 +92,11 @@ module NAME_RESOLUTION[T :: var SIMPLE[]] extends T begin
     endif;
   end;
   
-  match ?t:Type=integer() begin
+  match ?t:Type=integer_type() begin
     t.type_shape := int_shape;
   end;
   
-  match ?t:Type=string() begin
+  match ?t:Type=string_type() begin
     t.type_shape := str_shape;
   end;
   
@@ -132,13 +133,14 @@ module NAME_RESOLUTION[T :: var SIMPLE[]] extends T begin
     decl := lookup(id,e.expr_scope);
     if decl = not_found then
       msgs :> {id ++ " not declared"};
+      e.expr_shape := no_shape;
     else
       decl.entity_used :> true;
       e.expr_shape := decl.entity_shape;
     endif;
   end;
   
-  procedure lookup(name : String; scope : Scope) : EntityRef begin
+  function lookup(name : String; scope : Scope) : EntityRef begin
     if scope = root_scope then
       result := not_found;
     else
