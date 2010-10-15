@@ -650,7 +650,7 @@ public:
       os << "a" << LOCAL_UNIQUE_PREFIX(vd) << "_"
 	 << decl_name(vd) << ".get(anchor)"; 
     } else if (flags & VAR_VALUE_DECL_FLAG) {
-      os << "c_" << decl_name(vd) << "()";
+      os << "v_" << decl_name(vd);
     } else if (flags & ATTRIBUTE_DECL_FLAG) {
       // not currently active:
       // (but should work just fine)
