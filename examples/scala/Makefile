@@ -6,12 +6,13 @@ SCALACFLAGS= ${SCALAFLAGS}
 APS2SCALA = ${APSTOP}/bin/aps2scala
 APS2SCALAFLAGS = -p ..:${APSTOP}/base -G
 
-SCALAGEN = simple.scala classic-binding.scala
+SCALAGEN = simple.scala classic-binding.scala test-coll.scala
 
 .PHONY: all clean
 
 all : ${SCALAGEN}
 all : simple_implicit.class classic_binding_implicit.class Classic.class
+all : TestCollDriver.class
 
 %.scala : ../%.aps 
 	${APS2SCALA} ${APS2SCALAFLAGS} $*
