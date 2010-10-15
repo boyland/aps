@@ -165,9 +165,11 @@ class M__basic_5[T_T](t_T:C_NUMERIC[T_T] with C_ORDERED[T_T]) {
 
 };
 
+trait C_BOOLEAN[T_Result] extends C_TYPE[T_Result] {}
+
 class M_BOOLEAN(name : String) extends Module(name) {
   type T_Result = Boolean;
-  object t_Result extends I_TYPE[T_Result] {
+  object t_Result extends I_TYPE[T_Result] with C_BOOLEAN[T_Result] {
     override def f_assert(v__22 : T_Result) : Unit = { }
   }
   override def finish() : Unit = {
@@ -175,10 +177,11 @@ class M_BOOLEAN(name : String) extends Module(name) {
   }
 }
 
+trait C_INTEGER[T_Result] extends C_TYPE[T_Result] with C_NUMERIC[T_Result] with C_ORDERED[T_Result] with C_PRINTABLE[T_Result] {}
+
 class M_INTEGER(name : String) extends Module(name) {
   type T_Result = Int;
-  object t_Result extends I_TYPE[T_Result] with 
-     C_NUMERIC[T_Result] with C_ORDERED[T_Result] with C_PRINTABLE[T_Result] 
+  object t_Result extends I_TYPE[T_Result] with C_INTEGER[T_Result]
   {
     override def f_assert(v__28 : T_Result) : Unit = {};
     val v_zero:T_Result = 0;
@@ -1334,8 +1337,6 @@ trait C_STRING[T_Result] extends C_ORDERED[T_Result]
 }
 
 class M_STRING(name : String) extends Module(name) {
-  // import scala.collection.immutable.WrappedString;
-  import scala.runtime.RichString;
   type T_Result = String;
   object t_Result extends I_TYPE[T_Result] with C_STRING[T_Result] {
     override def f_assert(v__88 : T_Result) : Unit = {};
@@ -1345,13 +1346,13 @@ class M_STRING(name : String) extends Module(name) {
     
     val p__op_AC = new PatternSeqFunction[Char,T_Result](u__op_AC);
     def u__op_AC(x:Any) : Option[Seq[Char]] = x match {
-      case x:String => Some(new RichString(x));
+      case x:String => Some(x);
       case _ => None
     };
     
     val v_member = f_member _;
     def f_member(v_e : Char, v_l : T_Result):T_Boolean =
-      new RichString(v_l).contains(v_e);
+      v_l.indexOf(v_e) != -1;
     
     val v_append = f_append _;
     def f_append(v_l1 : T_Result, v_l2 : T_Result):T_Result = v_l1 + v_l2;
