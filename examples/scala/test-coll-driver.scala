@@ -1,6 +1,6 @@
 object TestCollDriver extends Application
 {
-    val m = M_TINY("Tiny");
+    val m = new M_TINY("Tiny");
     type T_Tiny = m.T_Result;
     val t_Tiny = m.t_Result;
 
@@ -11,5 +11,5 @@ object TestCollDriver extends Application
     m.finish();
 
     println("sum is " + t_Tiny.v_sum);
-    println("leaves is " + t_Tiny.m_v_leaves);
+    println("leaves is " + t_Tiny.v_leaves);
 }
