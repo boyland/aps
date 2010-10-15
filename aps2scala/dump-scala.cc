@@ -610,30 +610,54 @@ void dump_some_attribute(Declaration d, string i,
   const char *name = decl_name(d);
   bool is_col = direction_is_collection(dir);
   bool is_cir = direction_is_circular(dir);
-  bool is_attr = Declaration_KEY(d) == KEYattribute_decl;
+  //bool is_attr = Declaration_KEY(d) == KEYattribute_decl;
+
+  ostringstream tmp;
+  if (nt == 0) {
+    tmp << "Null";
+  } else {
+    tmp << nt;
+  }
+  string ntt = tmp.str();
+  // tmp.str() = ""; //XXX: doesn't work.  I can't see how to reset stream.
 
   ostringstream tmps;
-  tmps << "[" << nt << "," << vt << "]";
+  tmps << "[" << ntt << "," << vt << "]";
+  string typeargs = tmps.str();
 
-  oss << indent() << "private object a" << i << "_" << name
-      << " extends Attribute" << tmps.str() 
-      << "(" << as_val(nt) << "," << as_val(vt) << ",\"" << name << "\")"
-      << (is_cir ? " with Circular" + tmps.str() : "") 
-      << (is_col ? " with Collection" + tmps.str() : "")
+  oss << indent() << "private class E" << i << "_" << name
+      << "(anchor : " << ntt << ") extends Evaluation" << typeargs 
+      << "(anchor," << (nt == 0 ? "" : "anchor+\".\"+")
+      << "\"" << name << "\")"
+      << (is_cir ? " with CircularEvaluation" + tmps.str() : "") 
+      << (is_col ? " with CollectionEvaluation" + tmps.str() : "")
       << " {\n";
   ++nesting_level;
 
   switch (Default_KEY(deft)) {
-  default:
+  case KEYno_default:
+    if (is_col) {
+      oss << indent() << "override def initial : " << vt << " = " 
+	  << as_val(vt) << ".v_initial;\n";
+      oss << indent() << "override def combine(v1 : " << vt
+	  << ", v2 : " << vt << ") = " 
+	  << as_val(vt) << ".v_combine(v1,v2);\n";
+    }
     break;
   case KEYsimple:
-    if (is_attr) {
-      oss << indent() << "override def getDefault(n : " << nt << ") = "
+    if (i == "") {
+      //TODO: bind the formal parameter to anchor
+      oss << indent() << "override def getDefault = "
 	  << simple_value(deft) << ";\n";
+    }
+    if (is_col) {
+      oss << indent() << "override def combine(v1 : " << vt
+	  << ", v2 : " << vt << ") = " 
+	  << as_val(vt) << ".v_combine(v1,v2);\n";
     }
     break;
   case KEYcomposite:
-    oss << indent() << "override def getDefault(n : " << nt << ") = "
+    oss << indent() << "override def initial : " << vt << " = "
 	<< composite_initial(deft) << ";\n";
     oss << indent() << "override def combine(v1 : " << vt
 	<< ", v2 : " << vt << ") = ";
@@ -646,13 +670,34 @@ void dump_some_attribute(Declaration d, string i,
   }
 
   if (Declaration_KEY(d) == KEYvalue_decl) {
-    info->note_local_attribute(d,oss);
+    if (i == "")
+      info->note_var_value_decl(d,oss);
+    else
+      info->note_local_attribute(d,oss);
   } else {
     info->note_attribute_decl(d,oss);
   }
 
   --nesting_level;
   oss << indent() << "}\n";
+
+  if (nt == 0) {
+    oss << indent() << "private object a_" << name
+	<< " extends E_" << name << "(null) {}\n";
+  } else {
+    oss << indent() << "private object a" << i << "_" << name
+	<< " extends Attribute" << tmps.str() 
+	<< "(" << as_val(nt) << "," << as_val(vt) << ",\"" << name << "\")"
+	<< " {\n";
+    ++nesting_level;
+    
+    oss << indent()
+	<< "override def createEvaluation(anchor : " << nt << ") : Evaluation"
+	<< tmps.str() << " = new E" << i << "_" << name << "(anchor);\n";
+
+    --nesting_level;
+    oss << indent() << "}\n";
+  }
 
 }
   
@@ -1046,32 +1091,6 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
       
 	// now specific to module things:
 	switch (Declaration_KEY(d)) {
-	case KEYattribute_decl:
-	  {
-	    Type fty = attribute_decl_type(d);
-	    Declaration f = first_Declaration(function_type_formals(fty));
-	    Declarations rdecls = function_type_return_values(fty);
-	    Declaration rdecl = first_Declaration(rdecls);
-
-	    dump_some_attribute(d,"",infer_formal_type(f),
-				value_decl_type(rdecl),
-				attribute_decl_direction(d),
-				attribute_decl_default(d),info,oss);
-
-	    oss << indent() << "val v_" << n << " : "
-		<< infer_formal_type(f) << " => " << value_decl_type(rdecl)
-		<< " = a_" << n << ".evaluate _;\n";
-
-	    if (direction_is_input(attribute_decl_direction(d))) {
-	      oss << indent() << "def s_" << n << "(node:"
-		  << infer_formal_type(f)
-		  << ", value:" << value_decl_type(rdecl)
-		  << ") = " << "a_" << n
-		  << ".assign(node,value);\n";
-	    }
-
-	  }
-	  break;
 	case KEYtop_level_match:
 	  {
 	    Match m = top_level_match_m(d);
@@ -1081,13 +1100,57 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
 	  }
 	  info->note_top_level_match(d,oss);
 	  break;
+
 	case KEYvalue_decl:
-	  {
-	    Def def = value_decl_def(d);
-	    if (!def_is_constant(def))
-	      info->note_var_value_decl(d,oss);
+	  if (!def_is_constant(value_decl_def(d))) {
+	    Default init = value_decl_default(d);
+	    Direction dir = value_decl_direction(d);
+	    Type type = value_decl_type(d);
+	    dump_some_attribute(d,"",0,
+				value_decl_type(d),
+				value_decl_direction(d),
+				init,info,oss);
+	    
+	    oss << indent() << "def v_" << n << ":" << type
+		<< " = a_" << n << ".get;\n";
+	    if (direction_is_input(dir)) {
+	      // NB: the a_object handles combination, as appropriate
+	      oss << indent() << "def s_" << n << "(value:" << type
+		  << ") = " << "a_" << n
+		  << ".set(value);\n";
+	    }
+	    oss << endl;
 	  }
 	  break;
+
+	case KEYattribute_decl:
+	  {
+	    Type fty = attribute_decl_type(d);
+	    Declaration f = first_Declaration(function_type_formals(fty));
+	    Declarations rdecls = function_type_return_values(fty);
+	    Declaration rdecl = first_Declaration(rdecls);
+	    
+	    dump_some_attribute(d,"",infer_formal_type(f),
+				value_decl_type(rdecl),
+				attribute_decl_direction(d),
+				attribute_decl_default(d),info,oss);
+	    
+	    oss << indent() << "val v_" << n << " : "
+		<< infer_formal_type(f) << " => " << value_decl_type(rdecl)
+		<< " = a_" << n << ".get _;\n";
+	    
+	    if (direction_is_input(attribute_decl_direction(d))) {
+	      oss << indent() << "def s_" << n << "(node:"
+		  << infer_formal_type(f)
+		  << ", value:" << value_decl_type(rdecl)
+		  << ") = " << "a_" << n
+		  << ".assign(node,value);\n";
+	    }
+	    oss << endl;
+      
+	  }
+	  break;
+
 	default:
 	  break;
 	}
@@ -1234,38 +1297,55 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
     break;
 
   case KEYvalue_decl:
-    {
-      oss << indent() << "var v_" << name << ":" << value_decl_type(decl);
-      switch (Default_KEY(value_decl_default(decl))) {
+    // "var" things handled by module
+    if (def_is_constant(value_decl_def(decl))) {
+      Default init = value_decl_default(decl);
+      Direction dir = value_decl_direction(decl);
+      Type type = value_decl_type(decl);
+      oss << indent() << (direction_is_input(dir) ? "var" : "val")
+	  << " v_" << name << ":" << type;
+      switch (Default_KEY(init)) {
       case KEYsimple:
 	oss << " = ";
-	dump_Expression(simple_value(value_decl_default(decl)),oss);
+	dump_Expression(simple_value(init),oss);
 	break;
       case KEYcomposite:
 	oss << " = ";
-	dump_Expression(composite_initial(value_decl_default(decl)),oss);
+	dump_Expression(composite_initial(init),oss);
 	break;
       case KEYno_default:
-	if (direction_is_circular(value_decl_direction(decl))) {
-	  oss << " = " << as_val(value_decl_type(decl)) << ".v_bottom";
-	} else if (direction_is_collection(value_decl_direction(decl))) {
-	  oss << " = " << as_val(value_decl_type(decl)) << ".v_initial";
+	if (direction_is_collection(dir)) {
+	  oss << " = " << as_val(type) << ".v_initial";
 	} else {
 	  aps_error(decl,"No default value?");
 	}
 	break;
-      default:
-	aps_error(decl,"Cannot generate code for this");
-	break;
       }
       oss << ";\n";
+      if (direction_is_input(dir)) {
+	oss << indent() << "def s_" << name << "(value:" << type
+	    << ") : Unit = {\n";
+	oss << "  v_" << name << " = ";
+	if (direction_is_collection(dir)) {
+	  switch (Default_KEY(init)) {
+	  default:
+	    oss << as_val(value_decl_type(decl)) << ".v_combine";
+	    break;
+	  case KEYcomposite:
+	    oss << composite_combiner(init);
+	  }
+	  oss << "(v_" << name << ",value);\n";
+	} else {
+	  oss << "value;\n";
+	}
+	oss << "}\n";
+      }
     }
     break;
 
   case KEYattribute_decl:
-    // must be handled by the surrounding module
-    break;
-
+    break; // handled by module
+    
   case KEYfunction_decl:
     {
       Type fty = function_decl_type(decl);
