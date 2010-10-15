@@ -102,7 +102,8 @@ static void dump_context_open(void *c, ostream& os) {
       case KEYtop_level_match:
 	{
 	  Type ty = infer_pattern_type(matcher_pat(top_level_match_m(decl)));
-	  os << indent() << "for (anchor <- " << as_val(ty) << ".nodes) {\n";
+	  os << indent() << "for (anchor <- " << as_val(ty)
+	     << ".nodes) anchor match {\n";
 	  ++nesting_level;
 	}
 	return;
@@ -170,13 +171,25 @@ static void activate_attr_context(ostream& os)
 
 static void dump_context_close(void *c, ostream& os) {
   switch (ABSTRACT_APS_tnode_phylum(c)) {
-    case KEYType:
+  case KEYDeclaration:
+    switch (Declaration_KEY((Declaration)c)) {      
+    case KEYcase_stmt:
+    case KEYtop_level_match:
       os << indent() << "case _ => {}\n";
       /*FALLTHROUGH*/
     default:
       --nesting_level;
       os << indent() << "}\n";
       break; 
+    }
+    break;
+  case KEYType:
+    os << indent() << "case _ => {}\n";
+    /*FALLTHROUGH*/
+  default:
+    --nesting_level;
+    os << indent() << "}\n";
+    break; 
   }
 }
 
@@ -210,10 +223,6 @@ static void dump_attr_assign(void *vdecl, Declaration ass, ostream& os)
     dir = value_decl_direction(decl);
     def = value_decl_default(decl);
     activate_attr_context(os);
-    if (Declaration_info(decl)->decl_flags & VAR_VALUE_DECL_FLAG &&
-	!direction_is_collection(dir)) {
-      os << indent() << "s_" << decl_name(decl) << " = EVALUATED;\n";
-    }
     os << indent();
     break;
   case KEYfuncall:
@@ -234,7 +243,7 @@ static void dump_attr_assign(void *vdecl, Declaration ass, ostream& os)
     case KEYno_default:
     case KEYsimple:
       dump_Type_value(ty,os);
-      os << "->v_combine";
+      os << ".v_combine";
       break;
     case KEYcomposite:
       dump_Expression(composite_combiner(def),os);
@@ -511,16 +520,11 @@ void implement_var_value_decls(const vector<Declaration>& vvds,
 
     oss << indent() << "def c_" << name << "() : " << vt << " = {\n";
     ++nesting_level;
-    oss << indent() << "if (s_" << name << " >= EVALUATED) "
-	<< "return v_" << name << ";\n";
-    oss << indent() << "if (s_" << name << " == CYCLE) "
-	<< "throw CyclicAttributeException(\"" << name << "\");\n";
     if (debug) {
-      oss << indent() << "Debug.start(\"" << name << "\");\n";
+      oss << indent() << "Debug.begin(\"" << name << "\");\n";
       oss << indent() << "try {\n";
       ++nesting_level;
     }
-    oss << indent() << "s_" << name << " = CYCLE;\n";
     if (is_col) {
       dump_init_collection(vvd,oss);
     }
@@ -538,9 +542,7 @@ void implement_var_value_decls(const vector<Declaration>& vvds,
       if (debug) {
 	oss << indent() << "Debug.returns(collection.toString());\n";
       }
-      oss << indent() << "v_" << name << " = collection;\n";
     }
-    oss << indent() << "s_" << name << " = EVALUATED;\n";
     dump_default_return(value_decl_default(vvd),
 			value_decl_direction(vvd),
 			string("\"") + name + "\"", oss);
@@ -565,8 +567,8 @@ public:
     }
 
     void dump_compute(string cfname, ostream& oss) {
-      oss << indent() << "override def compute(node : NodeType) : ValueType = "
-	  << cfname << "(node);\n";
+      oss << indent() << "override def compute : ValueType = "
+	  << cfname << "(anchor);\n";
     }
     
     void note_local_attribute(Declaration ld, ostream& oss) {
@@ -583,10 +585,9 @@ public:
     
     void note_var_value_decl(Declaration vd, ostream& oss) {
       Super::note_var_value_decl(vd,oss);
+      oss << indent() << "override def compute : ValueType = "
+	  << "c_" << decl_name(vd) << "();\n";
       Declaration_info(vd)->decl_flags |= VAR_VALUE_DECL_FLAG;
-      const char *name = decl_name(vd);
-      oss << indent() << "var s_" << name << ": EvalStatus = " 
-	  << "UNEVALUATED;\n";
     }
 
     void implement(ostream& oss) {
@@ -601,15 +602,16 @@ public:
       // Implement finish routine:
       oss << indent() << "def finish() : Unit = {\n";
       ++nesting_level;
-      //? not sure how to do this:
-      //? we don't want to force these to finish in the wrong order.
       for (Declaration d = first_Declaration(ds); d; d = DECL_NEXT(d)) {
 	switch(Declaration_KEY(d)) {
 	default:
 	  break;
+	case KEYattribute_decl:
+	  oss << indent() << "a_" << decl_name(d) << ".finish;\n";
+	  break;
 	case KEYvalue_decl:
 	  if (!def_is_constant(value_decl_def(d))) {
-	    oss << indent() << "c_" << decl_name(d) << "();\n";
+	    oss << indent() << "a_" << decl_name(d) << ".get;\n";
 	  }
 	  break;
 	}
@@ -647,13 +649,13 @@ public:
     int flags = Declaration_info(vd)->decl_flags;
     if (flags & LOCAL_ATTRIBUTE_FLAG) {
       os << "a" << LOCAL_UNIQUE_PREFIX(vd) << "_"
-	 << decl_name(vd) << ".evaluate(anchor)"; 
+	 << decl_name(vd) << ".get(anchor)"; 
     } else if (flags & VAR_VALUE_DECL_FLAG) {
       os << "c_" << decl_name(vd) << "()";
     } else if (flags & ATTRIBUTE_DECL_FLAG) {
       // not currently active:
       // (but should work just fine)
-      os << "a" << "_" << decl_name(vd) << ".evaluate";
+      os << "a" << "_" << decl_name(vd) << ".get";
     } else {
       aps_error(vd,"internal_error: What is special about this?");
     }
