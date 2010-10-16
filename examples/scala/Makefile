@@ -16,8 +16,15 @@ all : simple_implicit.class classic_binding_implicit.class Classic.class
 all : test_coll_implicit.class TestCollDriver.class
 all : test_cycle_implicit.class TestCycleDriver.class
 
+.PHONY: run
+
+run: Classic.run TestCollDriver.run TestCycleDriver.run
+
 %.scala : ../%.aps 
 	${APS2SCALA} ${APS2SCALAFLAGS} $*
+
+%.scala : RCS/%.scala,v
+	co $<
 
 %_implicit.class : %.scala
 	${SCALAC} ${SCALACFLAGS} $*.scala
