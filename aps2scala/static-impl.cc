@@ -710,7 +710,7 @@ public:
 	  switch (Type_KEY(some_type_decl_type(d))) {
 	  case KEYno_type:
 	  case KEYtype_inst:
-	    kind = "m_";
+	    kind = "t_";
 	    break;
 	  default:
 	    break;
