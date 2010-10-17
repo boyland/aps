@@ -148,7 +148,7 @@ trait C_PHYLUM[T_Result <: Node] extends C_TYPE[T_Result] {
   val nodes : Nodes[T_Result];
 }
 
-abstract class I_PHYLUM[T_Result <: Node](name : String)
+class I_PHYLUM[T_Result <: Node](name : String)
 	 extends I_TYPE[T_Result](name) with C_PHYLUM[T_Result] 
 {
   val v_identical = f_identical _;
