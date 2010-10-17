@@ -470,7 +470,7 @@ void dump_Class_service_transfers(ServiceRecord& sr, string from,
       case KEYpattern_decl:
       case KEYconstructor_decl:
 	oss << indent() << "val p_" << n
-	    << " = t_" << from << ".p_" << n << ";\n";
+	    << " = " << from << ".p_" << n << ";\n";
 	if (Declaration_KEY(d) == KEYpattern_decl) break;
 	/* fall through */
       case KEYvalue_decl:
@@ -478,15 +478,15 @@ void dump_Class_service_transfers(ServiceRecord& sr, string from,
       case KEYfunction_decl:
       case KEYattribute_decl:
 	oss << indent() << "val v_" << n
-	    << " = t_" << from << ".v_" << n << ";\n";
+	    << " = " << from << ".v_" << n << ";\n";
 	break;
       case KEYtype_decl:
       case KEYphylum_decl:
       case KEYtype_renaming:
 	oss << indent() << "type T_" << n
-	    << " = t_" << from << ".T_" << n << ";\n";
+	    << " = " << from << ".T_" << n << ";\n";
 	oss << indent() << "val t_" << n
-	    << " = t_" << from << ".t_" << n << ";\n";	
+	    << " = " << from << ".t_" << n << ";\n";	
 	break;
       }
     }
@@ -896,7 +896,7 @@ static void dump_type_inst(string n, string nameArg, Type ti, ostream& oss)
     }
   }
   u=0;
-  oss << indent() << "val m_" << n << " = new ";
+  oss << indent() << "val t_" << n << " = new ";
   switch (Module_KEY(m)) {
   default:
     aps_error(m,"cannot handle this module");
@@ -944,30 +944,23 @@ static void dump_type_inst(string n, string nameArg, Type ti, ostream& oss)
     oss << "," << a;
   }
   oss << ");\n";
-  oss << indent() << "type T_" << n << " = m_" << n << ".T_" << rname << ";\n";
-  oss << indent() << "val t_" << n << " = m_" << n << ".t_" << rname << ";\n\n";
+  oss << indent() << "type T_" << n << " = t_" << n << ".T_" << rname << ";\n";
 }
 
 static void dump_new_type(string n, string nameArg, ostream& oss)
 {
-  static Declaration type_module = find_basic_decl("TYPE");
-  static Symbol TYPE_sym = find_symbol("TYPE");
-  Use u = use(TYPE_sym);
-  USE_DECL(u) = type_module;
-  
-  Type inst = type_inst(module_use(u),nil_TypeActuals(),nil_Actuals());
-  dump_type_inst(n, nameArg, inst,oss);
+  oss << indent() << "class T_" << n << "(t : I_TYPE[T_" << n
+      << "]) extends Value(t) { }\n";
+  oss << indent() << "val t_" << n << " = new I_TYPE[T_" << n << "]("
+      << nameArg << ");\n" << endl;
 }
 
 static void dump_new_phylum(string n, string nameArg, ostream& oss)
 {
-  static Declaration phylum_module = find_basic_decl("PHYLUM");
-  static Symbol PHYLUM_sym = find_symbol("PHYLUM");
-  Use u = use(PHYLUM_sym);
-  USE_DECL(u) = phylum_module;
-  
-  Type inst = type_inst(module_use(u),nil_TypeActuals(),nil_Actuals());
-  dump_type_inst(n, nameArg, inst, oss);
+  oss << indent() << "abstract class T_" << n << "(t : I_PHYLUM[T_" << n
+      << "]) extends Node(t) { }\n";
+  oss << indent() << "val t_" << n << " = new I_PHYLUM[T_" << n << "]("
+      << nameArg << ");\n" << endl;
 }
 
 void dump_scala_Declaration(Declaration decl,ostream& oss)
@@ -1005,8 +998,59 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
       
       dump_some_class_decl(decl,oss);
       
-      oss << indent() << "class M_" << def_name(some_class_decl_def(decl));
       TypeFormals tfs = some_class_decl_type_formals(decl);
+
+      Type rut = some_type_decl_type(rdecl);
+      // peel away remote/private (irrelevant in the Scala)
+      while (Type_KEY(rut) == KEYprivate_type)
+	rut = private_type_rep(rut);
+      while (Type_KEY(rut) == KEYremote_type)
+	rut = remote_type_nodetype(rut);
+
+      string result_type;
+      string result_typeval;
+      
+      if (impl_type) {
+	result_type = impl_type;
+      } else {
+	switch (Type_KEY(rut)) {
+	default: break;
+	case KEYtype_use:
+	  {
+	    ostringstream results;
+	    results << rut;
+	    result_type = results.str();
+	    ostringstream resultvals;
+	    resultvals << as_val(rut);
+	    result_typeval = resultvals.str();
+	  }
+	  break;
+	case KEYno_type:	  
+	  {
+	    ostringstream results;
+	    results << "T_" << name;
+	    bool started = false;
+	    for (Declaration tf = first_Declaration(tfs); tf; tf=DECL_NEXT(tf)) {
+	      if (started) results << ",";
+	      else { started = true; results << "["; }
+	      results << decl_name(tf);
+	    }
+	    if (started) results << "]";
+	    result_type = results.str();
+	    
+	    oss << indent() << "abstract class T_" << name;
+	    dump_TypeFormals(tfs,oss);
+	    oss << "(t : C_" << name << "[" << result_type;
+	    for (Declaration tf = first_Declaration(tfs); tf; tf=DECL_NEXT(tf)) {
+	      oss << "," << decl_name(tf);
+	    }
+	    oss << "]) extends " << (rdecl_is_phylum ? "Node" : "Value") 
+		<< "(t) { }\n";
+	  }
+	}
+      }
+
+      oss << indent() << "class M_" << def_name(some_class_decl_def(decl));
       dump_TypeFormals(tfs,oss);
       oss << "(name : String";
       {
@@ -1019,72 +1063,73 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
 	  oss << ",";
 	  dump_formal(vf,oss);
 	}
-	oss << ")";
+	oss << ")\n";
       }
 
-      oss << " extends Module(name) {" << endl;
-      ++nesting_level;
-
-      Type rut = some_type_decl_type(rdecl);
-      const char *source = "tmp";
-
-      // define T_Result:
-      if (impl_type) {
-	oss << indent() << "type T_" << rname << " = " 
-	    << impl_type << ";\n";
+      // define extends
+      if (result_typeval != "") {
+	oss << indent() << "  extends Module(name)\n";
+      } else if (result_type != "") {
+	oss << indent() << "  extends I_"
+	    << (rdecl_is_phylum ? "PHYLUM" : "TYPE")
+	    << "[" << result_type << "](name)\n";
       } else {
 	switch (Type_KEY(rut)) {
-	case KEYno_type:
-	  if (rdecl_is_phylum) {
-	    dump_new_phylum(source,"name",oss);
-	  } else {
-	    dump_new_type(source,"name",oss);
-	  }
+	default:
+	  aps_error(decl,"internal error: extension?");
 	  break;
 	case KEYtype_inst:
-	  dump_type_inst(source,"name",rut,oss);
-	  break;
-	case KEYprivate_type:
 	  {
-	    bool done = false;
-	    switch (Type_KEY(private_type_rep(rut))) {
-	    case KEYtype_inst:
-	      dump_type_inst(source,"name",private_type_rep(rut),oss);
-	      done = true;
-	      break;
-	    default:
-	      break;
+	    oss << indent() << "  ";
+	    dump_Use(module_use_use(type_inst_module(rut)),"M_",oss);
+
+	    bool started = false;
+	    TypeActuals tas = type_inst_type_actuals(rut);
+	    for (Type ta = first_TypeActual(tas); ta; ta=TYPE_NEXT(ta)) {
+	      if (started) oss << ",";
+	      else { started = true; oss << "["; }
+	      oss << ta;
 	    }
-	    if (done) break;
+	    if (started) oss << "]";
+	    oss << "(name";
+	    for (Type ta = first_TypeActual(tas); ta; ta=TYPE_NEXT(ta)) {
+	      oss << "," << as_val(ta);
+	    }
+	    Actuals as = type_inst_actuals(rut);
+	    for (Expression e = first_Actual(as); e; e = EXPR_NEXT(e)) {
+	      oss << "," << e;
+	    }
+	    oss << ")\n";
 	  }
-	default:
-	  oss << indent() << "type T_" << source << " = " << rut << ";\n";
-	  oss << indent() << "val t_" << source << " = " << as_val(rut) <<";\n";
 	}
-	oss << indent() << "type T_" << rname
-	    << " = T_" << source << ";" << endl;
       }
 
-      // define t_Result
-      oss << indent() << "object t_" << rname
-	  << " extends C_" << name << "[" << "T_" << rname;
+      // define with
+      oss << indent() << "  with C_" << name << "[" << "T_" << rname;
       for (Declaration tf=first_Declaration(tfs); tf ; tf = DECL_NEXT(tf)) {
 	oss << ",T_" << decl_name(tf);
       }
-      oss << "] {" << endl;
+      oss << "]\n";
+      oss << indent() << "{\n";
       ++nesting_level;
 
-      ServiceRecord sr;
-      // get "inherited" services:
-      // need to get typedefs which don't inherit
-      for (Declaration d = first_decl; d ; d = DECL_NEXT(d)) {
-	sr.add(d);
+      if (result_typeval != "") {
+	oss << indent() << "type T_" << rname << " = "
+	    << result_type << ";\n";
+	ServiceRecord sr;
+	// get "inherited" services:
+	// need to get typedefs which don't inherit
+	for (Declaration d = first_decl; d ; d = DECL_NEXT(d)) {
+	  sr.add(d);
+	}
+	dump_Type_service_transfers(sr,result_typeval,rdecl_is_phylum,rut,oss);
+	if (rdecl_is_phylum) {
+	  oss << indent() << "val nodes = " << result_typeval << ".nodes;\n";
+	}
+	oss << endl;
       }
-      dump_Type_service_transfers(sr,source,rdecl_is_phylum,rut,oss);
-      if (rdecl_is_phylum) {
-	oss << indent() << "val nodes = t_" << source << ".nodes;\n";
-      }
-      oss << endl;
+
+      oss << indent() << "val t_" << rname << " : this.type = this;\n";
 
       Implementation::ModuleInfo *info = impl->get_module_info(decl);
 
@@ -1172,12 +1217,6 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
       info->implement(oss);
 
       --nesting_level;
-      oss << indent() << "}\n\n";
-      oss << indent() << "override def finish() : Unit = {\n"
-	  << indent() << "  t_" << rname << ".finish();\n"
-	  << indent() << "  super.finish();\n"
-	  << indent() << "}\n";
-      --nesting_level;
       oss << indent() << "}\n" << endl;
     }
     break;
@@ -1235,7 +1274,7 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
 	if (started) oss << ","; else started = true;
 	dump_formal(f,oss);
       }
-      oss << ") extends " << rt << " {\n";
+      oss << ") extends " << rt << "(" << as_val(rt) << ") {\n";
       ++nesting_level;
       oss << indent() << "override def children : List[Node] = List(";
       started = false;

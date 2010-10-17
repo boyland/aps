@@ -70,10 +70,7 @@ class Module(val mname : String) {
 /**
  * The class of all constructed APS values.
  */
-abstract class Value extends AnyRef
-{
-  def getType : C_TYPE[_ <: Value];
-}
+class Value(val myType : C_TYPE[_ <: Value]) { }
 
 trait C_TYPE[T_Result] extends C_BASIC[T_Result] with C_PRINTABLE[T_Result]
 {
@@ -83,7 +80,8 @@ trait C_TYPE[T_Result] extends C_BASIC[T_Result] with C_PRINTABLE[T_Result]
   val v_string : (T_Result) => String;
 }
 
-class I_TYPE[T_Result] extends C_TYPE[T_Result] {
+class I_TYPE[T](name : String) extends Module(name) with C_TYPE[T] {
+  type T_Result = T;
   val v_assert = f_assert _;
   val v_equal = f_equal _;
   val v_node_equivalent = f_node_equivalent _;
@@ -91,27 +89,25 @@ class I_TYPE[T_Result] extends C_TYPE[T_Result] {
 
   def f_assert(x : T_Result) : Unit =
     x match {
-      case t:Value => assert(t.getType == this)
+      case t:Value => assert(t.myType == this)
     };
   def f_equal(x : T_Result, y : T_Result) : Boolean = f_node_equivalent(x,y);
   def f_node_equivalent(x : T_Result, y : T_Result) : Boolean = x.equals(y);
   def f_string(x : T_Result) : String = x.toString();
 }
     
-class M_TYPE(name : String) extends Module(name) {
-  class T_Result extends Value {
-    def getType : C_TYPE[_ <: T_Result] = t_Result;
-  }
-  object t_Result extends I_TYPE[T_Result] {}
+class T_TYPE(t_Result : C_TYPE[T_TYPE]) extends Value(t_Result) { };
+
+class M_TYPE(name : String) extends I_TYPE[T_TYPE](name) {
 }
 
 object PARSE {
   var lineNumber : Int = 0;
 }
 
-abstract class Node extends Value
+abstract class Node(t : C_PHYLUM[_ <: Node]) extends Value(t)
 {
-  def getType : C_PHYLUM[_ <: Node];
+  override val myType = t;
   val lineNumber = PARSE.lineNumber;
   private var _nodeNumber : Int = 0;
   def nodeNumber = _nodeNumber;
@@ -119,7 +115,7 @@ abstract class Node extends Value
   def parent : Node = _parent;
   def children : List[Node];
   def register : this.type = {
-    _nodeNumber = getType.nodes.add(this);
+    _nodeNumber = myType.nodes.add(this);
     for (ch <- children) {
       assert (ch.parent == null);
       ch._parent = this;
@@ -152,17 +148,15 @@ trait C_PHYLUM[T_Result <: Node] extends C_TYPE[T_Result] {
   val nodes : Nodes[T_Result];
 }
 
-abstract class I_PHYLUM[T_Result <: Node]
-	 extends I_TYPE[T_Result] with C_PHYLUM[T_Result] 
+abstract class I_PHYLUM[T_Result <: Node](name : String)
+	 extends I_TYPE[T_Result](name) with C_PHYLUM[T_Result] 
 {
   val v_identical = f_identical _;
   val v_object_id = f_object_id _;
   val v_object_id_less = f_object_id_less _;
 
   override def f_equal(x : T_Result, y : T_Result) : Boolean = f_identical(x,y);
-  def f_identical(x : T_Result, y : T_Result) : Boolean =
-    if (x == null || y == null) x == y
-    else f_object_id(x) == f_object_id(y);
+  def f_identical(x : T_Result, y : T_Result) : Boolean = x eq y;
   def f_object_id(x : T_Result) : Int = 
     x match {
       case n:Node => n.nodeNumber;
@@ -174,20 +168,18 @@ abstract class I_PHYLUM[T_Result <: Node]
 
   val v_nil : T_Result = null.asInstanceOf[T_Result];
   val nodes : Nodes[T_Result] = new Nodes();
+
+  override def finish() = {
+    nodes.freeze();
+    super.finish();
+  }
 }
 
-class M_PHYLUM(name : String) extends Module(name)
-{
-  class T_Result extends Node {
-    def getType : I_PHYLUM[T_Result] = t_Result;
-    def children : List[Node] = List();
-  }
-  object t_Result extends I_PHYLUM[T_Result] { }
-  override def finish() {
-    super.finish();
-    t_Result.nodes.freeze();
-  }
-}
+abstract class T_PHYLUM(t_Result : C_PHYLUM[T_PHYLUM]) 
+extends Node(t_Result) { }
+
+class M_PHYLUM(name : String) extends I_PHYLUM[T_PHYLUM](name)
+{ }
 
 object Evaluation {
   sealed trait EvalStatus;
@@ -314,14 +306,14 @@ extends Module("Attribute " + name)
     t_P.v_assert(n);
     val num = n.nodeNumber;
     {
-      val nn = n.getType.nodes(num);
+      val nn = n.myType.nodes(num);
       if (n != nn) {
 	println("Got " + n + "'s number as " + num + ", but the node with that number is " + nn);
       }
       assert (n == nn);
     }
     while (num >= evaluations.size) {
-      val nn = n.getType.nodes(evaluations.size);
+      val nn = n.myType.nodes(evaluations.size);
       evaluations += createEvaluation(nn.asInstanceOf[NodeType])
     };
     evaluations(num)
