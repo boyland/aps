@@ -147,6 +147,9 @@ static bool implement_visit_function(AUG_GRAPH* aug_graph,
 	  os << indent() << "for (root <- roots) {\n";
 	  ++nesting_level;
 	}
+	if (ph < 0) {
+	  aps_error(in->node,"used inherited attributes of children");
+	}
 	os << indent() << "visit_" << PHY_GRAPH_NUM(npg)
 	   << "_" << ph << "(";	
 	if (is_mod)
@@ -698,7 +701,7 @@ public:
       dump_visit_functions(s,oss);
 
       // Implement finish routine:
-      oss << indent() << "def finish() : Unit = {\n";
+      oss << indent() << "override def finish() : Unit = {\n";
       ++nesting_level;
       oss << indent() << "visit();\n";
       // types actually should be scheduled...
@@ -723,6 +726,7 @@ public:
 	  oss << indent() << kind << n << ".finish();\n";
 	}
       }
+      oss << "super.finish();\n";
       --nesting_level;
       oss << indent() << "}\n\n";
 
