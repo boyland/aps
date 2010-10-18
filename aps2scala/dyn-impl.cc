@@ -472,7 +472,7 @@ void implement_attributes(const vector<Declaration>& attrs,
     } else {
       if (inh) {
 	oss << indent() << "val anchor = anode.parent;\n";
-	oss << indent() << "val anchorNodes = anchor.getType.nodes;\n";
+	oss << indent() << "val anchorNodes = anchor.myType.nodes;\n";
       } else {
 	oss << indent() << "val anchor = anode;\n";
       }
@@ -600,7 +600,7 @@ public:
       Declarations ds = block_body(module_decl_contents(module_decl));
       
       // Implement finish routine:
-      oss << indent() << "def finish() : Unit = {\n";
+      oss << indent() << "override def finish() : Unit = {\n";
       ++nesting_level;
       for (Declaration d = first_Declaration(ds); d; d = DECL_NEXT(d)) {
 	switch(Declaration_KEY(d)) {
@@ -616,7 +616,7 @@ public:
 	  break;
 	}
       }
-      // oss << indent() << "super.finish();\n";
+      oss << indent() << "super.finish();\n";
       --nesting_level;
       oss << indent() << "}\n\n";
       clear_implementation_marks(module_decl);
