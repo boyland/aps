@@ -20,7 +20,7 @@ all : test_cycle_implicit.class TestCycleDriver.class
 
 run: Classic.run TestCollDriver.run TestCycleDriver.run
 
-%.scala : ../%.aps 
+%.scala : ../%.aps ${APS2SCALA}
 	${APS2SCALA} ${APS2SCALAFLAGS} $*
 
 %.scala : RCS/%.scala,v
