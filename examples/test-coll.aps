@@ -1,4 +1,4 @@
-module TINY[] begin
+module TEST_COLL[] begin
   phylum Wood;
   
   constructor branch(x,y : Wood) : Wood;

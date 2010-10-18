@@ -1,6 +1,6 @@
 object TestCycleDriver extends Application
 {
-    val m = new M_TINY("Tiny");
+    val m = new M_TEST_CYCLE("Tiny");
     type T_Tiny = m.T_Result;
     val t_Tiny = m.t_Result;
 
