@@ -5,6 +5,7 @@
 import basic_implicit._;
 object table_implicit {
   val table_loaded = true;
+  type T_TABLE[K,V] = scala.collection.immutable.TreeMap[K,V];
 }
 import table_implicit._;
 
