@@ -27,7 +27,10 @@ extends I_TYPE[TreeMap[T_KeyType,T_ValueType]](name)
 with C_TABLE[TreeMap[T_KeyType,T_ValueType],T_KeyType,T_ValueType]
 {
   implicit def key_order(x : T_KeyType) = new Ordered[T_KeyType] {
-    def compare(y : T_KeyType) : Int = {
+    def compare(y : T_KeyType) : Int = key_ordering.compare(x,y);
+  };
+  implicit val key_ordering = new Ordering[T_KeyType] {
+    def compare(x : T_KeyType, y : T_KeyType) : Int = {
       if (t_KeyType.v_equal(x,y)) return 0;
       if (t_KeyType.v_less(x,y)) return -1;
       else return 1;
@@ -60,7 +63,7 @@ with C_TABLE[TreeMap[T_KeyType,T_ValueType],T_KeyType,T_ValueType]
     var result : Table = v_t1;
     for ((k,v) <- v_t2) {
       if (result.isDefinedAt(k)) {
-	result = result.update(k,t_ValueType.v_combine(result(k),v))
+	result = result.update(k,t_ValueType.v_combine(result(k),v)).asInstanceOf[Table]
       } else {
 	result = result.insert(k,v);
       }
