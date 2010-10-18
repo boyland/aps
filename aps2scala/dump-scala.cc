@@ -450,7 +450,7 @@ void dump_Type_service_transfers(ServiceRecord&,string,bool,Type,ostream&);
 void dump_Class_service_transfers(ServiceRecord& sr, string from,
 				  Declaration cd, ostream& oss)
 {
-  // cout << "transfering services from " << decl_name(cd) << endl;
+  // cout << "transfering services from " << from << " :: " << decl_name(cd) << endl;
   dump_Signature_service_transfers(sr,from,some_class_decl_parent(cd),oss);
   if (Declaration_KEY(cd) == KEYmodule_decl) {
     if (string(decl_name(cd)) != "TYPE") { // avoid infinite recursion
@@ -537,6 +537,7 @@ void dump_Type_service_transfers(ServiceRecord& sr,
 				 bool is_phylum,
 				 Type ty, ostream& oss)
 {
+  // cout << "transfer from " << from << " as " << ty << endl;
   switch (Type_KEY(ty)) {
   case KEYno_type:
     {
@@ -582,7 +583,7 @@ void dump_Type_service_transfers(ServiceRecord& sr,
       Use u = type_use_use(ty);
       Type as = 0;
       Declaration td = USE_DECL(u);
-      string name = decl_name(td);
+      string name = string("t_") + decl_name(td);
       switch (Declaration_KEY(td)) {
       case KEYtype_decl:
 	as = type_subst(u,type_decl_type(td));
@@ -876,6 +877,121 @@ void dump_some_class_decl(Declaration decl, ostream& oss)
   oss << indent() << "}\n" << endl;
 }
 
+// THIS CODE IS COMPLETELY BROKEN: DO NOTUSE!!!
+static Type hack_type_subst(Use u, Type t)
+{
+  cout << "hack_type_subst(" << Type_KEY(t) << ")" << endl;
+  switch (Type_KEY(t)) {
+  case KEYtype_use:
+  case KEYfunction_type:
+    return type_subst(u,t);
+  case KEYno_type:
+    return t;
+  case KEYprivate_type:
+    return hack_type_subst(u,private_type_rep(t));
+  case KEYremote_type:
+    return hack_type_subst(u,remote_type_nodetype(t));
+  case KEYtype_inst:
+    {
+      TypeActuals tas = type_inst_type_actuals(t);
+      TypeActuals ntas = nil_TypeActuals();
+      for (Type ta = first_TypeActual(tas); ta; ta=TYPE_NEXT(ta)) {
+	Type nta = hack_type_subst(u,ta);
+	ntas = append_TypeActuals(ntas,list_TypeActuals(nta));
+      }
+      return type_inst(type_inst_module(t),ntas,type_inst_actuals(t));
+    }
+  }
+  aps_error(t,"Internal error: hack_type_subst");
+  return no_type();
+}
+
+static string type_inst_as_scala_type(Type ty)
+{
+  Declaration m = USE_DECL(module_use_use(type_inst_module(ty)));
+  TypeActuals tas = type_inst_type_actuals(ty);
+  Declaration rdecl = module_decl_result_type(m);
+  Type rut = some_type_decl_type(rdecl);
+
+  // KLUDGE for SET
+  static Declaration set_decl = find_basic_decl("SET");
+  if (m == set_decl) {
+    ostringstream oss;
+    oss << "T_SET[" << first_TypeActual(tas) << "]";
+    return oss.str();
+  }
+  // worse KLUDGE for MAKE_LATTICE
+  static Declaration make_lattice_decl = find_basic_decl("MAKE_LATTICE");
+
+  // construct an artificial use for type_subst
+  Declaration tdecl = (Declaration)tnode_parent(ty);
+  while (ABSTRACT_APS_tnode_phylum(tdecl) != KEYDeclaration)
+    tdecl = (Declaration)tnode_parent(tdecl);
+  Use tu = use(def_name(some_type_decl_def(tdecl)));
+  Use u = qual_use(type_use(tu),def_name(some_type_decl_def(rdecl)));
+  TypeContour tc;
+  tc.outer = 0;
+  tc.source = m;
+  tc.type_formals = module_decl_type_formals(m);
+  tc.result = rdecl;
+  tc.u.type_actuals = tas;
+  USE_DECL(tu) = tdecl;
+  USE_TYPE_ENV(tu) = 0;
+  USE_TYPE_ENV(u) = &tc;
+  USE_DECL(u) = rdecl;
+
+  int ii = 0;
+  for (Declaration tf = first_Declaration(module_decl_type_formals(m)); tf; tf = DECL_NEXT(tf)) {
+    Declaration_info(tf)->instance_index = ii++;
+  }
+
+  while (Type_KEY(rut) == KEYremote_type) rut = remote_type_nodetype(rut);
+  while (Type_KEY(rut) == KEYprivate_type) rut = private_type_rep(rut);
+  switch (Type_KEY(rut)) {
+  case KEYprivate_type:
+  case KEYremote_type:
+  case KEYno_type:
+    {
+      ostringstream oss;
+      oss << "T_" << decl_name(m);
+      bool started = false;
+      for (Type ta = first_TypeActual(tas); ta; ta = TYPE_NEXT(ta)) {
+	if (started) oss << ",";
+	else { started = true; oss << "["; }
+	oss << ta;
+      }
+      if (started) oss << "]";
+      return oss.str();
+    }
+    break;
+  case KEYtype_use:
+  case KEYfunction_type:
+    rut = type_subst(u,rut);
+    if (Type_KEY(rut) != KEYtype_inst) {
+      ostringstream oss;
+      oss << rut;
+      return oss.str();
+    } else return type_inst_as_scala_type(rut);
+  case KEYtype_inst:
+    // teh recursion I need here is too difficult
+    // TODO: fix this to be more general
+    if (USE_DECL(module_use_use(type_inst_module(rut))) == make_lattice_decl){
+      aps_warning(ty,"Hacking result type for MAKE_LATTICE");
+      // type_debug = true;
+      rut = type_subst(u,first_TypeActual(type_inst_type_actuals(rut)));
+      // type_debug = false;
+      if (Type_KEY(rut) != KEYtype_inst) {
+	ostringstream oss;
+	oss << rut;
+	return oss.str();
+      }
+    }
+    break;
+  }
+  aps_error(ty,"internal error: type_inst_as_scala_type");
+  return "*internal-error*";
+}
+
 static void dump_type_inst(string n, string nameArg, Type ti, ostream& oss)
 {
   Module m = type_inst_module(ti);
@@ -944,7 +1060,8 @@ static void dump_type_inst(string n, string nameArg, Type ti, ostream& oss)
     oss << "," << a;
   }
   oss << ");\n";
-  oss << indent() << "type T_" << n << " = t_" << n << ".T_" << rname << ";\n";
+  oss << indent() << "type T_" << n << " = "
+      << type_inst_as_scala_type(ti) << ";\n";
 }
 
 static void dump_new_type(string n, string nameArg, ostream& oss)
@@ -1023,6 +1140,8 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
 	    ostringstream resultvals;
 	    resultvals << as_val(rut);
 	    result_typeval = resultvals.str();
+
+	    // cout << "result = " << result_type << ", result_val = " << result_typeval << endl;
 	  }
 	  break;
 	case KEYno_type:	  
@@ -1045,7 +1164,8 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
 	      oss << "," << decl_name(tf);
 	    }
 	    oss << "]) extends " << (rdecl_is_phylum ? "Node" : "Value") 
-		<< "(t) { }\n";
+		<< "(t) { }\n" << endl;
+
 	  }
 	}
       }
@@ -1100,12 +1220,14 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
 	      oss << "," << e;
 	    }
 	    oss << ")\n";
+
+	    result_type = type_inst_as_scala_type(rut);
 	  }
 	}
       }
 
       // define with
-      oss << indent() << "  with C_" << name << "[" << "T_" << rname;
+      oss << indent() << "  with C_" << name << "[" << result_type;
       for (Declaration tf=first_Declaration(tfs); tf ; tf = DECL_NEXT(tf)) {
 	oss << ",T_" << decl_name(tf);
       }
@@ -1122,6 +1244,7 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
 	for (Declaration d = first_decl; d ; d = DECL_NEXT(d)) {
 	  sr.add(d);
 	}
+	// cout << "result_val = " << result_typeval << endl;
 	dump_Type_service_transfers(sr,result_typeval,rdecl_is_phylum,rut,oss);
 	if (rdecl_is_phylum) {
 	  oss << indent() << "val nodes = " << result_typeval << ".nodes;\n";
@@ -1705,6 +1828,9 @@ void dump_Type(Type t, ostream& o)
 	o << "Unit";
       }
     }
+    break;
+  case KEYtype_inst:
+    o << type_inst_as_scala_type(t);
     break;
   }
 }
