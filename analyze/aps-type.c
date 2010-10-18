@@ -1660,6 +1660,44 @@ Type type_subst(Use type_envs, Type ty)
   return ty;
 }
 
+Type type_inst_base(Type t)
+{
+  Use mu = module_use_use(type_inst_module(t));
+  Declaration mdecl = USE_DECL(mu);
+  Declaration etd = module_decl_result_type(mdecl);
+  Type et = some_type_decl_type(etd);
+  Declarations fs = module_decl_type_formals(mdecl);
+  TypeActuals as = type_inst_type_actuals(t);
+
+  while (Type_KEY(et) == KEYremote_type) {
+    et = remote_type_nodetype(et);
+  }
+  if (Type_KEY(et) == KEYtype_inst) {
+    et = type_inst_base(et);
+  }
+
+  switch (Type_KEY(et)) {
+  case KEYno_type:
+  case KEYprivate_type:
+  case KEYfunction_type:
+  case KEYremote_type: // shouldn't happen
+  case KEYtype_inst: // shouldn't happen
+    return et;
+  case KEYtype_use:
+    if (Use_KEY(type_use_use(et)) == KEYqual_use) return et; //TODO
+    {
+      Declaration etud = USE_DECL(type_use_use(et));
+      Declaration f;
+      Type a;
+      for (f = first_Declaration(fs), a = first_TypeActual(as);
+	   f && a; f = DECL_NEXT(f), a = TYPE_NEXT(a))
+	if (f == etud) return a;
+      return et;
+    }
+    break;
+  }
+}
+
 Type base_type(Type ty)
 {
   switch (Type_KEY(ty)) {
