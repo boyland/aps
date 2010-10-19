@@ -976,7 +976,7 @@ static string type_inst_as_scala_type(Type ty)
     // teh recursion I need here is too difficult
     // TODO: fix this to be more general
     if (USE_DECL(module_use_use(type_inst_module(rut))) == make_lattice_decl){
-      aps_warning(ty,"Hacking result type for MAKE_LATTICE");
+      //aps_warning(ty,"Hacking result type for MAKE_LATTICE");
       // type_debug = true;
       rut = type_subst(u,first_TypeActual(type_inst_type_actuals(rut)));
       // type_debug = false;
