@@ -330,9 +330,11 @@ void dump_Pattern(Pattern p, ostream& os)
       Declaration f = pattern_var_formal(p);
       string n = symbol_name(def_name(formal_def(f)));
       if (n == "_") os << "_";
-      else os << "v_" << n;
-      if (Pattern_info(p)->pat_type != 0) {
-	os << ":" << Pattern_info(p)->pat_type;
+      else {
+	os << "v_" << n;
+	if (Pattern_info(p)->pat_type != 0) {
+	  os << ":" << Pattern_info(p)->pat_type;
+	}
       }
     }
     break;
