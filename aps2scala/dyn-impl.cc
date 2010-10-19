@@ -116,23 +116,29 @@ static void dump_context_open(void *c, ostream& os) {
     {
       Block b = (Block)c;
       Declaration parent = (Declaration)tnode_parent(b);
-      switch (Declaration_KEY(parent)) {
-      case KEYif_stmt:
-	if (b == if_stmt_if_true(parent)) {
-	  os << indent() << "if (cond) {\n";
-	} else {
-	  os << indent() << "if (!cond) {\n";
+      if (ABSTRACT_APS_tnode_phylum(parent) == KEYDeclaration) {
+	switch (Declaration_KEY(parent)) {
+	case KEYif_stmt:
+	  if (b == if_stmt_if_true(parent)) {
+	    os << indent() << "if (cond) {\n";
+	  } else {
+	    os << indent() << "if (!cond) {\n";
+	  }
+	  ++nesting_level;
+	  break;
+	case KEYcase_stmt:
+	  os << indent() << "case _ => {\n";
+	  ++nesting_level;
+	  break;
+	default:
+	  fatal_error("%d: cannot determine why we have this attr_context",
+		      tnode_line_number(b));
+	  break;
 	}
+      } else {
+	// hack for Match/Block in top-level match for synthesized attrs
+	os << indent() << "anchor match {\n";
 	++nesting_level;
-	break;
-      case KEYcase_stmt:
-	os << indent() << "case _ => {\n";
-	++nesting_level;
-	break;
-      default:
-	fatal_error("%d: cannot determine why we have this attr_context",
-		    tnode_line_number(b));
-	break;
       }
       return;
     }
@@ -184,6 +190,16 @@ static void dump_context_close(void *c, ostream& os) {
     break;
   case KEYType:
     os << indent() << "case _ => {}\n";
+    --nesting_level;
+    os << indent() << "}\n";
+    break;
+  case KEYBlock:
+    {
+      void *p = tnode_parent(c);
+      if (ABSTRACT_APS_tnode_phylum(p) == KEYMatch) {
+	os << indent() << "case _ => {}\n";
+      }
+    }
     /*FALLTHROUGH*/
   default:
     --nesting_level;
@@ -477,28 +493,30 @@ void implement_attributes(const vector<Declaration>& attrs,
 	oss << indent() << "val anchor = anode;\n";
       }
     }
-    // apparent bug in scala: pattern matching doesn't work here
-    if (!inh && !is_col) {
-      oss << indent() << "anchor match {\n";
-      ++nesting_level;
-    }
+    // The scala compiler generates exponential code for
+    // match clauses (n = #cases).  And in any case,
+    // even when it works, it fails for inherited attributes
+    //if (!inh && !is_col) {
+    //  oss << indent() << "anchor match {\n";
+    //  ++nesting_level;
+    //}
     for (vector<Declaration>::const_iterator i = tlms.begin();
 	 i != tlms.end(); ++i) {
       Match m = top_level_match_m(*i);
-      if (inh) push_attr_context(infer_pattern_type(matcher_pat(m)));
-      if (is_col) push_attr_context(*i);
-      push_attr_context(m);
       Block body = matcher_body(m);
+      if (is_col) push_attr_context(*i);
+      else if (inh) push_attr_context(infer_pattern_type(matcher_pat(m)));
+      else push_attr_context(body);
+      push_attr_context(m);
       dump_Block(body,dump_attr_assign,ad,oss);
       pop_attr_context(oss);
-      if (is_col) pop_attr_context(oss);
-      if (inh) pop_attr_context(oss);
+      pop_attr_context(oss); // all three cases
     }
-    if (!inh && !is_col) {
-      oss << indent() << "case _ => {};\n";
-      --nesting_level;
-      oss << indent() << "}\n";
-    }
+    //if (!inh && !is_col) {
+    //  oss << indent() << "case _ => {};\n";
+    //  --nesting_level;
+    //  oss << indent() << "}\n";
+    //}
     dump_default_return(attribute_decl_default(ad),
 			attribute_decl_direction(ad),
 			string("anode.toString()+\".") + name + "\"", oss);
