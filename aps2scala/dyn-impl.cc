@@ -488,6 +488,8 @@ void implement_attributes(const vector<Declaration>& attrs,
     } else {
       if (inh) {
 	oss << indent() << "val anchor = anode.parent;\n";
+	oss << indent() << "if (!(anchor eq null)) {\n";
+	++nesting_level;
 	oss << indent() << "val anchorNodes = anchor.myType.nodes;\n";
       } else {
 	oss << indent() << "val anchor = anode;\n";
@@ -517,6 +519,10 @@ void implement_attributes(const vector<Declaration>& attrs,
     //  --nesting_level;
     //  oss << indent() << "}\n";
     //}
+    if (inh) {
+      --nesting_level;
+      oss << indent() << "}\n";
+    }
     dump_default_return(attribute_decl_default(ad),
 			attribute_decl_direction(ad),
 			string("anode.toString()+\".") + name + "\"", oss);
