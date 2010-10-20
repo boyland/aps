@@ -1567,6 +1567,7 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
 	  break;
 	}
       }
+      aps_warning(decl,"Function %s not implemented.",decl_name(decl));
       // cout << name << " has no body.\n";
       // 3. nothing -- leave to native code
       oss << ";\n";
