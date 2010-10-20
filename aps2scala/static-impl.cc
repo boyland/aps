@@ -148,7 +148,7 @@ static bool implement_visit_function(AUG_GRAPH* aug_graph,
 	  ++nesting_level;
 	}
 	if (ph < 0) {
-	  aps_error(in->node,"used inherited attributes of children");
+	  aps_warning(in->node,"used inherited attributes of children");
 	}
 	os << indent() << "visit_" << PHY_GRAPH_NUM(npg)
 	   << "_" << ph << "(";	
@@ -498,7 +498,7 @@ void dump_visit_functions(PHY_GRAPH *pg, ostream& oss)
   int num_cons = aug_graphs.size();
 
   if (num_cons == 0) {
-    fatal_error("no constructors for phylum %s", decl_name(pg->phylum));
+    fatal_error("no top-level-match match for phylum %s", decl_name(pg->phylum));
   }
   
   int cons_num = 0;
