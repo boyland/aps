@@ -1,0 +1,7 @@
+type checker doesn't notice improper usage of syntactic values
+type checker doesn't check signatures of implicit type parameters
+type instantiation is not scheduled, or even checked for cycles
+typed variables cannot match nil, even if type is a remote type
+static scheduler can't always handle uses of output attributes 
+static scheduling can only be done for extension modules
+static scheduler skips orphaned trees; dynamic scheduler notices them
