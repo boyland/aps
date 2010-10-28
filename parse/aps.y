@@ -7,6 +7,7 @@
 #include "aps-lex.h"
 #include "jbb-symbol.h"
 #include "jbb-string.h"
+#include "aps.tab.h"
 
 /* kludges */
 #define no_stmt() no_decl()
