@@ -1660,6 +1660,67 @@ Type type_subst(Use type_envs, Type ty)
   return ty;
 }
 
+int module_decl_generating(Declaration m)
+{
+  struct Declaration_info *info = Declaration_info(m);
+  if (info->decl_flags & MODULE_DECL_GENERATING_VALID) {
+    /*
+    printf("%s %s\n",
+	   decl_name(m),
+	   (info->decl_flags & MODULE_DECL_GENERATING) ? 
+	   "is generating" : "is not generating");
+    */
+    return !!(info->decl_flags & MODULE_DECL_GENERATING);
+  }
+  // avoid infinite recursion for recursive modules
+  info->decl_flags |= MODULE_DECL_GENERATING|MODULE_DECL_GENERATING_VALID;
+  Declaration rd = module_decl_result_type(m);
+  Type ty = some_type_decl_type(rd);
+
+  for (;;) {
+    switch (Type_KEY(ty)) {
+    case KEYremote_type:
+      ty = remote_type_nodetype(ty);
+      break;
+    case KEYno_type:
+    case KEYprivate_type:
+      return 1;
+    case KEYtype_inst:
+      {
+	Declaration m2 = USE_DECL(module_use_use(type_inst_module(ty)));
+	if (module_decl_generating(m2)) return 1;
+	Declaration rd2 = module_decl_result_type(m2);
+	Declarations tfs2 = module_decl_type_formals(m2);
+	Type ty2 = some_type_decl_type(rd2);
+	int loop_again = 0;
+	switch (Type_KEY(ty2)) {
+	default: break;
+	case KEYtype_use:
+	  {
+	    Declaration td = USE_DECL(type_use_use(ty2));
+	    Declaration tf2 = first_Declaration(tfs2);
+	    Type ta2 = first_TypeActual(type_inst_type_actuals(ty));
+	    while (tf2 && !loop_again) {
+	      if (tf2 == td) {
+		ty = ta2;
+		loop_again = 1;
+	      }
+	      tf2 = DECL_NEXT(tf2);
+	      ta2 = TYPE_NEXT(ta2);
+	    }
+	  }
+	}
+	if (loop_again) break;
+      }
+      /*FALLTHROUGH*/
+    case KEYfunction_type:
+    case KEYtype_use:
+      info->decl_flags &= ~MODULE_DECL_GENERATING;
+      return 0;
+    }
+  }
+}
+
 Type type_inst_base(Type t)
 {
   Use mu = module_use_use(type_inst_module(t));
@@ -1697,13 +1758,42 @@ Type type_inst_base(Type t)
     break;
   }
 }
+   
+Use type_inst_envs(Type ty)
+{
+  Use mu = module_use_use(type_inst_module(ty));
+  Declaration mdecl = USE_DECL(mu);
+  Declaration rdecl = module_decl_result_type(mdecl);
+  Def rdef = some_type_decl_def(rdecl);
+  TypeEnvironment te =
+    (TypeEnvironment)HALLOC(sizeof(struct TypeContour));
+  extern int aps_yylineno;
+  Declaration tdecl = (Declaration)tnode_parent(ty);
+  Use tu;
+  Use u;
+
+  while (ABSTRACT_APS_tnode_phylum(tdecl) != KEYDeclaration)
+    tdecl = (Declaration)tnode_parent(tdecl);
+  tu = use(def_name(some_type_decl_def(tdecl)));
+  te->outer = USE_TYPE_ENV(mu);
+  te->source = mdecl;
+  te->type_formals = module_decl_type_formals(mdecl);
+  te->result = (Declaration)tnode_parent(ty);
+  te->u.type_actuals = type_inst_type_actuals(ty);
+  aps_yylineno = tnode_line_number(ty);
+  USE_DECL(tu) = tdecl;
+  USE_TYPE_ENV(tu) = 0;
+  u = qual_use(type_use(tu),def_name(rdef));
+  USE_TYPE_ENV(u) = te;
+  USE_DECL(u) = rdecl;
+  return u;
+}
 
 Type base_type(Type ty)
 {
   switch (Type_KEY(ty)) {
   case KEYfunction_type:
   case KEYprivate_type:
-  case KEYtype_inst:
   case KEYno_type:
     break;
   case KEYremote_type:
@@ -1725,25 +1815,14 @@ Type base_type(Type ty)
 	  switch (Type_KEY(t)) {
 	  case KEYno_type:
 	  case KEYprivate_type:
-	    /* do nothing */
+	    return ty;
 	    break;
 	  case KEYtype_inst:
 	    {
 	      Use mu = module_use_use(type_inst_module(t));
 	      Declaration mdecl = USE_DECL(mu);
-	      Declaration etd = module_decl_result_type(mdecl);
-	      Type et = some_type_decl_type(etd);
-	      Declarations fs = module_decl_type_formals(mdecl);
-	      TypeActuals as = type_inst_type_actuals(t);
-	      if (Type_KEY(et) == KEYtype_use) {
-		Declaration etud = USE_DECL(type_use_use(et));
-		Declaration f;
-		Type a;
-		ty = et;
-		for (f = first_Declaration(fs), a = first_TypeActual(as);
-		     f && a; f = DECL_NEXT(f), a = TYPE_NEXT(a))
-		  if (f == etud) ty = a;
-	      }
+	      if (module_decl_generating(mdecl)) return ty;
+	      return base_type(type_subst(u,base_type(t)));
 	    }
 	    break;
 	  default:
@@ -1757,6 +1836,17 @@ Type base_type(Type ty)
       }
     }
     break;
+  case KEYtype_inst:
+    {
+      Declaration mdecl = USE_DECL(module_use_use(type_inst_module(ty)));
+      if (module_decl_generating(mdecl)) {
+	return ty;
+      }
+      Declaration etd = module_decl_result_type(mdecl);
+      Type et = type_subst(type_inst_envs(ty),
+			   base_type(some_type_decl_type(etd)));
+      return base_type(et);
+    }
   }
   return ty;
 }
@@ -1839,13 +1929,20 @@ int base_type_equal(Type b1, Type b2) {
 void check_type_equal(void *node, Type t1, Type t2) {
   if (t1 == t2) return; /* easy case */
   if (t1 == 0 || t2 == 0) return;
-  if (!base_type_equal(base_type(t1),base_type(t2))) {
-    aps_error(node,"type mismatch");
-    fprintf(stderr,"  ");
-    print_Type(t1,stderr);
-    fprintf(stderr," != ");
-    print_Type(t2,stderr);
-    fprintf(stderr,"\n");
+  {
+    Type b1 = base_type(t1);
+    Type b2 = base_type(t2);
+    if (!base_type_equal(b1,b2)) {
+      print_Type(b1,stderr); fprintf(stderr, " != ");
+      print_Type(b2,stderr); fprintf(stderr, "\n");
+      
+      aps_error(node,"type mismatch");
+      fprintf(stderr,"  ");
+      print_Type(t1,stderr);
+      fprintf(stderr," != ");
+      print_Type(t2,stderr);
+      fprintf(stderr,"\n");
+    }
   }
 }
 
