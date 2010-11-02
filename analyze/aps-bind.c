@@ -64,16 +64,19 @@ static void push_type_contour(Declaration d, TypeActuals tacts, Declaration tdec
   default:
     fatal_error("push_type_contour called with bad declaration");
   }
-  /* This should go somewhere else */
-  {
-    int i;
-    Declaration formal = first_Declaration(new_type_env->type_formals);
-    for (i=0; formal != 0; ++i, formal=DECL_NEXT(formal)) {
-      Declaration_info(formal)->instance_index = i;
-    }
-  }
   current_type_env = new_type_env;
 }
+
+static void set_instance_index(Declarations ds)
+{
+  int i;
+  Declaration formal = first_Declaration(ds);
+  for (i=0; formal != 0; ++i, formal=DECL_NEXT(formal)) {
+    // printf("Indx of %s = %d\n",decl_name(formal),i);
+    Declaration_info(formal)->instance_index = i;
+  }
+}
+
 
 static void pop_type_contour()
 {
@@ -510,6 +513,7 @@ static void *do_bind(void *vscope, void *node) {
       void *top_mark = SALLOC(0);
       switch (Declaration_KEY(d)) {
       case KEYclass_decl:
+	set_instance_index(class_decl_type_formals(d));
 	{ new_scope = bind_Declarations(new_scope,
 					class_decl_type_formals(d));
 	  new_scope = add_env_item(new_scope,class_decl_result_type(d));
@@ -520,6 +524,7 @@ static void *do_bind(void *vscope, void *node) {
 	  module_TYPE = d;
 	else if (module_PHYLUM == 0 && streq(decl_name(d),"PHYLUM"))
 	  module_PHYLUM = d;
+	set_instance_index(module_decl_type_formals(d));
 	{ new_scope = bind_Declarations(new_scope,
 					module_decl_type_formals(d));
 	  traverse_Signature(do_bind,new_scope,module_decl_parent(d));
@@ -559,6 +564,7 @@ static void *do_bind(void *vscope, void *node) {
 	  traverse_Declaration_skip(do_bind,new_scope,d); }
 	break;
       case KEYpolymorphic:
+	set_instance_index(polymorphic_type_formals(d));
 	{ new_scope = bind_Declarations(new_scope,
 					polymorphic_type_formals(d));
 	  traverse_Declaration_skip(do_bind,new_scope,d); }
