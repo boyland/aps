@@ -57,6 +57,8 @@ struct Declaration_info {
 #define FIELD_DECL_UNTRACKED_FLAG (1<<14)
 #define SELF_MANAGED_FLAG (1<<15)
 #define UP_DOWN_FLAG (1<<16)
+#define MODULE_DECL_GENERATING (1<<17)
+#define MODULE_DECL_GENERATING_VALID (1<<18)
 	OSET oset;				/* oset of the declaration */
 	USET uset;				/* uset of the declaration */
 	int	 index;			  /* represent the nodeis Qd and Qd(-) */
