@@ -65,6 +65,7 @@ Type make_type_use(Use type_envs, Declaration tdecl);
 
 Use type_envs_nested(Use);
 
+int module_decl_generating(Declaration);
 Type type_inst_base(Type);  // unwind to get a parameter
 Type base_type(Type);
 
