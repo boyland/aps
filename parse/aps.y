@@ -761,7 +761,7 @@ function_decl
 
 multi_result_value
 	: /* EMPTY */
-		{ $$ = nil_Declarations() }
+		{ $$ = nil_Declarations(); }
 	| direction id_or_result ':' type  default
 		{ $$ = list_Declarations(value_decl(def($2,FALSE,FALSE),
 						    $4,$1,$5)); }
@@ -790,7 +790,7 @@ result_value
 
 multi_result_typing
 	: /* EMPTY */
-		{ $$ = nil_Declarations() }
+		{ $$ = nil_Declarations(); }
 	| id_or_result ':' type
 		{ $$ = list_Declarations(value_decl(def($1,FALSE,FALSE),
 						    $3,no_direction(),
