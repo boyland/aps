@@ -783,7 +783,7 @@ class I_LIST[E](name : String) extends I_BAG[E](name) with C_LIST[List[E],E] {
     v_l.reverse.apply(v_i);
   val v_position = f_position _;
   def f_position(v_x : T_ElemType, v_l : T_Result):T_Integer =
-    v_l.indexOf(v_l);
+    v_l.indexOf(v_x);
   val v_position_from_end = f_position_from_end _;
   def f_position_from_end(v_x : T_ElemType, v_l : T_Result):T_Integer =
     v_l.reverse.indexOf(v_l);

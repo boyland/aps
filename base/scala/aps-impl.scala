@@ -3,7 +3,6 @@
 // John Boyland
 
 import scala.collection.mutable.Buffer;
-import scala.collection.mutable.ListBuffer;
 import scala.collection.mutable.ArrayBuffer;
 
 object Debug {
@@ -124,20 +123,16 @@ abstract class Node(t : C_PHYLUM[_ <: Node]) extends Value(t)
   }
 }
 
-class Nodes[T_Result <: Node] extends Collection[T_Result] {
+class Nodes[T_Result <: Node] extends ArrayBuffer[T_Result] {
   private var _frozen = false;
   def freeze() : Unit = _frozen = true;
-  private val allNodes : Buffer[T_Result] = new ListBuffer[T_Result];
   def add(x : Node) : Int = {
     assert (!_frozen);
     val result = size;
-    allNodes += x.asInstanceOf[T_Result];
+    this += x.asInstanceOf[T_Result];
     // println("registering " + x + " as #" + result);
     result
   };
-  def size : Int = allNodes.size;
-  def apply(i : Int) : T_Result = allNodes(i);
-  def elements = allNodes.elements;
 }
 
 trait C_PHYLUM[T_Result <: Node] extends C_TYPE[T_Result] {
@@ -442,6 +437,7 @@ trait CircularEvaluation[V_P, V_T] extends Evaluation[V_P,V_T] {
   def markPending() : Unit = {
     val cycle = inCycle;
     for (e <- pending.reverse) {
+      // println("Checking " + e + " in pending.");
       if (e.inCycle == cycle) return;
       e.setInCycle(cycle);
     }
@@ -454,7 +450,9 @@ trait CircularEvaluation[V_P, V_T] extends Evaluation[V_P,V_T] {
 	helper.modified = false;
 	var c : CircularEvaluation[_,_] = this;
 	do {
+	  pending.push(c);
 	  c.recompute();
+	  pending.pop();
 	  if (cycleParent != this) return; // no longer our responsibility
 	  c = c.cycleNext;
 	} while (c != null);
