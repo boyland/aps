@@ -12,6 +12,8 @@ aps-lib.o : ${APSLIBOBJS}
 aps-lex.c : aps.lex
 	flex -t aps.lex > aps-lex.c
 
+aps-tree.o : tree.i
+
 aps2lisp : ${APSCOBJS}
 	${CC} ${CFLAGS} ${APSCOBJS} -o aps2lisp
 
