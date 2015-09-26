@@ -941,6 +941,37 @@ INSTANCE* summary_vertex_instance(VERTEX* dv, FIBER f, PHY_GRAPH* phy_graph)
   return get_summary_instance_or_null(dv->attr,f,phy_graph);  
 }
 
+// return true if we are sure this vertex represents an input dependency
+static BOOL vertex_is_input(VERTEX* v) 
+{
+  if (!v->attr) return FALSE;
+  BOOL result;
+  if (ATTR_DECL_IS_INH(v->attr)) result = TRUE;
+  else if (ATTR_DECL_IS_SYN(v->attr)) result = FALSE;
+  else return FALSE;
+
+  if (!v->node) return result;
+
+  if (DECL_IS_RHS(v->node)) result = !result;
+  else if (!(DECL_IS_LHS(v->node))) result = FALSE;
+  return result;
+}
+
+static BOOL vertex_is_output(VERTEX* v) 
+{
+  if (!v->attr) return FALSE;
+  BOOL result;
+  if (ATTR_DECL_IS_INH(v->attr)) result = FALSE;
+  else if (ATTR_DECL_IS_SYN(v->attr)) result = TRUE;
+  else return FALSE;
+
+  if (!v->node) return result;
+
+  if (DECL_IS_RHS(v->node)) result = !result;
+  else if (!(DECL_IS_LHS(v->node))) result = FALSE;
+  return result;
+}
+
 /**
  * Connect the two vertices together, and if the kind is not indirect,
  * add fiber dependencies too.
@@ -1053,6 +1084,7 @@ static void record_expression_dependencies(VERTEX *sink, CONDITION *cond,
 	source.attr = 
 	  phylum_shared_info_attribute(phy,aug_graph->global_state);
 	source.modifier = NO_MODIFIER;
+	if (vertex_is_output(&source)) aps_warning(e,"Dependence on output value");
 	add_edges_to_graph(&source,sink,cond,kind&~DEPENDENCY_MAYBE_CARRYING,
 			   aug_graph);
 
@@ -1067,11 +1099,13 @@ static void record_expression_dependencies(VERTEX *sink, CONDITION *cond,
 	source.node = aug_graph->match_rule;
 	source.attr = decl;
 	source.modifier = mod;
+	if (vertex_is_output(&source)) aps_warning(e,"Dependence on output value");
 	add_edges_to_graph(&source,sink,cond,kind,aug_graph);
       } else {
 	source.node = NULL;
 	source.attr = decl;
 	source.modifier = mod;
+	if (vertex_is_output(&source)) aps_warning(e,"Dependence on output value");
 	add_edges_to_graph(&source,sink,cond,kind,aug_graph);
       }
     }
@@ -1082,6 +1116,7 @@ static void record_expression_dependencies(VERTEX *sink, CONDITION *cond,
 	source.node = attr_ref_node_decl(e);
 	source.attr = decl;
 	source.modifier = mod;
+	if (vertex_is_output(&source)) aps_warning(e,"Dependence on output value");
 	add_edges_to_graph(&source,sink,cond,kind,aug_graph);
       } else if ((decl = field_ref_p(e)) != NULL) {
 	Expression object = field_ref_object(e);
@@ -1115,6 +1150,7 @@ static void record_expression_dependencies(VERTEX *sink, CONDITION *cond,
 	  source.node = proxy;
 	  source.attr = result;
 	  source.modifier = mod;
+	  if (vertex_is_output(&source)) aps_warning(e,"Dependence on output value");
 	  add_edges_to_graph(&source,sink,cond,kind,aug_graph);
 	}
       } else {
@@ -1217,6 +1253,9 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
       } else if (Declaration_info(decl)->decl_flags &
 		 (ATTR_DECL_INH_FLAG|ATTR_DECL_SYN_FLAG)) {
 	/* a use of parameter or result (we hope) */
+	if (Declaration_info(decl)->decl_flags & ATTR_DECL_INH_FLAG) {
+	  aps_error(lhs,"Assignment of input value: %s\n",decl_name(decl));
+	}
 	sink.node = aug_graph->match_rule;
 	sink.attr = decl;
 	sink.modifier = mod;
@@ -1226,6 +1265,8 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
 	sink.modifier = mod;
       }
       set_value_for(&sink,rhs,aug_graph);
+      if (vertex_is_input(&sink)) aps_error(lhs,"Assignment of input value");
+      // don't make error even if not output: local attributes!
       record_expression_dependencies(&sink,cond,kind,NULL,rhs,aug_graph);
       record_condition_dependencies(&sink,cond,aug_graph);
     }
@@ -1252,6 +1293,7 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
 	sink.attr = attr;
 	sink.modifier = mod;
 	set_value_for(&sink,rhs,aug_graph);
+	if (vertex_is_input(&sink)) aps_error(lhs,"Assignment of input value");
 	record_expression_dependencies(&sink,cond,kind,NULL,rhs,aug_graph);
 	record_condition_dependencies(&sink,cond,aug_graph);
       } else if ((fdecl = local_call_p(lhs)) != NULL) {      
@@ -1264,6 +1306,7 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
 	sink.attr = result;
 	sink.modifier = mod;
 	set_value_for(&sink,rhs,aug_graph);
+	if (vertex_is_input(&sink)) aps_error(lhs,"Assignment of input value");
 	record_expression_dependencies(&sink,cond,kind,NULL,rhs,aug_graph);
 	record_condition_dependencies(&sink,cond,aug_graph);
       } else {
@@ -1569,7 +1612,8 @@ static void init_node_phy_graph2(Declaration node, Type ty, STATE *state) {
     fputc('\n',stderr);
     fatal_error("Abort");
   case KEYtype_use:
-    { Declaration phylum=Use_info(type_use_use(ty))->use_decl;
+    { Use u = type_use_use(ty);
+      Declaration phylum=Use_info(u)->use_decl;
       if (phylum == NULL)
 	fatal_error("%d: unbound type",tnode_line_number(ty));
       switch (Declaration_KEY(phylum)) {
@@ -1579,8 +1623,11 @@ static void init_node_phy_graph2(Declaration node, Type ty, STATE *state) {
 	break;
       case KEYtype_decl:
 	break;
+      case KEYtype_renaming:
+	init_node_phy_graph2(node,type_renaming_old(phylum),state);
+	break;
       default:
-	aps_error(node,"could not find type for summary graph");
+	aps_error(node,"could not find type for summary graph %s",decl_name(phylum));
 	break;
       }
     }
