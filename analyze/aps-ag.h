@@ -18,4 +18,4 @@
 #include "aps-debug.h"
 
 extern char *aps_yyfilename;
-extern void aps_error(void *tnode, char *fmt, ...);
+extern void aps_error(const void *tnode, const char *fmt, ...);

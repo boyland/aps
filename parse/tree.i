@@ -49,7 +49,7 @@ static TNODE create_tnode(int operator, int num_children) {
   return t;
 }
 
-int tnode_line_number(void *t) {
+int tnode_line_number(const void *t) {
   return ((TNODE)t)->line_number;
 }
 
@@ -63,7 +63,7 @@ void set_tnode_info(void *t, INFO *info) {
 
 /*VARARGS1*/
 void
-fatal_error(char *fmt, ...)
+fatal_error(const char *fmt, ...)
 {
   va_list args;
   

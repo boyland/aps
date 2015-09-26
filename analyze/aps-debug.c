@@ -7,7 +7,7 @@
 
 static int aps_error_count = 0;
   
-void aps_error(void *tnode, char *fmt, ...)
+void aps_error(const void *tnode, const char *fmt, ...)
 {
   va_list args;
   va_start(args,fmt);
@@ -24,7 +24,7 @@ void aps_error(void *tnode, char *fmt, ...)
   ++aps_error_count;
 }  
 
-void aps_warning(void *tnode, char *fmt, ...)
+void aps_warning(const void *tnode, const char *fmt, ...)
 {
   va_list args;
   va_start(args,fmt);
@@ -40,7 +40,7 @@ void aps_warning(void *tnode, char *fmt, ...)
   va_end(args);
 }  
 
-void aps_check_error(char *type)
+void aps_check_error(const char *type)
 {
   if (aps_error_count) {
     fflush(stdout);
@@ -84,7 +84,7 @@ static void list_debug_flags() {
   exit(0);
 }
 
-void set_debug_flags(char *options)
+void set_debug_flags(const char *options)
 {
   if (*options == '\0') usage();
   do {
