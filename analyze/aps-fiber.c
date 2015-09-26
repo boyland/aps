@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include "jbb.h"
 #include "jbb-alloc.h"
 #include "aps-ag.h"
@@ -1351,7 +1352,7 @@ void print_oset(OSET oset){
 void print_uset(USET uset){
 	USET p= uset;
 	while (p != NULL) {
-		printf("    (%d(0x%x),%s%s)\n", 
+		printf("    (%d(0x%p),%s%s)\n", 
 		       tnode_line_number(p->u),
 		       p->u,
 		       EXPR_IS_LHS(p->u) ? "dot " : "",
@@ -1854,7 +1855,7 @@ int id_expr_node(Expression expr) {
   FSA_next_node_index += 2;
 
   if (fiber_debug & ALL_FIBERSETS) {
-    printf("%d: index for expression(0x%x) is %d\n",
+    printf("%d: index for expression(0x%p) is %d\n",
 	   tnode_line_number(expr),
 	   expr,
 	   index);
@@ -2008,7 +2009,13 @@ void *compute_OU(void *u, void *node)
 	  break;
 	case KEYsimple: {
 	  Expression expr = simple_value(def);
-	  OSET oset = doOU(expr, get_uset(decl));
+	  USET uset = get_uset(decl);
+	  OSET oset;
+
+	  if (!uset) {
+	    fatal_error("%d: no USET for %s\n", tnode_line_number(decl),decl_name(decl));
+	  }
+	  oset = doOU(expr, uset);
 	  add_to_oset(decl, oset);
 	  
 	  break;}
