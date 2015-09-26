@@ -27,12 +27,12 @@ enum CONDcompare cond_compare(CONDITION *cond1, CONDITION *cond2) {
 }
 
 void print_condition(CONDITION *cond, FILE *stream) {
-  if (cond->positive != NULL) {
+  if (cond->positive) {
     fprintf(stream,"+0%o",cond->positive);
-  } else if (cond->negative == NULL) {
+  } else if (!cond->negative) {
     fprintf(stream,"_");
   }
-  if (cond->negative != NULL) {
+  if (cond->negative) {
     fprintf(stream,"-0%o",cond->negative);
   }
 }
