@@ -63,7 +63,7 @@ with C_TABLE[TreeMap[T_KeyType,T_ValueType],T_KeyType,T_ValueType]
     var result : Table = v_t1;
     for ((k,v) <- v_t2) {
       if (result.isDefinedAt(k)) {
-	result = result.update(k,t_ValueType.v_combine(result(k),v)).asInstanceOf[Table]
+	result = result.updated(k,t_ValueType.v_combine(result(k),v)).asInstanceOf[Table]
       } else {
 	result = result.insert(k,v);
       }
