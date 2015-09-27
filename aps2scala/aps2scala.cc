@@ -10,6 +10,7 @@ extern "C" {
 #include <fstream>
 #include "dump-scala.h"
 #include "implement.h"
+#include "version.h"
 
 using namespace std;
 
@@ -17,10 +18,12 @@ extern "C" {
 
 int callset_AI(Declaration module, STATE *s) { return 0; }
 
-static char* argv0 = "aps2scala";
+static const char* argv0 = "aps2scala";
 void usage() {
-  fprintf(stderr,"%s: usage: %s [-SVG] [-D...] <file.aps>\n",argv0,argv0);
+  fprintf(stderr,"APS-to-Scala version %s (John Boyland, boyland@uwm.edu)\n",
+	  VERSION);
   fprintf(stderr,"             compile APS to Scala\n");
+  fprintf(stderr,"%s: usage: %s [-SVG] [-D...] <file.aps>\n",argv0,argv0);
   /*fprintf(stderr,"    -I    generate an incremental implementation\n");*/
   fprintf(stderr,"    -S    generate a scheduled implementation\n");
   fprintf(stderr,"    -D... turn on indicated debugging flags\n");
