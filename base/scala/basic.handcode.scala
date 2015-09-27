@@ -853,7 +853,7 @@ with C_SET[Set[T_ElemType],T_ElemType]
   def u_append(x:Any) : Option[(T_Result,T_Result)] = x match {
     case x:T_Result =>
     if (x.size > 1) {
-      val y : T_ElemType = x.elements.next();
+      val y : T_ElemType = x.iterator.next();
       Some((ListSet(y),x - y))
     } else {
       None
@@ -865,7 +865,7 @@ with C_SET[Set[T_ElemType],T_ElemType]
   val v_single = f_single _;
   def f_single(v_x : T_ElemType):T_Result = ListSet(v_x);
   def u_single(x:Any) : Option[(T_ElemType)] = x match {
-    case x:T_Result => if (x.size == 1) Some(x.elements.next()) else None;
+    case x:T_Result => if (x.size == 1) Some(x.iterator.next()) else None;
     case _ => None
   };
   val p_single = new PatternFunction[(T_ElemType),T_Result](u_single);
