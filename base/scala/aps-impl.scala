@@ -121,6 +121,7 @@ abstract class Node(t : C_PHYLUM[_ <: Node]) extends Value(t)
     }
     this
   }
+  def isRooted : Boolean = (parent != null) && parent.isRooted;
 }
 
 class Nodes[T_Result <: Node] extends ArrayBuffer[T_Result] {
@@ -290,8 +291,10 @@ extends Module("Attribute " + name)
     
   override def finish() : Unit = {
     if (!isComplete) {
+      // We only demand values of rooted trees
+      // Otherwise "garbage" trees will cause problems 
       for (n <- t_P.nodes) {
-	get(n);
+	if (n.isRooted) get(n);
       }
     }
     super.finish();
