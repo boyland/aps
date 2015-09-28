@@ -2012,9 +2012,6 @@ void *compute_OU(void *u, void *node)
 	  USET uset = get_uset(decl);
 	  OSET oset;
 
-	  if (!uset) {
-	    fatal_error("%d: no USET for %s\n", tnode_line_number(decl),decl_name(decl));
-	  }
 	  oset = doOU(expr, uset);
 	  add_to_oset(decl, oset);
 	  
