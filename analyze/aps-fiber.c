@@ -1736,10 +1736,13 @@ OSET doOU(Expression e, USET uset)
 			// responsible shared info: shared_info on X0.
       Declaration rsi = responsible_node_shared_info(e, mystate);
 
+      if (rsi) {
+
 			// rsi pass down oset to fsi.
 			add_to_oset(fsi, get_oset(rsi));
 			// fsi pass up uset to rsi
 			add_to_uset(rsi, get_uset(fsi));
+      }
 
       // normal stuff
  	   {
@@ -2518,8 +2521,11 @@ NODESET link_expr_rhs(Expression e, NODESET ns){
       Declaration fsi = phylum_shared_info_attribute(fdecl, mystate);
       // responsible shared info: shared_info on X0.
       Declaration rsi = responsible_node_shared_info(e, mystate);
+
+      if (rsi) {
 			//!! deal with shared info here??
 			NODESET ns = set_of_node(get_node_decl(rsi));
+      }
 
 		// normal stuff
 	    Expression arg;
