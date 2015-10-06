@@ -250,6 +250,10 @@ class Evaluation[T_P, T_V](val anchor : T_P, val name : String)
   }
 
   def set(v : ValueType) : Unit = {
+    status match {
+    case EVALUATED => throw TooLateError;
+    case _ => ();
+    }
     value = v;
     status = ASSIGNED;
   }
@@ -333,8 +337,11 @@ extends Module("Attribute " + name)
 trait CollectionEvaluation[V_P, V_T] extends Evaluation[V_P,V_T] {
   import Evaluation._;
 
-  def initial : ValueType = getDefault;
+  def initial : ValueType = super.getDefault;
   def combine(v1 : ValueType, v2 : ValueType) : ValueType;
+
+  override
+  def getDefault : ValueType = initial;
 
   private def initialize : Unit = {
     if (status == UNINITIALIZED) {
@@ -346,6 +353,11 @@ trait CollectionEvaluation[V_P, V_T] extends Evaluation[V_P,V_T] {
   override def get : ValueType = {
     initialize;
     super.get
+  }
+
+  override def assign(v : ValueType) : Unit = {
+    Debug.out(name + " :> " + v);
+    set(v);
   }
 
   override def set(v : ValueType) : Unit = {
@@ -439,8 +451,8 @@ trait CircularEvaluation[V_P, V_T] extends Evaluation[V_P,V_T] {
 
   def markPending() : Unit = {
     val cycle = inCycle;
-    for (e <- pending.reverse) {
-      // println("Checking " + e + " in pending.");
+    for (e <- pending) {
+      Debug.out("Checking " + e + " in pending.");
       if (e.inCycle == cycle) return;
       e.setInCycle(cycle);
     }
@@ -490,16 +502,13 @@ trait CircularEvaluation[V_P, V_T] extends Evaluation[V_P,V_T] {
   }
 }
 
-class PatternFunction[A,R](f : Any => Option[A]) {
-  def unapply(x : Any) : Option[A] = f(x);
+// RA = (R,A1,A2,...)
+class PatternFunction[RA](f : Any => Option[RA]) {
+  def unapply(x : Any) : Option[RA] = f(x);
 }
 
-class Pattern0Function[R](f : Any => Option[Unit]) {
-  def unapply(x : Any) : Boolean = f(x) == Some(());
-}
-
-class PatternSeqFunction[A,R](f : Any => Option[Seq[A]]) {
-  def unapplySeq(x : Any) : Option[Seq[A]] = f(x);
+class PatternSeqFunction[R,A](f : Any => Option[(R,Seq[A])]) {
+  def unapplySeq(x : Any) : Option[(R,Seq[A])] = f(x);
 }
 
 object P_AND {
