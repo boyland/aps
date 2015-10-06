@@ -271,16 +271,9 @@ static bool implement_visit_function(AUG_GRAPH* aug_graph,
       case KEYvalue_use:
 	// shared global collection
 	field = USE_DECL(value_use_use(lhs));
-	os << "v_" << decl_name(field) << "=";
-	switch (Default_KEY(value_decl_default(field))) {
-	case KEYcomposite:
-	  os << composite_combiner(value_decl_default(field));
-	  break;
-	default:
-	  os << as_val(value_decl_type(field)) << ".v_combine";
-	  break;
-	}
-	os << "(v_" << decl_name(field) << "," << rhs << ");\n";
+	os << "a_" << decl_name(field) << ".";
+	if (debug) os << "assign"; else os << "set";
+	os << "(" << rhs << ");\n";
 	break;
       case KEYfuncall:
 	field = field_ref_p(lhs);
@@ -309,12 +302,12 @@ static bool implement_visit_function(AUG_GRAPH* aug_graph,
 	  int i = LOCAL_UNIQUE_PREFIX(ad);
 	  if (i == 0) {
 	    if (!def_is_constant(value_decl_def(ad))) {
-	      os << "v_" << asym << " = " << rhs << ";\n";
+	      os << "// v_" << asym << " is assigned/initialized by default.\n";
 	    } else {
 	      os << "// v_" << asym << " is initialized in module.\n";
 	    }
 	  } else {
-	    os << "v" << i << "_" << asym << " = " << rhs << ";\n";
+	    os << "v" << i << "_" << asym << " = " << rhs << "; // local\n";
 	  }
 	}
       } else {
@@ -342,7 +335,7 @@ static bool implement_visit_function(AUG_GRAPH* aug_graph,
 	  } else {
 	    int i = LOCAL_UNIQUE_PREFIX(ad);
 	    if (i == 0)
-	      os << "v_" << asym << " = " << rhs << ";\n";
+	      os << "v_" << asym << " = " << rhs << "; // function\n";
 	    else
 	      os << "v" << i << "_" << asym << " = " << rhs << ";\n";
 	  }
@@ -534,12 +527,10 @@ void dump_visit_functions(PHY_GRAPH *pg, ostream& oss)
       Declaration cd = aug_graphs[j]->syntax_decl;
       oss << indent() << "case ";
       dump_constructor_owner(pg->phylum,oss);
-      oss << "p_" << decl_name(cd) << "(";
+      oss << "p_" << decl_name(cd) << "(_";
       Declarations fs = function_type_formals(constructor_decl_type(cd));
-      bool started = false;
       for (Declaration f = first_Declaration(fs); f; f=DECL_NEXT(f)) {
-	if (started) oss << ","; else started = true;
-	oss << "_";
+	oss << ",_";
       }
       oss << ") => " << "visit_" << pgn << "_" << ph << "_"
 	  << Declaration_info(cd)->instance_index << "(node);\n";
