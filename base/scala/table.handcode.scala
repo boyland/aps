@@ -10,7 +10,7 @@ object table_implicit {
 import table_implicit._;
 
 trait C_TABLE[T_Result, T_KeyType, T_ValueType] extends C_TYPE[T_Result] with C_COMBINABLE[T_Result] {
-  val p_table_entry : PatternFunction[(T_KeyType,T_ValueType),T_Result];
+  val p_table_entry : PatternFunction[(T_Result,T_KeyType,T_ValueType)];
   def v_table_entry : (T_KeyType,T_ValueType) => T_Result;
   def v_initial : T_Result;
   val v_combine : (T_Result,T_Result) => T_Result;
@@ -45,16 +45,16 @@ with C_TABLE[TreeMap[T_KeyType,T_ValueType],T_KeyType,T_ValueType]
   def f_table_entry(v_key : T_KeyType, v_val : T_ValueType):T_Result = 
     v_empty_table.insert(v_key,v_val);
 
-  def u_table_entry(x:Any) : Option[(T_KeyType,T_ValueType)] = x match {
+  def u_table_entry(x:Any) : Option[(T_Result,T_KeyType,T_ValueType)] = x match {
     case m:Table => {
       if (m.size == 1) {
 	val k = m.firstKey;
-	Some((k,m(k)))
+	Some((m,k,m(k)))
       } else None
     }
     case _ => None
   };
-  val p_table_entry = new PatternFunction[(T_KeyType,T_ValueType),T_Result](u_table_entry);
+  val p_table_entry = new PatternFunction[(T_Result,T_KeyType,T_ValueType)](u_table_entry);
 
   val v_initial:T_Result = v_empty_table;
 

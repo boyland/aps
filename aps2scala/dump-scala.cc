@@ -212,24 +212,25 @@ void dump_pattern_prototype(string name, Type ft, ostream& oss)
   Declaration first = first_Declaration(formals);
 
   oss << indent() << "val p_" << name;
-  if (first) {
-    if (Declaration_KEY(first) == KEYseq_formal) {
-      oss << " : PatternSeqFunction[" << infer_formal_type(first) << ",";
-    } else {
-      oss << " : PatternFunction[(";
-      for (Declaration f = first; f != NULL; f = DECL_NEXT(f)) {
-	if (f != first) oss << ",";
-	oss << infer_formal_type(f);
-      }
-      oss << "),";
-    }
+  bool isSeq;
+  if (first && Declaration_KEY(first) == KEYseq_formal) {
+    oss << " : PatternSeqFunction[";
+    isSeq = true;
   } else {
-    oss << " : Pattern0Function[";
+    oss << " : PatternFunction[(";
+    isSeq = false;
   }
 
   Declaration returndecl = first_Declaration(function_type_return_values(ft));
   Type rt = value_decl_type(returndecl);
-  oss << rt << "]";
+  oss << rt;
+
+  for (Declaration f = first; f != NULL; f = DECL_NEXT(f)) {
+    oss << ",";
+    oss << infer_formal_type(f);
+  }
+  if (!isSeq) oss << ")";
+  oss << "]";
 }
 
 void dump_function_debug_start(const char *name, Type ft, ostream& os)
@@ -255,6 +256,34 @@ void dump_debug_end(ostream& os)
 }
 
 // Output Scala pattern for APS pattern
+
+static void dump_pattern_call(Pattern p, Pattern result, const char* resultS, ostream& os)
+{
+  Pattern pf = pattern_call_func(p);
+  PatternActuals pactuals = pattern_call_actuals(p);
+  Use pfuse;
+  switch (Pattern_KEY(pf)) {
+  default:
+    aps_error(p,"cannot find constructor (can only handle ?x=f(...) or f(...)");
+    return;
+  case KEYpattern_use:
+    pfuse = pattern_use_use(pf);
+    break;
+  }
+  dump_Use(pfuse,"p_",os);
+  os << "(";
+  if (result) {
+    dump_Pattern(result,os);
+  } else {
+    os << resultS;
+  }
+  for (Pattern pa = first_PatternActual(pactuals); pa ; pa = PAT_NEXT(pa)) {
+    os << ",";
+    dump_Pattern(pa,os);
+  }
+  os << ")";
+}
+
 void dump_Pattern(Pattern p, ostream& os) 
 {
   switch (Pattern_KEY(p)) {
@@ -276,25 +305,7 @@ void dump_Pattern(Pattern p, ostream& os)
 
   case KEYpattern_call:
     {
-      Pattern pf = pattern_call_func(p);
-      PatternActuals pactuals = pattern_call_actuals(p);
-      Use pfuse;
-      switch (Pattern_KEY(pf)) {
-      default:
-	aps_error(p,"cannot find constructor (can only handle ?x=f(...) or f(...)");
-	return;
-      case KEYpattern_use:
-	pfuse = pattern_use_use(pf);
-	break;
-      }
-      dump_Use(pfuse,"p_",os);
-      os << "(";
-      bool first = true;
-      for (Pattern pa = first_PatternActual(pactuals); pa ; pa = PAT_NEXT(pa)) {
-	if (first) first = false; else os << ",";
-	dump_Pattern(pa,os);
-      }
-      os << ")";
+      dump_pattern_call(p,((Pattern)0),"_",os);
     }
     break;
 
@@ -320,6 +331,9 @@ void dump_Pattern(Pattern p, ostream& os)
       os << " if ";
       dump_Expression(condition_e(and_pattern_p2(p)),os);
       return;
+    case KEYpattern_call:
+      dump_pattern_call(and_pattern_p2(p),and_pattern_p1(p),"",os);
+      return;
     }
     os << "P_AND(";
     dump_Pattern(and_pattern_p1(p),os);
@@ -335,8 +349,10 @@ void dump_Pattern(Pattern p, ostream& os)
       if (n == "_") os << "_";
       else {
 	os << "v_" << n;
-	//XXX: Start ing Scala 2.10, giving the type
-        // causes warnings to be generated
+	// Generating a type causes Scala to warn about erasure
+	// because typing has a pattern matching effect that cannot be
+	// implemented.  In our case, because APS doesn't have subtyping,
+	// the type inferred by the Scala compiler should always be correct.
 	/*
 	if (Pattern_info(p)->pat_type != 0) {
 	  os << ":" << Pattern_info(p)->pat_type;
@@ -1094,6 +1110,81 @@ static void dump_new_phylum(string n, string nameArg, bool isStart, ostream& oss
       << nameArg << ");\n" << endl;
 }
 
+static void dump_scala_pattern_function(
+	Declaration decl, 
+	bool is_syntax,
+	Type ft,
+	Pattern body, 
+	ostream& oss)
+{
+  string name = decl_name(decl);
+  Formals formals = function_type_formals(ft);
+  Declarations rdecls = function_type_return_values(ft);
+  Type rt = value_decl_type(first_Declaration(rdecls));
+
+  // helper: "(v_a1,v_a2)" and "(x,v_a1,v_a2)"
+  ostringstream argss;
+  bool started = false;
+  argss << "(";
+  for (Declaration f = first_Declaration(formals); f; f = DECL_NEXT(f)) {
+    if (started) argss << ","; else started = true;
+    argss << "v_" << decl_name(f);
+  }
+  argss << ")";
+  string args = argss.str();
+  string uargs = started ? ("(x," + args.substr(1)) : "x";
+  
+  // helper: "(T_Result,T_A1,T_A2)"
+  ostringstream typess;
+  typess << "(" << rt;
+  for (Declaration f = first_Declaration(formals); f; f = DECL_NEXT(f)) {
+    typess << ",";
+    typess << infer_formal_type(f);
+  }
+  typess << ")";
+  string utypes = typess.str();
+  
+  // the unconstructor function:
+  oss << indent() << "def u_" << name << "(x:Any)";
+  oss << " : Option[" << utypes << "] = x match {\n";
+  if (body) {
+    switch (Pattern_KEY(body)) {
+    case KEYno_pattern: break;
+    case KEYchoice_pattern:
+      {
+	Patterns choices = choice_pattern_choices(body);
+	for (Pattern p = first_Pattern(choices); p; p=PAT_NEXT(p)) {
+	  oss << indent() << "  x@case ";// probably won't type check
+	  dump_Pattern(p,oss); // should get x from here?
+	  oss << " => Some(" << uargs << ");\n";
+	}
+      }
+      break;
+    default:
+      oss << indent() << "  case " << body
+	  << " => Some(" << uargs << ");\n";
+      break;
+    }
+  } else {
+    oss << indent() << "  case x@c_" << name << args
+	<< " => Some(" << uargs << ");\n";
+  }
+  oss << indent() << "  case _ => None };\n";
+  
+  if (!body) {
+    // the constructor function:
+    dump_function_prototype(name,ft,oss);
+    oss << " = c_" << name << args;
+    if (is_syntax) oss << ".register";
+    oss << ";\n";
+  }
+  
+  // the pattern function
+  oss << indent() << "val p_" << name
+      << " = new PatternFunction[" << utypes << "]"
+      << "(u_" << name << ");\n" << endl;
+}
+
 void dump_scala_Declaration(Declaration decl,ostream& oss)
 {
   const char *name = 0;
@@ -1441,38 +1532,44 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
       --nesting_level;
       oss << indent() << "}\n";
 
+      dump_scala_pattern_function(decl,is_syntax,ft,((Pattern)0),oss);
+      /*
       // helper: "(v_a1,v_a2)"
-      ostringstream args;
+      ostringstream argss;
       started = false;
-      args << "(";
+      argss << "(";
       for (Declaration f = first_Declaration(formals); f; f = DECL_NEXT(f)) {
-	if (started) args << ","; else started = true;
-	args << "v_" << decl_name(f);
+	if (started) argss << ","; else started = true;
+	argss << "v_" << decl_name(f);
       }
-      args << ")";
+      argss << ")";
+      string args = argss.str();
+      string uargs = started ? ("(" + args + "),x)") : "x";
 
       // helper: "(T_A1,T_A2)"
       ostringstream typess;
       started = false;
-      typess << "(";
       for (Declaration f = first_Declaration(formals); f; f = DECL_NEXT(f)) {
-	if (started) typess << ","; else started = true;
+	if (started) typess << ","; else { typess << "("; started = true; }
 	typess << infer_formal_type(f);
       }
-      typess << ")";
+      if (started) typess << ")";
       string types = started ? typess.str() : "Unit";
+      typess.clear();
+      typess << rt;
+      string utypes = started ? ("(" + types + "," + typess.str() + ")") : typess.str(); 
       
       // the constructor function:
       dump_function_prototype(name,ft,oss);
-      oss << " = c_" << name << args.str();
+      oss << " = c_" << name << args;
       if (is_syntax) oss << ".register";
       oss << ";\n";
 
       // the unconstructor function:
       oss << indent() << "def u_" << name << "(x:Any)";
-      oss << " : Option[" << types << "] = x match {\n";
-      oss << indent() << "  case c_" << name << args.str()
-	  << " => Some(" << args.str() << ");\n";
+      oss << " : Option[" << utypes << "] = x match {\n";
+      oss << indent() << "  case x@c_" << name << args
+	  << " => Some(" << uargs << ");\n";
       oss << indent() << "  case _ => None };\n";
 
       // the pattern function
@@ -1483,7 +1580,7 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
 	oss << " = new PatternFunction[" << types << ",";
       }
       oss << rt << "](u_" << name << ");\n" << endl;
-      
+      */
     }
     break;
 
@@ -1636,60 +1733,9 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
   case KEYpattern_decl:
     {
       Type ft = pattern_decl_type(decl);
-      Declarations formals = function_type_formals(ft);
-      Declarations rdecls = function_type_return_values(ft);
-      Type rt = value_decl_type(first_Declaration(rdecls));
       Pattern body = pattern_decl_choices(decl);
       
-      // helper: "(v_a1,v_a2)"
-      ostringstream args;
-      bool started = false;
-      for (Declaration f = first_Declaration(formals); f; f = DECL_NEXT(f)) {
-	if (started) args << ","; else started = true;
-	args << "v_" << decl_name(f);
-      }
-      args << ")";
-
-      // helper: "(T_A1,T_A2)"
-      ostringstream typess;
-      started = false;
-      for (Declaration f = first_Declaration(formals); f; f = DECL_NEXT(f)) {
-	if (started) typess << ","; else started = true;
-	typess << formal_type(f);
-      }
-      typess << ")";
-      string types = started ? typess.str() : "Unit";
-
-      // the unconstructor function:
-      oss << indent() << "def u_" << name << "(x:Any) : ";
-      oss << " : Option[" << types << "] = x match {\n";
-      switch (Pattern_KEY(body)) {
-      case KEYno_pattern: break;
-      case KEYchoice_pattern:
-	{
-	  Patterns choices = choice_pattern_choices(body);
-	  for (Pattern p = first_Pattern(choices); p; p=PAT_NEXT(p)) {
-	    oss << indent() << "  case ";
-	    dump_Pattern(p,oss);
-	    oss << " => Some(" << args.str() << ");\n";
-	  }
-	}
-	break;
-      default:
-	oss << indent() << "  case " << body
-	    << " => Some(" << args.str() << ");\n";
-	break;
-      }
-      oss << indent() << "  case _ => None };\n";
-
-      // the pattern function
-      oss << indent() << "val p_" << name;
-      if (types == "Unit") {
-	oss << " = new Pattern0Function[";
-      } else {
-	oss << " = new PatternFunction[" << types << ",";
-      }
-      oss << rt << "](u_" << name << ");\n";	
+      dump_scala_pattern_function(decl,false,ft,body,oss);
     }
     break;
   default:
