@@ -8,6 +8,8 @@
 #include "jbb-alloc.h"
 #include "aps-ag.h"
 
+#include "aps-tree-dump.h"
+
 int analysis_debug = 0;
 
 
@@ -941,11 +943,27 @@ INSTANCE* summary_vertex_instance(VERTEX* dv, FIBER f, PHY_GRAPH* phy_graph)
   return get_summary_instance_or_null(dv->attr,f,phy_graph);  
 }
 
+static BOOL decl_is_collection(Declaration d) {
+  if (!d) return FALSE;
+  switch (Declaration_KEY(d)) {
+  case KEYvalue_decl: 
+    return direction_is_collection(value_decl_direction(d));
+  case KEYattribute_decl: 
+    return direction_is_collection(attribute_decl_direction(d));
+    // XXX: should handle value_renaming
+  default:
+    return FALSE;
+  }
+}
+
 // return true if we are sure this vertex represents an input dependency
 static BOOL vertex_is_input(VERTEX* v) 
 {
-  if (!v->attr) return FALSE;
   BOOL result;
+
+  if (!v->attr) return FALSE;
+  if (v->modifier) return FALSE;
+
   if (ATTR_DECL_IS_INH(v->attr)) result = TRUE;
   else if (ATTR_DECL_IS_SYN(v->attr)) result = FALSE;
   else return FALSE;
@@ -1253,9 +1271,6 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
       } else if (Declaration_info(decl)->decl_flags &
 		 (ATTR_DECL_INH_FLAG|ATTR_DECL_SYN_FLAG)) {
 	/* a use of parameter or result (we hope) */
-	if (Declaration_info(decl)->decl_flags & ATTR_DECL_INH_FLAG) {
-	  aps_error(lhs,"Assignment of input value: %s\n",decl_name(decl));
-	}
 	sink.node = aug_graph->match_rule;
 	sink.attr = decl;
 	sink.modifier = mod;
