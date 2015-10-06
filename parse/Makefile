@@ -3,7 +3,7 @@ CFLAGS=-Wall -g -DYYDEBUG -DYY_SKIP_YYWRAP
 
 APSLIBOBJS= alloc.o string.o symbol.o \
 	    aps-tree.o aps-traverse.o aps-util.o \
-	    aps-lex.o aps.tab.o
+	    aps-lex.o aps.tab.o aps-tree-dump.o
 APSCOBJS= apsc.o aps-tree-dump.o aps-lib.o
 
 aps-lib.o : ${APSLIBOBJS}
