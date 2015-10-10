@@ -1017,6 +1017,10 @@ void add_edges_to_graph(VERTEX* v1,
     INSTANCE *sink = dep_vertex_instance(v2,0,aug_graph);
     if (source != NULL && sink != NULL) {
       add_edge_to_graph(source,sink,cond,kind,aug_graph);
+    } else if (analysis_debug & ADD_EDGE) {
+      printf("  not added %s %s\n", 
+	     source ? "" : "null source",
+	     sink ? "" : "null sink");
     }
   }
 
@@ -1246,6 +1250,12 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
       MODIFIER new_mod;
 	
       if (shared_use_p(lhs) != NULL) {
+	if (!mod) {
+	  if (def_is_constant(value_decl_def(decl))) {
+	      aps_error(lhs,"Assignment to non-var disallowed: %s",
+			decl_name(decl));
+	  }
+	}
 	/* Assignment of shared global (or a field of a shared global) */
 	new_mod.next = mod;
 	if (EXPR_IS_LHS(lhs)) {
@@ -1397,12 +1407,17 @@ static void *get_edges(void *vaug_graph, void *node) {
 	  Declaration cdecl;
 	  VERTEX sink;
 	  sink.attr = decl;
-	  sink.node = 0;
+	  sink.node = responsible_node_declaration(decl);
 	  sink.modifier = NO_MODIFIER;
 	  record_condition_dependencies(&sink,cond,aug_graph);
 	  switch (Default_KEY(def)) {
 	  case KEYno_default: break;
 	  case KEYsimple:
+	    /* XXX: I don't know I have to do it both ways.
+	     */
+	    record_expression_dependencies(&sink,cond,dependency,NO_MODIFIER,
+					   simple_value(def),aug_graph);
+	    sink.node = 0;
 	    record_expression_dependencies(&sink,cond,dependency,NO_MODIFIER,
 					   simple_value(def),aug_graph);
 	    if ((cdecl = constructor_call_p(simple_value(def))) != NULL) {
@@ -1436,7 +1451,6 @@ static void *get_edges(void *vaug_graph, void *node) {
 		source.modifier = &dot_mod;
 		add_edges_to_graph(&source,&sink,cond,fiber_dependency,
 				   aug_graph);
-		
 	      }
 	    }
 	    break;
@@ -1659,6 +1673,8 @@ static void init_node_phy_graph(Declaration node, STATE *state) {
   init_node_phy_graph2(node,ty,state);
 }
 
+void print_aug_graph(AUG_GRAPH *aug_graph, FILE *stream);
+
 static void init_augmented_dependency_graph(AUG_GRAPH *aug_graph, 
 					    Declaration tlm,
 					    STATE *state)
@@ -1814,6 +1830,26 @@ static void init_augmented_dependency_graph(AUG_GRAPH *aug_graph,
 
   /* initialize the edge set array */
   traverse_Block(get_edges,aug_graph,body);
+
+  /* handle defaults */
+  switch (Declaration_KEY(tlm)) {
+  default: fatal_error("%d:unknown top-level-match",tnode_line_number(tlm));
+  case KEYmodule_decl:
+    break;
+  case KEYsome_function_decl:
+    {
+      Type ftype=some_function_decl_type(tlm);
+      /* int saved = analysis_debug;
+       * analysis_debug = -1;
+       */
+      traverse_Type(get_edges,aug_graph,ftype);
+      /* analysis_debug = saved;
+       * print_aug_graph(aug_graph,0);
+       */
+    }
+  case KEYtop_level_match:
+    break;
+  }
 
   if (aug_graph->first_rhs_decl != NULL) {
     VERTEX source;
