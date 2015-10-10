@@ -945,6 +945,13 @@ static string type_inst_as_scala_type(Type ty)
     oss << "T_SET[" << first_TypeActual(tas) << "]";
     return oss.str();
   }
+  // KLUDGE for MULTISET
+  static Declaration mset_decl = find_basic_decl("MULTISET");
+  if (m == mset_decl) {
+    ostringstream oss;
+    oss << "T_MULTISET[" << first_TypeActual(tas) << "]";
+    return oss.str();
+  }
   // worse KLUDGE for MAKE_LATTICE
   static Declaration make_lattice_decl = find_basic_decl("MAKE_LATTICE");
 
@@ -1011,7 +1018,7 @@ static string type_inst_as_scala_type(Type ty)
 	return oss.str();
       }
     }
-    break;
+    // return type_inst_as_scala_type(rut); (wrong scope)
   }
   aps_error(ty,"internal error: type_inst_as_scala_type");
   return "*internal-error*";
