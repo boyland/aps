@@ -49,6 +49,8 @@ object basic_implicit {
   val v_revimplies = f_revimplies _;
   def f_revimplies(v_x : T_Boolean, v_y : T_Boolean):T_Boolean = v_or(v_x,v_not(v_y));
 
+  type T_MAKE_LATTICE[L] = L;
+
   val t_OrLattice = new M_MAKE_LATTICE[T_Boolean]("OrLattice",t_Boolean,v_false,v_cand,v_implies,v_or,v_and);
   type T_OrLattice = T_Boolean;
 
@@ -58,7 +60,12 @@ object basic_implicit {
   type T_BAG[T] = List[T];
   type T_LIST[T] = List[T];
   type T_SET[T] = scala.collection.immutable.Set[T];
+  type T_MULTISET[T] = T_BAG[T];
 
+  type T_MAKE_LATTICE[T_L] = T_L;
+  type T_UNION_LATTICE[T_E,T_T] = T_T;
+  type T_INTERSECTION_LATTICE[T_E,T_T] = T_T;
+  
   val t_String = new M_STRING("String");
   type T_String = String;
 
@@ -983,6 +990,7 @@ class M_MULTISET[T_ElemType](name : String,val t_ElemType : C_TYPE[T_ElemType] w
     }
   }
 
+/*
   override
   val v_combine = f_combine _;
   override
@@ -990,6 +998,7 @@ class M_MULTISET[T_ElemType](name : String,val t_ElemType : C_TYPE[T_ElemType] w
   override def finish() : Unit = {
     super.finish();
   }
+*/
 
 }
 
