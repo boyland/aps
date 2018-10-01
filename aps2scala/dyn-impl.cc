@@ -482,6 +482,10 @@ void implement_attributes(const vector<Declaration>& attrs,
 
     oss << indent() << "def c_" << name << "(anode : " << at << ") : "
 	<< rt << " = {\n";
+    string fn = decl_name(af);
+    if (fn != "_") {
+      oss << indent() << "val v_" << fn << " = anode;\n";
+    }
     ++nesting_level;
     if (is_col) {
       dump_init_collection(rdecl,oss);
