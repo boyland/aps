@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
-#include "/usr/include/string.h"
+#include <string.h>
 #include <strings.h>
 #include "aps-ag.h"
 
