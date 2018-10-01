@@ -94,6 +94,8 @@ static string program_id(string name)
   return result;
 }
 
+void dump_scala_Declaration_header(Declaration, std::ostream&);
+
 void dump_scala_Program(Program p,std::ostream&oss)
 {
   aps_yyfilename = (char *)program_name(p);
@@ -121,8 +123,10 @@ void dump_scala_Program(Program p,std::ostream&oss)
       {
 	Declaration d = decl_unit_decl(u);
 	switch (Declaration_KEY(d)) {
-	case KEYclass_decl:
 	case KEYmodule_decl:
+	  dump_scala_Declaration_header(d,oss);
+	  break;
+	case KEYclass_decl:
 	case KEYpolymorphic:
 	  break;
 	default:
@@ -649,7 +653,7 @@ void dump_some_attribute(Declaration d, string i,
   const char *name = decl_name(d);
   bool is_col = direction_is_collection(dir);
   bool is_cir = direction_is_circular(dir);
-  //bool is_attr = Declaration_KEY(d) == KEYattribute_decl;
+  bool is_attr = Declaration_KEY(d) == KEYattribute_decl;
 
   ostringstream tmp;
   if (nt == 0) {
@@ -672,6 +676,14 @@ void dump_some_attribute(Declaration d, string i,
       << (is_col ? " with CollectionEvaluation" + tmps.str() : "")
       << " {\n";
   ++nesting_level;
+
+  if (is_attr) {
+    Formal af = first_Declaration(function_type_formals(attribute_decl_type(d)));
+    string fname = decl_name(af);
+    if (fname != "_") {
+      oss << indent() << "val v_" << fname << " = anchor;\n";
+    }
+  }
 
   switch (Default_KEY(deft)) {
   case KEYno_default:
@@ -935,9 +947,10 @@ static string type_inst_as_scala_type(Type ty)
 {
   Declaration m = USE_DECL(module_use_use(type_inst_module(ty)));
   TypeActuals tas = type_inst_type_actuals(ty);
+
+#ifdef WAS_WORKING
   Declaration rdecl = module_decl_result_type(m);
   Type rut = some_type_decl_type(rdecl);
-
   // KLUDGE for SET
   static Declaration set_decl = find_basic_decl("SET");
   if (m == set_decl) {
@@ -984,7 +997,9 @@ static string type_inst_as_scala_type(Type ty)
   case KEYremote_type:
   case KEYno_type:
     {
+#endif
       ostringstream oss;
+      oss << "/*TI*/";
       oss << "T_" << decl_name(m);
       bool started = false;
       for (Type ta = first_TypeActual(tas); ta; ta = TYPE_NEXT(ta)) {
@@ -994,6 +1009,7 @@ static string type_inst_as_scala_type(Type ty)
       }
       if (started) oss << "]";
       return oss.str();
+#ifdef WAS_WORKING
     }
     break;
   case KEYtype_use:
@@ -1022,6 +1038,7 @@ static string type_inst_as_scala_type(Type ty)
   }
   aps_error(ty,"internal error: type_inst_as_scala_type");
   return "*internal-error*";
+#endif
 }
 
 static void dump_type_inst(string n, string nameArg, Type ti, ostream& oss)
@@ -1192,6 +1209,53 @@ static void dump_scala_pattern_function(
       << "(u_" << name << ");\n" << endl;
 }
 
+void dump_scala_Declaration_header(Declaration decl, ostream& oss)
+{
+  switch(Declaration_KEY(decl)) {
+  default: break;
+  case KEYmodule_decl:
+    {
+      const char* name = decl_name(decl);
+      TypeFormals tfs = some_class_decl_type_formals(decl);
+      Declaration rdecl = module_decl_result_type(decl);
+      const char *impl_type = 0;
+
+      for (int i=0; i < omitted_number; ++i)
+	if (streq(omitted[i],name)) return;
+
+      for (int j=0; j < impl_number; ++j)
+	if (streq(impl_types[j],name)) impl_type = impl_types[j+1];
+
+      Type rut = some_type_decl_type(rdecl);
+
+      // peel away remote/private (irrelevant in the Scala)
+      while (Type_KEY(rut) == KEYprivate_type)
+	rut = private_type_rep(rut);
+      while (Type_KEY(rut) == KEYremote_type)
+	rut = remote_type_nodetype(rut);
+      
+      switch (Type_KEY(rut)) {
+      case KEYno_type: break;
+      default:
+	oss << "type T_" << name;
+	bool started = false;
+	for (Declaration tf = first_Declaration(tfs); tf; tf=DECL_NEXT(tf)) {
+	  if (started) oss << ",";
+	  else { started = true; oss << "["; }
+	  oss << "T_" << decl_name(tf);
+	}
+	if (started) oss << "]";
+	if (impl_type) {
+	  oss << " = " << impl_type << ";\n";
+	} else {
+	  oss << " = " << rut << ";\n";
+	}
+      }
+    }
+    break;
+  }
+}
+
 void dump_scala_Declaration(Declaration decl,ostream& oss)
 {
   const char *name = 0;
@@ -1266,7 +1330,7 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
 	    for (Declaration tf = first_Declaration(tfs); tf; tf=DECL_NEXT(tf)) {
 	      if (started) results << ",";
 	      else { started = true; results << "["; }
-	      results << decl_name(tf);
+	      results << "T_" << decl_name(tf);
 	    }
 	    if (started) results << "]";
 	    result_type = results.str();
@@ -1275,7 +1339,7 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
 	    dump_TypeFormals(tfs,oss);
 	    oss << "(t : C_" << name << "[" << result_type;
 	    for (Declaration tf = first_Declaration(tfs); tf; tf=DECL_NEXT(tf)) {
-	      oss << "," << decl_name(tf);
+	      oss << ",T_" << decl_name(tf);
 	    }
 	    oss << "]) extends " << (rdecl_is_phylum ? "Node" : "Value") 
 		<< "(t) { }\n" << endl;
@@ -1513,16 +1577,18 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
       }
       oss << ") extends " << rt << "(" << as_val(rt) << ") {\n";
       ++nesting_level;
-      oss << indent() << "override def children : List[Node] = List(";
-      started = false;
-      for (Declaration f = first_Declaration(formals); f; f = DECL_NEXT(f)) {
-	Type fty = formal_type(f);
-	if (type_is_syntax(fty)) {
-	  if (started) oss << ","; else started = true;
-	  oss << "v_" << decl_name(f);
+      if (is_syntax) {
+	oss << indent() << "override def children : List[Node] = List(";
+	started = false;
+	for (Declaration f = first_Declaration(formals); f; f = DECL_NEXT(f)) {
+	  Type fty = formal_type(f);
+	  if (type_is_syntax(fty)) {
+	    if (started) oss << ","; else started = true;
+	    oss << "v_" << decl_name(f);
+	  }
 	}
+	oss << ");\n";
       }
-      oss << ");\n";
       oss << indent()
 	  << "override def toString() : String = Debug.with_level {\n";
       ++nesting_level;
