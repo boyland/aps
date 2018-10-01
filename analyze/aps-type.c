@@ -264,7 +264,7 @@ static void *find_types(void *cont, void *node) {
   return cont;
 }
 
-static init_types() {
+static void init_types() {
   Program basic_program = find_Program(make_string("basic"));
   Boolean_Symbol = intern_symbol("Boolean");
   Integer_Symbol = intern_symbol("Integer");
@@ -836,7 +836,7 @@ Type infer_pattern_type(Pattern p)
       Use u = pattern_use_use(p);
       Declaration d = USE_DECL(u);
       
-      if (!d) return;
+      if (!d) return 0;
       switch (Declaration_KEY(d)) {
       case KEYconstructor_decl:
 	ty = constructor_decl_type(d);
@@ -1956,13 +1956,14 @@ static int check_declarations_type_subst
        d1 && d2; d1 = DECL_NEXT(d1), d2 = DECL_NEXT(d2)) {
     if (Declaration_KEY(d1) != Declaration_KEY(d2)) {
       aps_error(node,"declaration kind mismatch");
-      return;
+      return -1;
     }
     check_type_subst(node,some_value_decl_type(d1),
 		     type_envs,some_value_decl_type(d2));
   }
   if (d1 != 0 || d2 != 0)
     aps_error(node,"type mismatch: function formal number"); /* probably */
+  return 0;
 }
 
 void check_type_signatures(void *node, Type t, Use type_envs, Signature sig)
