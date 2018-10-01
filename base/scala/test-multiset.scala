@@ -9,4 +9,6 @@ object TestMultiSet extends App {
   println("union = "+ t_MI.v_union(l1,l2));
   println("intersect = " + t_MI.v_intersect(l1,l2));
   println("difference = " + t_MI.v_difference(l1,l2));
+  println("combine = "+ t_MI.v_combine(l1,l2));
+  println("count(2) = " + t_MI.v_count(2,l1));
 }
