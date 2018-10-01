@@ -2161,6 +2161,17 @@ void *build_FSA(void *vstate, void *node)
       Declaration decl = (Declaration)node;
       OSET oset = get_oset(decl);
       USET uset = get_uset(decl);
+
+      /*
+      printf("\nChecking:\n");
+      dump_lisp_Declaration(decl);
+      switch (Declaration_KEY(decl)) {
+      case KEYmulti_call:
+	aps_error(decl,"Procedure calls not supported.\n");
+	return NULL;
+      }
+      */
+
       if (oset != NULL) add_edges_oset(decl,NULL);	// Qx-->Qo
       if (uset != NULL) add_edges_uset(decl,NULL);	// Qx(-)-->Qu(-)
       	
@@ -2269,7 +2280,6 @@ void *build_FSA(void *vstate, void *node)
         link_expr_lhs(lhs, N);
   
         return NULL;
-        break;
       } // KEYassign
       case KEYcase_stmt: {
         Match m;
@@ -2279,6 +2289,7 @@ void *build_FSA(void *vstate, void *node)
           NODESET N = link_expr_lhs_p(matcher_pat(m), M);
           link_expr_rhs(expr, N);
         }
+	break;
       }
       } // switch decl
     }	// case KEYDecl
