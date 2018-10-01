@@ -555,6 +555,14 @@ static void *do_bind(void *vscope, void *node) {
 	  }
 	  traverse_Block(do_bind,new_scope,module_decl_contents(d)); }
 	break;
+      case KEYattribute_decl:
+	{ Type ftype = attribute_decl_type(d);
+	  new_scope = bind_Declarations(new_scope,
+					function_type_formals(ftype));
+	  new_scope = bind_Declarations(new_scope,
+					function_type_return_values(ftype));
+	  traverse_Declaration_skip(do_bind,new_scope,d); }
+	break;
       case KEYfunction_decl:
       case KEYprocedure_decl:
 	{ Type ftype = some_function_decl_type(d);
