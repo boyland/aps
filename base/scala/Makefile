@@ -1,6 +1,7 @@
 .PHONY: all install clean
 
 SCALA= aps-impl.scala basic.handcode.scala table.handcode.scala
+SVERSION=2.10
 
 all : aps-library-2.9.jar aps-library-2.10.jar aps-library-2.11.jar
 
@@ -23,6 +24,11 @@ aps-library-2.11.jar : ${SCALA}
 	@rm -f *.class
 	/afs/cs.uwm.edu/package/scala/scala-2.11.7/common/bin/scalac -deprecation ${SCALA}
 	jar cvf $@ *.class
+
+.PHONY: test-multiset.run
+test-multiset.run : aps-library-${SVERSION}.jar
+	scalac -cp aps-library-${SVERSION}.jar test-multiset.scala
+	scala -cp aps-library-${SVERSION}.jar:. TestMultiSet
 
 clean :
 	rm -f *.class *.jar *-2.*.scala
