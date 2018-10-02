@@ -30,6 +30,13 @@ T_String C_INTEGER::v_string(int x)
 
 C_INTEGER::C_INTEGER() : t_Result(this), v_zero(0), v_one(1) {}
 
+T_String C_IEEE::v_string(double x)
+{
+  return "too difficult";
+}
+
+C_IEEE::C_IEEE() : t_Result(this), v_zero(0.0), v_one(1.0) {}
+
 
 void C_PHYLUM::v_assert(Node *n) { assert(n || n->type == get_phylum()); }
 string C_PHYLUM::v_string(Node *n) {

@@ -7,12 +7,10 @@ using namespace std;
 typedef C_SET<C_INTEGER> C_IntegerSet;
 typedef C_IntegerSet::T_Result T_IntegerSet;
 
-bool eq_int(int x, int y) { return x == y; }
-
 main()
 {
   T_IntegerSet is, is2;
-  C_IntegerSet* t_IntegerSet = new C_IntegerSet(get_Integer(),eq_int);
+  C_IntegerSet* t_IntegerSet = new C_IntegerSet(get_Integer());
   COLL<C_IntegerSet,C_Integer> iscoll(t_IntegerSet,get_Integer());
   C_IntegerSet& t = *t_IntegerSet;
   is = t.v_append(t.v_append(t.v_single(1),t.v_single(2)),t.v_single(3));

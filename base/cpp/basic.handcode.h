@@ -4,6 +4,7 @@
 // #include <iostream>
 #include <stack>
 #include "stdarg.h"
+#include <assert.h>
 
 // inline versions of TYPE functions
 inline void C_TYPE::v_assert(Node *x) { assert (x != 0); }
@@ -30,6 +31,18 @@ inline int  C_INTEGER::v_times(int x, int y) { return x * y; }
 inline int  C_INTEGER::v_divide(int x, int y) { return x / y; }
 inline int  C_INTEGER::v_unary_minus(int x) { return -x; }
 inline int  C_INTEGER::v_unary_divide(int x) { return 1/x; }
+
+// Inline versions of IEEE functions
+inline void C_IEEE::v_assert(double x) {}
+inline bool C_IEEE::v_equal(double x, double y) { return x == y; }
+inline bool C_IEEE::v_less(double x, double y) { return x < y; }
+inline bool C_IEEE::v_less_equal(double x, double y) { return x <= y; }
+inline double C_IEEE::v_plus(double x, double y) { return x + y; }
+inline double C_IEEE::v_minus(double x, double y) { return x - y; }
+inline double C_IEEE::v_times(double x, double y) { return x * y; }
+inline double C_IEEE::v_divide(double x, double y) { return x / y; }
+inline double C_IEEE::v_unary_minus(double x) { return -x; }
+inline double C_IEEE::v_unary_divide(double x) { return 1/x; }
 
 // Integer$string is too big to inline
 
@@ -186,7 +199,7 @@ struct COLL {
   }
   Coll subseq_from_end(Coll l, int start, int finish) {
     int len = length(l);
-    return subseq(l,l-1-finish,l-1-start);
+    return subseq(l,l-finish,l-start);
   }
   Coll butsubseq(Coll l, int start, int finish) {
     // cout << "~[" << start << "," << finish << ")" << endl;
@@ -215,7 +228,7 @@ struct COLL {
   }
   Coll butsubseq_from_end(Coll l, int start, int finish) {
     int n = length(l);
-    return butsubseq(l,n-finish-1,n-start-1);
+    return butsubseq(l,n-finish,n-start);
   }
 
   static int length(Coll l) {
@@ -539,6 +552,16 @@ class C__basic_22<C_Character,C_String> {
 
   inline bool v_empty(T_String l) {
     return l.empty();
+  }
+};
+
+template <class C_Node>
+class C__basic_24 {
+ public:
+  C__basic_24(C_Node *) {}
+
+  inline T_Integer v_lineno(typename C_Node::T_Result n) {
+    return n->lineno;
   }
 };
 

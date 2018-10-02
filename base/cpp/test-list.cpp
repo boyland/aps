@@ -21,5 +21,6 @@ main()
   for (int i=0; i < 5; ++i) {
     cout << "Position(" << i << ") = " << t.v_position(i,is) << endl;
     cout << "Member(" << i << ") = " << t.v_member(i,is) << endl;
+    cout << "NthFromEnd(" << i << ") = " << t.v_nth_from_end(i,is) << endl;
   }
 }

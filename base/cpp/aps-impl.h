@@ -236,6 +236,7 @@ class Attribute {
     }
   }
   virtual void set(node_type n, value_type v) {
+    // Debug d(nodes->v_string(n) + "." + name + ":=" + values->v_string(v));
     check_phylum(n);
     value_array[n->index] = v;
     status_array[n->index] = ASSIGNED;
@@ -250,7 +251,7 @@ class Attribute {
   }
 
  protected:
-  value_type get_default(node_type n) {
+  virtual value_type get_default(node_type n) {
     throw UndefinedAttributeException(std::string("") + n + "." + name);
   }
 
