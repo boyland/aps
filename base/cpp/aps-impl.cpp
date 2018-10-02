@@ -67,6 +67,16 @@ string operator+(const string&s,int i)
   return s + t_Integer->v_string(i);
 }
 
+string operator+(const string&s, bool b)
+{
+  return s + t_Boolean->v_string(b);
+}
+
+string operator+(const string&s, double d)
+{
+  return s + t_Real->v_string(d);
+}
+
 Module::Module() : complete(false) {}
 
 void Module::finish() { complete = true; }
