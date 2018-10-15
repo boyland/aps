@@ -565,9 +565,6 @@ begin
   function union(_,_ : Result) : Result;
   function intersect(_,_ : Result) : Result;
   function difference(_,_ : Result) : Result;
-  
-  -- for collection attributes (use a different method than BAG)
-  function combine(x,y : Result) : Result := union(x,y);
 end;
 
 module ORDERED_SET[ElemType :: ORDERED[]]
