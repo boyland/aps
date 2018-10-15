@@ -62,7 +62,6 @@ object basic_implicit {
   type T_SET[T] = scala.collection.immutable.Set[T];
   type T_MULTISET[T] = T_BAG[T];
 
-  type T_MAKE_LATTICE[T_L] = T_L;
   type T_UNION_LATTICE[T_E,T_T] = T_T;
   type T_INTERSECTION_LATTICE[T_E,T_T] = T_T;
   
