@@ -2,7 +2,7 @@ extern "C" {
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
-#include "/usr/include/string.h"
+#include <cstring>
 #include <strings.h>
 #include "aps-ag.h"
 }
