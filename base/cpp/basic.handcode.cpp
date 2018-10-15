@@ -1,4 +1,5 @@
 using namespace std;
+#include <sstream>
 
 T_String C_TYPE::v_string(Node *n)
 {
@@ -32,7 +33,9 @@ C_INTEGER::C_INTEGER() : t_Result(this), v_zero(0), v_one(1) {}
 
 T_String C_IEEE::v_string(double x)
 {
-  return "too difficult";
+  stringstream ss;
+  ss << x;
+  return ss.str();
 }
 
 C_IEEE::C_IEEE() : t_Result(this), v_zero(0.0), v_one(1.0) {}
@@ -43,7 +46,7 @@ string C_PHYLUM::v_string(Node *n) {
   return C_NULL_PHYLUM::v_string(n);
 }
 
-C_PHYLUM::C_PHYLUM() : v_nil(0) {}
+C_PHYLUM::C_PHYLUM() : t_Result(this), v_nil(0) {}
 
 
 

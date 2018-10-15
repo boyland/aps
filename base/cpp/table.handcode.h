@@ -19,8 +19,10 @@ class C_TABLE : public C_TYPE {
   C_KeyType *t_KeyType;
   C_ValueType *t_ValueType;
 
+public:
   struct V_full_table;
 
+private:
   struct V_Table : public C_TYPE::Node {
     V_Table(Constructor *c) : C_TYPE::Node(c) {}
     virtual ~V_Table() {}
@@ -55,7 +57,7 @@ class C_TABLE : public C_TYPE {
       }
     }
     T_ValueType get(T_KeyType key) {
-      Debug debug(to_string()+".get(" + t_KeyType->v_string(key) + ")");
+      Debug debug(this->to_string()+".get(" + t_KeyType->v_string(key) + ")");
       typename Entries::iterator i = entries.find(key);
       T_ValueType result;
       if (i != entries.end()) {
@@ -67,7 +69,7 @@ class C_TABLE : public C_TYPE {
       return result;
     }
     void add(T_KeyType key, T_ValueType value) {
-      Debug debug(to_string()+".add(" + t_KeyType->v_string(key) +
+      Debug debug(this->to_string()+".add(" + t_KeyType->v_string(key) +
 		  "," + t_ValueType->v_string(value) + ")");
       T_ValueType old = get(key);
       entries[key] = t_ValueType->v_combine(old,value);

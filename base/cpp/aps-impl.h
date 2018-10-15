@@ -349,10 +349,10 @@ class CircularAttribute : public Attribute<C_P,C_V> {
 
   virtual value_type cycle_evaluate(node_type n) {
     CircularAttributeHelper<C_P,C_V> *cah = 
-	new CircularAttributeHelper<C_P,C_V>(nodes,values,this,n);
+	new CircularAttributeHelper<C_P,C_V>(this->nodes,this->values,this,n);
     Circular::add_pending(cah);
-    Attribute<C_P,C_V>::set(n,values->v_bottom);
-    return values->v_bottom;
+    Attribute<C_P,C_V>::set(n,this->values->v_bottom);
+    return this->values->v_bottom;
   }
 
   virtual value_type evaluate(node_type n) {

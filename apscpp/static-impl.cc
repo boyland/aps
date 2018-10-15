@@ -540,7 +540,7 @@ void dump_visit_functions(STATE*s, const output_streams& oss)
   INDEFINITION;
   bs << " {\n";
   ++nesting_level;
-  bs << indent() << "Phylum* phylum = t_" << decl_name(sp) //! bug sometimes
+  bs << indent() << "Phylum* phylum = this->t_" << decl_name(sp) //! bug sometimes
      << "->get_phylum();\n";
   bs << indent() << "int n_roots = phylum->size();\n";
   bs << "\n"; // blank line

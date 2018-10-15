@@ -1,7 +1,7 @@
 #ifndef BASIC_HANDCODE_H
 #define BASIC_HANDCODE_H
 
-// #include <iostream>
+#include <iostream>
 #include <stack>
 #include "stdarg.h"
 #include <assert.h>
@@ -175,7 +175,7 @@ struct COLL {
     return position(x,l) >= 0;
   }
   Coll subseq(Coll l, int start, int finish) {
-    // cout << "[" << start << "," << finish << ")" << endl;
+    // std::cout << "[" << start << "," << finish << ")" << endl;
     if (start == finish) return collection_type->v_none();
     if (V_append * n = dynamic_cast<V_append*>(l)) {
       int n1 = length(n->v_l1);
@@ -202,7 +202,7 @@ struct COLL {
     return subseq(l,l-finish,l-start);
   }
   Coll butsubseq(Coll l, int start, int finish) {
-    // cout << "~[" << start << "," << finish << ")" << endl;
+    // std::cout << "~[" << start << "," << finish << ")" << endl;
     if (start >= finish) return l;
     if (V_append * n = dynamic_cast<V_append*>(l)) {
       int n1 = length(n->v_l1);
@@ -399,7 +399,7 @@ inline bool C_SET<E>::v_less_equal(T_Result s1, T_Result s2)
   } else if(s1->cons == this->c_none){
     return true;
   } else {
-    cout << "Really strange error!!" << endl;
+    std::cout << "Really strange error!!" << std::endl;
     return false;
   }
 }
@@ -436,7 +436,7 @@ inline typename C_SET<E>::T_Result C_SET<E>::v_union(T_Result s1, T_Result s2)
   } else if(s1->cons == this->c_none){
     return s2;
   } else {
-    cout << "Really strange error!!" << endl;
+    std::cout << "Really strange error!!" << std::endl;
     return new V_none(this->c_none);
   }
 }
@@ -461,7 +461,7 @@ inline typename C_SET<E>::T_Result C_SET<E>::v_intersect(T_Result s1, T_Result s
   } else if(s1->cons == this->c_none){
     return s1;
   } else {
-    cout << "Really strange error!!" << endl;
+    std::cout << "Really strange error!!" << std::endl;
     return new V_none(this->c_none);
   }
 }
@@ -486,7 +486,7 @@ inline typename C_SET<E>::T_Result C_SET<E>::v_difference(T_Result s1, T_Result 
   } else if(s1->cons == this->c_none){
     return s1;
   } else {
-    cout << "Really strange error!!" << endl;
+    std::cout << "Really strange error!!" << std::endl;
     return new V_none(this->c_none);
   }
 }

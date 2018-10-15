@@ -8,6 +8,7 @@
 
 extern "C" {
 #include <stdio.h>
+#include <string.h>
 #include "aps-ag.h"
 String get_code_name(Symbol);
 }
@@ -334,7 +335,7 @@ void dump_Pattern_cond(Pattern p, string node, ostream& os)
 	}
       }
       os << node << "->cons==";
-      dump_Use(pfuse,"c_",os);
+      dump_Use(pfuse,"this->c_",os); // added "this->" because of C++ compiler
 
       ostringstream ts;
       ts << "((";
@@ -530,7 +531,7 @@ void dump_Type_signature(Type ty, ostream& os)
     break;
   case KEYtype_inst:
     {
-      char *mname = symbol_name(use_name(module_use_use(type_inst_module(ty))));
+      char *mname = (char *)symbol_name(use_name(module_use_use(type_inst_module(ty))));
       os << "C_" << mname;
       TypeActuals tactuals = type_inst_type_actuals(ty);
       bool started = false;
@@ -579,7 +580,7 @@ void dump_Type_superclass(bool is_phylum, Type ty, ostream& os)
     break;
   case KEYtype_inst:
     {
-      char *mname = symbol_name(use_name(module_use_use(type_inst_module(ty))));
+      char *mname = (char*)symbol_name(use_name(module_use_use(type_inst_module(ty))));
       os << "C_" << mname;
       TypeActuals tactuals = type_inst_type_actuals(ty);
       bool started = false;
@@ -954,7 +955,7 @@ void dump_some_attribute(Declaration d,
     hs << indent(nesting_level-1) << " public:\n";
   
   is << ",\n    a" << i << "_" << name << "(new " << attr_class_name << "(";
-  is << "this," << as_val(nt) << "," << as_val(vt);
+  is << "this,this->" << as_val(nt) << "," << as_val(vt);
   if (is_col) {
     is << ",";
     switch (Default_KEY(deft)) {
