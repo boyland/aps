@@ -1,13 +1,14 @@
 APSTOP= ../..
 SCALAC= scalac
-APSLIB = ${APSTOP}/lib/aps-library.jar
+SCALAV= 2.10
+APSLIB = ${APSTOP}/lib/aps-library-${SCALAV}.jar
 SCALAFLAGS= -cp .:${APSLIB}
 SCALACFLAGS= ${SCALAFLAGS}
 APS2SCALA = ${APSTOP}/bin/aps2scala
 APS2SCALAFLAGS = -p ..:${APSTOP}/base -G
 
 SCALAGEN = simple.scala classic-binding.scala \
-	test-coll.scala test-cycle.scala
+	test-coll.scala test-use-coll.scala test-cycle.scala
 
 .PHONY: all clean
 
@@ -15,6 +16,7 @@ all : ${SCALAGEN}
 all : simple_implicit.class classic_binding_implicit.class Classic.class
 all : test_coll_implicit.class TestCollDriver.class
 all : test_cycle_implicit.class TestCycleDriver.class
+all : test_use_coll_implicit.class TestUseCollDriver.class
 
 .PHONY: run
 
@@ -41,8 +43,14 @@ Classic.class : classic_binding_implicit.class
 test_coll_implicit.class : test-coll.scala
 	${SCALAC} ${SCALACFLAGS} $<
 
+test_use_coll_implicit.class : test-use-coll.scala
+	${SCALAC} ${SCALACFLAGS} $<
+
 TestCollDriver.class : test_coll_implicit.class test-coll-driver.scala
 	${SCALAC} ${SCALACFLAGS}  test-coll-driver.scala
+
+TestUseCollDriver.class : test_use_coll_implicit.class test-use-coll-driver.scala tiny_implicit.class
+	${SCALAC} ${SCALACFLAGS}  test-use-coll-driver.scala
 
 test_cycle_implicit.class : test-cycle.scala
 	${SCALAC} ${SCALACFLAGS} $<
