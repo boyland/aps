@@ -177,4 +177,5 @@ extern void set_tnode_parent(Program p);
 
 extern void *tnode_parent(void *);
 
-#define decl_name(decl) (char*)symbol_name(def_name(declaration_def(decl)))
+// Will fail if declaration with declaration key of `KEYassign` is passed
+#define decl_name(decl) symbol_name(def_name(declaration_def(decl)))

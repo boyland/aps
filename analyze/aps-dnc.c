@@ -957,6 +957,7 @@ static BOOL decl_is_collection(Declaration d) {
 }
 
 // return true if we are sure this vertex represents an input dependency
+// i.e. attribute values are going into the node
 static BOOL vertex_is_input(VERTEX* v) 
 {
   BOOL result;
@@ -975,6 +976,8 @@ static BOOL vertex_is_input(VERTEX* v)
   return result;
 }
 
+// return true if we are sure this vertex represents an output dependency
+// i.e. attribute values are going out of the node
 static BOOL vertex_is_output(VERTEX* v) 
 {
   if (!v->attr) return FALSE;
@@ -1305,12 +1308,21 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
 	Expression object = field_ref_object(lhs);
 	MODIFIER new_mod;
 	new_mod.next = mod;
+
+        // reverse of the field (or setter) is the modifier because declaration in on the lhs
 	if (EXPR_IS_LHS(lhs)) {
 	  new_mod.field = reverse_field(field);
 	} else {
+        // field getter is the modifier because declaration is on the rhs
 	  new_mod.field = field;
 	}
+
+        // This line is saying given a declaration: `x.f = y` where lhs is an attribute of tree node
+        // then `x.f` depends on `y`
 	record_lhs_dependencies(object,cond,kind,&new_mod,rhs,aug_graph);
+
+        // This line is saying given a declaration: `x.f = y` where lhs is an attribute of tree node
+        // then `x.f` depends on `x` itself
 	record_lhs_dependencies(object,cond,control_dependency,
 				&new_mod,object,aug_graph);
       } else if ((attr = attr_ref_p(lhs)) != NULL) {
@@ -1319,7 +1331,11 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
 	sink.modifier = mod;
 	set_value_for(&sink,rhs,aug_graph);
 	if (vertex_is_input(&sink)) aps_error(lhs,"Assignment of input value");
+
+        // This line is saying given a declaration `x.f = y` where lhs is an attribute of Phylum object
+        // not a tree node, then `x.f` depends on `y`
 	record_expression_dependencies(&sink,cond,kind,NULL,rhs,aug_graph);
+
 	record_condition_dependencies(&sink,cond,aug_graph);
       } else if ((fdecl = local_call_p(lhs)) != NULL) {      
 	Declaration result = some_function_decl_result(decl);
@@ -2770,6 +2786,9 @@ void print_cycles(STATE *s, FILE *stream) {
     PHY_GRAPH *phy_graph = &s->phy_graphs[i];
     int n = phy_graph->instances.length;
     for (j=0; j < n; ++j) {
+      // `phy_graph->mingraph` is a matrix (row-major) and accessing [j*n+j]
+      // is equal to accessing dependency between each node and itself because
+      // transitive closure is already completed
       switch (phy_graph->mingraph[j*n+j]) {
       case no_dependency: break;
       case indirect_control_fiber_dependency:
@@ -2791,6 +2810,9 @@ void print_cycles(STATE *s, FILE *stream) {
     AUG_GRAPH *aug_graph = &s->aug_graphs[i];
     int n = aug_graph->instances.length;
     for (j=0; j < n; ++j) {
+      // `aug_graph->graph` is a matrix (row-major) and accessing [j*n+j]
+      // is equal to accessing dependency between each node and itself because
+      // transitive closure is already completed
       switch (edgeset_kind(aug_graph->graph[j*n+j])) {
       case no_dependency: break;
       case indirect_control_fiber_dependency:
