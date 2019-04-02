@@ -1309,11 +1309,11 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
 	MODIFIER new_mod;
 	new_mod.next = mod;
 
-        // reverse of the field (or setter) is the modifier because declaration in on the lhs
+        // Reverse of the field (or setter) is the modifier because declaration in on the lhs
 	if (EXPR_IS_LHS(lhs)) {
 	  new_mod.field = reverse_field(field);
 	} else {
-        // field getter is the modifier because declaration is on the rhs
+        // Field getter is the modifier because declaration is on the rhs
 	  new_mod.field = field;
 	}
 
