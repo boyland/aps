@@ -25,7 +25,8 @@ typedef unsigned DEPENDENCY;
 
 #define SOME_DEPENDENCY 1
 #define DEPENDENCY_NOT_JUST_FIBER 2
-#define DEPENDENCY_MAYBE_CARRYING 4     // By carrying we mean carrying values
+// By carrying we mean carrying values
+#define DEPENDENCY_MAYBE_CARRYING 4
 #define DEPENDENCY_MAYBE_DIRECT 8
 
 #define no_dependency 0
