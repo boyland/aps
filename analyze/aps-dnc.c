@@ -1336,6 +1336,7 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
         // not a tree node, then `x.f` depends on `y`
 	record_expression_dependencies(&sink,cond,kind,NULL,rhs,aug_graph);
 
+        // Will add a control dependency from conditionals (either if or match stmts) to this sink node
 	record_condition_dependencies(&sink,cond,aug_graph);
       } else if ((fdecl = local_call_p(lhs)) != NULL) {      
 	Declaration result = some_function_decl_result(decl);
