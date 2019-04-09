@@ -1631,6 +1631,7 @@ static void *mark_local(void *ignore, void *node) {
   if (ABSTRACT_APS_tnode_phylum(node) == KEYDeclaration) {
     Declaration_info((Declaration)node)->decl_flags |= DECL_LOCAL_FLAG;
   }
+  return node;
 }
 
 static void init_node_phy_graph2(Declaration node, Type ty, STATE *state) { 
