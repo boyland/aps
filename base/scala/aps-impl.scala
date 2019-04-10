@@ -482,7 +482,7 @@ trait CircularEvaluation[V_P, V_T] extends Evaluation[V_P,V_T] {
   }
 
   private def check(newValue : ValueType) : Unit = {
-    if (!(value == null && newValue == null) && !lattice.v_equal(value,newValue)) {
+    if (!lattice.v_equal(value,newValue)) {
       inCycle.helper.modified = true;
       if (!lattice.v_compare(value,newValue)) {
 	throw new CyclicAttributeException("non-monotonic " + name);
