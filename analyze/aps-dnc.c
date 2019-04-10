@@ -1505,8 +1505,6 @@ static void *get_edges(void *vaug_graph, void *node) {
 	  sink.modifier = NO_MODIFIER;
 	  record_condition_dependencies(&sink,cond,aug_graph);
 
-	  // NO_MODIFIER (or NULL = 0) is used because nothing is being modified in if-stmt
-	  // which is control dependency
 	  record_expression_dependencies(&sink,cond,control_dependency,
 					 NO_MODIFIER, test, aug_graph);
 	}
@@ -1523,8 +1521,6 @@ static void *get_edges(void *vaug_graph, void *node) {
 	    record_condition_dependencies(&sink,cond,aug_graph);
 
 	    for (; test != 0; test = Expression_info(test)->next_expr) {
-	      // NO_MODIFIER (or NULL = 0) is used because nothing is being modified in case-stmt
-	      // which is control dependency 
 	      record_expression_dependencies(&sink,cond,control_dependency,
 					     NO_MODIFIER, test, aug_graph);
 	    }
