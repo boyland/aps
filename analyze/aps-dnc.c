@@ -1504,8 +1504,9 @@ static void *get_edges(void *vaug_graph, void *node) {
 	  sink.attr = decl;
 	  sink.modifier = NO_MODIFIER;
 	  record_condition_dependencies(&sink,cond,aug_graph);
+
 	  record_expression_dependencies(&sink,cond,control_dependency,
-					 NULL,test,aug_graph);
+					 NO_MODIFIER, test, aug_graph);
 	}
 	break;
       case KEYcase_stmt:
@@ -1521,7 +1522,7 @@ static void *get_edges(void *vaug_graph, void *node) {
 
 	    for (; test != 0; test = Expression_info(test)->next_expr) {
 	      record_expression_dependencies(&sink,cond,control_dependency,
-					     NO_MODIFIER,test,aug_graph);
+					     NO_MODIFIER, test, aug_graph);
 	    }
 	  }
 	}
