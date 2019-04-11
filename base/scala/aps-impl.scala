@@ -91,7 +91,7 @@ class I_TYPE[T](name : String) extends Module(name) with C_TYPE[T] {
       case t:Value => assert(t.myType == this)
     };
   def f_equal(x : T_Result, y : T_Result) : Boolean = f_node_equivalent(x,y);
-  def f_node_equivalent(x : T_Result, y : T_Result) : Boolean = x != null && x.equals(y);
+  def f_node_equivalent(x : T_Result, y : T_Result) : Boolean = x != null && y != null && x.equals(y);
   def f_string(x : T_Result) : String = x.toString();
 }
     
