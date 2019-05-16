@@ -13,8 +13,8 @@ module NAME_RESOLUTION[T :: var SIMPLE[]] extends T begin
   type Entities := BAG[EntityRef];
   collection attribute Contour.entities : Entities;
 
-  procedure enclosing(e : Scope) : Scope begin
-    case e begin
+  procedure enclosing(s : Scope) : Scope begin
+    case s begin
       match contour(?e:Scope) begin
 	result := e;
       end;
@@ -29,8 +29,8 @@ module NAME_RESOLUTION[T :: var SIMPLE[]] extends T begin
 
   procedure entity_shape(e : EntityRef) : Shape begin
     case e begin
-      match entity(? : String, ?shape : Shape) begin
-	result := shape;
+      match entity(? : String, ?s : Shape) begin
+	result := s;
       end;
     end;
   end;
@@ -95,11 +95,11 @@ module NAME_RESOLUTION[T :: var SIMPLE[]] extends T begin
     endif;
   end;
   
-  match ?t:Type=integer() begin
+  match ?t:Type=integer_type() begin
     t.type_shape := int_shape;
   end;
   
-  match ?t:Type=string() begin
+  match ?t:Type=string_type() begin
     t.type_shape := str_shape;
   end;
   

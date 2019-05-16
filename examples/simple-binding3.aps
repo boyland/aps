@@ -97,12 +97,12 @@ module NAME_RESOLUTION[T :: var SIMPLE[]] extends T begin
   --attribute Type.tmp : Messages;
   --pragma synthesized(tmp);
 
-  match ?t:Type=integer() begin
+  match ?t:Type=integer_type() begin
     t.type_shape := int_shape;
     --t.tmp := msgs;
   end;
   
-  match ?t:Type=string() begin
+  match ?t:Type=string_type() begin
     t.type_shape := str_shape;
   end;
   
