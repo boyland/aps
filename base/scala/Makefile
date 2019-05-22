@@ -35,9 +35,3 @@ test-multiset.run : aps-library-${SVERSION}.jar
 clean :
 	rm -f *.class *.jar *-2.*.scala
 
-%.scala : RCS/%.scala,v
-	co $*.scala
-
-Makefile : RCS/Makefile,v
-	co Makefile
-

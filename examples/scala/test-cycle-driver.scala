@@ -1,4 +1,4 @@
-object TestCycleDriver extends Application
+object TestCycleDriver extends App
 {
     val m = new M_TEST_CYCLE("Tiny");
     type T_Tiny = m.T_Result;

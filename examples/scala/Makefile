@@ -1,6 +1,6 @@
 APSTOP= ../..
 SCALAC= scalac
-SCALAV= 2.10
+SCALAV= 2.11
 APSLIB = ${APSTOP}/lib/aps-library-${SCALAV}.jar
 SCALAFLAGS= -cp .:${APSLIB}
 SCALACFLAGS= ${SCALAFLAGS}

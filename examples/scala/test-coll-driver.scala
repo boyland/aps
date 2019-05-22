@@ -1,4 +1,4 @@
-object TestCollDriver extends Application
+object TestCollDriver extends App
 {
     val m = new M_TEST_COLL("Tiny");
     type T_Tiny = m.T_Result;
