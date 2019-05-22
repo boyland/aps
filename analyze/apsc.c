@@ -19,12 +19,11 @@ main(int argc,char **argv) {
 	/* printf("argv[%d] = %s\n",i,argv[i]); */
     if (argv[i][0] == '-') {
       char *options = argv[i]+1;
-      if (*options == '\0') usage();
       if (*options == 'D') {
 	set_debug_flags(options+1);
       } else if (*options == 'p') {
 	set_aps_path(argv[++i]);
-      }
+      } else usage();
     } else {
       Program p = find_Program(make_string(argv[i]));
       bind_Program(p);
