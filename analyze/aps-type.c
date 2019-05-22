@@ -128,6 +128,7 @@ static void* do_typechecking(void* ignore, void*node) {
 	}
 	/* FALL THROUGH */
       case KEYcollect_assign:
+	// TODO: check that lhs decl is declared VAR
 	check_expr_type(assign_rhs(decl),infer_expr_type(assign_lhs(decl)));
 	return 0;
 	break;
