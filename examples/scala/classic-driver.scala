@@ -1,6 +1,6 @@
 /* Driver to run classic driver code */
 
-object Classic extends Application {
+object Classic extends App {
   val m_simple = new M_SIMPLE("Simple");
   val m_binding = new M_NAME_RESOLUTION[m_simple.T_Result]("Binding",m_simple.t_Result);
   val t_binding = m_binding.t_Result;
