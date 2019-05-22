@@ -1,0 +1,32 @@
+with "tiny";
+
+module TEST_USE_COLL[T :: var TINY[]] extends T
+begin
+  type Integers := SET[Integer];
+
+  var collection sum : Integer :> 0, (+);
+  var collection leaves : Integers;
+
+  attribute Wood.sumsum : Integer;
+  attribute Root.result : Integer;
+  attribute Root.result2 : Integers := leaves;
+
+  pragma synthesized(sumsum,result,result2);
+
+  var function f1() f1r : Integer := sum;
+
+  var function f2() f2r : Integer := f1();
+
+  match ?l=leaf(?x) begin
+    sum :> x;
+    leaves :> {x};
+    l.sumsum := f2();
+  end;
+  match ?b=branch(?x,?y) begin
+    b.sumsum := x.sumsum + y.sumsum;
+  end;
+  match ?p=root(?b) begin
+    p.result := b.sumsum;
+  end;
+
+end;

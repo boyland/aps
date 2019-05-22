@@ -1,0 +1,23 @@
+with "tiny";
+-- Very simple example of using a global collection attribute
+module USE_GLOBAL[T :: var TINY[]] extends T begin
+
+  var collection max_value : Integer :> 0, max;
+  attribute Wood.result : Integer := 0;
+  pragma synthesized(result);
+  attribute Root.done : Integer;
+  pragma synthesized(done);
+
+  match ?r:Root=root(?w:Wood) begin
+    r.done := w.result;
+  end;
+
+  match ?b:Wood=branch(?w1:Wood,?w2:Wood) begin
+    b.result := w1.result + w2.result;
+  end;
+
+  match ?l=leaf(?v:Integer) begin
+    max_value :> v;
+    l.result := max_value;
+  end;
+end;
