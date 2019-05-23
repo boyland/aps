@@ -1,0 +1,11 @@
+module TINY[] begin
+  phylum Root;
+  phylum Wood;
+  
+  pragma root_phylum(type Root);
+
+  constructor root(w : Wood) : Root;
+  constructor branch(x,y : Wood) : Wood;
+  constructor leaf(x : Integer) : Wood;
+
+end;
