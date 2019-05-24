@@ -1,13 +1,13 @@
 .PHONY: all install clean
 
 SCALA= aps-impl.scala basic.handcode.scala table.handcode.scala
-SVERSION=2.11
+SVERSION=2.12
 
 # We can't make 2.9 anymore because it doesn't understand Java 8
 
-all : aps-library-2.10.jar aps-library-2.11.jar
+all : aps-library-2.10.jar aps-library-2.11.jar aps-library-2.12.jar
 
-install : aps-library-2.10.jar aps-library-2.11.jar
+install : 
 	cp aps-library*.jar ../../lib
 
 aps-library-2.9.jar : ${SCALA}
@@ -25,6 +25,11 @@ aps-library-2.10.jar : ${SCALA}
 aps-library-2.11.jar : ${SCALA}
 	@rm -f *.class
 	/afs/cs.uwm.edu/package/scala/scala-2.11.12/common/bin/scalac -deprecation ${SCALA}
+	jar cvf $@ *.class
+
+aps-library-2.12.jar : ${SCALA}
+	@rm -f *.class
+	/afs/cs.uwm.edu/package/scala/scala-2.12.8/common/bin/scalac -deprecation ${SCALA}
 	jar cvf $@ *.class
 
 .PHONY: test-multiset.run
