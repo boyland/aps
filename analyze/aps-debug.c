@@ -6,12 +6,17 @@
 #include "aps-ag.h"
 
 static int aps_error_count = 0;
-  
+
+void aps_clear_errors()
+{
+  aps_error_count = 0;
+}
+
 void aps_error(const void *tnode, const char *fmt, ...)
 {
   va_list args;
   va_start(args,fmt);
-  
+
   fflush(stdout);
 
   (void)  fprintf(stderr, "%s.aps:%d:",
@@ -19,16 +24,16 @@ void aps_error(const void *tnode, const char *fmt, ...)
   (void) vfprintf(stderr, fmt, args);
   (void)  fprintf(stderr, "\n");
   (void)   fflush(stderr);
-  
+
   va_end(args);
   ++aps_error_count;
-}  
+}
 
 void aps_warning(const void *tnode, const char *fmt, ...)
 {
   va_list args;
   va_start(args,fmt);
-  
+
   fflush(stdout);
 
   (void)  fprintf(stderr, "%s.aps:%d:Warning: ",
@@ -36,9 +41,9 @@ void aps_warning(const void *tnode, const char *fmt, ...)
   (void) vfprintf(stderr, fmt, args);
   (void)  fprintf(stderr, "\n");
   (void)   fflush(stderr);
-  
+
   va_end(args);
-}  
+}
 
 void aps_check_error(const char *type)
 {

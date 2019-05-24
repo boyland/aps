@@ -2,6 +2,7 @@ extern "C" {
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <signal.h>
 #include <cstring>
 #include <strings.h>
 #include "aps-ag.h"
@@ -38,45 +39,64 @@ extern void init_lexer(FILE*);
 extern int aps_yyparse(void);
 }
 
-Implementation* impl;
+Implementation* impl = dynamic_impl;
 bool static_schedule = 0;
+int i = 1;
+int argc;
+char **argv;
 
-int main(int argc,char **argv) {
-  argv0 = argv[0];
-  if (argc < 2) usage();
-  for (int i=1; i < argc; ++i) {
+void process_next_arg();
+void process_arg();
+
+void handle_signal(int signal_num) {
+  if (signal_num == SIGABRT) {
+    cout << "Static scheduler failed, falling back to dynamic" << endl;
+    aps_clear_errors();
+    impl = dynamic_impl;
+    process_arg();
+  }
+}
+
+
+void process_arg() {
     if (streq(argv[i],"--omit")) {
       omit_declaration(argv[++i]);
-      continue;
+      process_next_arg();
     } else if (streq(argv[i],"--impl")) {
       impl_module(argv[i+1],argv[i+2]);
       i += 2;
-      continue;
+      process_next_arg();
     } else if (streq(argv[i],"-I") || streq(argv[i],"--incremental")) {
       incremental = true;
-      continue;
+      process_next_arg();
     } else if (streq(argv[i],"-S") || streq(argv[i],"--static")) {
-      static_schedule = true;
-      continue;
+      impl = static_impl;
+      if (!impl) {
+	cerr << "Warning: static scheduling not implemented: reverting to dynamic..." << endl;
+	impl = dynamic_impl;
+      }
+      process_next_arg();
     } else if (streq(argv[i],"-V") || streq(argv[i],"--verbose")) {
       ++verbose;
-      continue;
+      process_next_arg();
     } else if (streq(argv[i],"-G") || streq(argv[i],"--debug")) {
       ++debug;
-      continue;
+      process_next_arg();
     } else if (streq(argv[i],"-p") || streq(argv[i],"--apspath")) {
       set_aps_path(argv[++i]);
-      continue;
+      process_next_arg();
     } else if (argv[i][0] == '-' && argv[i][1] == 'D') {
       set_debug_flags(argv[i]+2);
-      continue;
+      process_next_arg();
     } else if (argv[i][0] == '-') {
       usage();
     }
+
     Program p = find_Program(make_string(argv[i]));
     if (p == 0) {
       fprintf(stderr,"Cannot find APS compilation unit %s\n",argv[i]);
-      continue;
+
+
     }
     aps_check_error("parse");
     aps_yyfilename = (char*)program_name(p);
@@ -84,23 +104,34 @@ int main(int argc,char **argv) {
     aps_check_error("binding");
     type_Program(p);
     aps_check_error("type");
-    if (static_schedule) {
-      impl = static_impl;
+
+    if (impl == static_impl) {
+      signal(SIGABRT, &handle_signal);
       analyze_Program(p);
       aps_check_error("analysis");
-      if (!impl) {
-	cerr << "Warning: static scheduling not implemented: reverting to dynamic..." << endl;
-	impl = dynamic_impl;
-      }
-    } else {
-      impl = dynamic_impl;
     }
-    char* outfilename = str2cat(argv[i],".scala");
 
+    char* outfilename = str2cat(argv[i],".scala");
     ofstream out(outfilename);
     dump_scala_Program(p,out);
-  }
-  exit(0);
+    process_next_arg();
+}
+
+void process_next_arg() {
+    i++;
+    if (i < argc) {
+      process_arg();
+    } else {
+      exit(0);
+    }
+}
+
+int main(int c,char **v) {
+  argc = c;
+  argv = v;
+  argv0 = argv[0];
+  if (argc < 2) usage();
+  process_arg();
 }
 
 
