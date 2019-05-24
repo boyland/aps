@@ -25,9 +25,6 @@ run: Classic.run TestCollDriver.run TestCycleDriver.run
 %.scala : ../%.aps ${APS2SCALA}
 	${APS2SCALA} ${APS2SCALAFLAGS} $*
 
-%.scala : RCS/%.scala,v
-	co $<
-
 %_implicit.class : %.scala
 	${SCALAC} ${SCALACFLAGS} $*.scala
 
