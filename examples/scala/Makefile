@@ -1,14 +1,14 @@
 APSTOP= ../..
 SCALAC= scalac
-SCALAV= 2.11
+SCALAV= 2.12
 APSLIB = ${APSTOP}/lib/aps-library-${SCALAV}.jar
 SCALAFLAGS= -cp .:${APSLIB}
 SCALACFLAGS= ${SCALAFLAGS}
 APS2SCALA = ${APSTOP}/bin/aps2scala
 APS2SCALAFLAGS = -p ..:${APSTOP}/base -G
 
-SCALAGEN = simple.scala classic-binding.scala \
-	test-coll.scala test-use-coll.scala test-cycle.scala use-global.scala
+SCALAGEN = simple.scala classic-binding.scala tiny.scala \
+	test-coll.scala test-use-coll.scala test-cycle.scala use-global.scala 
 
 .PHONY: all clean
 
@@ -58,10 +58,13 @@ test_cycle_implicit.class : test-cycle.scala
 TestCycleDriver.class : test_cycle_implicit.class test-cycle-driver.scala
 	${SCALAC} ${SCALACFLAGS}  test-cycle-driver.scala
 
-TinyParser.class : tiny-parser.handcode.scala
+TinyParser.class : tiny-parser.handcode.scala tiny_implicit.class
 	${SCALAC} ${SCALACFLAGS} tiny-parser.handcode.scala
 
-UseGlobal.class : use-global_implicit.class TinyParser.class
+use_global_implicit.class : use-global.scala tiny_implicit.class
+	${SCALAC} ${SCALACFLAGS} use-global.scala
+
+UseGlobal.class : use_global_implicit.class TinyParser.class
 UseGlobal.class : use-global-driver.scala
 	${SCALAC} ${SCALACFLAGS} $<
 
