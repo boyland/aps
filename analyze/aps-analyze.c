@@ -57,5 +57,8 @@ static void *analyze_thing(void *ignore, void *node)
 
 void analyze_Program(Program p)
 {
+  char *saved_filename = aps_yyfilename;
+  aps_yyfilename = (char *)program_name(p);
   traverse_Program(analyze_thing,p,p);
+  aps_yyfilename = saved_filename;
 }
