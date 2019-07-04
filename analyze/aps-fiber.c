@@ -1717,11 +1717,12 @@ OSET doOU(Expression e, USET uset)
 	      
 	      USET q;	
 	      for  (q = u_o; q != NULL; q= q->rest) {
-					if ( (EXPR_IS_LHS(q->u)) && same_field(q->u ,newuset->u)) {
-		  		// f. belongs to u_o
-		 				 oset = oset_union(oset, 
-				    doOU(assign_rhs( (Declaration)tnode_parent(q->u) ), uset));
-					} // if
+		if ( (EXPR_IS_LHS(q->u)) && same_field(q->u ,newuset->u)) {
+		  // f. belongs to u_o
+		  Declaration assign = (Declaration)tnode_parent(q->u);
+		  add_to_uset(assign,uset);
+		  oset = oset_union(oset, get_oset(assign));
+		} // if
 	      } // for q
 	    } // for p
 	    RETURN oset;	
@@ -2032,10 +2033,9 @@ void *compute_OU(void *u, void *node)
 	// printf("ASSIGN: %d \n", tnode_line_number(node));
 	Expression lhs = assign_lhs(decl);
 	Expression rhs = assign_rhs(decl);
-	
-	USET u1 = doUO(lhs, EMPTY_OSET);
-	OSET o2 = doOU(rhs, u1);
-	doUO(lhs, o2);
+
+	add_to_oset(decl, doOU(rhs, get_uset(decl)));
+	add_to_uset(decl, doUO(lhs, get_oset(decl)));
 	
 	return NULL;
 	break;
@@ -2946,8 +2946,15 @@ void *DFA_fiber_set(void *u, void *node)
       decl_fsets->set[FIBERSET_REVERSE_FINAL] = NULL;
       
       if (fiber_debug & FIBER_FINAL) {
-	printf("fiber set for %s /%d is: ", decl_name(decl), 
-	       Declaration_info(decl)->index);
+	switch (Declaration_KEY(decl)) {
+	case KEYassign:
+	  printf("fiber set for assignment /%d is: ", Declaration_info(decl)->index);
+	  break;
+	default:
+	  printf("fiber set for %s /%d is: ", decl_name(decl), 
+		 Declaration_info(decl)->index);
+	  break;
+	}
       }
       for (i= 2; i<= DFA_node_number; i++) {  // for any DFA tree node
 	// fiberset doesn't include base fiber
@@ -3258,7 +3265,17 @@ void print_fiberset_entry(FIBERSET fs, FILE *stream) {
   print_fiber(fs->fiber,stdout);
   switch (ABSTRACT_APS_tnode_phylum(tnode)) {
   case KEYDeclaration:
-    printf(" of %s",decl_name((Declaration)tnode));
+    {
+      Declaration decl = (Declaration)tnode;
+      switch (Declaration_KEY(decl)) {
+      case KEYassign:
+	printf(" of assignment");
+	break;
+      default:
+	printf(" of %s",decl_name(decl));
+	break;
+      }
+    }
     break;
   case KEYExpression:
     { Expression expr = (Expression)tnode;
