@@ -23,7 +23,7 @@ aps.tab.h aps.tab.c : aps.y
 	bison -d -p aps_yy aps.y
 
 install : aps-lib.o
-	mv aps-lib.o ../lib
+	mv aps-lib.o ../lib/.
 
 clean:
 	rm -f *.o aps.tab.* aps2lisp core aps-lex.c
