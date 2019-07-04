@@ -4,7 +4,6 @@
 #include "jbb-alloc.h"
 #include "aps-ag.h"
 
-
 #define ADD_FIBER 1
 #define ALL_FIBERSETS 2
 #define PUSH_FIBER 4
@@ -1385,11 +1384,18 @@ USET add_to_uset(Declaration decl, USET uset)
 	if (*head != new_uset) {
 	  done = FALSE;
 	  if (fiber_debug & ADD_FIBER) {
-	    printf("Added (%d,%s%s) to uset of %s\n",
+	    printf("Added (%d,%s%s) to uset of ",
 			   tnode_line_number(new_uset->u),
 			   EXPR_IS_LHS(new_uset->u) ? "dot " : "",
-		  	 decl_name(uitem_field(new_uset->u)),
-		   	 decl_name(decl));
+		   decl_name(uitem_field(new_uset->u)));
+	    switch (Declaration_KEY(decl)) {
+	    case KEYassign:
+	      printf("assignment:%d\n",tnode_line_number(decl));
+	      break;
+	    default:
+	      printf("%s\n",decl_name(decl));
+	      break;
+	    }
 	  }
 	  *head = new_uset;
 	}
@@ -1409,8 +1415,16 @@ OSET add_to_oset(Declaration decl, OSET oset)
 	if (new_oset != *head) {
 	  done = FALSE;
 	  if (fiber_debug & ADD_FIBER) {
-	    printf("Added %s to oset for %s\n",
-		   		decl_name(new_oset->o),decl_name(decl));
+	    printf("Added %s to oset for ",
+		   		decl_name(new_oset->o));
+	    switch (Declaration_KEY(decl)) {
+	    case KEYassign:
+	      printf("assignment:%d\n",tnode_line_number(decl));
+	      break;
+	    default:
+	      printf("%s\n",decl_name(decl));
+	      break;
+	    }
 	  }
 	  *head = new_oset;
 	}
@@ -2946,15 +2960,16 @@ void *DFA_fiber_set(void *u, void *node)
       decl_fsets->set[FIBERSET_REVERSE_FINAL] = NULL;
       
       if (fiber_debug & FIBER_FINAL) {
+	printf("fiber set for ");
 	switch (Declaration_KEY(decl)) {
 	case KEYassign:
-	  printf("fiber set for assignment /%d is: ", Declaration_info(decl)->index);
+	  printf("assignment on line %d",tnode_line_number(decl));
 	  break;
 	default:
-	  printf("fiber set for %s /%d is: ", decl_name(decl), 
-		 Declaration_info(decl)->index);
+	  puts(decl_name(decl));
 	  break;
 	}
+	printf(" /%d is ",Declaration_info(decl)->index);
       }
       for (i= 2; i<= DFA_node_number; i++) {  // for any DFA tree node
 	// fiberset doesn't include base fiber
@@ -3269,7 +3284,7 @@ void print_fiberset_entry(FIBERSET fs, FILE *stream) {
       Declaration decl = (Declaration)tnode;
       switch (Declaration_KEY(decl)) {
       case KEYassign:
-	printf(" of assignment");
+	printf(" of assignment on line %d",tnode_line_number(decl));
 	break;
       default:
 	printf(" of %s",decl_name(decl));
