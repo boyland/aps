@@ -3,7 +3,7 @@
 
 #include "jbb-alloc.h"
 
-#define BLOCKSIZE 1000000
+#define BLOCKSIZE 10000000
 struct block {
   struct block *next, *prev;
   char contents[BLOCKSIZE];

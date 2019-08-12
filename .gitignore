@@ -1,0 +1,5 @@
+bin
+lib
+*.o
+*.a
+*.class

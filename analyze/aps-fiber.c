@@ -4,7 +4,6 @@
 #include "jbb-alloc.h"
 #include "aps-ag.h"
 
-
 #define ADD_FIBER 1
 #define ALL_FIBERSETS 2
 #define PUSH_FIBER 4
@@ -1385,11 +1384,18 @@ USET add_to_uset(Declaration decl, USET uset)
 	if (*head != new_uset) {
 	  done = FALSE;
 	  if (fiber_debug & ADD_FIBER) {
-	    printf("Added (%d,%s%s) to uset of %s\n",
+	    printf("Added (%d,%s%s) to uset of ",
 			   tnode_line_number(new_uset->u),
 			   EXPR_IS_LHS(new_uset->u) ? "dot " : "",
-		  	 decl_name(uitem_field(new_uset->u)),
-		   	 decl_name(decl));
+		   decl_name(uitem_field(new_uset->u)));
+	    switch (Declaration_KEY(decl)) {
+	    case KEYassign:
+	      printf("assignment:%d\n",tnode_line_number(decl));
+	      break;
+	    default:
+	      printf("%s\n",decl_name(decl));
+	      break;
+	    }
 	  }
 	  *head = new_uset;
 	}
@@ -1409,8 +1415,16 @@ OSET add_to_oset(Declaration decl, OSET oset)
 	if (new_oset != *head) {
 	  done = FALSE;
 	  if (fiber_debug & ADD_FIBER) {
-	    printf("Added %s to oset for %s\n",
-		   		decl_name(new_oset->o),decl_name(decl));
+	    printf("Added %s to oset for ",
+		   		decl_name(new_oset->o));
+	    switch (Declaration_KEY(decl)) {
+	    case KEYassign:
+	      printf("assignment:%d\n",tnode_line_number(decl));
+	      break;
+	    default:
+	      printf("%s\n",decl_name(decl));
+	      break;
+	    }
 	  }
 	  *head = new_oset;
 	}
@@ -1717,11 +1731,12 @@ OSET doOU(Expression e, USET uset)
 	      
 	      USET q;	
 	      for  (q = u_o; q != NULL; q= q->rest) {
-					if ( (EXPR_IS_LHS(q->u)) && same_field(q->u ,newuset->u)) {
-		  		// f. belongs to u_o
-		 				 oset = oset_union(oset, 
-				    doOU(assign_rhs( (Declaration)tnode_parent(q->u) ), uset));
-					} // if
+		if ( (EXPR_IS_LHS(q->u)) && same_field(q->u ,newuset->u)) {
+		  // f. belongs to u_o
+		  Declaration assign = (Declaration)tnode_parent(q->u);
+		  add_to_uset(assign,uset);
+		  oset = oset_union(oset, get_oset(assign));
+		} // if
 	      } // for q
 	    } // for p
 	    RETURN oset;	
@@ -2032,10 +2047,9 @@ void *compute_OU(void *u, void *node)
 	// printf("ASSIGN: %d \n", tnode_line_number(node));
 	Expression lhs = assign_lhs(decl);
 	Expression rhs = assign_rhs(decl);
-	
-	USET u1 = doUO(lhs, EMPTY_OSET);
-	OSET o2 = doOU(rhs, u1);
-	doUO(lhs, o2);
+
+	add_to_oset(decl, doOU(rhs, get_uset(decl)));
+	add_to_uset(decl, doUO(lhs, get_oset(decl)));
 	
 	return NULL;
 	break;
@@ -2946,8 +2960,16 @@ void *DFA_fiber_set(void *u, void *node)
       decl_fsets->set[FIBERSET_REVERSE_FINAL] = NULL;
       
       if (fiber_debug & FIBER_FINAL) {
-	printf("fiber set for %s /%d is: ", decl_name(decl), 
-	       Declaration_info(decl)->index);
+	printf("fiber set for ");
+	switch (Declaration_KEY(decl)) {
+	case KEYassign:
+	  printf("assignment on line %d",tnode_line_number(decl));
+	  break;
+	default:
+	  puts(decl_name(decl));
+	  break;
+	}
+	printf(" /%d is ",Declaration_info(decl)->index);
       }
       for (i= 2; i<= DFA_node_number; i++) {  // for any DFA tree node
 	// fiberset doesn't include base fiber
@@ -3258,7 +3280,17 @@ void print_fiberset_entry(FIBERSET fs, FILE *stream) {
   print_fiber(fs->fiber,stdout);
   switch (ABSTRACT_APS_tnode_phylum(tnode)) {
   case KEYDeclaration:
-    printf(" of %s",decl_name((Declaration)tnode));
+    {
+      Declaration decl = (Declaration)tnode;
+      switch (Declaration_KEY(decl)) {
+      case KEYassign:
+	printf(" of assignment on line %d",tnode_line_number(decl));
+	break;
+      default:
+	printf(" of %s",decl_name(decl));
+	break;
+      }
+    }
     break;
   case KEYExpression:
     { Expression expr = (Expression)tnode;
