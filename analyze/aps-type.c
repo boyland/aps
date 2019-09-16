@@ -44,6 +44,30 @@ static void* do_typechecking(void* ignore, void*node) {
     {
       Declaration decl = (Declaration)node;
       switch (Declaration_KEY(decl)) {
+        case KEYconstructor_decl:
+        {
+          Declarations formals = function_type_formals(constructor_decl_type(decl));
+          Declaration formals_ptr1, formals_ptr2;
+          int i, j;
+          BOOL duplicate_formal_name_error = FALSE;
+
+          for (formals_ptr1 = first_Declaration(formals), i = 0;
+              formals_ptr1 != NULL && !duplicate_formal_name_error;
+              formals_ptr1 = DECL_NEXT(formals_ptr1), i++) {
+
+              char* formal_name = decl_name(formals_ptr1);
+
+              for (formals_ptr2 = first_Declaration(formals), j = 0;
+                formals_ptr2 != NULL;
+                formals_ptr2 = DECL_NEXT(formals_ptr2), j++) {
+                  if (i != j && strcmp(formal_name, decl_name(formals_ptr2)) == 0) {
+                    aps_error(decl, "Duplicate constructor formal name: \"%s\" at indices: %i, %i in \"%s\" constructor", formal_name, i, j, decl_name(decl));
+                    duplicate_formal_name_error = TRUE;
+                  }
+              }
+          }
+          break;
+        }
       case KEYvalue_decl:
 	check_default_type(value_decl_default(decl),value_decl_type(decl));
 	break;
