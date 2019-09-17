@@ -128,7 +128,13 @@ static void* do_typechecking(void* ignore, void*node) {
 	}
 	/* FALL THROUGH */
       case KEYcollect_assign:
-	// TODO: check that lhs decl is declared VAR
+      {
+        Declaration lhs_decl = Use_info(value_use_use(assign_lhs(decl)))->use_decl;
+
+        if (def_is_constant(declaration_def(lhs_decl))) {
+          aps_error(lhs_decl, "Collection \"%s\" has to be declared as VAR to be assigned", decl_name(lhs_decl));
+        }
+      }
 	check_expr_type(assign_rhs(decl),infer_expr_type(assign_lhs(decl)));
 	return 0;
 	break;
