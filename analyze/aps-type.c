@@ -20,6 +20,16 @@ Type function_type_return_type(Type ft)
   return value_decl_type(first_Declaration(function_type_return_values(ft)));
 }
 
+Use constructor_decl_use(Declaration decl) {
+  Type function_type = constructor_decl_type(decl);
+  Declaration rd = first_Declaration(function_type_return_values(function_type));
+  Type rt = value_decl_type(rd);
+  Use u = type_use_use(rt);
+  return u;
+}
+
+Declaration current_module = NULL;
+
 static void* do_typechecking(void* ignore, void*node) {
   // find places where Expression, Pattern or Default is used
   switch (ABSTRACT_APS_tnode_phylum(node)) {
@@ -44,6 +54,26 @@ static void* do_typechecking(void* ignore, void*node) {
     {
       Declaration decl = (Declaration)node;
       switch (Declaration_KEY(decl)) {
+        case KEYconstructor_decl:
+        {
+          TypeEnvironment type_env = Use_info(constructor_decl_use(decl))->use_type_env;
+
+          while (type_env != NULL) {
+            switch (Declaration_KEY(type_env->source))
+            {
+              case KEYmodule_decl:
+                if (type_env->source != current_module) {
+                      aps_error(decl, "Adding a constructor \"%s\" in extending module is forbidden", decl_name(decl));
+                }
+                break;
+              default:
+                break;
+            }
+            
+            type_env = type_env->outer;
+          }
+          break;
+        }
       case KEYvalue_decl:
 	check_default_type(value_decl_default(decl),value_decl_type(decl));
 	break;
