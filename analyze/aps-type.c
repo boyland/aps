@@ -20,7 +20,7 @@ Type function_type_return_type(Type ft)
   return value_decl_type(first_Declaration(function_type_return_values(ft)));
 }
 
-Use constructor_decl_use(Declaration decl) {
+Use constructor_result_type_use(Declaration decl) {
   Type function_type = constructor_decl_type(decl);
   Declaration rd = first_Declaration(function_type_return_values(function_type));
   Type rt = value_decl_type(rd);
@@ -54,9 +54,12 @@ static void* do_typechecking(void* ignore, void*node) {
     {
       Declaration decl = (Declaration)node;
       switch (Declaration_KEY(decl)) {
+        case KEYmodule_decl:
+          current_module = (Declaration) node;
+          break;
         case KEYconstructor_decl:
         {
-          TypeEnvironment type_env = Use_info(constructor_decl_use(decl))->use_type_env;
+          TypeEnvironment type_env = Use_info(constructor_result_type_use(decl))->use_type_env;
 
           while (type_env != NULL) {
             switch (Declaration_KEY(type_env->source))
