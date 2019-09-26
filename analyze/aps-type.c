@@ -49,10 +49,9 @@ static void* do_typechecking(void* ignore, void*node) {
           Declarations formals = function_type_formals(constructor_decl_type(decl));
           Declaration formals_ptr1, formals_ptr2;
           int i, j;
-          BOOL duplicate_formal_name_error = FALSE;
 
           for (formals_ptr1 = first_Declaration(formals), i = 0;
-              formals_ptr1 != NULL && !duplicate_formal_name_error;
+              formals_ptr1 != NULL;
               formals_ptr1 = DECL_NEXT(formals_ptr1), i++) {
 
               char* formal_name = decl_name(formals_ptr1);
@@ -62,7 +61,6 @@ static void* do_typechecking(void* ignore, void*node) {
                 formals_ptr2 = DECL_NEXT(formals_ptr2), j++) {
                   if (strcmp(formal_name, decl_name(formals_ptr2)) == 0) {
                     aps_error(decl, "Duplicate constructor formal name: \"%s\" at indices: %i, %i in \"%s\" constructor", formal_name, i, j, decl_name(decl));
-                    duplicate_formal_name_error = TRUE;
                   }
               }
           }
