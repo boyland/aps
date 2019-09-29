@@ -77,7 +77,22 @@ Expression* make_instance_assignment(AUG_GRAPH* aug_graph,
   Declarations ds = block_body(block);
   for (Declaration d = first_Declaration(ds); d; d = DECL_NEXT(d)) {
     switch (Declaration_KEY(d)) {
-    case KEYassign:
+    case KEYcollect_assign:
+    {
+      if (INSTANCE* in = Expression_info(assign_rhs(d))->value_for) {
+        if (in->index >= n) fatal_error("bad index for instance");
+
+        if (array[in->index] != NULL) {
+          Expression prev = array[in->index];
+          array[in->index] = assign_rhs(d);
+          Expression_info(array[in->index])->collect_next = prev;
+        } else {
+          array[in->index] = assign_rhs(d);
+        }
+      }
+      break;
+    }
+    case KEYnormal_assign:
       if (INSTANCE* in = Expression_info(assign_rhs(d))->value_for) {
 	if (in->index >= n) fatal_error("bad index for instance");
 	array[in->index] = assign_rhs(d);
@@ -245,6 +260,7 @@ static bool implement_visit_function(AUG_GRAPH* aug_graph,
 
     Expression rhs = instance_assignment[in->index];
 
+    do {
     if (in->node && Declaration_KEY(in->node) == KEYnormal_assign) {
       // parameter value will be filled in at call site
       os << indent() << "// delaying " << in << " to call site." << endl;
@@ -365,6 +381,8 @@ static bool implement_visit_function(AUG_GRAPH* aug_graph,
     }
     cout << "Problem assigning " << in << endl;
     os << "// Not sure what to do for " << in << endl;
+
+  } while ((rhs = Expression_info(rhs)->collect_next) != NULL);
   }
   return 0; // no more!
 }

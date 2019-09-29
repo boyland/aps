@@ -135,6 +135,7 @@ struct Expression_info {
 #define EXPR_LHS_FLAG 1
 #define EXPR_RHS_FLAG 2
 	int	 index;			// represent the nodes of Qe and Qe(-).
+  Expression collect_next;
 };
 extern struct Expression_info *Expression_info(Expression);
 #define EXPR_NEXT(expr) (Expression_info(expr)->next_expr)
