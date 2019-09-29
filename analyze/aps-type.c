@@ -129,10 +129,24 @@ static void* do_typechecking(void* ignore, void*node) {
 	/* FALL THROUGH */
       case KEYcollect_assign:
       {
-        Declaration lhs_decl = Use_info(value_use_use(assign_lhs(decl)))->use_decl;
-
-        if (def_is_constant(declaration_def(lhs_decl))) {
-          aps_error(lhs_decl, "Collection \"%s\" has to be declared as VAR to be assigned", decl_name(lhs_decl));
+        Declaration lhs = assign_lhs(decl);
+        Declaration lhs_use_decl;
+        switch (Expression_KEY(lhs))
+        {
+          case KEYfuncall:
+            lhs_use_decl = Use_info(value_use_use(funcall_f(lhs)))->use_decl;
+            if (def_is_constant(declaration_def(lhs_use_decl))) {
+              aps_error(lhs_use_decl, "Attribute collection \"%s\" has to be declared as VAR to be assigned", decl_name(lhs_use_decl));
+            }
+            break;
+          case KEYvalue_use:
+            lhs_use_decl = Use_info(value_use_use(lhs))->use_decl;
+            if (def_is_constant(declaration_def(lhs_use_decl))) {
+              aps_error(lhs_use_decl, "Global collection \"%s\" has to be declared as VAR to be assigned", decl_name(lhs_use_decl));
+            }
+            break;
+          default:
+            break;
         }
       }
 	check_expr_type(assign_rhs(decl),infer_expr_type(assign_lhs(decl)));
