@@ -151,7 +151,7 @@ static void* do_typechecking(void* ignore, void*node) {
 	/* FALL THROUGH */
       case KEYcollect_assign:
       {
-        Declaration lhs = assign_lhs(decl);
+        Expression lhs = assign_lhs(decl);
         Declaration lhs_use_decl;
         switch (Expression_KEY(lhs))
         {
