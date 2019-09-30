@@ -1,17 +1,18 @@
-module TEST_COLL[] begin
-  phylum Wood;
-  
-  constructor branch(x,y : Wood) : Wood;
-  constructor leaf(x : Integer) : Wood;
-  
+with "tiny";
+
+module TEST_COLL[T :: TINY[]] extends T begin
   type Integers := SET[Integer];
 
   var collection sum : Integer :> 0, (+);
   var collection leaves : Integers;
+  attribute Root.result : Integer;
+  pragma synthesized(result);
 
+  match ?p=root(?w) begin
+    p.result := sum;
+  end;
   match ?l=leaf(?x) begin
     sum :> x;
-    leaves :> {x};
   end;
   match ?b=branch(?x,?y) begin
   end;
