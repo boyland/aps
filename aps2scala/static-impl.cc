@@ -83,9 +83,12 @@ Expression* make_instance_assignment(AUG_GRAPH* aug_graph,
         if (in->index >= n) fatal_error("bad index for instance");
 
         if (array[in->index] != NULL) {
-          Expression prev = array[in->index];
-          array[in->index] = assign_rhs(d);
-          Expression_info(array[in->index])->collect_next = prev;
+          Expression ptr = array[in->index];
+          Expression last = ptr;
+
+          while ((ptr = Expression_info(ptr)->collect_next) != NULL) last = ptr;
+
+          Expression_info(last)->collect_next = assign_rhs(d);
         } else {
           array[in->index] = assign_rhs(d);
         }
@@ -382,7 +385,7 @@ static bool implement_visit_function(AUG_GRAPH* aug_graph,
     cout << "Problem assigning " << in << endl;
     os << "// Not sure what to do for " << in << endl;
 
-  } while ((rhs = Expression_info(rhs)->collect_next) != NULL);
+  } while (rhs != NULL && (rhs = Expression_info(rhs)->collect_next) != NULL);
   }
   return 0; // no more!
 }
