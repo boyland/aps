@@ -52,7 +52,7 @@ TestUseCollDriver.class : test_use_coll_implicit.class test-use-coll-driver.scal
 test_cycle_implicit.class : test-cycle.scala
 	${SCALAC} ${SCALACFLAGS} $<
 
-TestCycleDriver.class : test_cycle_implicit.class test-cycle-driver.scala
+TestCycleDriver.class : tiny_implicit.class test_cycle_implicit.class test-cycle-driver.scala
 	${SCALAC} ${SCALACFLAGS}  test-cycle-driver.scala
 
 TinyParser.class : tiny-parser.handcode.scala tiny_implicit.class
