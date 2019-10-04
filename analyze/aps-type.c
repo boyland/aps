@@ -20,12 +20,11 @@ Type function_type_return_type(Type ft)
   return value_decl_type(first_Declaration(function_type_return_values(ft)));
 }
 
-Use constructor_result_type_use(Declaration decl) {
+Type constructor_return_type(Declaration decl) {
   Type function_type = constructor_decl_type(decl);
   Declaration rd = first_Declaration(function_type_return_values(function_type));
   Type rt = value_decl_type(rd);
-  Use u = type_use_use(rt);
-  return u;
+  return rt;
 }
 
 Declaration current_module = NULL;
@@ -59,21 +58,25 @@ static void* do_typechecking(void* ignore, void*node) {
           break;
         case KEYconstructor_decl:
         {
-          TypeEnvironment type_env = Use_info(constructor_result_type_use(decl))->use_type_env;
+          Type rt = constructor_return_type(decl);
+          if (Type_KEY(rt) == KEYremote_type) {
+            aps_error(decl, "Constructor for remote type is forbidden");
+          } else {
+            TypeEnvironment type_env = Use_info(type_use_use(rt))->use_type_env;
+            while (type_env != NULL) {
+              switch (Declaration_KEY(type_env->source))
+              {
+                case KEYmodule_decl:
+                  if (type_env->source != current_module) {
+                        aps_error(decl, "Adding a constructor \"%s\" in extending module is forbidden", decl_name(decl));
+                  }
+                  break;
+                default:
+                  break;
+              }
 
-          while (type_env != NULL) {
-            switch (Declaration_KEY(type_env->source))
-            {
-              case KEYmodule_decl:
-                if (type_env->source != current_module) {
-                      aps_error(decl, "Adding a constructor \"%s\" in extending module is forbidden", decl_name(decl));
-                }
-                break;
-              default:
-                break;
+              type_env = type_env->outer;
             }
-            
-            type_env = type_env->outer;
           }
           break;
         }
