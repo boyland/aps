@@ -78,24 +78,32 @@ static void* do_typechecking(void* ignore, void*node) {
           }
 
           Type rt = constructor_return_type(decl);
-          if (Type_KEY(rt) == KEYremote_type) {
-            aps_error(decl, "Constructor for remote type is forbidden (constructor %s(...): remote %s)", decl_name(decl), symbol_name(use_name(type_use_use(remote_type_nodetype(rt)))));
-          } else {
-            TypeEnvironment type_env = Use_info(type_use_use(rt))->use_type_env;
-            while (type_env != NULL) {
-              switch (Declaration_KEY(type_env->source))
+          switch (Type_KEY(rt))
+          {
+            case KEYremote_type:
+              aps_error(decl, "Constructor for remote type is forbidden (constructor %s(...): remote %s)", decl_name(decl), symbol_name(use_name(type_use_use(remote_type_nodetype(rt)))));
+              break;
+            case KEYtype_use:
               {
-                case KEYmodule_decl:
-                  if (type_env->source != current_module) {
-                        aps_error(decl, "Adding a constructor \"%s\" in extending module is forbidden", decl_name(decl));
+                TypeEnvironment type_env = Use_info(type_use_use(rt))->use_type_env;
+                while (type_env != NULL) {
+                  switch (Declaration_KEY(type_env->source))
+                  {
+                    case KEYmodule_decl:
+                      if (type_env->source != current_module) {
+                            aps_error(decl, "Adding a constructor \"%s\" in extending module is forbidden", decl_name(decl));
+                      }
+                      break;
+                    default:
+                      break;
                   }
-                  break;
-                default:
-                  break;
-              }
 
-              type_env = type_env->outer;
-            }
+                  type_env = type_env->outer;
+                }
+                break;
+              }
+            default:
+              break;
           }
           break;
         }
