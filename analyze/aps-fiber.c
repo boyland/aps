@@ -327,6 +327,8 @@ Expression field_ref_object(Expression expr) {
 }
 
 BOOL local_type_p(Type ty) { /* could this type carry an object? */
+  if (ty == NULL) return FALSE;
+
   switch (Type_KEY(ty)) {
   default:
     return TRUE;
@@ -1492,6 +1494,8 @@ static int recursion_level = 0;
 
 // calculating USET of e given oset.
 USET doUO(Expression e, OSET oset) {
+  if (infer_expr_type(e) == NULL) return EMPTY_OSET;
+
   if (!local_type_p(infer_expr_type(e))) oset = EMPTY_OSET;
   ENTER;
 //  printf("%d: doUO starting on line %d.\n", recursion_level,
@@ -1621,6 +1625,8 @@ int same_field(Expression e1, Expression e2) {
 // get Oset of e given a uset.
 OSET doOU(Expression e, USET uset)
 {
+  if (infer_expr_type(e) == NULL) return EMPTY_OSET;
+
   if (!local_type_p(infer_expr_type(e))) uset = EMPTY_USET;
   ENTER;
 //  printf("%d: doOU starting on line %d.\n", recursion_level, tnode_line_number(e));

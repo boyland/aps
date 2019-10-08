@@ -27,7 +27,26 @@ Type constructor_return_type(Declaration decl) {
   return rt;
 }
 
+Declaration resolve_module_from_type_environment(TypeEnvironment type_env) {
+  Declaration module = NULL;
+
+  while (type_env != NULL) {
+    switch (Declaration_KEY(type_env->source))
+    {
+      case KEYmodule_decl:
+        module = type_env->source;
+        break;
+      default:
+        break;
+    }
+    type_env = type_env->outer;
+  }
+
+  return module;
+}
+
 Declaration current_module = NULL;
+Declaration root_phylum = NULL;
 
 static void* do_typechecking(void* ignore, void*node) {
   // find places where Expression, Pattern or Default is used
@@ -52,6 +71,22 @@ static void* do_typechecking(void* ignore, void*node) {
   case KEYDeclaration:
     {
       Declaration decl = (Declaration)node;
+
+      declaration_def(decl)
+
+      if (DECL_IS_START_PHYLUM(decl)) {
+        if (root_phylum == NULL) {
+          Def_info(NULL)->
+          phylum_decl_type(decl)
+          if (Declaration_KEY(decl) == KEYphylum_decl && resolve_module_from_type_environment(Use_info(type_use_use(phylum_decl_type(decl)))->use_type_env) != current_module) {
+            aps_error(decl, "root_phylum should be called in the same module as phylum itself");
+          }
+          root_phylum = decl;
+        } else {
+          aps_error(decl, "root_phylum cannot be set more than one time");
+        }
+      }
+
       switch (Declaration_KEY(decl)) {
         case KEYmodule_decl:
           current_module = (Declaration) node;
