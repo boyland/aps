@@ -624,6 +624,9 @@ static void *do_bind(void *vscope, void *node) {
       SCOPE new_scope = scope;
       Expression e = (Expression)node;
       switch (Expression_KEY(e)) {
+      case KEYtype_value:
+        bind_Use(type_use_use(type_value_t(e)),NAME_VALUE,scope);
+        break;
       case KEYvalue_use:
 	bind_Use(value_use_use(e),NAME_VALUE,scope);
 	break;
