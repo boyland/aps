@@ -24,8 +24,11 @@ static void *analyze_thing(void *ignore, void *node)
       s = compute_dnc(decl);
       switch (analysis_state_cycle(s)) {
       default:
-	aps_error(decl,"Cycle detected; Attribute grammar is not DNC");
+	aps_error(decl,"Cycle detected; Attribute grammar is not DNC %d", analysis_state_cycle(s));
 	break;
+      case indirect_circular_dependency:
+        printf("in-progress\n");
+        break;
       case indirect_control_fiber_dependency:
       case control_fiber_dependency:
       case indirect_fiber_dependency:

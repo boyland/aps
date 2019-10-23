@@ -79,6 +79,8 @@ DEPENDENCY dependency_trans(DEPENDENCY k1, DEPENDENCY k2)
 	   (k2 & DEPENDENCY_NOT_JUST_FIBER)) |
 	  ((k1 & DEPENDENCY_MAYBE_CARRYING)&
 	   (k2 & DEPENDENCY_MAYBE_CARRYING)) |
+    ((k1 & DEPENDENCY_MAYBE_SIMPLE)&
+	   (k2 & DEPENDENCY_MAYBE_SIMPLE)) | 
 	  SOME_DEPENDENCY);
 }
 
@@ -950,6 +952,19 @@ static BOOL decl_is_collection(Declaration d) {
     return direction_is_collection(value_decl_direction(d));
   case KEYattribute_decl: 
     return direction_is_collection(attribute_decl_direction(d));
+    // XXX: should handle value_renaming
+  default:
+    return FALSE;
+  }
+}
+
+static BOOL decl_is_circular(Declaration d) {
+  if (!d) return FALSE;
+  switch (Declaration_KEY(d)) {
+  case KEYvalue_decl: 
+    return direction_is_circular(value_decl_direction(d));
+  case KEYattribute_decl: 
+    return direction_is_circular(attribute_decl_direction(d));
     // XXX: should handle value_renaming
   default:
     return FALSE;
