@@ -1109,6 +1109,8 @@ static void record_expression_dependencies(VERTEX *sink, CONDITION *cond,
   case KEYvalue_use:
     { Declaration decl=Use_info(value_use_use(e))->use_decl;
       Declaration rdecl;
+      int new_kind = kind;
+      if (!decl_is_circular(decl)) new_kind |= DEPENDENCY_MAYBE_SIMPLE;
       if (decl == NULL)
 	fatal_error("%d: unbound expression",tnode_line_number(e));
       if (DECL_IS_LOCAL(decl) &&
@@ -1122,13 +1124,13 @@ static void record_expression_dependencies(VERTEX *sink, CONDITION *cond,
 	  phylum_shared_info_attribute(phy,aug_graph->global_state);
 	source.modifier = NO_MODIFIER;
 	if (vertex_is_output(&source)) aps_warning(e,"Dependence on output value");
-	add_edges_to_graph(&source,sink,cond,kind&~DEPENDENCY_MAYBE_CARRYING,
+	add_edges_to_graph(&source,sink,cond,new_kind&~DEPENDENCY_MAYBE_CARRYING,
 			   aug_graph);
 
 	new_mod.field = decl;
 	new_mod.next = mod;
 	source.modifier = &new_mod;
-	add_edges_to_graph(&source,sink,cond,kind,aug_graph);
+	add_edges_to_graph(&source,sink,cond,new_kind,aug_graph);
       } else if (Declaration_info(decl)->decl_flags &
 		 (ATTR_DECL_INH_FLAG|ATTR_DECL_SYN_FLAG)) {
 	/* a use of parameter or result (we hope) */
@@ -1149,22 +1151,25 @@ static void record_expression_dependencies(VERTEX *sink, CONDITION *cond,
     break;
   case KEYfuncall:
     { Declaration decl;
+      int new_kind = kind;
       if ((decl = attr_ref_p(e)) != NULL) {
+  if (!decl_is_circular(decl)) new_kind |= DEPENDENCY_MAYBE_SIMPLE;
 	source.node = attr_ref_node_decl(e);
 	source.attr = decl;
 	source.modifier = mod;
 	if (vertex_is_output(&source)) aps_warning(e,"Dependence on output value");
-	add_edges_to_graph(&source,sink,cond,kind,aug_graph);
+	add_edges_to_graph(&source,sink,cond,new_kind,aug_graph);
       } else if ((decl = field_ref_p(e)) != NULL) {
+  if (!decl_is_circular(decl)) new_kind |= DEPENDENCY_MAYBE_SIMPLE;
 	Expression object = field_ref_object(e);
 	new_mod.field = decl;
 	new_mod.next = mod;
 	// first the dependency on the pointer itself (NOT carrying)
 	record_expression_dependencies(sink,cond,
-				       kind&~DEPENDENCY_MAYBE_CARRYING,
+				       new_kind&~DEPENDENCY_MAYBE_CARRYING,
 				       NO_MODIFIER,object,aug_graph);
 	// then the dependency on the field (possibly carrying)
-	record_expression_dependencies(sink,cond,kind,&new_mod,object,
+	record_expression_dependencies(sink,cond,new_kind,&new_mod,object,
 				       aug_graph);
       } else if ((decl = local_call_p(e)) != NULL) {
 	Declaration result = some_function_decl_result(decl);
@@ -1173,7 +1178,7 @@ static void record_expression_dependencies(VERTEX *sink, CONDITION *cond,
 	if (mod == NO_MODIFIER) {
 	  for (;actual!=NULL; actual=Expression_info(actual)->next_actual) {
 	    record_expression_dependencies(sink,cond,
-					   kind&~DEPENDENCY_MAYBE_CARRYING,
+					   new_kind&~DEPENDENCY_MAYBE_CARRYING,
 					   NO_MODIFIER,actual,aug_graph);
 	  }
 	}
@@ -1313,9 +1318,11 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
     break;
   case KEYfuncall:
     {
+      int new_kind = kind;
       Declaration field, attr, fdecl, decl;
       VERTEX sink;
       if ((field = field_ref_p(lhs)) != NULL) {
+  if (!decl_is_circular(field)) new_kind |= DEPENDENCY_MAYBE_SIMPLE;
 	/* Assignment of a field, or a field of a field */
 	Expression object = field_ref_object(lhs);
 	MODIFIER new_mod;
@@ -1325,10 +1332,12 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
 	} else {
 	  new_mod.field = field;
 	}
+  int new_kind = kind;
 	record_lhs_dependencies(object,cond,kind,&new_mod,rhs,aug_graph);
 	record_lhs_dependencies(object,cond,control_dependency,
 				&new_mod,object,aug_graph);
       } else if ((attr = attr_ref_p(lhs)) != NULL) {
+  if (!decl_is_circular(attr)) new_kind |= DEPENDENCY_MAYBE_SIMPLE;
 	sink.node = attr_ref_node_decl(lhs);
 	sink.attr = attr;
 	sink.modifier = mod;
@@ -1336,7 +1345,8 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
 	if (vertex_is_input(&sink)) aps_error(lhs,"Assignment of input value");
 	record_expression_dependencies(&sink,cond,kind,NULL,rhs,aug_graph);
 	record_condition_dependencies(&sink,cond,aug_graph);
-      } else if ((fdecl = local_call_p(lhs)) != NULL) {      
+      } else if ((fdecl = local_call_p(lhs)) != NULL) {     
+  if (!decl_is_circular(fdecl)) new_kind |= DEPENDENCY_MAYBE_SIMPLE; 
 	Declaration result = some_function_decl_result(decl);
 	Declaration proxy = Expression_info(lhs)->funcall_proxy;
 	if (mod == NO_MODIFIER) {
@@ -2113,12 +2123,19 @@ static void init_analysis_state(STATE *s, Declaration module) {
 	 */
 	{ Type ftype = some_function_decl_type(decl);
 	  Declaration d;
+    BOOL function_decl_is_simple = TRUE;
 	  for (d = first_Declaration(function_type_formals(ftype));
 	       d != NULL;
 	       d = DECL_NEXT(d)) {
 	    Declaration_info(d)->decl_flags |= ATTR_DECL_INH_FLAG;
+      if (!decl_is_circular(d)) {
+        Declaration_info(d)->decl_flags |= DEPENDENCY_MAYBE_SIMPLE;
+        function_decl_is_simple = FALSE;
+      }
 	    add_attrset_for(s,decl,d);
 	  }
+    if (function_decl_is_simple) Declaration_info(decl)->decl_flags |= DEPENDENCY_MAYBE_SIMPLE;
+
 	  for (d = first_Declaration(function_type_return_values(ftype));
 	       d != NULL;
 	       d = DECL_NEXT(d)) {
