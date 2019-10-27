@@ -965,7 +965,6 @@ static BOOL decl_is_circular(Declaration d) {
     return direction_is_circular(value_decl_direction(d));
   case KEYattribute_decl: 
     return direction_is_circular(attribute_decl_direction(d));
-    // XXX: should handle value_renaming
   default:
     return FALSE;
   }
@@ -1139,13 +1138,13 @@ static void record_expression_dependencies(VERTEX *sink, CONDITION *cond,
 	source.attr = decl;
 	source.modifier = mod;
 	if (vertex_is_output(&source)) aps_warning(e,"Dependence on output value");
-	add_edges_to_graph(&source,sink,cond,kind,aug_graph);
+	add_edges_to_graph(&source,sink,cond,new_kind,aug_graph);
       } else {
 	source.node = NULL;
 	source.attr = decl;
 	source.modifier = mod;
 	if (vertex_is_output(&source)) aps_warning(e,"Dependence on output value");
-	add_edges_to_graph(&source,sink,cond,kind,aug_graph);
+	add_edges_to_graph(&source,sink,cond,new_kind,aug_graph);
       }
     }
     break;
@@ -1153,14 +1152,14 @@ static void record_expression_dependencies(VERTEX *sink, CONDITION *cond,
     { Declaration decl;
       int new_kind = kind;
       if ((decl = attr_ref_p(e)) != NULL) {
-  if (!decl_is_circular(decl)) new_kind |= DEPENDENCY_MAYBE_SIMPLE;
+  if (!decl_is_circular(decl)) new_kind |= DEPENDENCY_MAYBE_SIMPLE; else new_kind = kind;
 	source.node = attr_ref_node_decl(e);
 	source.attr = decl;
 	source.modifier = mod;
 	if (vertex_is_output(&source)) aps_warning(e,"Dependence on output value");
 	add_edges_to_graph(&source,sink,cond,new_kind,aug_graph);
       } else if ((decl = field_ref_p(e)) != NULL) {
-  if (!decl_is_circular(decl)) new_kind |= DEPENDENCY_MAYBE_SIMPLE;
+  if (!decl_is_circular(decl)) new_kind |= DEPENDENCY_MAYBE_SIMPLE; else new_kind = kind;
 	Expression object = field_ref_object(e);
 	new_mod.field = decl;
 	new_mod.next = mod;
@@ -1172,6 +1171,7 @@ static void record_expression_dependencies(VERTEX *sink, CONDITION *cond,
 	record_expression_dependencies(sink,cond,new_kind,&new_mod,object,
 				       aug_graph);
       } else if ((decl = local_call_p(e)) != NULL) {
+  if (!decl_is_circular(decl)) new_kind |= DEPENDENCY_MAYBE_SIMPLE; else new_kind = kind;
 	Declaration result = some_function_decl_result(decl);
 	Expression actual = first_Actual(funcall_actuals(e));
 	/* first depend on the arguments (not carrying, no fibers) */
@@ -1322,7 +1322,7 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
       Declaration field, attr, fdecl, decl;
       VERTEX sink;
       if ((field = field_ref_p(lhs)) != NULL) {
-  if (!decl_is_circular(field)) new_kind |= DEPENDENCY_MAYBE_SIMPLE;
+  if (!decl_is_circular(field)) new_kind |= DEPENDENCY_MAYBE_SIMPLE; else new_kind = kind;
 	/* Assignment of a field, or a field of a field */
 	Expression object = field_ref_object(lhs);
 	MODIFIER new_mod;
@@ -1332,12 +1332,11 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
 	} else {
 	  new_mod.field = field;
 	}
-  int new_kind = kind;
 	record_lhs_dependencies(object,cond,kind,&new_mod,rhs,aug_graph);
 	record_lhs_dependencies(object,cond,control_dependency,
 				&new_mod,object,aug_graph);
       } else if ((attr = attr_ref_p(lhs)) != NULL) {
-  if (!decl_is_circular(attr)) new_kind |= DEPENDENCY_MAYBE_SIMPLE;
+  if (!decl_is_circular(attr)) new_kind |= DEPENDENCY_MAYBE_SIMPLE; else new_kind = kind;
 	sink.node = attr_ref_node_decl(lhs);
 	sink.attr = attr;
 	sink.modifier = mod;
@@ -1346,7 +1345,7 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
 	record_expression_dependencies(&sink,cond,kind,NULL,rhs,aug_graph);
 	record_condition_dependencies(&sink,cond,aug_graph);
       } else if ((fdecl = local_call_p(lhs)) != NULL) {     
-  if (!decl_is_circular(fdecl)) new_kind |= DEPENDENCY_MAYBE_SIMPLE; 
+  if (!decl_is_circular(fdecl)) new_kind |= DEPENDENCY_MAYBE_SIMPLE; else new_kind = kind;
 	Declaration result = some_function_decl_result(decl);
 	Declaration proxy = Expression_info(lhs)->funcall_proxy;
 	if (mod == NO_MODIFIER) {
@@ -1357,7 +1356,7 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
 	sink.modifier = mod;
 	set_value_for(&sink,rhs,aug_graph);
 	if (vertex_is_input(&sink)) aps_error(lhs,"Assignment of input value");
-	record_expression_dependencies(&sink,cond,kind,NULL,rhs,aug_graph);
+	record_expression_dependencies(&sink,cond,new_kind,NULL,rhs,aug_graph);
 	record_condition_dependencies(&sink,cond,aug_graph);
       } else {
 	Expression actual = first_Actual(funcall_actuals(lhs));
