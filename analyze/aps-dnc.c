@@ -2128,12 +2128,10 @@ static void init_analysis_state(STATE *s, Declaration module) {
 	       d = DECL_NEXT(d)) {
 	    Declaration_info(d)->decl_flags |= ATTR_DECL_INH_FLAG;
       if (!decl_is_circular(d)) {
-        Declaration_info(d)->decl_flags |= DEPENDENCY_MAYBE_SIMPLE;
         function_decl_is_simple = FALSE;
       }
 	    add_attrset_for(s,decl,d);
 	  }
-    if (function_decl_is_simple) Declaration_info(decl)->decl_flags |= DEPENDENCY_MAYBE_SIMPLE;
 
 	  for (d = first_Declaration(function_type_return_values(ftype));
 	       d != NULL;
@@ -2601,6 +2599,7 @@ void print_instance(INSTANCE *i, FILE *stream) {
 
 void print_edge_helper(DEPENDENCY kind, CONDITION *cond, FILE* stream) {
   if (stream == 0) stream = stdout;
+  if (kind & DEPENDENCY_MAYBE_SIMPLE == DEPENDENCY_MAYBE_SIMPLE) fputc('s', stream);
   switch (kind) {
   default: fprintf(stream,"?%d",kind); break;
   case no_dependency: fputc('!',stream); break;
