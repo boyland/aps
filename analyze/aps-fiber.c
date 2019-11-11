@@ -1792,6 +1792,11 @@ void *print_all_ou(void *statep, void *node) {
   switch (ABSTRACT_APS_tnode_phylum(node)) {
   case KEYDeclaration: {
     Declaration decl = (Declaration)node;
+    switch (Declaration_KEY(decl))
+    {
+      case KEYassign:
+        return;
+    }
     if (Declaration_info(decl)->oset != NULL) {
       printf("OSET of node: %s\n", decl_name(decl));
       print_oset(Declaration_info(decl)->oset);
@@ -1852,8 +1857,15 @@ int id_decl_node(Declaration decl) {
   FSA_next_node_index += 2;
 
   if (fiber_debug & ALL_FIBERSETS) {
+    switch (Declaration_KEY(decl))
+    {
+      case KEYassign:
+        break;
+      default:
     printf("%d: index for %s is %d\n",tnode_line_number(decl),
 	   decl_name(decl),index);
+        break;
+    }
   }
   Declaration_info(decl)->index = index;
   omega = add_to_nodeset(omega, index);
