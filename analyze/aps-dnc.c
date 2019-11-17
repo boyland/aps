@@ -1328,7 +1328,6 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
 	sink.modifier = mod;
 	set_value_for(&sink,rhs,aug_graph);
 	if (vertex_is_input(&sink)) aps_error(lhs,"Assignment of input value");
-
 	record_expression_dependencies(&sink,cond,kind,NULL,rhs,aug_graph);
 	record_condition_dependencies(&sink,cond,aug_graph);
       } else if ((fdecl = local_call_p(lhs)) != NULL) {      
