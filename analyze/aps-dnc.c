@@ -1291,6 +1291,15 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
       }
       set_value_for(&sink,rhs,aug_graph);
       if (vertex_is_input(&sink)) aps_error(lhs,"Assignment of input value");
+
+      if (Expression_KEY(rhs) == KEYfuncall) {
+        VERTEX source;
+        source.node = NULL;
+        source.attr = decl;
+        source.modifier = mod;
+        add_edges_to_graph(&source,&sink,cond,kind,aug_graph);
+      }
+
       // don't make error even if not output: local attributes!
       record_expression_dependencies(&sink,cond,kind,NULL,rhs,aug_graph);
       record_condition_dependencies(&sink,cond,aug_graph);
@@ -1319,6 +1328,7 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
 	sink.modifier = mod;
 	set_value_for(&sink,rhs,aug_graph);
 	if (vertex_is_input(&sink)) aps_error(lhs,"Assignment of input value");
+
 	record_expression_dependencies(&sink,cond,kind,NULL,rhs,aug_graph);
 	record_condition_dependencies(&sink,cond,aug_graph);
       } else if ((fdecl = local_call_p(lhs)) != NULL) {      
