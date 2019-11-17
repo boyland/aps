@@ -1295,7 +1295,7 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
       if (Expression_KEY(rhs) == KEYfuncall) {
         VERTEX source;
         source.node = NULL;
-        source.attr = decl;
+        source.attr = Use_info(value_use_use(funcall_f(rhs)))->use_decl;
         source.modifier = mod;
         add_edges_to_graph(&source,&sink,cond,kind,aug_graph);
       }
