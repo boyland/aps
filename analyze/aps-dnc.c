@@ -1473,7 +1473,10 @@ static void *get_edges(void *vaug_graph, void *node) {
 		dot_mod.next = nodot_mod.next = NO_MODIFIER;
 		sink.modifier = &nodot_mod;
 		source.modifier = &dot_mod;
-		add_edges_to_graph(&source,&sink,cond,fiber_dependency,
+		DEPENDENCY new_kind = fiber_dependency;
+		if (decl_is_circular(fdecl)) new_kind ^= DEPENDENCY_MAYBE_SIMPLE;
+
+		add_edges_to_graph(&source,&sink,cond,new_kind,
 				   aug_graph);
 	      }
 	    }
