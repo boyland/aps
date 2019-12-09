@@ -1795,7 +1795,7 @@ void *print_all_ou(void *statep, void *node) {
     switch (Declaration_KEY(decl))
     {
       case KEYassign:
-        return;
+        return statep;
     }
     if (Declaration_info(decl)->oset != NULL) {
       printf("OSET of node: %s\n", decl_name(decl));
