@@ -2125,14 +2125,10 @@ static void init_analysis_state(STATE *s, Declaration module) {
 	 */
 	{ Type ftype = some_function_decl_type(decl);
 	  Declaration d;
-    BOOL function_decl_is_simple = TRUE;
 	  for (d = first_Declaration(function_type_formals(ftype));
 	       d != NULL;
 	       d = DECL_NEXT(d)) {
 	    Declaration_info(d)->decl_flags |= ATTR_DECL_INH_FLAG;
-      if (!decl_is_circular(d)) {
-        function_decl_is_simple = FALSE;
-      }
 	    add_attrset_for(s,decl,d);
 	  }
 
