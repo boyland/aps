@@ -1,0 +1,22 @@
+module TINY[] begin
+
+  pragma root_phylum(type Program);
+
+  phylum Program;
+  phylum Decls;
+  phylum Decl;
+  phylum Expression;
+
+
+
+  constructor program(decls : Decls; expr : Expression) : Program;
+  constructor decls(decls : Decls; decl : Decl) : Decls;
+  -- constructor no_decls() : Decls;
+  constructor decl(id : String; i : Integer) : Decl;
+
+  constructor add(e1 : Expression; e2 : Expression) : Expression;
+  -- constructor sub(e1 : Expression; e2 : Expression) : Expression;
+  constructor variable(id : String) : Expression;
+  -- constructor intconstant(i : Integer) : Expression;
+
+end;

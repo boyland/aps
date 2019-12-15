@@ -1,0 +1,64 @@
+with "tiny";
+
+module ARITHMETIC[T :: var TINY[]] extends T
+begin
+
+
+
+  type ProgramRef := remote Program;
+  type Messages := BAG[String];
+  type Identifiers := LIST[String];
+
+  var collection messages : Messages;
+
+  attribute Expression.program : ProgramRef;
+  attribute Decls.decls_ids : Identifiers;
+  attribute Decl.decl_id : Identifiers;
+  attribute Program.ids : Identifiers;
+
+
+  pragma synthesized(decls_ids, decl_id, ids);
+  pragma inherited(program);
+
+  match ?p:Program=program(?ds:Decls, ?e:Expression) begin
+
+    p.ids := ds.decls_ids;
+    e.program := p;
+  end;
+
+  match ?ds0:Decls=decls(?ds1:Decls, ?d:Decl) begin
+    ds0.decls_ids := Identifiers$append(d.decl_id, ds1.decls_ids);
+  end;
+
+  match ?d:Decl=decl(?id:String, ?i:Integer) begin
+    d.decl_id := Identifiers$single(id);
+  end;
+
+  match ?e:Expression=add(?e1:Expression, ?e2:Expression) begin
+    e1.program := e.program;
+    e2.program := e.program;
+  end;
+
+  match ?e:Expression=variable(?id:String) begin
+    c : ProgramRef := e.program;
+    if not lookup(id, c.ids) then
+      messages :> {"Undefined variable " || id};
+    endif;
+  end;
+
+  function lookup(id:String; list:Identifiers) : Boolean begin
+    case list begin
+        match Identifiers${} begin
+          result := false;
+        end;
+    else
+        identifier : String := first(list);
+        if identifier = id then
+            result := true;
+        else
+            result := lookup(id, butfirst(list));
+        endif;
+    end;
+  end;
+
+end;

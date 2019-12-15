@@ -115,11 +115,11 @@ void add_to_worklist(EDGESET node, AUG_GRAPH *aug_graph) {
     }
     if (aug_graph->worklist_tail == NULL) {
       if (aug_graph->worklist_head != NULL)
-	fatal_error("Worklist head is wrong!");
+	    fatal_error("Worklist head is wrong!");
       aug_graph->worklist_head = node;
     } else {
       if (aug_graph->worklist_head == NULL)
-	fatal_error("Worklist head is NULL");
+	    fatal_error("Worklist head is NULL");
       aug_graph->worklist_tail->next_in_edge_worklist = node;
     }
     aug_graph->worklist_tail = node;
@@ -152,9 +152,9 @@ void remove_from_worklist(EDGESET node, AUG_GRAPH *aug_graph) {
     } else {
       EDGESET e = aug_graph->worklist_head;
       while (e->next_in_edge_worklist != node) {
-	if (e->next_in_edge_worklist == NULL)
-	  fatal_error("Worklist in two pieces");
-	e = e->next_in_edge_worklist;
+        if (e->next_in_edge_worklist == NULL)
+          fatal_error("Worklist in two pieces");
+        e = e->next_in_edge_worklist;
       }
       e->next_in_edge_worklist = NULL;
       aug_graph->worklist_tail = e;
@@ -164,6 +164,7 @@ void remove_from_worklist(EDGESET node, AUG_GRAPH *aug_graph) {
 }
 
 static EDGESET edgeset_freelist = NULL;
+
 EDGESET new_edgeset(INSTANCE *source,
 		    INSTANCE *sink,
 		    CONDITION *cond,
@@ -261,10 +262,10 @@ EDGESET add_edge(INSTANCE *source,
     return new_edge;
   } else {
     enum CONDcompare comp = cond_compare(cond,&current->cond);
-    if (current->source != source ||
-	current->sink != sink) fatal_error("edgeset mixup");
-    if (AT_MOST(kind,current->kind) &&
-	(comp == CONDlt || comp == CONDeq)) {
+    if (current->source != source || current->sink != sink) {
+        fatal_error("edgeset mixup");
+    }
+    if (AT_MOST(kind,current->kind) && (comp == CONDlt || comp == CONDeq)) {
       /* already entailed (or equal) */
       return current;
     } else if (AT_MOST(current->kind,kind) &&
@@ -282,7 +283,7 @@ EDGESET add_edge(INSTANCE *source,
       merged.negative = cond->negative|current->cond.negative;
       common = merged.positive&merged.negative;
       if (common != 0 && !ONE_BIT(common))
-	fatal_error("bad condition computation");
+	    fatal_error("bad condition computation");
       merged.positive &= ~common;
       merged.negative &= ~common;
       rest = add_edge(source,sink,&merged,kind,rest,aug_graph);
@@ -290,8 +291,7 @@ EDGESET add_edge(INSTANCE *source,
       return rest;
     } else {
       /* there is nothing to do */
-      current->rest =
-	add_edge(source,sink,cond,kind,current->rest,aug_graph);
+      current->rest = add_edge(source,sink,cond,kind,current->rest,aug_graph);
       return current;
     }
   }
@@ -303,7 +303,6 @@ void add_edge_to_graph(INSTANCE *source,
 		       DEPENDENCY kind,
 		       AUG_GRAPH *aug_graph) {
   int index = source->index*(aug_graph->instances.length)+sink->index;
-
   aug_graph->graph[index] =
     add_edge(source,sink,cond,kind,aug_graph->graph[index],aug_graph);
 }
@@ -381,8 +380,8 @@ static void *count_if_rules(void *pint, void *node) {
       break;
     case KEYcase_stmt:
       for (m = first_Match(case_stmt_matchers(decl)); m; m=MATCH_NEXT(m)) {
-	Match_info(m)->if_index = *count;
-	++*count;
+	    Match_info(m)->if_index = *count;
+	    ++*count;
       }
       break;
     default: break;
@@ -403,7 +402,7 @@ static void *get_if_rules(void *varray, void *node) {
       break;
     case KEYcase_stmt:
       for (m = first_Match(case_stmt_matchers(decl)); m; m=MATCH_NEXT(m)) {
-	array[Match_info(m)->if_index] = m;
+	    array[Match_info(m)->if_index] = m;
       }
       break;
     default: break;
@@ -430,14 +429,14 @@ static void *get_match_tests(void *vpexpr, void *node)
     { Pattern pat = (Pattern)node;
       switch (Pattern_KEY(pat)) {
       case KEYcondition:
-	{ Expression cond = condition_e(pat);
-	  Expression expr = *pexpr;
-	  Expression_info(cond)->next_expr = expr;
-	  *pexpr = cond;
-	}
-	break;
+        { Expression cond = condition_e(pat);
+          Expression expr = *pexpr;
+          Expression_info(cond)->next_expr = expr;
+          *pexpr = cond;
+        }
+        break;
       default:
-	break;
+	    break;
       }
     }
   }
@@ -479,7 +478,7 @@ int if_rule_index(void *if_rule) {
   }
 }
  
-int if_rule_p(void *if_rule) {
+BOOL if_rule_p(void *if_rule) {
   switch (ABSTRACT_APS_tnode_phylum(if_rule)) {
   case KEYDeclaration:
     return Declaration_KEY(if_rule) == KEYif_stmt;
@@ -500,36 +499,36 @@ static void *init_decl_cond(void *vcond, void *node) {
     case KEYmodule_decl: return NULL;
     case KEYif_stmt:
       {
-	Block if_true = if_stmt_if_true(decl);
-	Block if_false = if_stmt_if_false(decl);
-	int index = Declaration_info(decl)->if_index;
-	CONDITION new_cond;
-	new_cond.positive = cond->positive | (1 << index);
-	new_cond.negative = cond->negative;
-	traverse_Block(init_decl_cond,&new_cond,if_true);
-	new_cond.positive = cond->positive;
-	new_cond.negative = cond->negative | (1 << index);
-	traverse_Block(init_decl_cond,&new_cond,if_false);
+        Block if_true = if_stmt_if_true(decl);
+        Block if_false = if_stmt_if_false(decl);
+        int index = Declaration_info(decl)->if_index;
+        CONDITION new_cond;
+        new_cond.positive = cond->positive | (1 << index);
+        new_cond.negative = cond->negative;
+        traverse_Block(init_decl_cond,&new_cond,if_true);
+        new_cond.positive = cond->positive;
+        new_cond.negative = cond->negative | (1 << index);
+        traverse_Block(init_decl_cond,&new_cond,if_false);
       }
       return NULL;
     case KEYcase_stmt:
       {
-	Matches ms = case_stmt_matchers(decl);
-	Expression testvar = case_stmt_expr(decl);
-	CONDITION new_cond = *cond;
-	Match m;
+        Matches ms = case_stmt_matchers(decl);
+        Expression testvar = case_stmt_expr(decl);
+        CONDITION new_cond = *cond;
+        Match m;
 
-	Expression_info(testvar)->next_expr = 0;
-	traverse_Matches(get_match_tests,&testvar,ms);
-	for (m = first_Match(ms); m; m=MATCH_NEXT(m)) {
-	  int index = Match_info(m)->if_index;
-	  Match_info(m)->match_cond = new_cond;
-	  new_cond.positive |= (1 << index); /* first set it */
-	  traverse_Block(init_decl_cond,&new_cond,matcher_body(m));
-	  new_cond.positive &= ~(1 << index); /* now clear it */
-	  new_cond.negative |= (1 << index); /* set negative for rest */
-	}
-	traverse_Block(init_decl_cond,&new_cond,case_stmt_default(decl));
+        Expression_info(testvar)->next_expr = 0;
+        traverse_Matches(get_match_tests,&testvar,ms);
+        for (m = first_Match(ms); m; m=MATCH_NEXT(m)) {
+          int index = Match_info(m)->if_index;
+          Match_info(m)->match_cond = new_cond;
+          new_cond.positive |= (1 << index); /* first set it */
+          traverse_Block(init_decl_cond,&new_cond,matcher_body(m));
+          new_cond.positive &= ~(1 << index); /* now clear it */
+          new_cond.negative |= (1 << index); /* set negative for rest */
+        }
+        traverse_Block(init_decl_cond,&new_cond,case_stmt_default(decl));
       }
       return NULL;
     default: break;
@@ -610,30 +609,33 @@ static void *get_instances(void *vaug_graph, void *node) {
   
   if (ABSTRACT_APS_tnode_phylum(node) == KEYDeclaration) {
     Declaration decl = (Declaration)node;
-    if (index == -1) index = Declaration_info(decl)->instance_index;
+    if (index == -1) { // array != NULL
+        index = Declaration_info(decl)->instance_index;
+    }
     switch (Declaration_KEY(decl)) {
     case KEYmodule_decl:
       /* we let the module_decl represent the instance of the
        * root phylum in the global dependency graph.
        */
-      if (array == NULL) Declaration_info(decl)->instance_index = index;
-      {
-	ATTRSET attrset=attrset_for(s,s->start_phylum);
-	for (; attrset != NULL; attrset=attrset->rest) {
-	  Declaration attr = attrset->attr;
-	  FIBERSET fiberset;
-	  assign_instance(array,index++,attr,NULL,decl);
-	  for (fiberset = fiberset_for(attr,FIBERSET_NORMAL_FINAL);
-	       fiberset != NULL;
-	       fiberset=fiberset->rest) {
-	    assign_instance(array,index++,attr,fiberset->fiber,decl);
-	  }
-	  for (fiberset = fiberset_for(attr,FIBERSET_REVERSE_FINAL);
-	       fiberset != NULL;
-	       fiberset=fiberset->rest) {
-	    assign_instance(array,index++,attr,fiberset->fiber,decl);
-	  }
-	}
+      if (array == NULL) {
+          Declaration_info(decl)->instance_index = index;
+      }
+      { ATTRSET attrset=attrset_for(s,s->start_phylum);
+        for (; attrset != NULL; attrset=attrset->rest) {
+          Declaration attr = attrset->attr;
+          FIBERSET fiberset;
+          assign_instance(array,index++,attr,NULL,decl);
+          for (fiberset = fiberset_for(attr,FIBERSET_NORMAL_FINAL);
+               fiberset != NULL;
+               fiberset=fiberset->rest) {
+            assign_instance(array,index++,attr,fiberset->fiber,decl);
+          }
+          for (fiberset = fiberset_for(attr,FIBERSET_REVERSE_FINAL);
+               fiberset != NULL;
+               fiberset=fiberset->rest) {
+            assign_instance(array,index++,attr,fiberset->fiber,decl);
+          }
+        }
       }
       break;
     case KEYsome_function_decl:
@@ -645,115 +647,138 @@ static void *get_instances(void *vaug_graph, void *node) {
        * for a function_decl.
        */
       { ATTRSET attrset=attrset_for(s,decl);
-	for (; attrset != NULL; attrset=attrset->rest) {
-	  Declaration attr = attrset->attr;
-	  FIBERSET fiberset;
-	  assign_instance(array,index++,attr,NULL,decl);
-	  for (fiberset = fiberset_for(attr,FIBERSET_NORMAL_FINAL);
-	       fiberset != NULL;
-	       fiberset=fiberset->rest) {
-	    assign_instance(array,index++,attr,fiberset->fiber,decl);
-	  }
-	  for (fiberset = fiberset_for(attr,FIBERSET_REVERSE_FINAL);
-	       fiberset != NULL;
-	       fiberset=fiberset->rest) {
-	    assign_instance(array,index++,attr,fiberset->fiber,decl);
-	  }
-	}
+//      printf("decl: %d\n", tnode_line_number(decl));
+        for (; attrset != NULL; attrset=attrset->rest) {
+          Declaration attr = attrset->attr;
+//          printf("  attr:%s\n", decl_name(attr));
+          FIBERSET fiberset;
+          assign_instance(array,index++,attr,NULL,decl);
+          for (fiberset = fiberset_for(attr,FIBERSET_NORMAL_FINAL);
+               fiberset != NULL;
+               fiberset=fiberset->rest) {
+            assign_instance(array,index++,attr,fiberset->fiber,decl);
+          }
+          for (fiberset = fiberset_for(attr,FIBERSET_REVERSE_FINAL);
+               fiberset != NULL;
+               fiberset=fiberset->rest) {
+            assign_instance(array,index++,attr,fiberset->fiber,decl);
+          }
+        }
       }
       break;
-    case KEYformal: case KEYvalue_decl:
+    case KEYformal:
+    case KEYvalue_decl:
       if (array == NULL) Declaration_info(decl)->instance_index = index;
       { Type ty = infer_some_value_decl_type(decl);
       /*if (Type_KEY(ty) == KEYremote_type)
-	ty = remote_type_nodetype(ty); */
-	switch (Type_KEY(ty)) {
-	default:
-	  fprintf(stderr,"cannot handle type: ");
-	  print_Type(ty,stderr);
-	  fatal_error("\n%d:abort",tnode_line_number(ty));
-	case KEYtype_use:
-	  { Declaration tdecl = Use_info(type_use_use(ty))->use_decl;
-	    if (tdecl == NULL) fatal_error("%d:type not bound",
-					   tnode_line_number(ty));
-	    /*printf("%d: finding instances for %s",tnode_line_number(decl),
-	      decl_name(decl)); */
-	    /* first direct fibers (but not for nodes & parameters) */
-	    if (0 == (Declaration_info(decl)->decl_flags &
-		      (ATTR_DECL_INH_FLAG|ATTR_DECL_SYN_FLAG|
-		       DECL_LHS_FLAG|DECL_RHS_FLAG)))
-	    { FIBERSET fiberset;
-	      assign_instance(array,index++,decl,NULL,NULL);
-	       /* printf("%s, first option: ",decl_name(decl));
-		 print_fiberset(fiberset_for(decl,FIBERSET_NORMAL_FINAL),
-		 stdout);
-		 printf("\n"); */
-	      for (fiberset = fiberset_for(decl,FIBERSET_NORMAL_FINAL);
-		   fiberset != NULL;
-		   fiberset=fiberset->rest) {
-		assign_instance(array,index++,decl,fiberset->fiber,NULL);
-	      }
-	      /* printf(", ");
-		 print_fiberset(fiberset_for(decl,FIBERSET_REVERSE_FINAL),stdout);
-		 printf("\n"); */
-	      for (fiberset = fiberset_for(decl,FIBERSET_REVERSE_FINAL);
-		   fiberset != NULL;
-		   fiberset=fiberset->rest) {
-		assign_instance(array,index++,decl,fiberset->fiber,NULL);
-	      }
-	    } else
-	    /* then fibers on attributes */
-	    { ATTRSET attrset=attrset_for(s,tdecl);
-	      /*printf(" Second option: ");
-	        print_attrset(attrset,stdout);
-	        printf("\n");*/
-	      for (; attrset != NULL; attrset=attrset->rest) {
-		Declaration attr = attrset->attr;
-		FIBERSET fiberset;
-		assign_instance(array,index++,attr,NULL,decl);
-		for (fiberset = fiberset_for(attr,FIBERSET_NORMAL_FINAL);
-		     fiberset != NULL;
-		     fiberset=fiberset->rest) {
-		  assign_instance(array,index++,attr,fiberset->fiber,decl);
-		}
-		for (fiberset = fiberset_for(attr,FIBERSET_REVERSE_FINAL);
-		     fiberset != NULL;
-		     fiberset=fiberset->rest) {
-		  assign_instance(array,index++,attr,fiberset->fiber,decl);
-		}
-	      }
-	    }
-	  }
-	  break;
-	}
+        ty = remote_type_nodetype(ty); */
+        switch (Type_KEY(ty)) {
+        default:
+          fprintf(stderr,"cannot handle type: ");
+          print_Type(ty,stderr);
+          fatal_error("\n%d:abort",tnode_line_number(ty));
+        case KEYtype_use:
+          { Declaration tdecl = Use_info(type_use_use(ty))->use_decl;
+            if (tdecl == NULL) fatal_error("%d:type not bound",tnode_line_number(ty));
+//            printf("%d: finding instances for %s, tdecl:%s@%d\n",tnode_line_number(decl),decl_name(decl),decl_name(tdecl), tnode_line_number(tdecl));
+            /* first direct fibers (but not for nodes & parameters) */
+            if (0 == (Declaration_info(decl)->decl_flags &
+                  (ATTR_DECL_INH_FLAG|ATTR_DECL_SYN_FLAG|
+                   DECL_LHS_FLAG|DECL_RHS_FLAG)))
+            {
+                FIBERSET fiberset;
+              assign_instance(array,index++,decl,NULL,NULL);
+//              printf("  first option: \n");
+//              printf("    normal fiberset: ");
+//              print_fiberset(fiberset_for(decl,FIBERSET_NORMAL_FINAL),stdout);
+              for (fiberset = fiberset_for(decl,FIBERSET_NORMAL_FINAL);
+               fiberset != NULL;
+               fiberset=fiberset->rest) {
+                  assign_instance(array,index++,decl,fiberset->fiber,NULL);
+              }
+//              printf("    reverse fiberset:");
+//              print_fiberset(fiberset_for(decl,FIBERSET_REVERSE_FINAL),stdout);
+//              printf("\n");
+              for (fiberset = fiberset_for(decl,FIBERSET_REVERSE_FINAL);
+               fiberset != NULL;
+               fiberset=fiberset->rest) {
+                assign_instance(array,index++,decl,fiberset->fiber,NULL);
+              }
+            } else {
+
+              /* then fibers on attributes */
+              ATTRSET attrset=attrset_for(s,tdecl); // tdecl is a phylum
+//              printf(" Second option: ");
+//                print_attrset(attrset,stdout);
+//                printf("\n");
+              for (; attrset != NULL; attrset=attrset->rest) {
+                Declaration attr = attrset->attr;
+                FIBERSET fiberset;
+                assign_instance(array,index++,attr,NULL,decl);
+                for (fiberset = fiberset_for(attr,FIBERSET_NORMAL_FINAL);
+                     fiberset != NULL;
+                     fiberset=fiberset->rest) {
+                  assign_instance(array,index++,attr,fiberset->fiber,decl);
+                }
+                for (fiberset = fiberset_for(attr,FIBERSET_REVERSE_FINAL);
+                     fiberset != NULL;
+                     fiberset=fiberset->rest) {
+                  assign_instance(array,index++,attr,fiberset->fiber,decl);
+                }
+              }
+
+                if (fiberset_for(decl,FIBERSET_NORMAL_FINAL) != NULL ||
+                    fiberset_for(decl,FIBERSET_REVERSE_FINAL) != NULL) {
+                    FIBERSET fiberset;
+                    assign_instance(array,index++,decl,NULL,NULL);
+                    for (fiberset = fiberset_for(decl,FIBERSET_NORMAL_FINAL);
+                         fiberset != NULL;
+                         fiberset=fiberset->rest) {
+                        assign_instance(array,index++,decl,fiberset->fiber,NULL);
+                    }
+                    for (fiberset = fiberset_for(decl,FIBERSET_REVERSE_FINAL);
+                         fiberset != NULL;
+                         fiberset=fiberset->rest) {
+                        assign_instance(array,index++,decl,fiberset->fiber,NULL);
+                    }
+                    /* xxx: Not sure if this will work for parameters */
+//                    if (array != NULL) Declaration_info(decl)->instance_index = index;
+                }
+            }
+          }
+          break;
+        }
       }
       break;
     case KEYassign:
-      { Declaration pdecl = proc_call_p(assign_rhs(decl));
-	if (pdecl != NULL) {
-	  if (array == NULL) {
-	    STATE *s = aug_graph->global_state;
-	    int i;
-	    Declaration_info(decl)->instance_index = index;
-	    Declaration_info(decl)->decl_flags |= DECL_RHS_FLAG;
-	    for (i=0; i < s->phyla.length; ++i) {
-	      if (s->phyla.array[i] == pdecl) {
-		Declaration_info(decl)->node_phy_graph = &s->phy_graphs[i];
-		break;
-	      }
-	    }
-	  }
-	  /* assertion check */
-	  if (index != Declaration_info(decl)->instance_index)
-	    fatal_error("%d: instance index %d != %d",tnode_line_number(decl),
-			Declaration_info(decl)->instance_index,index);
-	  { ATTRSET attrset=attrset_for(s,pdecl);
-	    for (; attrset != NULL; attrset=attrset->rest) {
-	      Declaration attr = attrset->attr;
-	      index = assign_instances(array,index,attr,decl);
-	    }
-	  }
-	}
+      {
+
+
+          Declaration pdecl = proc_call_p(assign_rhs(decl));
+        if (pdecl != NULL) {
+          if (array == NULL) {
+            STATE *s = aug_graph->global_state;
+            int i;
+            Declaration_info(decl)->instance_index = index;
+            Declaration_info(decl)->decl_flags |= DECL_RHS_FLAG;
+            for (i=0; i < s->phyla.length; ++i) {
+              if (s->phyla.array[i] == pdecl) {
+                  Declaration_info(decl)->node_phy_graph = &s->phy_graphs[i];
+                  break;
+              }
+            }
+          }
+          /* assertion check */
+          if (index != Declaration_info(decl)->instance_index)
+            fatal_error("%d: instance index %d != %d",tnode_line_number(decl),
+                Declaration_info(decl)->instance_index,index);
+          { ATTRSET attrset=attrset_for(s,pdecl);
+            for (; attrset != NULL; attrset=attrset->rest) {
+              Declaration attr = attrset->attr;
+              index = assign_instances(array,index,attr,decl);
+            }
+          }
+        }
       }
       break;
     case KEYpragma_call:
@@ -776,32 +801,35 @@ static void *get_instances(void *vaug_graph, void *node) {
       break;
     case KEYfuncall:
       if ((fdecl = local_call_p(e)) != NULL) {
-	ATTRSET attrset=attrset_for(s,fdecl);
-	Declaration proxy = Expression_info(e)->funcall_proxy;
+        ATTRSET attrset=attrset_for(s,fdecl);
+        Declaration proxy = Expression_info(e)->funcall_proxy;
 
-	/* printf("%d: Found local function call of %s\n",
-	 *      tnode_line_number(e),decl_name(fdecl));
-	 */
-	if (array == NULL) {
-	  extern int aps_yylineno;
-	  aps_yylineno = tnode_line_number(e);
-	  proxy = pragma_call(def_name(some_function_decl_def(fdecl)),
-			      nil_Expressions());
-	  Expression_info(e)->funcall_proxy = proxy;
-	  Declaration_info(proxy)->instance_index = index;
-	  Declaration_info(proxy)->node_phy_graph = 
-	    summary_graph_for(s,fdecl);
-	  Declaration_info(proxy)->decl_flags |= DECL_RHS_FLAG;
-	} else {
-	  index =  Declaration_info(proxy)->instance_index;
-	}
+        /* printf("%d: Found local function call of %s\n",
+         *      tnode_line_number(e),decl_name(fdecl));
+         */
+        if (array == NULL) {
+          extern int aps_yylineno;
+          aps_yylineno = tnode_line_number(e);
+          proxy = pragma_call(def_name(some_function_decl_def(fdecl)),nil_Expressions());
+          Expression_info(e)->funcall_proxy = proxy;
+          Declaration_info(proxy)->instance_index = index;
+          Declaration_info(proxy)->node_phy_graph = summary_graph_for(s,fdecl);
+          Declaration_info(proxy)->decl_flags |= DECL_RHS_FLAG;
+        } else {
+          index =  Declaration_info(proxy)->instance_index;
+        }
 
-	for (; attrset != NULL; attrset=attrset->rest) {
-	  Declaration attr = attrset->attr;
-	  index = assign_instances(array,index,attr,proxy);
-	}
+        for (; attrset != NULL; attrset=attrset->rest) {
+          Declaration attr = attrset->attr;
+          index = assign_instances(array,index,attr,proxy);
+        }
       }
       break;
+//        case KEYvalue_use: {
+
+//            break;
+//        }
+
     }
   }
   if (array == NULL) aug_graph->instances.length = index;
@@ -818,11 +846,22 @@ static INSTANCE *get_instance_or_null(Declaration attr, FIBER fiber,
 
   if (fiber == base_fiber) fiber = NULL;
 
-  for (i=start; i < n; ++i) {
+//    printf("=========== table =========\n");
+    for (i=start; i < n; ++i) {
+//      Declaration attr_ = array[i].fibered_attr.attr;
+//        FIBER fiber_ = array[i].fibered_attr.fiber;
+//        Declaration node_ = array[i].node;
+//        printf("attr:%s, field: %s, node:%s.\n", attr_ == NULL ? "null" : decl_name(attr_),
+//               fiber_ == NULL ? "null" : decl_name(fiber_->field),
+//               node_ == NULL ? "null" : decl_name(node_));
     if (array[i].fibered_attr.attr == attr &&
 	array[i].fibered_attr.fiber == fiber &&
 	array[i].node == node) return &array[i];
   }
+//    printf("=========== end of table =========\n");
+//  printf("attr:%s, field: %s, node:%s.\n", attr == NULL ? "null" : decl_name(attr),
+//          fiber == NULL ? "null" : decl_name(fiber->field),
+//          node == NULL ? "null" : decl_name(node));
   return NULL;
 }
 
@@ -943,6 +982,7 @@ INSTANCE* summary_vertex_instance(VERTEX* dv, FIBER f, PHY_GRAPH* phy_graph)
   return get_summary_instance_or_null(dv->attr,f,phy_graph);  
 }
 
+/** not used */
 static BOOL decl_is_collection(Declaration d) {
   if (!d) return FALSE;
   switch (Declaration_KEY(d)) {
@@ -1016,6 +1056,9 @@ void add_edges_to_graph(VERTEX* v1,
     INSTANCE *source = dep_vertex_instance(v1,0,aug_graph);
     INSTANCE *sink = dep_vertex_instance(v2,0,aug_graph);
     if (source != NULL && sink != NULL) {
+        if (analysis_debug & ADD_EDGE) {
+            printf("Add edge:");
+        }
       add_edge_to_graph(source,sink,cond,kind,aug_graph);
     } else if (analysis_debug & ADD_EDGE) {
       printf("  not added %s %s\n", 
@@ -1040,6 +1083,9 @@ void add_edges_to_graph(VERTEX* v1,
       i1 = i2;
       i2 = i;
     }
+    if (analysis_debug & ADD_EDGE) {
+        printf("Add edge(fiber):");
+    }
     add_edge_to_graph(i1,i2,cond,kind,aug_graph);
   }
 }
@@ -1058,8 +1104,8 @@ Declaration attr_ref_node_decl(Expression e)
 /** Add edges to the dependency graph to represent dependencies
  * from the value computed in the expression to the given sink
  * @param cond condition under which dependency holds
- * @param mod modifier to apply to instances found
  * @param kind whether carrying/non-fiber etc.
+ * @param mod modifier to apply to instances found
  */
 static void record_expression_dependencies(VERTEX *sink, CONDITION *cond,
 					   DEPENDENCY kind, MODIFIER *mod,
@@ -1088,100 +1134,92 @@ static void record_expression_dependencies(VERTEX *sink, CONDITION *cond,
     /* nothing to do */
     break;
   case KEYrepeat:
-    record_expression_dependencies(sink,cond,kind,mod,
-				   repeat_expr(e),aug_graph);
+    record_expression_dependencies(sink,cond,kind,mod,repeat_expr(e),aug_graph);
     break;
   case KEYvalue_use:
     { Declaration decl=Use_info(value_use_use(e))->use_decl;
       Declaration rdecl;
-      if (decl == NULL)
-	fatal_error("%d: unbound expression",tnode_line_number(e));
-      if (DECL_IS_LOCAL(decl) &&
-	  DECL_IS_SHARED(decl) &&
-	  (rdecl = responsible_node_declaration(e)) != NULL) {
-	/* a shared dependency: we get it from the shared_info */
-	Declaration phy = node_decl_phylum(rdecl);
+      if (decl == NULL) {
+	    fatal_error("%d: unbound expression",tnode_line_number(e));
 
-	source.node = rdecl;
-	source.attr = 
-	  phylum_shared_info_attribute(phy,aug_graph->global_state);
-	source.modifier = NO_MODIFIER;
-	if (vertex_is_output(&source)) aps_warning(e,"Dependence on output value");
-	add_edges_to_graph(&source,sink,cond,kind&~DEPENDENCY_MAYBE_CARRYING,
-			   aug_graph);
+      }
+//      printf("value_use expression@%d, decl@%d: %s, ", tnode_line_number(e), tnode_line_number(decl), decl_name(decl));
 
-	new_mod.field = decl;
-	new_mod.next = mod;
-	source.modifier = &new_mod;
-	add_edges_to_graph(&source,sink,cond,kind,aug_graph);
-      } else if (Declaration_info(decl)->decl_flags &
-		 (ATTR_DECL_INH_FLAG|ATTR_DECL_SYN_FLAG)) {
-	/* a use of parameter or result (we hope) */
-	Declaration fdecl = aug_graph->match_rule;
-	source.node = aug_graph->match_rule;
-	source.attr = decl;
-	source.modifier = mod;
-	if (vertex_is_output(&source)) aps_warning(e,"Dependence on output value");
-	add_edges_to_graph(&source,sink,cond,kind,aug_graph);
+      if (DECL_IS_LOCAL(decl) && DECL_IS_SHARED(decl) && (rdecl = responsible_node_declaration(e)) != NULL) {
+//          printf("shared\n");
+        /* a shared dependency: we get it from the shared_info */
+        Declaration phy = node_decl_phylum(rdecl);
+        source.node = rdecl;
+        source.attr = phylum_shared_info_attribute(phy,aug_graph->global_state);
+        source.modifier = NO_MODIFIER;
+        if (vertex_is_output(&source)) aps_warning(e,"Dependence on output value");
+        add_edges_to_graph(&source,sink,cond,kind&~DEPENDENCY_MAYBE_CARRYING,aug_graph);
+        new_mod.field = decl;
+        new_mod.next = mod;
+        source.modifier = &new_mod;
+        add_edges_to_graph(&source,sink,cond,kind,aug_graph);
+      } else if (Declaration_info(decl)->decl_flags & (ATTR_DECL_INH_FLAG|ATTR_DECL_SYN_FLAG)) {
+//          printf("function\n");
+        /* a use of parameter or result (we hope) */
+        source.node = aug_graph->match_rule;
+        source.attr = decl;
+        source.modifier = mod;
+        if (vertex_is_output(&source)) aps_warning(e,"Dependence on output value");
+        add_edges_to_graph(&source,sink,cond,kind,aug_graph);
       } else {
-	source.node = NULL;
-	source.attr = decl;
-	source.modifier = mod;
-	if (vertex_is_output(&source)) aps_warning(e,"Dependence on output value");
-	add_edges_to_graph(&source,sink,cond,kind,aug_graph);
+        source.node = NULL;
+        source.attr = decl;
+        source.modifier = mod;
+//        print_dep_vertex(sink,stdout);
+        if (vertex_is_output(&source)) aps_warning(e,"Dependence on output value");
+        add_edges_to_graph(&source,sink,cond,kind,aug_graph);
       }
     }
     break;
   case KEYfuncall:
     { Declaration decl;
       if ((decl = attr_ref_p(e)) != NULL) {
-	source.node = attr_ref_node_decl(e);
-	source.attr = decl;
-	source.modifier = mod;
-	if (vertex_is_output(&source)) aps_warning(e,"Dependence on output value");
-	add_edges_to_graph(&source,sink,cond,kind,aug_graph);
+        source.node = attr_ref_node_decl(e);
+//        printf("funcall %s@%d\n", decl_name(source.node), tnode_line_number(e));
+        source.attr = decl; /* decl is attribute_decl*/
+        source.modifier = mod;
+        if (vertex_is_output(&source)) aps_warning(e,"Dependence on output value");
+        add_edges_to_graph(&source,sink,cond,kind,aug_graph);
       } else if ((decl = field_ref_p(e)) != NULL) {
-	Expression object = field_ref_object(e);
-	new_mod.field = decl;
-	new_mod.next = mod;
-	// first the dependency on the pointer itself (NOT carrying)
-	record_expression_dependencies(sink,cond,
-				       kind&~DEPENDENCY_MAYBE_CARRYING,
-				       NO_MODIFIER,object,aug_graph);
-	// then the dependency on the field (possibly carrying)
-	record_expression_dependencies(sink,cond,kind,&new_mod,object,
-				       aug_graph);
+        Expression object = field_ref_object(e);
+        new_mod.field = decl;
+        new_mod.next = mod;
+        // first the dependency on the pointer itself (NOT carrying)
+        record_expression_dependencies(sink,cond,kind&~DEPENDENCY_MAYBE_CARRYING,NO_MODIFIER,object,aug_graph);
+        // then the dependency on the field (possibly carrying)
+        record_expression_dependencies(sink,cond,kind,&new_mod,object,aug_graph);
       } else if ((decl = local_call_p(e)) != NULL) {
-	Declaration result = some_function_decl_result(decl);
-	Expression actual = first_Actual(funcall_actuals(e));
-	/* first depend on the arguments (not carrying, no fibers) */
-	if (mod == NO_MODIFIER) {
-	  for (;actual!=NULL; actual=Expression_info(actual)->next_actual) {
-	    record_expression_dependencies(sink,cond,
-					   kind&~DEPENDENCY_MAYBE_CARRYING,
-					   NO_MODIFIER,actual,aug_graph);
-	  }
-	}
-
-	/* attach to result, and somewhere else ? attach actuals */
-	/* printf("%d: looking at local function %s\n",
-	 *	 tnode_line_number(e),decl_name(decl));
-	 */
-	{
-	  Declaration proxy = Expression_info(e)->funcall_proxy;
-	  source.node = proxy;
-	  source.attr = result;
-	  source.modifier = mod;
-	  if (vertex_is_output(&source)) aps_warning(e,"Dependence on output value");
-	  add_edges_to_graph(&source,sink,cond,kind,aug_graph);
-	}
+        Declaration result = some_function_decl_result(decl);
+        Expression actual = first_Actual(funcall_actuals(e));
+        /* first depend on the arguments (not carrying, no fibers) */
+        if (mod == NO_MODIFIER) {
+          for (;actual!=NULL; actual=Expression_info(actual)->next_actual) {
+            record_expression_dependencies(sink,cond,kind&~DEPENDENCY_MAYBE_CARRYING,NO_MODIFIER,actual,aug_graph);
+          }
+        }
+        /* attach to result, and somewhere else ? attach actuals */
+        /* printf("%d: looking at local function %s\n",
+         *	 tnode_line_number(e),decl_name(decl));
+         */
+        Declaration proxy = Expression_info(e)->funcall_proxy;
+        source.node = proxy;
+        source.attr = result;
+        source.modifier = mod;
+        if (vertex_is_output(&source)) aps_warning(e,"Dependence on output value");
+        add_edges_to_graph(&source,sink,cond,kind,aug_graph);
       } else {
-	/* some random (external) function call */
-	Expression actual = first_Actual(funcall_actuals(e));
-	for (; actual != NULL; actual=Expression_info(actual)->next_actual) {
-	  record_expression_dependencies(sink,cond,kind,mod,
-					 actual,aug_graph);
-	}
+        /* some random (external) function call */
+//          printf("external funcall@%d \n", tnode_line_number(e));
+        Expression actual = first_Actual(funcall_actuals(e));
+        for (; actual != NULL; actual=Expression_info(actual)->next_actual) {
+          record_expression_dependencies(sink,cond,kind,mod,
+                         actual,aug_graph);
+        }
       }
     }
     break;
@@ -1223,7 +1261,7 @@ static void set_value_for(VERTEX* sink, Expression rhs, AUG_GRAPH *aug_graph)
  * @param cond condition under which dependency holds
  * @param mod modifier to apply to instances found in the lhs
  * @param kind whether carrying/non-fiber etc.
- * @param the rhs that this depends on
+ * @param rhs the rhs that this depends on
  */
 static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
 				    DEPENDENCY kind, MODIFIER *mod,
@@ -1248,48 +1286,50 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
       Declaration decl = USE_DECL(value_use_use(lhs));
       VERTEX sink;
       MODIFIER new_mod;
-	
+
+//          printf("value_use lhs line:%d ,lhs decl@%d: %s\n", tnode_line_number(lhs), tnode_line_number(decl), decl_name(decl));
+
       if (shared_use_p(lhs) != NULL) {
-	if (!mod) {
-	  if (def_is_constant(value_decl_def(decl))) {
-	      aps_error(lhs,"Assignment to non-var disallowed: %s",
-			decl_name(decl));
-	  }
-	}
-	/* Assignment of shared global (or a field of a shared global) */
-	new_mod.next = mod;
-	if (EXPR_IS_LHS(lhs)) {
-	  new_mod.field = reverse_field(decl);
-	} else {
-	  new_mod.field = decl;
-	}
-	sink.node = responsible_node_declaration(lhs);
-	if (sink.node == NULL) {
-	  fatal_error("%d: Assignment of global %s in global space???",
-		      tnode_line_number(lhs), decl_name(decl));
-	  return;
-	}
-	/*!!!HERE! What if this is null ? */
-	sink.attr =
-	  phylum_shared_info_attribute(node_decl_phylum(sink.node),
-				       aug_graph->global_state);
-	sink.modifier = &new_mod;
-	/* should also force a backwards depend on the shared info,
-	 * but shared info is actually uninteresting,
-	 * so I'll skip it...
-	 */
+	    if (!mod) {
+          if (def_is_constant(value_decl_def(decl))) {
+              aps_error(lhs,"Assignment to non-var disallowed: %s", decl_name(decl));
+          }
+        }
+        /* Assignment of shared global (or a field of a shared global) */
+        new_mod.next = mod;
+        if (EXPR_IS_LHS(lhs)) {
+          new_mod.field = reverse_field(decl);
+        } else {
+          new_mod.field = decl;
+        }
+        sink.node = responsible_node_declaration(lhs);
+        if (sink.node == NULL) {
+          fatal_error("%d: Assignment of global %s in global space???", tnode_line_number(lhs), decl_name(decl));
+          return;
+        }
+        /*!!!HERE! What if this is null ? */
+        sink.attr = phylum_shared_info_attribute(node_decl_phylum(sink.node),aug_graph->global_state);
+        sink.modifier = &new_mod;
+        /* should also force a backwards depend on the shared info,
+         * but shared info is actually uninteresting,
+         * so I'll skip it...
+         */
       } else if (Declaration_info(decl)->decl_flags &
 		 (ATTR_DECL_INH_FLAG|ATTR_DECL_SYN_FLAG)) {
-	/* a use of parameter or result (we hope) */
-	sink.node = aug_graph->match_rule;
-	sink.attr = decl;
-	sink.modifier = mod;
+        /* a use of parameter or result (we hope) */
+        sink.node = aug_graph->match_rule;
+        sink.attr = decl;
+        sink.modifier = mod;
       } else {
-	sink.node = 0;
-	sink.attr = decl;
-	sink.modifier = mod;
+        sink.node = 0;
+        sink.attr = decl;
+        sink.modifier = mod;
       }
       set_value_for(&sink,rhs,aug_graph);
+      if (Expression_info(rhs)->value_for){
+          print_instance(Expression_info(rhs)->value_for, stdout);
+          printf("\n");
+      }
       if (vertex_is_input(&sink)) aps_error(lhs,"Assignment of input value");
       // don't make error even if not output: local attributes!
       record_expression_dependencies(&sink,cond,kind,NULL,rhs,aug_graph);
@@ -1301,47 +1341,51 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
       Declaration field, attr, fdecl, decl;
       VERTEX sink;
       if ((field = field_ref_p(lhs)) != NULL) {
-	/* Assignment of a field, or a field of a field */
-	Expression object = field_ref_object(lhs);
-	MODIFIER new_mod;
-	new_mod.next = mod;
-	if (EXPR_IS_LHS(lhs)) {
-	  new_mod.field = reverse_field(field);
-	} else {
-	  new_mod.field = field;
-	}
-	record_lhs_dependencies(object,cond,kind,&new_mod,rhs,aug_graph);
-	record_lhs_dependencies(object,cond,control_dependency,
-				&new_mod,object,aug_graph);
-      } else if ((attr = attr_ref_p(lhs)) != NULL) {
-	sink.node = attr_ref_node_decl(lhs);
-	sink.attr = attr;
-	sink.modifier = mod;
-	set_value_for(&sink,rhs,aug_graph);
-	if (vertex_is_input(&sink)) aps_error(lhs,"Assignment of input value");
-	record_expression_dependencies(&sink,cond,kind,NULL,rhs,aug_graph);
-	record_condition_dependencies(&sink,cond,aug_graph);
-      } else if ((fdecl = local_call_p(lhs)) != NULL) {      
-	Declaration result = some_function_decl_result(decl);
-	Declaration proxy = Expression_info(lhs)->funcall_proxy;
-	if (mod == NO_MODIFIER) {
-	  aps_error(lhs,"How can we assign the result of a function?");
-	}
-	sink.node = proxy;
-	sink.attr = result;
-	sink.modifier = mod;
-	set_value_for(&sink,rhs,aug_graph);
-	if (vertex_is_input(&sink)) aps_error(lhs,"Assignment of input value");
-	record_expression_dependencies(&sink,cond,kind,NULL,rhs,aug_graph);
-	record_condition_dependencies(&sink,cond,aug_graph);
-      } else {
-	Expression actual = first_Actual(funcall_actuals(lhs));
-	if (mod == NO_MODIFIER) {
-	  aps_error(lhs,"How can we assign the result of a function?");
-	}
-	for (; actual != NULL; actual=Expression_info(actual)->next_actual) {
-	  record_lhs_dependencies(actual,cond,kind,mod,rhs,aug_graph);
-	}
+        /* Assignment of a field, or a field of a field */
+        Expression object = field_ref_object(lhs);
+        MODIFIER new_mod;
+        new_mod.next = mod;
+        if (EXPR_IS_LHS(lhs)) {
+          new_mod.field = reverse_field(field);
+        } else {
+          new_mod.field = field;
+        }
+        record_lhs_dependencies(object,cond,kind,&new_mod,rhs,aug_graph);
+        record_lhs_dependencies(object,cond,control_dependency,&new_mod,object,aug_graph);
+      }
+      else if ((attr = attr_ref_p(lhs)) != NULL) {
+        sink.node = attr_ref_node_decl(lhs);
+        sink.attr = attr;
+        sink.modifier = mod;
+        set_value_for(&sink,rhs,aug_graph);
+        if (vertex_is_input(&sink)) aps_error(lhs,"Assignment of input value");
+        record_expression_dependencies(&sink,cond,kind,NO_MODIFIER,rhs,aug_graph);
+        record_condition_dependencies(&sink,cond,aug_graph);
+      }
+      else if ((fdecl = local_call_p(lhs)) != NULL) {
+//          printf("local funcall assignment line:%d\n", tnode_line_number(lhs));
+          Declaration result = some_function_decl_result(decl);
+          Declaration proxy = Expression_info(lhs)->funcall_proxy;
+          if (mod == NO_MODIFIER) {
+            aps_error(lhs,"How can we assign the result of a function?");
+          }
+          sink.node = proxy;
+          sink.attr = result;
+          sink.modifier = mod;
+          set_value_for(&sink,rhs,aug_graph);
+          if (vertex_is_input(&sink)) aps_error(lhs,"Assignment of input value");
+          record_expression_dependencies(&sink,cond,kind,NULL,rhs,aug_graph);
+          record_condition_dependencies(&sink,cond,aug_graph);
+      }
+      else {
+//          printf("other funcall assignment line:%d\n", tnode_line_number(lhs));
+          Expression actual = first_Actual(funcall_actuals(lhs));
+          if (mod == NO_MODIFIER) {
+              aps_error(lhs,"How can we assign the result of a function?");
+          }
+          for (; actual != NULL; actual=Expression_info(actual)->next_actual) {
+              record_lhs_dependencies(actual,cond,kind,mod,rhs,aug_graph);
+          }
       }
     }
     break;
@@ -1385,150 +1429,193 @@ static void *get_edges(void *vaug_graph, void *node) {
       case KEYtype_decl:
       case KEYtype_renaming:
       case KEYconstructor_decl:
-	/* Don't look in nested things */
-	return NULL;
-      case KEYformal:
-	{ Declaration case_stmt = formal_in_case_p(decl);
-	  if (case_stmt != NULL) {
-	    Expression expr = case_stmt_expr(case_stmt);
-	    VERTEX f;
-	    f.node = 0;
-	    f.attr = decl;
-	    f.modifier = NO_MODIFIER;
-	    record_condition_dependencies(&f,cond,aug_graph);
-	    record_expression_dependencies(&f,cond,dependency,NO_MODIFIER,
-					   expr,aug_graph);
-	  }
-	}
-	break;
+	    /* Don't look in nested things */
+	    return NULL;
+      case KEYformal: /* This can be seen as a special case of vaule_decl */
+        {
+          Declaration case_stmt = formal_in_case_p(decl);
+          if (case_stmt != NULL) {
+            Expression expr = case_stmt_expr(case_stmt);
+            VERTEX sink;
+            sink.node = 0;
+            sink.attr = decl;
+            sink.modifier = NO_MODIFIER;
+            record_condition_dependencies(&sink,cond,aug_graph);
+            record_expression_dependencies(&sink,cond,dependency,NO_MODIFIER,expr,aug_graph);
+          }
+        }
+	    break;
       case KEYvalue_decl:
-	{
-	  Default def = value_decl_default(decl);
-	  Declaration cdecl;
-	  VERTEX sink;
-	  sink.attr = decl;
-	  sink.node = responsible_node_declaration(decl);
-	  sink.modifier = NO_MODIFIER;
-	  record_condition_dependencies(&sink,cond,aug_graph);
-	  switch (Default_KEY(def)) {
-	  case KEYno_default: break;
-	  case KEYsimple:
-	    /* XXX: I don't know I have to do it both ways.
-	     */
-	    record_expression_dependencies(&sink,cond,dependency,NO_MODIFIER,
-					   simple_value(def),aug_graph);
-	    sink.node = 0;
-	    record_expression_dependencies(&sink,cond,dependency,NO_MODIFIER,
-					   simple_value(def),aug_graph);
-	    if ((cdecl = constructor_call_p(simple_value(def))) != NULL) {
-	      FIBERSET fs = fiberset_for(decl,FIBERSET_NORMAL_FINAL);
-	      FIBERSET rfs = fiberset_for(decl,FIBERSET_REVERSE_FINAL);
-	      Declaration pdecl = constructor_decl_phylum(cdecl);
-	      Declaration fdecl;
-	      /*
-	      printf("Looking at %s which instantiates %s\n",decl_name(decl),
-		     decl_name(cdecl));
-	      printf("Normal: ");
-	      print_fiberset(fs,stdout);
-	      printf("\nReverse: ");
-	      print_fiberset(rfs,stdout);
-	      printf("\n");
-	      */
-	      /* add fiber dependencies for fields */
-	      for (fdecl = NEXT_FIELD(pdecl);
-		   fdecl != NULL;
-		   fdecl = NEXT_FIELD(fdecl)) {
-		Declaration rfdecl = reverse_field(fdecl);
-		VERTEX source;
-		MODIFIER dot_mod;
-		MODIFIER nodot_mod;
-		source.node = NULL;
-		source.attr = decl;
-		dot_mod.field = rfdecl;
-		nodot_mod.field = fdecl;
-		dot_mod.next = nodot_mod.next = NO_MODIFIER;
-		sink.modifier = &nodot_mod;
-		source.modifier = &dot_mod;
-		add_edges_to_graph(&source,&sink,cond,fiber_dependency,
-				   aug_graph);
-	      }
-	    }
-	    break;
-	  case KEYcomposite:
-	    record_expression_dependencies(&sink,cond,dependency,NO_MODIFIER,
-					   composite_initial(def),aug_graph);
-	    break;
-	  }
-	  if (DECL_IS_SHARED(decl)) {
-	    /* add edges for shared info */
-	    STATE *s = aug_graph->global_state;
-	    Declaration sattr =
-	      phylum_shared_info_attribute(s->start_phylum,s);
-	    Declaration rdecl = reverse_field(decl);
-	    Declaration module = aug_graph->match_rule;
-	    VERTEX shared_info_fiber, this_decl;
-	    MODIFIER dot_mod;
-	    MODIFIER nodot_mod;
-	    shared_info_fiber.node = module;
-	    shared_info_fiber.attr = sattr;
-	    this_decl.node = 0;
-	    this_decl.attr = decl;
-	    this_decl.modifier = NO_MODIFIER;
-	    dot_mod.field = rdecl;
-	    nodot_mod.field = decl;
-	    dot_mod.next = nodot_mod.next = NO_MODIFIER;
+        {
+//            printf("value_decl@%d: %s\n", tnode_line_number(decl), decl_name(decl));
+          Default def = value_decl_default(decl);
+          Declaration cdecl;
+          VERTEX sink;
+          sink.node = responsible_node_declaration(decl);
+//          if (sink.node == NULL) {
+//            printf("responsible_node_declaration for %s@%d: NULL\n", decl_name(decl), tnode_line_number(decl));
+//          } else {
+//            printf("responsible_node_declaration for %s@%d: %s\n", decl_name(decl), tnode_line_number(decl), decl_name(sink.node));
+//          }
+          sink.attr = decl;
+          sink.modifier = NO_MODIFIER;
+          record_condition_dependencies(&sink,cond,aug_graph);
+          switch (Default_KEY(def)) {
+          case KEYno_default: break;
+          case KEYsimple:
+            /* XXX: I don't know I have to do it both ways.*/
+            record_expression_dependencies(&sink,cond,dependency,NO_MODIFIER,simple_value(def),aug_graph);
+            sink.node = 0;
+            record_expression_dependencies(&sink,cond,dependency,NO_MODIFIER,simple_value(def),aug_graph);
+            if ((cdecl = constructor_call_p(simple_value(def))) != NULL) {
+//              FIBERSET fs = fiberset_for(decl,FIBERSET_NORMAL_FINAL);
+//              FIBERSET rfs = fiberset_for(decl,FIBERSET_REVERSE_FINAL);
+              Declaration pdecl = constructor_decl_phylum(cdecl);
+              printf("Looking at %s@%d which instantiates %s\n",decl_name(decl), tnode_line_number(decl),
+                 decl_name(cdecl));
+                 /*
+              printf("Normal: ");
+              print_fiberset(fs,stdout);
+              printf("\nReverse: ");
+              print_fiberset(rfs,stdout);
+              printf("\n");
+              */
+              /* add fiber dependencies for fields */
+              for (Declaration fdecl = NEXT_FIELD(pdecl); fdecl != NULL; fdecl = NEXT_FIELD(fdecl)) {
+//                  printf("    next field@%d: %s\n", tnode_line_number(fdecl), decl_name(fdecl));
+                Declaration rfdecl = reverse_field(fdecl);
+//                  printf("        reversed field@%d: %s\n", tnode_line_number(rfdecl), decl_name(rfdecl));
+                VERTEX source;
+                MODIFIER dot_mod;
+                MODIFIER nodot_mod;
+                source.node = NULL;
+                source.attr = decl;
+                dot_mod.field = rfdecl;
+                nodot_mod.field = fdecl;
+                dot_mod.next = nodot_mod.next = NO_MODIFIER;
+                sink.modifier = &nodot_mod;
+                source.modifier = &dot_mod;
+                add_edges_to_graph(&source,&sink,cond,fiber_dependency,aug_graph);
+              }
+            }
+            break;
+          case KEYcomposite:
+            record_expression_dependencies(&sink,cond,dependency,NO_MODIFIER,
+                           composite_initial(def),aug_graph);
+            break;
+          }
+          if (DECL_IS_SHARED(decl)) {
+//              printf("shared value_decl:%s@%d\n", decl_name(decl), tnode_line_number(decl));
+            /* add edges for shared info */
+            STATE *s = aug_graph->global_state;
+            Declaration sattr =
+              phylum_shared_info_attribute(s->start_phylum,s);
+            Declaration rdecl = reverse_field(decl);
+            Declaration module = aug_graph->match_rule;
+//            printf("module name: %s \n", decl_name(module));
+            VERTEX shared_info_fiber, this_decl;
+            MODIFIER dot_mod;
+            MODIFIER nodot_mod;
+            shared_info_fiber.node = module;
+            shared_info_fiber.attr = sattr;
+            this_decl.node = 0;
+            this_decl.attr = decl;
+            this_decl.modifier = NO_MODIFIER;
+            dot_mod.field = rdecl;
+            nodot_mod.field = decl;
+            dot_mod.next = nodot_mod.next = NO_MODIFIER;
 
-	    /* add edges to collect value */
-	    shared_info_fiber.modifier = &dot_mod;
-	    add_edges_to_graph(&shared_info_fiber,&this_decl,
-			       cond,dependency,aug_graph);
+            /* add edges to collect value */
+            shared_info_fiber.modifier = &dot_mod;
+            add_edges_to_graph(&shared_info_fiber,&this_decl,
+                       cond,dependency,aug_graph);
 
-	    /* add edges to broadcast value */
-	    shared_info_fiber.modifier = &nodot_mod;
-	    add_edges_to_graph(&this_decl,&shared_info_fiber,
-			       cond,dependency,aug_graph);
-	  }
-	}
-	break;
+            /* add edges to broadcast value */
+            shared_info_fiber.modifier = &nodot_mod;
+            add_edges_to_graph(&this_decl,&shared_info_fiber,
+                       cond,dependency,aug_graph);
+          }
+        }
+        break;
       case KEYassign:
-	{ Expression lhs=assign_lhs(decl);
-	  Expression rhs=assign_rhs(decl);
-	  record_lhs_dependencies(lhs,cond,dependency,NULL,rhs,aug_graph);
-	}
-	break;
-      case KEYif_stmt:
-	{
-	  Expression test = if_stmt_cond(decl);
-	  VERTEX sink;
-	  sink.node = 0;
-	  sink.attr = decl;
-	  sink.modifier = NO_MODIFIER;
-	  record_condition_dependencies(&sink,cond,aug_graph);
-	  record_expression_dependencies(&sink,cond,control_dependency,
-					 NULL,test,aug_graph);
-	}
-	break;
-      case KEYcase_stmt:
-	{
-	  Match m;
-	  VERTEX sink;
-	  sink.node = 0;
-	  sink.modifier = NO_MODIFIER;
-	  for (m=first_Match(case_stmt_matchers(decl)); m; m=MATCH_NEXT(m)) {
-	    Expression test = Match_info(m)->match_test;
-	    sink.attr = (Declaration)m;
-	    record_condition_dependencies(&sink,cond,aug_graph);
+        { Expression lhs=assign_lhs(decl);
+          Expression rhs=assign_rhs(decl);
+          record_lhs_dependencies(lhs,cond,dependency,NULL,rhs,aug_graph);
 
-	    for (; test != 0; test = Expression_info(test)->next_expr) {
-	      record_expression_dependencies(&sink,cond,control_dependency,
-					     NO_MODIFIER,test,aug_graph);
-	    }
-	  }
-	}
-	break;
+          if (Expression_KEY(rhs) == KEYvalue_use) {
+
+
+            Declaration sdecl = USE_DECL(value_use_use(rhs));
+            if (DECL_IS_SYNTAX(sdecl)) {
+                Type ty = infer_some_value_decl_type(sdecl);
+                /*if (Type_KEY(ty) == KEYremote_type)
+                  ty = remote_type_nodetype(ty); */
+                switch (Type_KEY(ty)) {
+                    case KEYtype_use: {
+                        VERTEX sink;
+                        sink.node = 0;
+                        sink.attr = sdecl;
+                        sink.modifier = NO_MODIFIER;
+
+                        Declaration tdecl = Use_info(type_use_use(ty))->use_decl;
+                        for (Declaration fdecl = NEXT_FIELD(tdecl); fdecl != NULL; fdecl = NEXT_FIELD(fdecl)) {
+
+                            if (Declaration_info(fdecl)->decl_flags & FIELD_DECL_FLAG) {
+                                Declaration rfdecl = reverse_field(fdecl);
+                                VERTEX source;
+                                MODIFIER dot_mod;
+                                MODIFIER nodot_mod;
+                                source.node = NULL;
+                                source.attr = sdecl;
+                                dot_mod.field = rfdecl;
+                                nodot_mod.field = fdecl;
+                                dot_mod.next = nodot_mod.next = NO_MODIFIER;
+                                sink.modifier = &nodot_mod;
+                                source.modifier = &dot_mod;
+                                add_edges_to_graph(&source, &sink, cond, fiber_dependency, aug_graph);
+                            }
+
+
+                        }
+                    }
+                }
+            }
+          }
+
+        }
+        break;
+      case KEYif_stmt:
+        {
+          Expression test = if_stmt_cond(decl);
+          VERTEX sink;
+          sink.node = 0;
+          sink.attr = decl;
+          sink.modifier = NO_MODIFIER;
+          record_condition_dependencies(&sink,cond,aug_graph);
+          record_expression_dependencies(&sink,cond,control_dependency,
+                         NO_MODIFIER, test, aug_graph);
+        }
+	    break;
+      case KEYcase_stmt:
+        {
+          Match m;
+          VERTEX sink;
+          sink.node = 0;
+          sink.modifier = NO_MODIFIER;
+          for (m=first_Match(case_stmt_matchers(decl)); m; m=MATCH_NEXT(m)) {
+            Expression test = Match_info(m)->match_test;
+            sink.attr = (Declaration)m;
+            record_condition_dependencies(&sink,cond,aug_graph);
+            for (; test != 0; test = Expression_info(test)->next_expr) {
+              record_expression_dependencies(&sink,cond,control_dependency,
+                             NO_MODIFIER, test, aug_graph);
+            }
+          }
+        }
+	    break;
       default:
-	printf("%d: don't handle this kind yet\n",tnode_line_number(decl));
-	break;
+	    printf("%d: don't handle this kind yet\n",tnode_line_number(decl));
+	    break;
       }
     }
     break;
@@ -1536,60 +1623,61 @@ static void *get_edges(void *vaug_graph, void *node) {
     {
       Expression e = (Expression) node;
       Declaration fdecl;
-      
+
       if ((fdecl = local_call_p(e)) != NULL) {
-	Declaration proxy = Expression_info(e)->funcall_proxy;
-	CONDITION *cond;
-	void *parent = tnode_parent(node);
+//          printf("local call@%d %s: \n", tnode_line_number(e), decl_name(fdecl));
+        Declaration proxy = Expression_info(e)->funcall_proxy;
+        CONDITION *cond;
+        void *parent = tnode_parent(node);
 
-	while (ABSTRACT_APS_tnode_phylum(parent) != KEYDeclaration) {
-	  parent = tnode_parent(parent);
-	}
-	cond = &Declaration_info((Declaration)parent)->decl_cond;
+        while (ABSTRACT_APS_tnode_phylum(parent) != KEYDeclaration) {
+          parent = tnode_parent(parent);
+        }
+        cond = &Declaration_info((Declaration)parent)->decl_cond;
 
-	/* connect result to conditions */
-	{
-	  Declaration rd = some_function_decl_result(fdecl);
-	  VERTEX sink;
-	  sink.node = proxy;
-	  sink.attr = rd;
-	  sink.modifier = NO_MODIFIER;
-	  record_condition_dependencies(&sink,cond,aug_graph);
-	}
+        /* connect result to conditions */
+        {
+          Declaration rd = some_function_decl_result(fdecl);
+          VERTEX sink;
+          sink.node = proxy;
+          sink.attr = rd;
+          sink.modifier = NO_MODIFIER;
+          record_condition_dependencies(&sink,cond,aug_graph);
+        }
 
-	/* connect formals and actuals */
-	{
-	  Type ft = some_function_decl_type(fdecl);
-	  Declaration f = first_Declaration(function_type_formals(ft));
-	  Expression a = first_Actual(funcall_actuals(e));
-	  for (; f != NULL; f = DECL_NEXT(f), a = EXPR_NEXT(a)) {
-	    VERTEX sink;
-	    sink.node = proxy;
-	    sink.attr = f;
-	    sink.modifier = NO_MODIFIER;
-	    record_expression_dependencies(&sink,cond,dependency,
-					   NO_MODIFIER,a,aug_graph);
-	    record_condition_dependencies(&sink,cond,aug_graph);
-	  }
-	}
+        /* connect formals and actuals */
+        {
+          Type ft = some_function_decl_type(fdecl);
+          Declaration f = first_Declaration(function_type_formals(ft));
+          Expression a = first_Actual(funcall_actuals(e));
+          for (; f != NULL; f = DECL_NEXT(f), a = EXPR_NEXT(a)) {
+            VERTEX sink;
+            sink.node = proxy;
+            sink.attr = f;
+            sink.modifier = NO_MODIFIER;
+            record_expression_dependencies(&sink,cond,dependency,
+                           NO_MODIFIER,a,aug_graph);
+            record_condition_dependencies(&sink,cond,aug_graph);
+          }
+        }
 
-	/* connect shared info */
-	{
-	  STATE *s = aug_graph->global_state;
-	  Declaration rnode = responsible_node_declaration(e);
-	  Declaration rnodephy = node_decl_phylum(rnode);
-	  Declaration lattr = phylum_shared_info_attribute(rnodephy,s);
-	  Declaration rattr = phylum_shared_info_attribute(fdecl,s);
-	  VERTEX source, sink;
-	  source.node = rnode;
-	  source.attr = lattr;
-	  source.modifier = NO_MODIFIER;
-	  sink.node = proxy;
-	  sink.attr = rattr;
-	  sink.modifier = NO_MODIFIER;
-	  add_edges_to_graph(&source,&sink,cond,dependency,aug_graph);
-	  record_condition_dependencies(&sink,cond,aug_graph);
-	}
+        /* connect shared info */
+        {
+          STATE *s = aug_graph->global_state;
+          Declaration rnode = responsible_node_declaration(e);
+          Declaration rnodephy = node_decl_phylum(rnode);
+          Declaration lattr = phylum_shared_info_attribute(rnodephy,s);
+          Declaration rattr = phylum_shared_info_attribute(fdecl,s);
+          VERTEX source, sink;
+          source.node = rnode;
+          source.attr = lattr;
+          source.modifier = NO_MODIFIER;
+          sink.node = proxy;
+          sink.attr = rattr;
+          sink.modifier = NO_MODIFIER;
+          add_edges_to_graph(&source,&sink,cond,dependency,aug_graph);
+          record_condition_dependencies(&sink,cond,aug_graph);
+        }
       }
     }
     break;
@@ -1627,10 +1715,97 @@ void add_attrset_for(STATE *s, Declaration phylum, Declaration attr) {
 
 /*** INITIALIZATION ***/
 
-static void *mark_local(void *ignore, void *node) {
+static void *mark_decl(void *state, void *node) {
   if (ABSTRACT_APS_tnode_phylum(node) == KEYDeclaration) {
-    Declaration_info((Declaration)node)->decl_flags |= DECL_LOCAL_FLAG;
+      Declaration decl = (Declaration)node;
+      Declaration_info(decl)->decl_flags |= DECL_LOCAL_FLAG;
+
+      switch (Declaration_KEY(decl)) {
+          case KEYmodule_decl: /* representing shared instances. */
+            Declaration_info(decl)->decl_flags |= DECL_RHS_FLAG;
+            break;
+          case KEYsome_function_decl:
+              Declaration_info(decl)->decl_flags |= DECL_LHS_FLAG;
+              Type ftype=some_function_decl_type(decl);
+              Declaration formal=first_Declaration(function_type_formals(ftype));
+              Declaration result=first_Declaration(function_type_return_values(ftype));
+              for (; formal != NULL; formal=Declaration_info(formal)->next_decl) {
+                  Declaration_info(formal)->decl_flags |= ATTR_DECL_INH_FLAG;
+              }
+              for (; result != NULL; result=Declaration_info(result)->next_decl) {
+                  Declaration_info(result)->decl_flags |= ATTR_DECL_SYN_FLAG;
+              }
+              break;
+          case KEYtop_level_match: {
+              Pattern pat = matcher_pat(top_level_match_m(decl));
+              switch (Pattern_KEY(pat)) {
+                  default:
+                      fatal_error("%d:improper top-level-match", tnode_line_number(decl));
+                  case KEYand_pattern: {
+                      switch (Pattern_KEY(and_pattern_p1(pat))) {
+                          default:
+                              fatal_error("%d:improper top-level-match", tnode_line_number(decl));
+                          case KEYpattern_var: {
+                              Pattern p1 = and_pattern_p1(pat);
+                              Pattern p2 = and_pattern_p2(pat);
+                              Declaration_info(pattern_var_formal(p1))->decl_flags |= DECL_LHS_FLAG;
+                              switch (Pattern_KEY(p2)) {
+                                  default:
+                                      fatal_error("%d:misformed pattern", tnode_line_number(p2));
+                                  case KEYpattern_call: {
+                                      switch (Pattern_KEY(pattern_call_func(p2))) {
+                                          default:
+                                              fatal_error("%d:unknown pattern function",tnode_line_number(pat));
+                                          case KEYpattern_use: {
+                                              for (Pattern next_pat = first_PatternActual(pattern_call_actuals(p2));
+                                                   next_pat != NULL;
+                                                   next_pat = Pattern_info(next_pat)->next_pattern_actual) {
+                                                  switch (Pattern_KEY(next_pat)) {
+                                                      default:
+                                                          aps_error(next_pat, "too complex a pattern");
+                                                          break;
+                                                      case KEYpattern_var: {
+                                                          Declaration next_rhs = pattern_var_formal(next_pat);
+                                                          Declaration_info(next_rhs)->decl_flags |= DECL_RHS_FLAG;
+                                                          break;
+                                                      }
+                                                  }
+                                              }
+                                              break;
+                                          }
+                                      }
+                                      break;
+                                  }
+                              }
+                              break;
+                          }
+                      }
+                      break;
+                  }
+              }
+          }
+          break;
+      }
   }
+  else if (ABSTRACT_APS_tnode_phylum(node) == KEYExpression) {
+      Expression expr = (Expression)node;
+      switch (Expression_KEY(expr)) {
+          default:
+              break;
+          case KEYfuncall: {
+              Declaration attr;
+              if ((attr = attr_ref_p(expr)) != NULL) {
+                  Declaration node = attr_ref_node_decl(expr);
+                  if (Declaration_KEY(node) == KEYvalue_decl) {
+                      Declaration_info(attr)->decl_flags |= FIELD_DECL_FLAG;
+//                      printf("attr is field: %s, %d\n", decl_name(attr), tnode_line_number(node));
+                  }
+              }
+          }
+      }
+  }
+  return node;
+
 }
 
 static void init_node_phy_graph2(Declaration node, Type ty, STATE *state) { 
@@ -1643,21 +1818,21 @@ static void init_node_phy_graph2(Declaration node, Type ty, STATE *state) {
   case KEYtype_use:
     { Use u = type_use_use(ty);
       Declaration phylum=Use_info(u)->use_decl;
-      if (phylum == NULL)
-	fatal_error("%d: unbound type",tnode_line_number(ty));
+      if (phylum == NULL) {
+	    fatal_error("%d: unbound type",tnode_line_number(ty));
+      }
       switch (Declaration_KEY(phylum)) {
       case KEYphylum_decl:
-	Declaration_info(node)->node_phy_graph =
-	  summary_graph_for(state,phylum);
-	break;
+	    Declaration_info(node)->node_phy_graph = summary_graph_for(state,phylum);
+	    break;
       case KEYtype_decl:
-	break;
+	    break;
       case KEYtype_renaming:
-	init_node_phy_graph2(node,type_renaming_old(phylum),state);
-	break;
+	    init_node_phy_graph2(node,type_renaming_old(phylum),state);
+	    break;
       default:
-	aps_error(node,"could not find type for summary graph %s",decl_name(phylum));
-	break;
+	    aps_error(node,"could not find type for summary graph %s",decl_name(phylum));
+	    break;
       }
     }
     break;
@@ -1682,123 +1857,84 @@ static void init_augmented_dependency_graph(AUG_GRAPH *aug_graph,
   Block body;
   aug_graph->match_rule = tlm;
   aug_graph->global_state = state;
-
   switch (Declaration_KEY(tlm)) {
-  default: fatal_error("%d:unknown top-level-match",tnode_line_number(tlm));
-  case KEYmodule_decl: /* representing shared instances. */
-    aug_graph->syntax_decl = tlm;
-    aug_graph->lhs_decl = tlm;
-    aug_graph->first_rhs_decl = NULL;
-    { int i;
-      for (i=0; i < state->phyla.length; ++i) {
-	if (state->phyla.array[i] == state->start_phylum) break;
+      default:
+          fatal_error("%d:unknown top-level-match", tnode_line_number(tlm));
+
+      case KEYmodule_decl: { /* representing shared instances. */
+          aug_graph->syntax_decl = tlm;
+          aug_graph->lhs_decl = tlm;
+          aug_graph->first_rhs_decl = NULL;
+          int i;
+          for (i = 0; i < state->phyla.length; ++i) {
+              if (state->phyla.array[i] == state->start_phylum) break;
+          }
+          if (i == state->phyla.length) {
+              fatal_error("%d: Cannot find start phylum summary graph", tnode_line_number(tlm));
+          }
+          Declaration_info(tlm)->node_phy_graph = &state->phy_graphs[i];
+//      printf("init argumented DP for shared instance: %s \n", decl_name(tlm));
+          body = module_decl_contents(tlm);
+          break;
       }
-      if (i == state->phyla.length)
-	fatal_error("%d: Cannot find start phylum summary graph",
-		    tnode_line_number(tlm));
-      Declaration_info(tlm)->node_phy_graph = &state->phy_graphs[i];
-      Declaration_info(tlm)->decl_flags |= DECL_RHS_FLAG;
-    }
-    body = module_decl_contents(tlm);
-    break;
-  case KEYsome_function_decl:
-    aug_graph->syntax_decl = tlm;
-    aug_graph->lhs_decl = tlm;
-    aug_graph->first_rhs_decl = NULL;
-    { int i;
-      for (i=0; i < state->phyla.length; ++i) {
-	if (state->phyla.array[i] == tlm) break;
+      case KEYsome_function_decl: {
+          aug_graph->syntax_decl = tlm;
+          aug_graph->lhs_decl = tlm;
+          aug_graph->first_rhs_decl = NULL;
+          int i;
+          for (i = 0; i < state->phyla.length; ++i) {
+              if (state->phyla.array[i] == tlm) break;
+          }
+          if (i == state->phyla.length) {
+              fatal_error("%d: Cannot find summary phylum graph", tnode_line_number(tlm));
+          }
+          Declaration_info(tlm)->node_phy_graph = &state->phy_graphs[i];
+          body = some_function_decl_body(tlm);
+          break;
       }
-      if (i == state->phyla.length)
-	fatal_error("%d: Cannot find summary phylum graph",
-		    tnode_line_number(tlm));
-      Declaration_info(tlm)->node_phy_graph = &state->phy_graphs[i];
-    }
-    body = some_function_decl_body(tlm);
-    Declaration_info(tlm)->decl_flags |= DECL_LHS_FLAG;
-    { Type ftype=some_function_decl_type(tlm);
-      Declaration formal=first_Declaration(function_type_formals(ftype));
-      Declaration result=first_Declaration(function_type_return_values(ftype));
-      for (; formal != NULL; formal=Declaration_info(formal)->next_decl) {
-	Declaration_info(formal)->decl_flags |= ATTR_DECL_INH_FLAG;
+      case KEYtop_level_match: {
+          body = matcher_body(top_level_match_m(tlm));
+          Pattern pat = matcher_pat(top_level_match_m(tlm));
+          Pattern p1 = and_pattern_p1(pat);
+          Pattern p2 = and_pattern_p2(pat);
+
+          aug_graph->lhs_decl = pattern_var_formal(p1);
+          init_node_phy_graph(aug_graph->lhs_decl, state);
+
+          Declaration decl = Use_info(pattern_use_use(pattern_call_func(p2)))->use_decl;
+          if (decl == NULL) fatal_error("%d:unbound func", tnode_line_number(p2));
+          aug_graph->syntax_decl = decl; // decl is the construtor
+//            printf("pattern decl: %s@%d\n", decl_name(decl), tnode_line_number(decl));
+
+          Declaration last_rhs = NULL;
+          Pattern next_pat;
+          for (next_pat = first_PatternActual(pattern_call_actuals(p2));
+               next_pat != NULL;
+               next_pat = Pattern_info(next_pat)->next_pattern_actual) {
+              Declaration next_rhs = pattern_var_formal(next_pat);
+              init_node_phy_graph(next_rhs, state);
+              if (last_rhs == NULL) {
+                  aug_graph->first_rhs_decl = next_rhs;
+              } else {
+                  Declaration_info(last_rhs)->next_decl = next_rhs;
+              }
+              last_rhs = next_rhs;
+          }
+          break;
       }
-      for (; result != NULL; result=Declaration_info(result)->next_decl) {
-	Declaration_info(result)->decl_flags |= ATTR_DECL_SYN_FLAG;
-      }
-    }
-    break;
-  case KEYtop_level_match:
-    body = matcher_body(top_level_match_m(tlm));
-    { Pattern pat=matcher_pat(top_level_match_m(tlm));
-      switch (Pattern_KEY(pat)) {
-      default: fatal_error("%d:improper top-level-match",
-			   tnode_line_number(tlm));
-      case KEYand_pattern:
-	switch (Pattern_KEY(and_pattern_p1(pat))) {
-	default: fatal_error("%d:improper top-level-match",
-			     tnode_line_number(tlm));
-	case KEYpattern_var:
-	  aug_graph->lhs_decl = pattern_var_formal(and_pattern_p1(pat));
-	  Declaration_info(aug_graph->lhs_decl)->decl_flags |= DECL_LHS_FLAG;
-	  init_node_phy_graph(aug_graph->lhs_decl,state);
-	  break;
-	}
-	pat = and_pattern_p2(pat);
-      }
-      switch (Pattern_KEY(pat)) {
-      default: fatal_error("%d:misformed pattern",tnode_line_number(pat));
-      case KEYpattern_call:
-	switch (Pattern_KEY(pattern_call_func(pat))) {
-	default:
-	  fatal_error("%d:unknown pattern function",tnode_line_number(pat));
-	case KEYpattern_use:
-	  { Declaration decl =
-	      Use_info(pattern_use_use(pattern_call_func(pat)))->use_decl;
-	    if (decl == NULL) fatal_error("%d:unbound pfunc",
-					  tnode_line_number(pat));
-	    aug_graph->syntax_decl = decl;
-	  }
-	}
-	{ Declaration last_rhs = NULL;
-	  Pattern next_pat;
-	  for (next_pat = first_PatternActual(pattern_call_actuals(pat));
-	       next_pat != NULL;
-	       next_pat = Pattern_info(next_pat)->next_pattern_actual) {
-	    switch (Pattern_KEY(next_pat)) {
-	    default:
-	      aps_error(next_pat,"too complex a pattern");
-	      break;
-	    case KEYpattern_var:
-	      { Declaration next_rhs = pattern_var_formal(next_pat);
-		Declaration_info(next_rhs)->decl_flags |= DECL_RHS_FLAG;
-		init_node_phy_graph(next_rhs,state);
-		if (last_rhs == NULL) {
-		  aug_graph->first_rhs_decl = next_rhs;
-		} else {
-		  Declaration_info(last_rhs)->next_decl = next_rhs;
-		}
-		last_rhs = next_rhs;
-	      }
-	      break;
-	    }
-	  }
-	}
-	break;
-      }
-    }
-    break;
   }
 
   /* initialize the if_rules vector */
   { int num_if_rules = 0;
-    CONDITION cond;
     traverse_Declaration(count_if_rules,&num_if_rules,tlm);
-    if (num_if_rules > 32)
+    if (num_if_rules > 32){
       fatal_error("Can handle up to 32 conditionals (got %d)",num_if_rules);
+    }
 
     VECTORALLOC(aug_graph->if_rules,void*,num_if_rules);
     traverse_Declaration(get_if_rules,aug_graph->if_rules.array,tlm);
     /* now initialize the decl_cond on every Declaration */
+    CONDITION cond;
     cond.positive = 0;
     cond.negative = 0;
     traverse_Declaration(init_decl_cond,&cond,tlm);
@@ -1859,17 +1995,16 @@ static void init_augmented_dependency_graph(AUG_GRAPH *aug_graph,
     source.attr = phylum_shared_info_attribute
       (node_decl_phylum(aug_graph->lhs_decl),state);
     source.modifier = NO_MODIFIER;
-    cond.positive = 0; cond.negative = 0;
-    for (decl = aug_graph->first_rhs_decl;
-	 decl != NULL;
-	 decl = DECL_NEXT(decl)) {
+    cond.positive = 0;
+    cond.negative = 0;
+    for (decl = aug_graph->first_rhs_decl; decl != NULL; decl = DECL_NEXT(decl)) {
       Declaration phy = node_decl_phylum(decl);
       if (phy != NULL) {
-	VERTEX sink;
-	sink.node = decl;
-	sink.attr = phylum_shared_info_attribute(phy,state);
-	sink.modifier = NO_MODIFIER;
-	add_edges_to_graph(&source,&sink,&cond,dependency,aug_graph);
+        VERTEX sink;
+        sink.node = decl;
+        sink.attr = phylum_shared_info_attribute(phy,state);
+        sink.modifier = NO_MODIFIER;
+        add_edges_to_graph(&source,&sink,&cond,dependency,aug_graph);
       }
     }
   }
@@ -1891,29 +2026,29 @@ static void init_summary_dependency_graph(PHY_GRAPH *phy_graph,
       FIBERSET fs;
       ++count; /* base attribute */
       for (fs = fiberset_for(as->attr,FIBERSET_NORMAL_FINAL); fs != NULL; fs=fs->rest) {
-	++count;
+	    ++count;
       }
       for (fs = fiberset_for(as->attr,FIBERSET_REVERSE_FINAL); fs != NULL; fs=fs->rest) {
-	++count;
+	    ++count;
       }
     }
   }
   VECTORALLOC(phy_graph->instances,INSTANCE,count);
-  { int index=0;
-    ATTRSET as=attrset;
-    INSTANCE *array=phy_graph->instances.array;
-    for (; as != NULL; as=as->rest) {
-      FIBERSET fs;
-      assign_instance(array,index++,as->attr,NULL,NULL); /* base attribute */
-      for (fs=fiberset_for(as->attr,FIBERSET_NORMAL_FINAL); fs != NULL; fs=fs->rest) {
-	assign_instance(array,index++,as->attr,fs->fiber,NULL);
-      }
-      for (fs=fiberset_for(as->attr,FIBERSET_REVERSE_FINAL); fs != NULL; fs=fs->rest) {
-	assign_instance(array,index++,as->attr,fs->fiber,NULL);
-      }
+    { int index=0;
+        ATTRSET as=attrset;
+        INSTANCE *array=phy_graph->instances.array;
+        for (; as != NULL; as=as->rest) {
+            FIBERSET fs;
+            assign_instance(array,index++,as->attr,NULL,NULL); /* base attribute */
+            for (fs=fiberset_for(as->attr,FIBERSET_NORMAL_FINAL); fs != NULL; fs=fs->rest) {
+                assign_instance(array,index++,as->attr,fs->fiber,NULL);
+            }
+            for (fs=fiberset_for(as->attr,FIBERSET_REVERSE_FINAL); fs != NULL; fs=fs->rest) {
+                assign_instance(array,index++,as->attr,fs->fiber,NULL);
+            }
+        }
     }
-  }
-  { int total = count*count;
+    { int total = count*count;
     int i;
     phy_graph->mingraph = (DEPENDENCY *)HALLOC(total*sizeof(DEPENDENCY));
     for (i=0; i < total; ++i) {
@@ -1930,9 +2065,6 @@ static void init_analysis_state(STATE *s, Declaration module) {
   s->module = module;
   s->phylum_attrset_table = new_table();
 
-  /* mark all local declarations such */
-  traverse_Declaration(mark_local,module,module);
-
   /* get phyla (imported only) */
   { Declaration tf=first_Declaration(type_formals);
     Declarations edecls = NULL;
@@ -1943,88 +2075,87 @@ static void init_analysis_state(STATE *s, Declaration module) {
       Signature sig = some_type_formal_sig(tf);
       switch (Signature_KEY(sig)) {
       default:
-	fatal_error("%d:cannot handle the signature of extension",
+	    fatal_error("%d:cannot handle the signature of extension",
 		    tnode_line_number(tf));
-	break;
+	    break;
       case KEYsig_inst:
-	/*! ignore is_input and is_var */
-	{ Class cl = sig_inst_class(sig);
-	  switch (Class_KEY(cl)) {
-	  default: fatal_error("%d: bad class",tnode_line_number(cl));
+        /*! ignore is_input and is_var */
+        { Class cl = sig_inst_class(sig);
+          switch (Class_KEY(cl)) {
+          default: fatal_error("%d: bad class",tnode_line_number(cl));
+            break;
+          case KEYclass_use:
+            { Declaration d = Use_info(class_use_use(cl))->use_decl;
+              if (d == NULL) {
+                fatal_error("%d: class not found",tnode_line_number(cl));
+              }
+              switch (Declaration_KEY(d)) {
+              default: fatal_error("%d: bad class_decl %s",
+                      tnode_line_number(cl), symbol_name(def_name(declaration_def(d))));
+                break;
+              case KEYsome_class_decl:
+                edecls = block_body(some_class_decl_contents(d));
+                break;
+              }
+            }
+            break;
+          }
+        }
 	    break;
-	  case KEYclass_use:
-	    { Declaration d = Use_info(class_use_use(cl))->use_decl;
-	      if (d == NULL) fatal_error("%d: class not found",
-					 tnode_line_number(cl));
-	      switch (Declaration_KEY(d)) {
-	      default: fatal_error("%d: bad class_decl %s",
-				   tnode_line_number(cl),
-				   symbol_name(def_name(declaration_def(d))));
-		break;
-	      case KEYsome_class_decl:
-		edecls = block_body(some_class_decl_contents(d));
-		break;
-	      }
-	    }
-	    break;
-	  }
-	}
-	break;
       }
     }
+
+
     { int phyla_count = 0;
       if (edecls == NULL) {
-	aps_error(module,"no extension to module %s",
-		  symbol_name(def_name(declaration_def(module))));
+	    aps_error(module,"no extension to module %s",
+	            symbol_name(def_name(declaration_def(module))));
       } else {
-	Declaration edecl = first_Declaration(edecls);
-	/*DEBUG fprintf(stderr,"got an extension!\n"); */
-	for (; edecl != NULL; edecl = Declaration_info(edecl)->next_decl) {
-	  switch (Declaration_KEY(edecl)) {
-	  case KEYphylum_decl:
-	    if (def_is_public(phylum_decl_def(edecl))) ++phyla_count;
-	    if (DECL_IS_START_PHYLUM(edecl)) s->start_phylum = edecl;
-	    break;
-	  }
-	}
+        Declaration edecl = first_Declaration(edecls);
+        /*DEBUG fprintf(stderr,"got an extension!\n"); */
+        for (; edecl != NULL; edecl = Declaration_info(edecl)->next_decl) {
+          switch (Declaration_KEY(edecl)) {
+          case KEYphylum_decl:
+            if (def_is_public(phylum_decl_def(edecl))) ++phyla_count;
+            if (DECL_IS_START_PHYLUM(edecl)) s->start_phylum = edecl;
+            break;
+          }
+        }
       }
-      if (s->start_phylum == NULL)
-	fatal_error("no root_phylum indicated");
+      if (s->start_phylum == NULL) {
+	    fatal_error("no root_phylum indicated");
+      }
+
       /* we count functions and procedures as *both* phyla
        * and match rules (for convenience).  Here we count them as phyla:
        */
-      { Declaration decl = first_Declaration(decls);
-	for (; decl != NULL; decl = DECL_NEXT(decl)) {
-	  switch (Declaration_KEY(decl)) {
-	  case KEYsome_function_decl:
-	    ++phyla_count;
-	    break;
-	  }
-	}
+      for (Declaration decl = first_Declaration(decls); decl != NULL; decl = DECL_NEXT(decl)) {
+          switch (Declaration_KEY(decl)) {
+          case KEYsome_function_decl:
+            ++phyla_count;
+            break;
+          }
       }
       VECTORALLOC(s->phyla,Declaration,phyla_count);
       phyla_count = 0;
       if (edecls != NULL) {
-	Declaration edecl;
-	for (edecl = first_Declaration(edecls);
-	     edecl != NULL; edecl = Declaration_info(edecl)->next_decl) {
-	  switch (Declaration_KEY(edecl)) {
-	  case KEYphylum_decl:
-	    if (def_is_public(phylum_decl_def(edecl)))  {
-	      s->phyla.array[phyla_count++] = edecl;
-	    }
-	    break;
-	  }
-	}
+        Declaration edecl;
+        for (edecl = first_Declaration(edecls); edecl != NULL; edecl = Declaration_info(edecl)->next_decl) {
+          switch (Declaration_KEY(edecl)) {
+          case KEYphylum_decl:
+            if (def_is_public(phylum_decl_def(edecl)))  {
+              s->phyla.array[phyla_count++] = edecl;
+            }
+            break;
+          }
+        }
       }
-      { Declaration decl = first_Declaration(decls);
-	for (; decl != NULL; decl = DECL_NEXT(decl)) {
-	  switch (Declaration_KEY(decl)) {
-	  case KEYsome_function_decl:
-	    s->phyla.array[phyla_count++] = decl;
-	    break;
-	  }
-	}
+      for (Declaration decl = first_Declaration(decls); decl != NULL; decl = DECL_NEXT(decl)) {
+          switch (Declaration_KEY(decl)) {
+          case KEYsome_function_decl:
+            s->phyla.array[phyla_count++] = decl;
+            break;
+          }
       }
     }
   }
@@ -2055,12 +2186,16 @@ static void init_analysis_state(STATE *s, Declaration module) {
       switch (Declaration_KEY(decl)) {
       case KEYsome_function_decl:
       case KEYtop_level_match:
-	s->match_rules.array[match_rule_count++] = decl;
-	break;
+        s->match_rules.array[match_rule_count++] = decl;
+        break;
       }
     }
   }
-  
+
+
+    /* mark all local declarations such */
+    traverse_Declaration(mark_decl,s,module);
+
   /* perform fibering */
   fiber_module(s->module,s);
   add_fibers_to_state(s);
@@ -2070,54 +2205,55 @@ static void init_analysis_state(STATE *s, Declaration module) {
     for (; decl != NULL; decl = Declaration_info(decl)->next_decl) {
       switch (Declaration_KEY(decl)) {
       case KEYattribute_decl:
-	if (!ATTR_DECL_IS_SYN(decl) && !ATTR_DECL_IS_INH(decl) &&
-	    !FIELD_DECL_P(decl)) {
-	  aps_error(decl,"%s not declared either synthesized or inherited",
-		    decl_name(decl));
-	  Declaration_info(decl)->decl_flags |= ATTR_DECL_SYN_FLAG;
-	}
-	{ Type ftype = attribute_decl_type(decl);
-	  Declaration formal = first_Declaration(function_type_formals(ftype));
-	  Type ntype = formal_type(formal);
-	  switch (Type_KEY(ntype)) {
-	  case KEYtype_use:
-	    { Declaration phylum=Use_info(type_use_use(ntype))->use_decl;
-	      if (phylum == NULL)
-		fatal_error("%d: unknown phylum",tnode_line_number(ntype));
-	      add_attrset_for(s,phylum,decl);
-	    }
+        if (!ATTR_DECL_IS_SYN(decl) && !ATTR_DECL_IS_INH(decl) &&
+            !FIELD_DECL_P(decl)) {
+          aps_error(decl,"%s not declared either synthesized or inherited",decl_name(decl));
+          Declaration_info(decl)->decl_flags |= ATTR_DECL_SYN_FLAG;
+        }
+        { Type ftype = attribute_decl_type(decl);
+          Declaration formal = first_Declaration(function_type_formals(ftype));
+          Type ntype = formal_type(formal);
+          switch (Type_KEY(ntype)) {
+          case KEYtype_use:
+            { Declaration phylum=Use_info(type_use_use(ntype))->use_decl;
+              if (phylum == NULL) {
+                fatal_error("%d: unknown phylum",tnode_line_number(ntype));
+              }
+              add_attrset_for(s,phylum,decl);
+            }
+            break;
+          }
+        }
 	    break;
-	  }
-	}
-	break;
       case KEYsome_function_decl:
-	/* The parameters are inherited attributes
-	 * and the results are synthesized ones.
-	 */
-	{ Type ftype = some_function_decl_type(decl);
-	  Declaration d;
-	  for (d = first_Declaration(function_type_formals(ftype));
-	       d != NULL;
-	       d = DECL_NEXT(d)) {
-	    Declaration_info(d)->decl_flags |= ATTR_DECL_INH_FLAG;
-	    add_attrset_for(s,decl,d);
-	  }
-	  for (d = first_Declaration(function_type_return_values(ftype));
-	       d != NULL;
-	       d = DECL_NEXT(d)) {
-	    Declaration_info(d)->decl_flags |= ATTR_DECL_SYN_FLAG;
-	    add_attrset_for(s,decl,d);
-	  }
-	}
-	break;
+        /* The parameters are inherited attributes
+         * and the results are synthesized ones.
+         */
+        { Type ftype = some_function_decl_type(decl);
+          Declaration d;
+          for (d = first_Declaration(function_type_formals(ftype));
+               d != NULL;
+               d = DECL_NEXT(d)) {
+            add_attrset_for(s,decl,d);
+          }
+          for (d = first_Declaration(function_type_return_values(ftype));
+               d != NULL;
+               d = DECL_NEXT(d)) {
+            add_attrset_for(s,decl,d);
+          }
+        }
+        break;
       }
     }
   }
-  /* add special shared_info attributes */
+  /* add special shared_info attributes to phylum */
   { int i;
     for (i=0; i < s->phyla.length; ++i) {
       Declaration phy = s->phyla.array[i];
-      add_attrset_for(s,phy,phylum_shared_info_attribute(phy,s));
+      /* share_info is an object formed by global attributes */
+      Declaration shared_info = phylum_shared_info_attribute(phy,s);
+//      printf("shared info: %s \n", decl_name(shared_info));
+      add_attrset_for(s, phy, shared_info);
     }
   }
 
@@ -2125,7 +2261,7 @@ static void init_analysis_state(STATE *s, Declaration module) {
   s->aug_graphs = (AUG_GRAPH *)HALLOC(s->match_rules.length*sizeof(AUG_GRAPH));
   s->phy_graphs = (PHY_GRAPH *)HALLOC(s->phyla.length*sizeof(PHY_GRAPH));
   { int i;
-    for (i=0; i < s->match_rules.length; ++i) {
+    for (int i=0; i < s->match_rules.length; ++i) {
       init_augmented_dependency_graph(&s->aug_graphs[i],
 				      s->match_rules.array[i],s);
     }
@@ -2134,7 +2270,7 @@ static void init_analysis_state(STATE *s, Declaration module) {
       init_summary_dependency_graph(&s->phy_graphs[i],
 				    s->phyla.array[i],s);
     }
-  } 
+  }
 }
 
 
@@ -2158,7 +2294,7 @@ static void synchronize_dependency_graphs(AUG_GRAPH *aug_graph,
   /* discover when the instances for this node end.
    */
   max = start + phy_n;
-  
+
   for (i=start; i < max; ++i) {
     INSTANCE *source = &aug_graph->instances.array[i];
     INSTANCE *phy_source = &phy_graph->instances.array[i-start];
@@ -2168,6 +2304,17 @@ static void synchronize_dependency_graphs(AUG_GRAPH *aug_graph,
       fputs(" != ",stderr);
       print_instance(phy_source,stderr);
       fputc('\n',stderr);
+        printf("start=%d \n", start);
+        printf("All aug_graph instances:\n");
+        for (int i = 0; i < aug_graph->instances.length; i++) {
+            print_instance(&aug_graph->instances.array[i], stdout);
+            printf("\n");
+        }
+        printf("All phy_graph instances:\n");
+        for (int i = 0; i < phy_graph->instances.length; i++) {
+            print_instance(&phy_graph->instances.array[i], stdout);
+            printf("\n");
+        }
       fatal_error("instances %s:%d vs %s:%d in different order",
 		  aug_graph_name(aug_graph),i,
 		  phy_graph_name(phy_graph),i-start);
@@ -2214,7 +2361,7 @@ static void synchronize_dependency_graphs(AUG_GRAPH *aug_graph,
 	  print_instance(sink,stdout);
 	  printf("\n");
 	}
-	add_edge_to_graph(source,sink,&cond,kind,aug_graph);
+	    add_edge_to_graph(source,sink,&cond,kind,aug_graph);
       }
     }
   }

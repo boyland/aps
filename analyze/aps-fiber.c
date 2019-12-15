@@ -4,7 +4,6 @@
 #include "jbb-alloc.h"
 #include "aps-ag.h"
 
-
 #define ADD_FIBER 1
 #define ALL_FIBERSETS 2
 #define PUSH_FIBER 4
@@ -803,28 +802,28 @@ void init_field_decls(Declaration module, STATE *s) {
       break;
     case KEYattribute_decl:
       { Declaration phylum = attribute_decl_phylum(decl);
-	for (i=0; i < s->phyla.length; ++i) {
-	  if (phylum == s->phyla.array[i]) break;
-	}
-	if (i == s->phyla.length) {
-	  if (fiber_debug & FIBER_INTRO)
-	    printf("%s is a field (not an attribute)\n",decl_name(decl));
-	  Declaration_info(decl)->decl_flags |= FIELD_DECL_FLAG;
-	  NEXT_FIELD(decl) = NEXT_FIELD(phylum);
-	  NEXT_FIELD(phylum) = decl;
-	  { Declaration reversed;
-	    aps_yylineno = tnode_line_number(decl);
-	    reversed =
-	      attribute_decl(reverse_def(attribute_decl_def(decl)),
-			     no_type(),
-			     copy_Direction(attribute_decl_direction(decl)),
-			     no_default());
-	    Declaration_info(reversed)->decl_flags =
-	      Declaration_info(decl)->decl_flags | FIELD_DECL_REVERSE_FLAG;
-	    DUAL_DECL(decl) = reversed;
-	    DUAL_DECL(reversed) = decl;
-	  }
-	}
+        for (i=0; i < s->phyla.length; ++i) {
+          if (phylum == s->phyla.array[i]) break;
+        }
+        if (i == s->phyla.length || Declaration_info(decl)->decl_flags & FIELD_DECL_FLAG) {
+          if (fiber_debug & FIBER_INTRO)
+            printf("%s is a field (not an attribute)\n",decl_name(decl));
+          Declaration_info(decl)->decl_flags |= FIELD_DECL_FLAG;
+          NEXT_FIELD(decl) = NEXT_FIELD(phylum);
+          NEXT_FIELD(phylum) = decl;
+          { Declaration reversed;
+            aps_yylineno = tnode_line_number(decl);
+            reversed =
+              attribute_decl(reverse_def(attribute_decl_def(decl)),
+                     no_type(),
+                     copy_Direction(attribute_decl_direction(decl)),
+                     no_default());
+            Declaration_info(reversed)->decl_flags =
+              Declaration_info(decl)->decl_flags | FIELD_DECL_REVERSE_FLAG;
+            DUAL_DECL(decl) = reversed;
+            DUAL_DECL(reversed) = decl;
+          }
+        }
       }
       break;
     }
@@ -1385,11 +1384,18 @@ USET add_to_uset(Declaration decl, USET uset)
 	if (*head != new_uset) {
 	  done = FALSE;
 	  if (fiber_debug & ADD_FIBER) {
-	    printf("Added (%d,%s%s) to uset of %s\n",
+	    printf("Added (%d,%s%s) to uset of ",
 			   tnode_line_number(new_uset->u),
 			   EXPR_IS_LHS(new_uset->u) ? "dot " : "",
-		  	 decl_name(uitem_field(new_uset->u)),
-		   	 decl_name(decl));
+		   decl_name(uitem_field(new_uset->u)));
+	    switch (Declaration_KEY(decl)) {
+	    case KEYassign:
+	      printf("assignment:%d\n",tnode_line_number(decl));
+	      break;
+	    default:
+	      printf("%s\n",decl_name(decl));
+	      break;
+	    }
 	  }
 	  *head = new_uset;
 	}
@@ -1409,8 +1415,16 @@ OSET add_to_oset(Declaration decl, OSET oset)
 	if (new_oset != *head) {
 	  done = FALSE;
 	  if (fiber_debug & ADD_FIBER) {
-	    printf("Added %s to oset for %s\n",
-		   		decl_name(new_oset->o),decl_name(decl));
+	    printf("Added %s to oset for ",
+		   		decl_name(new_oset->o));
+	    switch (Declaration_KEY(decl)) {
+	    case KEYassign:
+	      printf("assignment:%d\n",tnode_line_number(decl));
+	      break;
+	    default:
+	      printf("%s\n",decl_name(decl));
+	      break;
+	    }
 	  }
 	  *head = new_oset;
 	}
@@ -1478,7 +1492,9 @@ static int recursion_level = 0;
 
 // calculating USET of e given oset.
 USET doUO(Expression e, OSET oset) {
-  if (!local_type_p(infer_expr_type(e))) oset = EMPTY_OSET;
+//  if (!local_type_p(infer_expr_type(e))) {
+//      oset = EMPTY_OSET;
+//  }
   ENTER;
 //  printf("%d: doUO starting on line %d.\n", recursion_level,
 //				 tnode_line_number(e));
@@ -1525,17 +1541,28 @@ USET doUO(Expression e, OSET oset) {
 
 		// attr ref: X.a 
 		if ((fdecl = attr_ref_p(e)) != NULL) {
-		  add_to_oset(fdecl,oset);
-		  RETURN get_uset(fdecl);
-		} else if ((fdecl = field_ref_p(e))!= NULL) {
-		// field ref: w.f
+		    add_to_oset(fdecl,oset);
+		    RETURN get_uset(fdecl);
+		}
+		else if ((fdecl = field_ref_p(e))!= NULL) {
+		    // field ref: w.f
 		  Expression object = field_ref_object(e);
+		  Declaration sdecl = USE_DECL(value_use_use(object));
 
-		  USET newuset = (USET)malloc(sizeof(struct uset));
-		  OSET o_w; 
-		  newuset->rest = NULL;
-		  newuset->u = e;
-		  o_w = doOU(object, newuset);
+            USET newuset = (USET)malloc(sizeof(struct uset));
+            OSET o_w;
+            newuset->rest = NULL;
+            newuset->u = e;
+
+		  if (DECL_IS_SYNTAX(sdecl)) {
+		      Declaration phyla = node_decl_phylum(sdecl);
+		      if (phyla != NULL) {
+                  add_to_uset(sdecl,newuset);
+		      }
+		  }
+		  else {
+              o_w = doOU(object, newuset);
+		  }
 			RETURN EMPTY_USET;
 		}
 		}  // case funcall
@@ -1607,7 +1634,9 @@ int same_field(Expression e1, Expression e2) {
 // get Oset of e given a uset.
 OSET doOU(Expression e, USET uset)
 {
-  if (!local_type_p(infer_expr_type(e))) uset = EMPTY_USET;
+//  if (!local_type_p(infer_expr_type(e))) {
+//      uset = EMPTY_USET;
+//  }
   ENTER;
 //  printf("%d: doOU starting on line %d.\n", recursion_level, tnode_line_number(e));
   if (e==NULL) { RETURN EMPTY_OSET; }
@@ -1636,8 +1665,9 @@ OSET doOU(Expression e, USET uset)
 		// * 4> a use of a local (attribute)
 		// * 5> a use of a syntax-tree node.
 		// *    (an error, for now)
-		//		 
-		if (!DECL_IS_LOCAL(sdecl)) {
+		//
+
+            if (!DECL_IS_LOCAL(sdecl)) {
 //			printf("	%d: decl is local.\n", tnode_line_number(e));
 		  RETURN EMPTY_OSET;
 		} else if (DECL_IS_SHARED(sdecl)) {
@@ -1669,9 +1699,19 @@ OSET doOU(Expression e, USET uset)
 		  add_to_uset(sdecl,uset);
 		  RETURN get_oset(sdecl);
 		} else {
-		  aps_warning(e,"using a syntax decl");
-		  add_to_uset(sdecl,uset);
-		  RETURN get_oset(sdecl);
+//		  aps_warning(e,"using a syntax decl");
+//		  add_to_uset(sdecl,uset);
+//		  RETURN get_oset(sdecl);
+
+            if (get_oset(sdecl) == NULL) {
+                OSET oset = (OSET)malloc(sizeof(struct oset));
+                oset->rest = NULL;
+                oset->o = sdecl;
+                Declaration_info(sdecl)->oset = oset;
+            }
+
+            add_to_uset(sdecl,uset);
+            RETURN get_oset(sdecl);
 		}
 //		break;
 	} // case KEYvalue_use
@@ -1699,7 +1739,11 @@ OSET doOU(Expression e, USET uset)
 	    OSET o_w; 
 	    newuset->rest = NULL;
 	    newuset->u = e;
-	    o_w = doOU(object, newuset);
+
+//	    printf("Pass in uset: ");
+//          print_uset(newuset);
+//          printf("\n");
+	    o_w = doOU(object, newuset); //o_w is B#(v), newuset is (g, ...)
 
 	    /*
 	    if (fiber_debug & ALL_FIBERSETS) {
@@ -1712,16 +1756,18 @@ OSET doOU(Expression e, USET uset)
 	    OSET p; 
 	    oset = EMPTY_OSET;
 	    for (p = o_w; p != NULL; p = p->rest){
-	      Declaration o = p->o;
-	      USET u_o = get_uset(o);
-	      
-	      USET q;	
+	      Declaration o = p->o; // o
+	      USET u_o = get_uset(o); // B#_Bar(o)
+	      USET q;
 	      for  (q = u_o; q != NULL; q= q->rest) {
-					if ( (EXPR_IS_LHS(q->u)) && same_field(q->u ,newuset->u)) {
-		  		// f. belongs to u_o
-		 				 oset = oset_union(oset, 
-				    doOU(assign_rhs( (Declaration)tnode_parent(q->u) ), uset));
-					} // if
+
+		if ( (EXPR_IS_LHS(q->u)) && same_field(q->u ,newuset->u)) {
+		  // f. belongs to u_o
+		  Declaration assign = (Declaration)tnode_parent(q->u);
+		  add_to_uset(assign,uset);
+		  oset = oset_union(oset, get_oset(assign));
+		} // if
+
 	      } // for q
 	    } // for p
 	    RETURN oset;	
@@ -1777,6 +1823,11 @@ void *print_all_ou(void *statep, void *node) {
   switch (ABSTRACT_APS_tnode_phylum(node)) {
   case KEYDeclaration: {
     Declaration decl = (Declaration)node;
+    switch (Declaration_KEY(decl))
+    {
+      case KEYassign:
+        return statep;
+    }
     if (Declaration_info(decl)->oset != NULL) {
       printf("OSET of node: %s\n", decl_name(decl));
       print_oset(Declaration_info(decl)->oset);
@@ -1837,8 +1888,15 @@ int id_decl_node(Declaration decl) {
   FSA_next_node_index += 2;
 
   if (fiber_debug & ALL_FIBERSETS) {
+    switch (Declaration_KEY(decl))
+    {
+      case KEYassign:
+        break;
+      default:
     printf("%d: index for %s is %d\n",tnode_line_number(decl),
 	   decl_name(decl),index);
+        break;
+    }
   }
   Declaration_info(decl)->index = index;
   omega = add_to_nodeset(omega, index);
@@ -1902,7 +1960,6 @@ void print_fields(EDGES fields_list){
 	EDGES p;
 	for (p = fields_list; p != NULL; p = p->rest)
 		printf("	field: %s\n", decl_name(p->edge));
-		;
 }
 
 // acount the number of nodes needed for FSA and
@@ -2004,38 +2061,35 @@ void *compute_OU(void *u, void *node)
 	break;
       }	// case top_level_match
       
-      // value_decl: includes initilization precess
+      // value_decl: includes initialization process
       case KEYvalue_decl: {
-	Default def = value_decl_default(decl) ;
-	switch (Default_KEY(def)){
-	case KEYno_default: 
-	  break;
-	case KEYsimple: {
-	  Expression expr = simple_value(def);
-	  USET uset = get_uset(decl);
-	  OSET oset;
+        Default def = value_decl_default(decl) ;
+        switch (Default_KEY(def)){
+        case KEYno_default:
+          break;
+        case KEYsimple: {
+          Expression expr = simple_value(def);
+          USET uset = get_uset(decl);
+          OSET oset = doOU(expr, uset);
+          add_to_oset(decl, oset);
 
-	  oset = doOU(expr, uset);
-	  add_to_oset(decl, oset);
-	  
-	  break;}
-	case KEYcomposite: {
-	  Expression expr = composite_initial(def);
-	  OSET oset = doOU(expr, get_uset(decl));
-	  add_to_oset(decl, oset);
-	  break;}
-	}
-	break;
+          break;}
+        case KEYcomposite: {
+          Expression expr = composite_initial(def);
+          OSET oset = doOU(expr, get_uset(decl));
+          add_to_oset(decl, oset);
+          break;}
+        }
+        break;
       } // value_decl
 	
       case KEYassign: {
 	// printf("ASSIGN: %d \n", tnode_line_number(node));
 	Expression lhs = assign_lhs(decl);
 	Expression rhs = assign_rhs(decl);
-	
-	USET u1 = doUO(lhs, EMPTY_OSET);
-	OSET o2 = doOU(rhs, u1);
-	doUO(lhs, o2);
+
+	add_to_oset(decl, doOU(rhs, get_uset(decl)));
+	add_to_uset(decl, doUO(lhs, get_oset(decl)));
 	
 	return NULL;
 	break;
@@ -2480,23 +2534,40 @@ NODESET link_expr_rhs(Expression e, NODESET ns){
   case KEYvalue_use: {
     Declaration decl = USE_DECL(value_use_use(e));
     if (DECL_IS_LOCAL(decl)) {
-      if (DECL_IS_SHARED(decl)  &&
-	  responsible_node_declaration(e) != NULL) {
-	// use of a global value in a rule (need to use shared_info)
+      if (DECL_IS_SHARED(decl)  && responsible_node_declaration(e) != NULL) {
+	    // use of a global value in a rule (need to use shared_info)
 	
-	NODESET n;
-	for (n=ns; n; n = n->rest) {
-	  add_FSA_edge(get_node_expr(e)+1, n->node,decl);
-	  add_FSA_edge(get_node_expr(e), n->node, reverse_field(decl));
-	  // Qe(-) to n: bar node is even number.
-	  // the edge is reverse_field(fdecl);
-	} // for end
+	    NODESET n;
+        for (n=ns; n; n = n->rest) {
+          add_FSA_edge(get_node_expr(e)+1, n->node,decl);
+          add_FSA_edge(get_node_expr(e), n->node, reverse_field(decl));
+          // Qe(-) to n: bar node is even number.
+          // the edge is reverse_field(fdecl);
+        } // for end
+
+        {
+          OSET oset = doOU(e, EMPTY_USET);
+          return oset_to_nodeset(oset);
+        }
 	
-	{ 
-	  OSET oset = doOU(e, EMPTY_USET);
-	  return oset_to_nodeset(oset);
-	}
-	
+      } else if (DECL_IS_SYNTAX(decl)) {
+          Declaration pdecl, fdecl;
+          pdecl = node_decl_phylum(decl);
+
+          if (pdecl != NULL) {
+              for (fdecl = NEXT_FIELD(pdecl); fdecl != NULL; fdecl = NEXT_FIELD(fdecl)) {
+                  add_FSA_edge(Declaration_info(decl)->index, //Qo
+                               Declaration_info(fdecl)->index, //Qf
+                               fdecl);
+              }
+              USET q = Declaration_info(decl)->uset;
+              for (; q != NULL; q = q->rest) {
+                  add_FSA_edge(Declaration_info(decl)->index, //Qo
+                               Expression_info(q->u)->index,   //Qu
+                               NULL );
+              }
+          }
+
       } else {
 	return set_of_node(get_node_decl(decl)); // {Qd}
       }
@@ -2946,8 +3017,16 @@ void *DFA_fiber_set(void *u, void *node)
       decl_fsets->set[FIBERSET_REVERSE_FINAL] = NULL;
       
       if (fiber_debug & FIBER_FINAL) {
-	printf("fiber set for %s /%d is: ", decl_name(decl), 
-	       Declaration_info(decl)->index);
+	printf("fiber set for ");
+	switch (Declaration_KEY(decl)) {
+	case KEYassign:
+	  printf("assignment on line %d",tnode_line_number(decl));
+	  break;
+	default:
+	  puts(decl_name(decl));
+	  break;
+	}
+	printf(" /%d is ",Declaration_info(decl)->index);
       }
       for (i= 2; i<= DFA_node_number; i++) {  // for any DFA tree node
 	// fiberset doesn't include base fiber
@@ -3258,7 +3337,17 @@ void print_fiberset_entry(FIBERSET fs, FILE *stream) {
   print_fiber(fs->fiber,stdout);
   switch (ABSTRACT_APS_tnode_phylum(tnode)) {
   case KEYDeclaration:
-    printf(" of %s",decl_name((Declaration)tnode));
+    {
+      Declaration decl = (Declaration)tnode;
+      switch (Declaration_KEY(decl)) {
+      case KEYassign:
+	printf(" of assignment on line %d",tnode_line_number(decl));
+	break;
+      default:
+	printf(" of %s",decl_name(decl));
+	break;
+      }
+    }
     break;
   case KEYExpression:
     { Expression expr = (Expression)tnode;

@@ -121,6 +121,8 @@ extern void print_edge_helper(DEPENDENCY, CONDITION *, FILE*);
 extern void print_edgeset(EDGESET, FILE *);
 extern void print_analysis_state(STATE *, FILE *);
 extern void print_cycles(STATE *, FILE *);
+extern void add_fibers_to_state(STATE *s);
+extern void print_attrset(ATTRSET,FILE*);
 
 extern int analysis_debug;
 #define ADD_EDGE 16
