@@ -1474,7 +1474,9 @@ static void *get_edges(void *vaug_graph, void *node) {
 		sink.modifier = &nodot_mod;
 		source.modifier = &dot_mod;
 		DEPENDENCY new_kind = fiber_dependency;
-		if (decl_is_circular(fdecl)) new_kind ^= DEPENDENCY_MAYBE_SIMPLE;
+		if (decl_is_circular(fdecl)) {
+      new_kind &= ~DEPENDENCY_MAYBE_SIMPLE;
+    }
 
 		add_edges_to_graph(&source,&sink,cond,new_kind,
 				   aug_graph);
@@ -2598,7 +2600,10 @@ void print_instance(INSTANCE *i, FILE *stream) {
 
 void print_edge_helper(DEPENDENCY kind, CONDITION *cond, FILE* stream) {
   if (stream == 0) stream = stdout;
-  if (kind & DEPENDENCY_MAYBE_SIMPLE == DEPENDENCY_MAYBE_SIMPLE) fputc('s', stream);
+  if ((kind & DEPENDENCY_MAYBE_SIMPLE) == DEPENDENCY_MAYBE_SIMPLE) fputc('s', stream);
+  else {
+    fputc('X', stream);
+  }
   switch (kind) {
   default: fprintf(stream,"?%d",kind); break;
   case no_dependency: fputc('!',stream); break;
@@ -2831,7 +2836,7 @@ void print_cycles(STATE *s, FILE *stream) {
 	fprintf(stream,"fiber ");
 	/* fall through */
       default:
-	fprintf(stream,"local cycle for %s involving ",
+	fprintf(stream,"%d local cycle for %s involving ", (edgeset_kind(aug_graph->graph[j*n+j])),
 		aug_graph_name(aug_graph));
 	print_instance(&aug_graph->instances.array[j],stdout);
 	fprintf(stream,"\n");
