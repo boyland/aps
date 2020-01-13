@@ -1476,6 +1476,8 @@ static void *get_edges(void *vaug_graph, void *node) {
 		DEPENDENCY new_kind = fiber_dependency;
 		if (decl_is_circular(fdecl)) {
       new_kind &= ~DEPENDENCY_MAYBE_SIMPLE;
+    } else {
+      new_kind |= DEPENDENCY_MAYBE_SIMPLE;
     }
 
 		add_edges_to_graph(&source,&sink,cond,new_kind,
