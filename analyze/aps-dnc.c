@@ -1439,6 +1439,14 @@ static void *get_edges(void *vaug_graph, void *node) {
 	  case KEYsimple:
 	    /* XXX: I don't know I have to do it both ways.
 	     */
+
+      // if (!decl_is_circular(decl)) {
+      //   printf("bad name: %s %d\n", decl_name(decl), tnode_line_number(decl));
+      // } else {
+      //   printf("good name: %s %d\n", decl_name(decl), tnode_line_number(decl));
+      // }
+
+
 	    record_expression_dependencies(&sink,cond,dependency,NO_MODIFIER,
 					   simple_value(def),aug_graph);
 	    sink.node = 0;
@@ -1449,7 +1457,7 @@ static void *get_edges(void *vaug_graph, void *node) {
 	      FIBERSET rfs = fiberset_for(decl,FIBERSET_REVERSE_FINAL);
 	      Declaration pdecl = constructor_decl_phylum(cdecl);
 	      Declaration fdecl;
-	      /*
+	      
 	      printf("Looking at %s which instantiates %s\n",decl_name(decl),
 		     decl_name(cdecl));
 	      printf("Normal: ");
@@ -1457,7 +1465,7 @@ static void *get_edges(void *vaug_graph, void *node) {
 	      printf("\nReverse: ");
 	      print_fiberset(rfs,stdout);
 	      printf("\n");
-	      */
+	      
 	      /* add fiber dependencies for fields */
 	      for (fdecl = NEXT_FIELD(pdecl);
 		   fdecl != NULL;

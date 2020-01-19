@@ -22,9 +22,9 @@ static void *analyze_thing(void *ignore, void *node)
     switch (Declaration_KEY(decl)) {
     case KEYmodule_decl:
       s = compute_dnc(decl);
-                  printf("\n-----------------\n");
-                print_analysis_state(s,stdout);
-                  printf("\n-----------------\n");
+      printf("\n----- start DNC ---------\n");
+      print_analysis_state(s,stdout);
+      printf("\n----- end DNC -----------\n");
       switch (analysis_state_cycle(s)) {
       default:
 	aps_error(decl,"Cycle detected; Attribute grammar is not DNC %d", analysis_state_cycle(s));
@@ -33,11 +33,14 @@ static void *analyze_thing(void *ignore, void *node)
         {
             printf("in-progress\n");
             break_fiber_cycles(decl,s, indirect_circular_dependency);
-            printf("\n-----------------\n");
-                print_analysis_state(s,stdout);
-            // s = compute_dnc(decl);
-            // DEPENDENCY d = analysis_state_cycle(s);
-            // printf("%d\n", d);
+            printf("\n----- start indirect_circular_dependency ---------\n");
+            print_analysis_state(s,stdout);
+            printf("\n----- end indirect_circular_dependency -----------\n");
+            compute_oag(decl,s);
+
+            printf("\n----- start OAG indirect_circular_dependency ---------\n");
+            print_analysis_state(s,stdout);
+            printf("\n----- end OAG indirect_circular_dependency -----------\n");
         }
         break;
       case indirect_control_fiber_dependency:
@@ -46,6 +49,9 @@ static void *analyze_thing(void *ignore, void *node)
       case fiber_dependency:
 	printf("Fiber cycle detected; cycle being removed\n");
 	break_fiber_cycles(decl,s, fiber_dependency);
+  printf("\n----- start fiber_dependency ---------\n");
+  print_analysis_state(s,stdout);
+  printf("\n----- end fiber_dependency -----------\n");
 	/* fall through */
       case no_dependency:
 	compute_oag(decl,s);
