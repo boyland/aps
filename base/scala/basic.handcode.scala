@@ -519,7 +519,7 @@ trait C_COLLECTION[T_Result, T_ElemType] extends C_READ_ONLY_COLLECTION[T_Result
   val v_append : (T_Result,T_Result) => T_Result;
   val v_single : (T_ElemType) => T_Result;
   val v_none : () => T_Result;
-  val v__op_AC : (T_ElemType*) => T_Result;
+  val v__op_AC : (Seq[T_ElemType]) => T_Result;
 }
 
 class M__basic_14[T_ElemType,T_T](t_ElemType:Any,t_T:C_READ_ONLY_COLLECTION[T_T,T_ElemType]) {
@@ -529,7 +529,7 @@ class M__basic_14[T_ElemType,T_T](t_ElemType:Any,t_T:C_READ_ONLY_COLLECTION[T_T,
 };
 
 class M__basic_15[T_ElemType,T_T](t_ElemType:Any,t_T:C_COLLECTION[T_T,T_ElemType]) {
-  val v__op_AC : (T_ElemType*) => T_T = t_T.v__op_AC;
+  val v__op_AC : (Seq[T_ElemType]) => T_T = t_T.v__op_AC;
 };
 
 trait C_READ_ONLY_ORDERED_COLLECTION[T_Result, T_ElemType] extends C_READ_ONLY_COLLECTION[T_Result,T_ElemType] {
@@ -751,7 +751,7 @@ with C_BAG[List[T_ElemType],T_ElemType]
   val v_none = f_none _;
   def f_none():T_Result = Nil;
   def u_none(x:Any) : Option[T_Result] = x match {
-    case x@Nil => Some((x));
+    case x@Nil => Some((x)).asInstanceOf[Option[T_Result]];
     case _ => None };
   val p_none = new PatternFunction[T_Result](u_none);
   
@@ -911,7 +911,7 @@ trait C_MULTISET[T_Result, T_ElemType] extends C_TYPE[T_Result]with C_BAG[T_Resu
   val v_equal : (T_Result,T_Result) => T_Boolean;
   val v_less : (T_Result,T_Result) => T_Boolean;
   val v_less_equal : (T_Result,T_Result) => T_Boolean;
-  val v__op_AC : (T_ElemType*) => T_Result;
+  val v__op_AC : (Seq[T_ElemType]) => T_Result;
   val p__op_AC : PatternSeqFunction[T_Result,T_ElemType];
   val v_member : (T_ElemType,T_Result) => T_Boolean;
   val v_count : (T_ElemType,T_Result) => T_Integer;

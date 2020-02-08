@@ -43,7 +43,7 @@ with C_TABLE[TreeMap[T_KeyType,T_ValueType],T_KeyType,T_ValueType]
 
   val v_table_entry = f_table_entry _;
   def f_table_entry(v_key : T_KeyType, v_val : T_ValueType):T_Result = 
-    v_empty_table.insert(v_key,v_val);
+    v_empty_table.updated(v_key,v_val);
 
   def u_table_entry(x:Any) : Option[(T_Result,T_KeyType,T_ValueType)] = x match {
     case m:Table => {
