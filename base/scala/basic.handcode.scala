@@ -57,6 +57,10 @@ object basic_implicit {
   val t_AndLattice = new M_MAKE_LATTICE[T_Boolean]("AndLattice",t_Boolean,v_true,v_andc,v_revimplies,v_and,v_or);
   type T_AndLattice = T_Boolean;
 
+  type T_MAX_LATTICE[T] = T;
+  type T_MIN_LATTICE[T] = T;
+
+
   type T_BAG[T] = List[T];
   type T_LIST[T] = List[T];
   type T_SET[T] = scala.collection.immutable.Set[T];
@@ -484,9 +488,15 @@ class M_MAX_LATTICE[T_TO]
 				   new M__basic_13[ T_TO](t_TO).v_max,
 				   new M__basic_13[ T_TO](t_TO).v_min)
       with C_MAX_LATTICE[T_TO,T_TO] with C_ORDERED[T_TO]
+      with C_TYPE[T_TO]
 {
   val v_less = t_TO.v_less;
   val v_less_equal = t_TO.v_less_equal;
+
+
+  override val v_assert: T_TO => Unit = _ => ()
+  override val v_node_equivalent: (T_TO, T_TO) => T_OrLattice = (a, b) => a == b
+  override val v_string: T_TO => String = _ => ""
 }
 
 trait C_MIN_LATTICE[T_Result, T_T] extends
@@ -502,9 +512,14 @@ extends M_MAKE_LATTICE[T_T](name,t_T,v_max_element,
 			    new M__basic_13[ T_T](t_T).v_min,
 			    new M__basic_13[ T_T](t_T).v_max)
       with C_MIN_LATTICE[T_T,T_T] with C_ORDERED[T_T]
+      with C_TYPE[T_T]
 {
   val v_less = t_T.v_less;
   val v_less_equal = t_T.v_less_equal;
+
+  override val v_assert: T_T => Unit = _ => ()
+  override val v_node_equivalent: (T_T, T_T) => T_OrLattice = (a, b) => a == b
+  override val v_string: T_T => String = _ => ""
 }
 
 trait C_READ_ONLY_COLLECTION[T_Result, T_ElemType] {
