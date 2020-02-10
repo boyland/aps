@@ -492,11 +492,6 @@ class M_MAX_LATTICE[T_TO]
 {
   val v_less = t_TO.v_less;
   val v_less_equal = t_TO.v_less_equal;
-
-
-  override val v_assert: T_TO => Unit = _ => ()
-  override val v_node_equivalent: (T_TO, T_TO) => T_OrLattice = (a, b) => a == b
-  override val v_string: T_TO => String = _ => ""
 }
 
 trait C_MIN_LATTICE[T_Result, T_T] extends
@@ -516,10 +511,6 @@ extends M_MAKE_LATTICE[T_T](name,t_T,v_max_element,
 {
   val v_less = t_T.v_less;
   val v_less_equal = t_T.v_less_equal;
-
-  override val v_assert: T_T => Unit = _ => ()
-  override val v_node_equivalent: (T_T, T_T) => T_OrLattice = (a, b) => a == b
-  override val v_string: T_T => String = _ => ""
 }
 
 trait C_READ_ONLY_COLLECTION[T_Result, T_ElemType] {
