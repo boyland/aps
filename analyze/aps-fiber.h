@@ -70,6 +70,7 @@ extern int fiber_debug;
 #define FIBER_INTRO 8
 #define FIBER_FINAL 16
 #define CALLSITE_INFO 32 
+#define ADD_FSA_EDGE 64
 
 /* useful routines */
 

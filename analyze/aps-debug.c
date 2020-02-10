@@ -59,7 +59,8 @@ static void list_debug_flags() {
   fprintf(stderr,"\tP  PRAGMA_ACTIVATION\n");
   fprintf(stderr,"\tt  TYPE CHECKING\n");
   fprintf(stderr,"\t+  ADD_FIBER\n");
-  fprintf(stderr,"\ta  ALL_FIBERSETS\n");
+  fprintf(stderr,"\ta  ADD_FSA_EDGE");
+  fprintf(stderr,"\tA  ALL_FIBERSETS\n");
   fprintf(stderr,"\tp  PUSH_FIBER\n");
   fprintf(stderr,"\tf  FIBER_INTRO\n");
   fprintf(stderr,"\tF  FIBER_FINAL\n");
@@ -95,7 +96,8 @@ void set_debug_flags(const char *options)
     case 'P': bind_debug |= PRAGMA_ACTIVATION; break;
     case 't': type_debug = -1; break;
     case '+': fiber_debug |= ADD_FIBER; break;
-    case 'a': fiber_debug |= ALL_FIBERSETS; break;
+    case 'a': fiber_debug |= ADD_FSA_EDGE; break;
+    case 'A': fiber_debug |= ALL_FIBERSETS; break;
     case 'p': fiber_debug |= PUSH_FIBER; break;
     case 'f': fiber_debug |= FIBER_INTRO; break;
     case 'F': fiber_debug |= FIBER_FINAL; break;
