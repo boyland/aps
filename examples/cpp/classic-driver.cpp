@@ -30,7 +30,7 @@ int main()
   C_SIMPLE* simple = new C_SIMPLE();
   C_SIMPLE::T_Decls ds =
     simple->v_xcons_decls(simple->v_no_decls(),
-			  simple->v_decl("x",simple->v_integer()));
+			  simple->v_decl("x",simple->v_integer_type()));
   C_SIMPLE::T_Stmt s =
     simple->v_assign_stmt(simple->v_variable("x"),simple->v_variable("y"));
   C_SIMPLE::T_Stmts ss = simple->v_xcons_stmts(simple->v_no_stmts(),s);
