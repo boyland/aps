@@ -488,7 +488,6 @@ class M_MAX_LATTICE[T_TO]
 				   new M__basic_13[ T_TO](t_TO).v_max,
 				   new M__basic_13[ T_TO](t_TO).v_min)
       with C_MAX_LATTICE[T_TO,T_TO] with C_ORDERED[T_TO]
-      with C_TYPE[T_TO]
 {
   val v_less = t_TO.v_less;
   val v_less_equal = t_TO.v_less_equal;
@@ -507,7 +506,6 @@ extends M_MAKE_LATTICE[T_T](name,t_T,v_max_element,
 			    new M__basic_13[ T_T](t_T).v_min,
 			    new M__basic_13[ T_T](t_T).v_max)
       with C_MIN_LATTICE[T_T,T_T] with C_ORDERED[T_T]
-      with C_TYPE[T_T]
 {
   val v_less = t_T.v_less;
   val v_less_equal = t_T.v_less_equal;
