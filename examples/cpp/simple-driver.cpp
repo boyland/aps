@@ -38,10 +38,10 @@ int main()
 
   C_SIMPLE::T_Decls ds =
     add_decl(add_decl(add_decl(add_decl(simple->v_no_decls(),
-					"v",simple->v_integer()),
-			       "w",simple->v_string()),
-		      "w",simple->v_integer()),
-	     "x",simple->v_integer());
+					"v",simple->v_integer_type()),
+			       "w",simple->v_string_type()),
+		      "w",simple->v_integer_type()),
+	     "x",simple->v_integer_type());
   C_SIMPLE::T_Stmt s =
     simple->v_assign_stmt(simple->v_variable("x"),simple->v_variable("y"));
   C_SIMPLE::T_Stmts ss = simple->v_xcons_stmts(simple->v_no_stmts(),s);

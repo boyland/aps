@@ -380,7 +380,7 @@ class Collection : public A {
     : A(nt,vt,n), initial(init) {}
 
   virtual void set(node_type n, value_type v) {
-    Attribute<C_P,C_V>::set(n,combine(get(n),v));
+    Attribute<C_P,C_V>::set(n,combine(this->get(n),v));
   }
 
  protected:
@@ -427,6 +427,7 @@ typedef class C_BOOLEAN C_Boolean;
 typedef bool T_Boolean;
 extern C_Boolean *t_Boolean;
 extern C_Boolean *get_Boolean();
+extern T_Boolean v_not(T_Boolean v__27);
 
 template <class T_T>
 std::string s_string(T_T n);
