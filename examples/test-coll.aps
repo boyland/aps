@@ -1,6 +1,10 @@
 with "tiny";
 
 module TEST_COLL[T :: TINY[]] extends T begin
+  
+  type IntegerMaxLattice := MAX_LATTICE[Integer](0);
+  var taha: IntegerMaxLattice := 1 + 2;
+
   type Integers := SET[Integer];
 
   var collection sum : Integer :> 0, (+);
