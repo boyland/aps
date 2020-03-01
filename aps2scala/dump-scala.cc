@@ -1380,7 +1380,6 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
     break;
   case KEYmodule_decl:
     {
-      // module_decl = decl;
       Declarations body = block_body(module_decl_contents(decl));
       Declaration rdecl = module_decl_result_type(decl);
       const char *rname = decl_name(rdecl);
