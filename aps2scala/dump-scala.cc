@@ -1041,6 +1041,53 @@ static string type_inst_as_scala_type(Type ty)
 #endif
 }
 
+/**
+ *  Traverse function to collect KEYsome_function_decl of Declaration and put them into a vec<Declaration>
+ */
+void *collect_module_func_decls(void *scopep, void *node) {
+  vector<Declaration>& vec = *(vector<Declaration>*) scopep;
+
+  if (ABSTRACT_APS_tnode_phylum(node) == KEYDeclaration) {
+    Declaration decl = (Declaration) node;
+    switch (Declaration_KEY(decl))
+    {
+    case KEYsome_function_decl:
+      vec.push_back(decl);
+      break;
+    default:
+      break;
+    } 
+  }
+
+  return scopep;
+}
+
+/**
+ *  Diffs two module_decl and returns the decls missing in extending module
+ */
+vector<Declaration> missing_func_decls(Declaration base, Declaration extending, vector<Declaration>& result) {
+  ServiceRecord sr;
+  vector<Declaration> vec;
+
+  traverse_Declaration(collect_module_func_decls, (void*) &vec, base);
+  for (int i = 0; i < vec.size(); i++) {
+    sr.add(vec[i]);
+    printf("%s\n", decl_name(vec[i]));
+  }
+
+  vec.clear();
+  traverse_Declaration(collect_module_func_decls, (void*) &vec, extending);
+
+  for (int i = 0; i < vec.size(); i++) {
+    if (sr.missing(vec[i])) {
+      result.push_back(vec[i]);
+    }
+  }
+
+  return result;
+}
+
+
 static void dump_type_inst(string n, string nameArg, Type ti, ostream& oss)
 {
   Module m = type_inst_module(ti);
@@ -1072,7 +1119,22 @@ static void dump_type_inst(string n, string nameArg, Type ti, ostream& oss)
     break;
   }
   bool started = false;
+  Declaration base_module_decl;
+  Declaration type_actual_use_decl;
+  vector<Declaration> missing_funcs;
+
   for (Type ta = first_TypeActual(tas); ta ; ta = TYPE_NEXT(ta)) {
+    printf("%d\n", Type_KEY(ta));
+
+    Use type_actual_use = type_use_use(ta);
+    Declaration type_actual_use_decl = Use_info(type_actual_use)->use_decl;
+
+    Module base_module = type_inst_module(type_decl_type(type_actual_use_decl));
+    base_module_decl = Use_info(module_use_use(base_module))->use_decl;
+    Declaration extending_module_decl = Use_info(module_use_use(m))->use_decl;
+
+    missing_func_decls(base_module_decl, Use_info(module_use_use(m))->use_decl, missing_funcs);
+
     if (started) oss << ",";
     else {
       oss << "[";
@@ -1108,7 +1170,13 @@ static void dump_type_inst(string n, string nameArg, Type ti, ostream& oss)
   for (Expression a = first_Actual(as); a; a = EXPR_NEXT(a)) {
     oss << "," << a;
   }
-  oss << ");\n";
+  
+  oss << ") with C_" << decl_name(base_module_decl) << "[" << "Amir" << "] {\n";
+  for (int i = 0; i < missing_funcs.size(); i++) {
+    oss << indent() << indent() <<"val t_" << decl_name(missing_funcs[i]) << " = \n";
+  }
+  oss << indent() << "};\n";
+
   oss << indent() << "type T_" << n << " = "
       << type_inst_as_scala_type(ti) << ";\n";
 }
@@ -1256,8 +1324,12 @@ void dump_scala_Declaration_header(Declaration decl, ostream& oss)
   }
 }
 
+// Declaration module_decl;
+
 void dump_scala_Declaration(Declaration decl,ostream& oss)
 {
+  printf("%s\n", decl_name(decl));
+
   const char *name = 0;
   switch (Declaration_KEY(decl)) {
   case KEYdeclaration:
@@ -1280,6 +1352,7 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
     break;
   case KEYmodule_decl:
     {
+      // module_decl = decl;
       Declarations body = block_body(module_decl_contents(decl));
       Declaration rdecl = module_decl_result_type(decl);
       const char *rname = decl_name(rdecl);
