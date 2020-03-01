@@ -1188,7 +1188,7 @@ static void dump_type_inst(string n, string nameArg, Type ti, ostream& oss)
         oss << " with C_" << decl_name(base_module_decl) << "[" << as_val(ta) << "] {\n";
 
         for (int i = 0; i < missing_funcs.size(); i++) {
-          oss << indent() << indent() <<"val v_" << decl_name(missing_funcs[i]) << " = " << as_val(ta) << "." << decl_name(missing_funcs[i]) << ";\n";
+          oss << indent() << indent() <<"val v_" << decl_name(missing_funcs[i]) << " = " << as_val(ta) << ".v_" << decl_name(missing_funcs[i]) << ";\n";
         }
       }
         break;
