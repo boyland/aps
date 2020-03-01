@@ -1049,10 +1049,14 @@ void *collect_module_func_decls(void *scopep, void *node) {
 
   if (ABSTRACT_APS_tnode_phylum(node) == KEYDeclaration) {
     Declaration decl = (Declaration) node;
+    // printf("Traverse: %s %d\n", decl_name(decl), Declaration_KEY(decl));
     switch (Declaration_KEY(decl))
     {
     case KEYsome_function_decl:
-      vec.push_back(decl);
+    case KEYvalue_decl:
+      if (strcmp(decl_name(decl), "result") != 0) {
+        vec.push_back(decl);
+      }
       break;
     default:
       break;
@@ -1071,9 +1075,9 @@ vector<Declaration> missing_func_decls(Declaration base, Declaration extending, 
   vector<Declaration> vec;
 
   traverse_Declaration(collect_module_func_decls, (void*) &vec, extending);
+
   for (int i = 0; i < vec.size(); i++) {
     sr.add(vec[i]);
-    printf("extending: %s\n", decl_name(vec[i]));
   }
 
   vec.clear();
@@ -1083,7 +1087,6 @@ vector<Declaration> missing_func_decls(Declaration base, Declaration extending, 
     if (sr.missing(vec[i])) {
       result.push_back(vec[i]);
     }
-    printf("base: %s\n", decl_name(vec[i]));
   }
 
   return result;
@@ -1185,11 +1188,15 @@ static void dump_type_inst(string n, string nameArg, Type ti, ostream& oss)
         Declaration base_module_decl = resolve_type_actual_module_decl(ta);
         missing_func_decls(base_module_decl, Use_info(module_use_use(m))->use_decl, missing_funcs);
 
-        oss << " with C_" << decl_name(base_module_decl) << "[" << as_val(ta) << "] {\n";
+        if (missing_funcs.size() == 0) continue;
+
+        oss << " with C_" << decl_name(base_module_decl) << "[" << ta << "] {\n";
 
         for (int i = 0; i < missing_funcs.size(); i++) {
           oss << indent() << indent() <<"val v_" << decl_name(missing_funcs[i]) << " = " << as_val(ta) << ".v_" << decl_name(missing_funcs[i]) << ";\n";
         }
+
+        oss << indent() << "}";
       }
         break;
       default:
@@ -1197,7 +1204,7 @@ static void dump_type_inst(string n, string nameArg, Type ti, ostream& oss)
     }
   }
 
-  oss << indent() << "};\n";
+  oss << ";\n";
   oss << indent() << "type T_" << n << " = "
       << type_inst_as_scala_type(ti) << ";\n";
 }
@@ -1994,7 +2001,7 @@ void dump_Type_Signature(Type t, string name, ostream& o)
       Module m = type_inst_module(t);
       TypeActuals tas = type_inst_type_actuals(t);
       Declaration mdecl = USE_DECL(module_use_use(m));
-      o << "with C_" << decl_name(mdecl) << "[" << name;
+      o << " with C_" << decl_name(mdecl) << "[" << name;
       for (Type ta = first_TypeActual(tas); ta; ta = TYPE_NEXT(ta)) {
 	o << "," << ta;
       }
