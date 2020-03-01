@@ -1090,12 +1090,10 @@ vector<Declaration> missing_func_decls(Declaration base, Declaration extending, 
 }
 
 /**
- * Given a type actual it get the module
+ * Given a KEYtype_use it returns the KEYmodule_decl
  */
 Declaration resolve_type_actual_module_decl(Type ta)
 {
-  printf("type key %d\n", Type_KEY(ta));
-
   Use type_actual_use = type_use_use(ta);
   Declaration type_actual_use_decl = Use_info(type_actual_use)->use_decl;
 
