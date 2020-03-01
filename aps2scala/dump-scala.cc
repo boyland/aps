@@ -1352,7 +1352,6 @@ void dump_scala_Declaration_header(Declaration decl, ostream& oss)
   }
 }
 
-// Declaration module_decl;
 
 void dump_scala_Declaration(Declaration decl,ostream& oss)
 {
