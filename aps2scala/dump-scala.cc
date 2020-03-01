@@ -1065,26 +1065,44 @@ void *collect_module_func_decls(void *scopep, void *node) {
 /**
  *  Diffs two module_decl and returns the decls missing in extending module
  */
-vector<Declaration> missing_func_decls(Declaration base, Declaration extending, vector<Declaration>& result) {
+vector<Declaration> missing_func_decls(Declaration base, Declaration extending, vector<Declaration>& result)
+{
   ServiceRecord sr;
   vector<Declaration> vec;
 
-  traverse_Declaration(collect_module_func_decls, (void*) &vec, base);
+  traverse_Declaration(collect_module_func_decls, (void*) &vec, extending);
   for (int i = 0; i < vec.size(); i++) {
     sr.add(vec[i]);
-    printf("%s\n", decl_name(vec[i]));
+    printf("extending: %s\n", decl_name(vec[i]));
   }
 
   vec.clear();
-  traverse_Declaration(collect_module_func_decls, (void*) &vec, extending);
+  traverse_Declaration(collect_module_func_decls, (void*) &vec, base);
 
   for (int i = 0; i < vec.size(); i++) {
     if (sr.missing(vec[i])) {
       result.push_back(vec[i]);
     }
+    printf("base: %s\n", decl_name(vec[i]));
   }
 
   return result;
+}
+
+/**
+ * Given a type actual it get the module
+ */
+Declaration resolve_type_actual_module_decl(Type ta)
+{
+  printf("type key %d\n", Type_KEY(ta));
+
+  Use type_actual_use = type_use_use(ta);
+  Declaration type_actual_use_decl = Use_info(type_actual_use)->use_decl;
+
+  Module base_module = type_inst_module(type_decl_type(type_actual_use_decl));
+  Declaration base_module_decl = Use_info(module_use_use(base_module))->use_decl;
+
+  return base_module_decl;
 }
 
 
@@ -1093,6 +1111,8 @@ static void dump_type_inst(string n, string nameArg, Type ti, ostream& oss)
   Module m = type_inst_module(ti);
   TypeActuals tas = type_inst_type_actuals(ti);
   Actuals as = type_inst_actuals(ti);
+  Declaration extending_module_decl = Use_info(module_use_use(m))->use_decl;
+
   // const char *rname = "Result";
   int u=0;
   for (Type ta = first_TypeActual(tas); ta ; ta = TYPE_NEXT(ta)) {
@@ -1119,22 +1139,7 @@ static void dump_type_inst(string n, string nameArg, Type ti, ostream& oss)
     break;
   }
   bool started = false;
-  Declaration base_module_decl;
-  Declaration type_actual_use_decl;
-  vector<Declaration> missing_funcs;
-
   for (Type ta = first_TypeActual(tas); ta ; ta = TYPE_NEXT(ta)) {
-    printf("%d\n", Type_KEY(ta));
-
-    Use type_actual_use = type_use_use(ta);
-    Declaration type_actual_use_decl = Use_info(type_actual_use)->use_decl;
-
-    Module base_module = type_inst_module(type_decl_type(type_actual_use_decl));
-    base_module_decl = Use_info(module_use_use(base_module))->use_decl;
-    Declaration extending_module_decl = Use_info(module_use_use(m))->use_decl;
-
-    missing_func_decls(base_module_decl, Use_info(module_use_use(m))->use_decl, missing_funcs);
-
     if (started) oss << ",";
     else {
       oss << "[";
@@ -1171,12 +1176,30 @@ static void dump_type_inst(string n, string nameArg, Type ti, ostream& oss)
     oss << "," << a;
   }
   
-  oss << ") with C_" << decl_name(base_module_decl) << "[" << "Amir" << "] {\n";
-  for (int i = 0; i < missing_funcs.size(); i++) {
-    oss << indent() << indent() <<"val t_" << decl_name(missing_funcs[i]) << " = \n";
-  }
-  oss << indent() << "};\n";
+  oss << ")";
+  
+  for (Type ta = first_TypeActual(tas); ta ; ta = TYPE_NEXT(ta)) {
+    switch (Type_KEY(ta))
+    {
+      case KEYtype_use:
+      {
+        vector<Declaration> missing_funcs;
+        Declaration base_module_decl = resolve_type_actual_module_decl(ta);
+        missing_func_decls(base_module_decl, Use_info(module_use_use(m))->use_decl, missing_funcs);
 
+        oss << " with C_" << decl_name(base_module_decl) << "[" << as_val(ta) << "] {\n";
+
+        for (int i = 0; i < missing_funcs.size(); i++) {
+          oss << indent() << indent() <<"val v_" << decl_name(missing_funcs[i]) << " = " << as_val(ta) << "." << decl_name(missing_funcs[i]) << ";\n";
+        }
+      }
+        break;
+      default:
+        break;
+    }
+  }
+
+  oss << indent() << "};\n";
   oss << indent() << "type T_" << n << " = "
       << type_inst_as_scala_type(ti) << ";\n";
 }
