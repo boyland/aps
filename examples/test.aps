@@ -9,5 +9,5 @@ module TEST[] begin
 
   type IntegerMaxLattice := MAX_LATTICE[Integer](0);
   
-  var taha: IntegerMaxLattice := 1 + 2;
+  var integerMaxLattice: IntegerMaxLattice := 1 + 2;
 end;
