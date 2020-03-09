@@ -341,6 +341,7 @@ static SCOPE type_services(Type t)
 	  } else {
 	    services = type_services(ty);
 	  }
+    Type_info(ty)->type_sig = some_type_decl_sig(tdecl);
 	}
 	break;
       case KEYphylum_decl:

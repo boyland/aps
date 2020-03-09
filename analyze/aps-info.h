@@ -159,6 +159,7 @@ struct Type_info {
   Type next_type_actual; /* in a series of type actuals */
   void *binding_temporary;
   char *impl_type;
+  Signature  *type_sig;
 };
 extern struct Type_info *Type_info(Type);
 #define TYPE_NEXT(type) (Type_info(type)->next_type_actual)
