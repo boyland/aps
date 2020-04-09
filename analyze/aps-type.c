@@ -29,6 +29,132 @@ Type constructor_return_type(Declaration decl) {
 
 Declaration current_module = NULL;
 
+Signature infer_signature(TypeEnvironment scope, Signature sig);
+Signature infer_type_sig(TypeEnvironment scope, Type type);
+TypeEnvironment push_type_contour_return(TypeEnvironment current_type_env, Declaration d, TypeActuals tacts, Declaration tdecl);
+
+// Populates the derives properties of a Sign_Info struct
+Signature infer_signature(TypeEnvironment scope, Signature sig) {
+  switch (Signature_KEY(sig)) {
+  case KEYsig_inst:
+    {
+      Class class = sig_inst_class(sig);
+      Use use = class_use_use(class);
+      Declaration class_decl = Use_info(use)->use_decl;
+
+      // For each formal used in signature
+      //    Find the formal's index that is used in module declaration such that the names match
+      //        Lookup the actual in type instance actual using index
+      TypeActuals inferred_actuals = nil_TypeActuals();
+      TypeFormals tfs1 = some_class_decl_type_formals(class_decl);
+      for (Declaration tf1=first_Declaration(tfs1); tf1 ; tf1 = DECL_NEXT(tf1)) {
+          TypeFormals tfs2 = some_class_decl_type_formals(scope->source);
+          int i = 0;
+          for (Declaration tf2=first_Declaration(tfs2); tf2; tf2 = DECL_NEXT(tf2), i++) {
+            if (strcmp(decl_name(tf1), decl_name(tf2)) == 0) {
+
+              int j = 0;
+              TypeActuals as = scope->u.type_actuals;
+              Type a;
+              for (a = first_TypeActual(as); a; a=TYPE_NEXT(a), j++) {
+                if (i == j) {
+                  inferred_actuals = append_TypeActuals(inferred_actuals, list_TypeActuals(a));
+                }
+              }
+            }
+          }
+      }
+
+      Signature sig_self = sig_inst(TRUE, TRUE, class, inferred_actuals);
+
+      // push resolved actuals to the contour
+      scope = push_type_contour_return(scope, scope->source, inferred_actuals, scope->result);
+
+      Signature parent_sig = some_class_decl_parent(class_decl);
+      Signature parent_inferred_signature = infer_signature(scope, parent_sig);
+
+      return mult_sig(sig_self, parent_inferred_signature);
+    }
+    break;
+    case KEYmult_sig:
+      {
+        Signature inferred_sig1 = infer_signature(scope, mult_sig_sig1(sig));
+        Signature inferred_sig2 = infer_signature(scope, mult_sig_sig2(sig));
+        return mult_sig(inferred_sig1, inferred_sig2);
+      }
+      break;
+    case KEYfixed_sig:
+      {
+        Types types = fixed_sig_types(sig);
+        // TODO: Consult with Dr. Boyland
+        // Maybe iterate over the types and resolve their signatures
+        return no_sig();
+      } 
+    case KEYno_sig:
+      return no_sig();
+    case KEYsig_use:
+      return no_sig();
+    default:
+      aps_error(sig, "Not sure that is the type code while inferring signatures");
+      break;
+  }
+
+  // Continue further
+  return no_sig();
+}
+
+TypeEnvironment push_type_contour_return(TypeEnvironment current_type_env, Declaration d, TypeActuals tacts, Declaration tdecl) {
+  TypeEnvironment new_type_env =
+    (TypeEnvironment)HALLOC(sizeof(struct TypeContour));
+  new_type_env->outer = current_type_env;
+  new_type_env->source = d;
+  new_type_env->result = tdecl;
+  switch (Declaration_KEY(d)) {
+  case KEYsome_class_decl:
+    new_type_env->type_formals = some_class_decl_type_formals(d);
+    new_type_env->u.type_actuals = tacts;
+    break;
+  case KEYpolymorphic:
+    new_type_env->type_formals = polymorphic_type_formals(d);
+    new_type_env->u.inferred = 0; /* instantiate at each use */
+    break;
+  default:
+    fatal_error("push_type_contour called with bad declaration");
+  }
+  return new_type_env;
+}
+
+Signature infer_type_sig(TypeEnvironment scope, Type type) {
+  switch (Type_KEY(type))
+  {
+  case KEYtype_inst:
+  {
+    // get class from module, get signature from type_int
+    // this can also be accomplished by using scope
+    Module module = type_inst_module(type);
+    Use module_use = module_use_use(module);
+    Declaration class_decl = Use_info(module_use)->use_decl;
+
+    Signature self_sig = sig_inst(TRUE, TRUE, class_use(module_use), scope->u.type_actuals);
+    // Collect all the extended modules
+    Signature parents_sig = some_class_decl_parent(class_decl);
+    Signature parent_inferred_signature = infer_signature(scope, parents_sig);
+
+    Signature result = mult_sig(self_sig, parent_inferred_signature);
+    return result;
+  }
+  case KEYno_type:
+  case KEYremote_type:
+  case KEYprivate_type:
+    Type_info(type)->type_sig=no_sig();
+    return;
+  case KEYfunction_type:
+    Type_info(type)->type_sig=no_sig();
+  default:
+    break;
+  }
+}
+
 static void* do_typechecking(void* ignore, void*node) {
   // find places where Expression, Pattern or Default is used
   switch (ABSTRACT_APS_tnode_phylum(node)) {
@@ -258,6 +384,9 @@ static void* do_typechecking(void* ignore, void*node) {
     {
       Type ty = (Type)node;
       switch (Type_KEY(ty)) {
+      default:
+          Type_info(ty)->type_sig = infer_type_sig(NULL, ty);
+          break;
       case KEYtype_inst:
 	{
 	  Use mu = module_use_use(type_inst_module(ty));
@@ -297,7 +426,13 @@ static void* do_typechecking(void* ignore, void*node) {
 					  direction(0,0,0),
 					  no_default())));
 	  (void)check_actuals(type_inst_actuals(ty),fty,u);
+	  Type_info(ty)->type_sig = infer_type_sig(te, ty);
 	}
+	printf(">> line number %d of file %s.aps << \n type: ", tnode_line_number(ty), aps_yyfilename);
+	print_Type(ty, stdout);
+	printf("\n");
+	print_Signature(Type_info(ty)->type_sig, stdout);
+	printf("\n\n");
 	return 0;
       }
     }
