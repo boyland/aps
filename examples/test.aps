@@ -1,9 +1,7 @@
-module TEST[] begin
-  type Test := LIST[String];
-  
-  t : Test := Test$single("hello,") ++ Test$single(" world");
-
-  i : Integer := length("hello");
-  
-  b : Boolean := t = Test${} and Test${} = t;
+module TEST[ElemType] begin
+  type SelfT := LIST[Result];
+  self : LIST[Integer] := SelfT${};
 end;
+
+type TestT := TEST[Integer];
+testSelf : LIST[Integer] := TestT$self;

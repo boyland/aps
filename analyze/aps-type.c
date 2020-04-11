@@ -35,6 +35,7 @@ TypeEnvironment push_type_contour_return(TypeEnvironment current_type_env, Decla
 
 // Populates the derives properties of a Sign_Info struct
 Signature infer_signature(TypeEnvironment scope, Signature sig) {
+  // printf("%d\n", Signature_KEY(sig));
   switch (Signature_KEY(sig)) {
   case KEYsig_inst:
     {
@@ -47,22 +48,28 @@ Signature infer_signature(TypeEnvironment scope, Signature sig) {
       //        Lookup the actual in type instance actual using index
       TypeActuals inferred_actuals = nil_TypeActuals();
       TypeFormals tfs1 = some_class_decl_type_formals(class_decl);
-      for (Declaration tf1=first_Declaration(tfs1); tf1 ; tf1 = DECL_NEXT(tf1)) {
+      int count = 0;
+      for (Declaration tf1=first_Declaration(tfs1); tf1 != NULL; tf1 = DECL_NEXT(tf1), count++) {
           TypeFormals tfs2 = some_class_decl_type_formals(scope->source);
           int i = 0;
-          for (Declaration tf2=first_Declaration(tfs2); tf2; tf2 = DECL_NEXT(tf2), i++) {
+          for (Declaration tf2=first_Declaration(tfs2); tf2 != NULL; tf2 = DECL_NEXT(tf2), i++) {
             if (strcmp(decl_name(tf1), decl_name(tf2)) == 0) {
 
               int j = 0;
               TypeActuals as = scope->u.type_actuals;
               Type a;
-              for (a = first_TypeActual(as); a; a=TYPE_NEXT(a), j++) {
+              for (a = first_TypeActual(as); a != NULL; a=TYPE_NEXT(a), j++) {
                 if (i == j) {
                   inferred_actuals = append_TypeActuals(inferred_actuals, list_TypeActuals(a));
+                  count--;
                 }
               }
             }
           }
+      }
+
+      if (count != 0) {
+        aps_error(sig, "Failed to resolve actuals while inferring type_sig");
       }
 
       Signature sig_self = sig_inst(TRUE, TRUE, class, inferred_actuals);
@@ -120,13 +127,44 @@ TypeEnvironment push_type_contour_return(TypeEnvironment current_type_env, Decla
     break;
   default:
     fatal_error("push_type_contour called with bad declaration");
+    break;
   }
   return new_type_env;
+}
+
+// If there is any result types in module, set them
+void* set_result_types(void* untyped_signature, void*node) {
+  Signature sig = (Signature) untyped_signature;
+  Declaration decl = (Declaration) node;
+  if (node != NULL &&
+      ABSTRACT_APS_tnode_phylum(node) == KEYDeclaration &&
+      Declaration_KEY(decl) == KEYtype_decl &&
+      strcmp(decl_name(decl), "Result") == 0) {
+
+    Type type = type_decl_type(decl);
+    printf("Child node decl %d %s ", tnode_line_number(decl), decl_name(decl));
+    print_Type(type, stdout);
+    printf("\t set to ");
+    print_Signature(sig, stdout);
+    printf("\n");
+
+    Type_info(type)->type_sig = sig;
+    
+    // No need to continue further
+    return NULL;
+  }
+
+  return untyped_signature;
 }
 
 Signature infer_type_sig(TypeEnvironment scope, Type type) {
   switch (Type_KEY(type))
   {
+  case KEYtype_use:
+  {
+    // This will be set by a secondary traversal
+    return no_sig();
+  }
   case KEYtype_inst:
   {
     // get class from module, get signature from type_int
@@ -134,25 +172,33 @@ Signature infer_type_sig(TypeEnvironment scope, Type type) {
     Module module = type_inst_module(type);
     Use module_use = module_use_use(module);
     Declaration class_decl = Use_info(module_use)->use_decl;
+    printf("name %s %d '%d'\n", decl_name(class_decl), tnode_line_number(type), scope->outer == NULL);
 
     Signature self_sig = sig_inst(TRUE, TRUE, class_use(module_use), scope->u.type_actuals);
     // Collect all the extended modules
     Signature parents_sig = some_class_decl_parent(class_decl);
     Signature parent_inferred_signature = infer_signature(scope, parents_sig);
 
-    Signature result = mult_sig(self_sig, parent_inferred_signature);
-    return result;
+    // Mix in together signatures
+    Signature result_sig = mult_sig(self_sig, parent_inferred_signature);
+
+    traverse_Declaration(set_result_types, result_sig, class_decl);
+
+    return result_sig;
   }
   case KEYno_type:
   case KEYremote_type:
   case KEYprivate_type:
-    Type_info(type)->type_sig=no_sig();
+    return no_sig();
     return;
   case KEYfunction_type:
-    Type_info(type)->type_sig=no_sig();
+    return no_sig();
   default:
+    aps_error(type, "Not sure that is the type code while inferring signatures");
     break;
   }
+
+  return no_sig();
 }
 
 static void* do_typechecking(void* ignore, void*node) {
@@ -387,6 +433,18 @@ static void* do_typechecking(void* ignore, void*node) {
       default:
           Type_info(ty)->type_sig = infer_type_sig(NULL, ty);
           break;
+      case KEYtype_use:
+      {
+        Use use = type_use_use(ty);
+        Declaration decl = USE_DECL(use);
+
+        TypeEnvironment te = USE_TYPE_ENV(ty);
+        printf(" &&&&&&&& %s %d %d &&&&&&&&&& \n", decl_name(decl), tnode_line_number(ty), tnode_line_number(decl));
+        print_TypeEnvironment(te, stdout);
+        printf("\n");
+
+        break;
+      }
       case KEYtype_inst:
 	{
 	  Use mu = module_use_use(type_inst_module(ty));
@@ -403,6 +461,7 @@ static void* do_typechecking(void* ignore, void*node) {
 
 	  while (ABSTRACT_APS_tnode_phylum(tdecl) != KEYDeclaration)
 	    tdecl = (Declaration)tnode_parent(tdecl);
+
 	  tu = use(def_name(some_type_decl_def(tdecl)));
 	  te->outer = USE_TYPE_ENV(mu);
 	  te->source = mdecl;
