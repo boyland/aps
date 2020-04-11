@@ -132,31 +132,6 @@ TypeEnvironment push_type_contour_return(TypeEnvironment current_type_env, Decla
   return new_type_env;
 }
 
-// If there is any result types in module, set them
-void* set_result_types(void* untyped_signature, void*node) {
-  Signature sig = (Signature) untyped_signature;
-  Declaration decl = (Declaration) node;
-  if (node != NULL &&
-      ABSTRACT_APS_tnode_phylum(node) == KEYDeclaration &&
-      Declaration_KEY(decl) == KEYtype_decl &&
-      strcmp(decl_name(decl), "Result") == 0) {
-
-    Type type = type_decl_type(decl);
-    printf("Child node decl %d %s ", tnode_line_number(decl), decl_name(decl));
-    print_Type(type, stdout);
-    printf("\t set to ");
-    print_Signature(sig, stdout);
-    printf("\n");
-
-    Type_info(type)->type_sig = sig;
-    
-    // No need to continue further
-    return NULL;
-  }
-
-  return untyped_signature;
-}
-
 Signature infer_type_sig(TypeEnvironment scope, Type type) {
   switch (Type_KEY(type))
   {
@@ -172,7 +147,6 @@ Signature infer_type_sig(TypeEnvironment scope, Type type) {
     Module module = type_inst_module(type);
     Use module_use = module_use_use(module);
     Declaration class_decl = Use_info(module_use)->use_decl;
-    printf("name %s %d '%d'\n", decl_name(class_decl), tnode_line_number(type), scope->outer == NULL);
 
     Signature self_sig = sig_inst(TRUE, TRUE, class_use(module_use), scope->u.type_actuals);
     // Collect all the extended modules
@@ -181,8 +155,6 @@ Signature infer_type_sig(TypeEnvironment scope, Type type) {
 
     // Mix in together signatures
     Signature result_sig = mult_sig(self_sig, parent_inferred_signature);
-
-    traverse_Declaration(set_result_types, result_sig, class_decl);
 
     return result_sig;
   }
@@ -199,6 +171,31 @@ Signature infer_type_sig(TypeEnvironment scope, Type type) {
   }
 
   return no_sig();
+}
+
+// Code taken from type_inst type checking 
+TypeEnvironment build_type_inst_type_environment(Type ty)
+{
+	  Use mu = module_use_use(type_inst_module(ty));
+	  Declaration mdecl = USE_DECL(mu);
+	  Declaration rdecl = module_decl_result_type(mdecl);
+	  Def rdef = some_type_decl_def(rdecl);
+	  TypeEnvironment te = (TypeEnvironment)HALLOC(sizeof(struct TypeContour));
+	  Declaration tdecl = (Declaration)tnode_parent(ty);
+	  Use tu;
+	  Use u;
+	  Type fty;
+
+	  while (ABSTRACT_APS_tnode_phylum(tdecl) != KEYDeclaration)
+	    tdecl = (Declaration)tnode_parent(tdecl);
+
+	  te->outer = USE_TYPE_ENV(mu);
+	  te->source = mdecl;
+	  te->type_formals = module_decl_type_formals(mdecl);
+	  te->result = (Declaration)tnode_parent(ty);
+	  te->u.type_actuals = type_inst_type_actuals(ty);
+
+    return te;
 }
 
 static void* do_typechecking(void* ignore, void*node) {
@@ -430,20 +427,33 @@ static void* do_typechecking(void* ignore, void*node) {
     {
       Type ty = (Type)node;
       switch (Type_KEY(ty)) {
-      default:
-          Type_info(ty)->type_sig = infer_type_sig(NULL, ty);
-          break;
       case KEYtype_use:
       {
         Use use = type_use_use(ty);
         Declaration decl = USE_DECL(use);
+        TypeEnvironment te = USE_TYPE_ENV(use);
 
-        TypeEnvironment te = USE_TYPE_ENV(ty);
-        printf(" &&&&&&&& %s %d %d &&&&&&&&&& \n", decl_name(decl), tnode_line_number(ty), tnode_line_number(decl));
-        print_TypeEnvironment(te, stdout);
-        printf("\n");
+        switch (Declaration_KEY(decl))
+        {
+        case KEYtype_decl:
+          switch (Type_KEY(type_decl_type(decl)))
+          {
+          case KEYno_type:
+          case KEYprivate_type:
+            Type_info(ty)->type_sig = no_sig();
+            break;
+          case KEYtype_inst:
+            // TypeEnvironment is null, build it
+            if (te == NULL) {
+              te = build_type_inst_type_environment(type_decl_type(decl));
+            }
+            Type_info(ty)->type_sig = infer_type_sig(te, type_decl_type(decl));
+            break;
+          }
+          break;
+        }
 
-        break;
+        return 0;
       }
       case KEYtype_inst:
 	{
@@ -485,13 +495,7 @@ static void* do_typechecking(void* ignore, void*node) {
 					  direction(0,0,0),
 					  no_default())));
 	  (void)check_actuals(type_inst_actuals(ty),fty,u);
-	  Type_info(ty)->type_sig = infer_type_sig(te, ty);
 	}
-	printf(">> line number %d of file %s.aps << \n type: ", tnode_line_number(ty), aps_yyfilename);
-	print_Type(ty, stdout);
-	printf("\n");
-	print_Signature(Type_info(ty)->type_sig, stdout);
-	printf("\n\n");
 	return 0;
       }
     }
