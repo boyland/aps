@@ -29,32 +29,40 @@ Type constructor_return_type(Declaration decl) {
 
 Declaration current_module = NULL;
 
-Signature infer_signature(TypeEnvironment scope, Signature sig);
+Signature infer_signature(TypeEnvironment scope, Signature sig, Declaration decl);
 Signature infer_type_sig(TypeEnvironment scope, Type type);
 TypeEnvironment push_type_contour_return(TypeEnvironment current_type_env, Declaration d, TypeActuals tacts, Declaration tdecl);
 
 // Populates the derives properties of a Sign_Info struct
-Signature infer_signature(TypeEnvironment scope, Signature sig) {
+Signature infer_signature(TypeEnvironment scope, Signature sig, Declaration decl) {
   // printf("%d\n", Signature_KEY(sig));
   switch (Signature_KEY(sig)) {
   case KEYsig_inst:
     {
       Class class = sig_inst_class(sig);
       Use use = class_use_use(class);
-      Declaration class_decl = Use_info(use)->use_decl;
+      Declaration class_decl = USE_DECL(use);
 
       // For each formal used in signature
       //    Find the formal's index that is used in module declaration such that the names match
       //        Lookup the actual in type instance actual using index
       TypeActuals inferred_actuals = nil_TypeActuals();
-      TypeFormals tfs1 = some_class_decl_type_formals(class_decl);
+      TypeActuals tfs1 = sig_inst_actuals(sig);
+
       int count = 0;
-      for (Declaration tf1=first_Declaration(tfs1); tf1 != NULL; tf1 = DECL_NEXT(tf1), count++) {
-          TypeFormals tfs2 = some_class_decl_type_formals(scope->source);
+      for (Type tf1=first_TypeActual(tfs1); tf1 != NULL; tf1 = TYPE_NEXT(tf1), count++) {
+          char* tf1_name = symbol_name(use_name(type_use_use(tf1)));
+          if (strcmp("Result", symbol_name(use_name(type_use_use(tf1)))) == 0) {
+            inferred_actuals = append_TypeActuals(inferred_actuals, list_TypeActuals(tf1));
+            count--;
+            continue;
+          }
+
+          Declarations tfs2 = some_class_decl_type_formals(decl);
           int i = 0;
           for (Declaration tf2=first_Declaration(tfs2); tf2 != NULL; tf2 = DECL_NEXT(tf2), i++) {
-            if (strcmp(decl_name(tf1), decl_name(tf2)) == 0) {
-
+            char* tf2_name = decl_name(tf2);
+            if (strcmp(tf1_name, tf2_name) == 0) {
               int j = 0;
               TypeActuals as = scope->u.type_actuals;
               Type a;
@@ -78,15 +86,15 @@ Signature infer_signature(TypeEnvironment scope, Signature sig) {
       scope = push_type_contour_return(scope, scope->source, inferred_actuals, scope->result);
 
       Signature parent_sig = some_class_decl_parent(class_decl);
-      Signature parent_inferred_signature = infer_signature(scope, parent_sig);
+      Signature parent_inferred_signature = infer_signature(scope, parent_sig, class_decl);
 
       return mult_sig(sig_self, parent_inferred_signature);
     }
     break;
     case KEYmult_sig:
       {
-        Signature inferred_sig1 = infer_signature(scope, mult_sig_sig1(sig));
-        Signature inferred_sig2 = infer_signature(scope, mult_sig_sig2(sig));
+        Signature inferred_sig1 = infer_signature(scope, mult_sig_sig1(sig), decl);
+        Signature inferred_sig2 = infer_signature(scope, mult_sig_sig2(sig), decl);
         return mult_sig(inferred_sig1, inferred_sig2);
       }
       break;
@@ -151,7 +159,7 @@ Signature infer_type_sig(TypeEnvironment scope, Type type) {
     Signature self_sig = sig_inst(TRUE, TRUE, class_use(module_use), scope->u.type_actuals);
     // Collect all the extended modules
     Signature parents_sig = some_class_decl_parent(class_decl);
-    Signature parent_inferred_signature = infer_signature(scope, parents_sig);
+    Signature parent_inferred_signature = infer_signature(scope, parents_sig, class_decl);
 
     // Mix in together signatures
     Signature result_sig = mult_sig(self_sig, parent_inferred_signature);
@@ -197,6 +205,16 @@ TypeEnvironment build_type_inst_type_environment(Type ty)
 
     return te;
 }
+
+// Type get_type_inst(Use use) {
+//   while (Use_KEY(use) == KEYqual_use)
+//     use = type_use_use(qual_use_from(use));
+
+//   Declaration decl = USE_DECL(use);
+//   if (decl == KEYtype_decl) {
+
+//   }
+// }
 
 static void* do_typechecking(void* ignore, void*node) {
   // find places where Expression, Pattern or Default is used
@@ -447,7 +465,22 @@ static void* do_typechecking(void* ignore, void*node) {
             if (te == NULL) {
               te = build_type_inst_type_environment(type_decl_type(decl));
             }
+   
+            if (Use_KEY(use) == KEYqual_use) {
+              if (Type_KEY(qual_use_from(use)) == KEYtype_use) {
+                Declaration e = USE_DECL(type_use_use(qual_use_from(use)));
+                te->u.type_actuals = type_inst_type_actuals(type_decl_type(e));
+              } else {
+                te->u.type_actuals = type_inst_type_actuals(qual_use_from(use));
+              }
+            }
+
             Type_info(ty)->type_sig = infer_type_sig(te, type_decl_type(decl));
+            printf("%d\n", tnode_line_number(ty));
+            print_Type(ty, stdout);
+            printf("\n");
+            print_Signature(Type_info(ty)->type_sig, stdout);
+            printf("\n\n");
             break;
           }
           break;
