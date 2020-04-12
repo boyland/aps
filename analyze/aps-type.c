@@ -189,37 +189,27 @@ Signature infer_type_sig(TypeEnvironment scope, Type type) {
 // Code taken from type_inst type checking 
 TypeEnvironment build_type_inst_type_environment(Type ty)
 {
-	  Use mu = module_use_use(type_inst_module(ty));
-	  Declaration mdecl = USE_DECL(mu);
-	  Declaration rdecl = module_decl_result_type(mdecl);
-	  Def rdef = some_type_decl_def(rdecl);
-	  TypeEnvironment te = (TypeEnvironment)HALLOC(sizeof(struct TypeContour));
-	  Declaration tdecl = (Declaration)tnode_parent(ty);
-	  Use tu;
-	  Use u;
-	  Type fty;
+  Use mu = module_use_use(type_inst_module(ty));
+  Declaration mdecl = USE_DECL(mu);
+  Declaration rdecl = module_decl_result_type(mdecl);
+  Def rdef = some_type_decl_def(rdecl);
+  TypeEnvironment te = (TypeEnvironment)HALLOC(sizeof(struct TypeContour));
+  Declaration tdecl = (Declaration)tnode_parent(ty);
+  Use tu;
+  Use u;
+  Type fty;
 
-	  while (ABSTRACT_APS_tnode_phylum(tdecl) != KEYDeclaration)
-	    tdecl = (Declaration)tnode_parent(tdecl);
+  while (ABSTRACT_APS_tnode_phylum(tdecl) != KEYDeclaration)
+    tdecl = (Declaration)tnode_parent(tdecl);
 
-	  te->outer = USE_TYPE_ENV(mu);
-	  te->source = mdecl;
-	  te->type_formals = module_decl_type_formals(mdecl);
-	  te->result = (Declaration)tnode_parent(ty);
-	  te->u.type_actuals = type_inst_type_actuals(ty);
+  te->outer = USE_TYPE_ENV(mu);
+  te->source = mdecl;
+  te->type_formals = module_decl_type_formals(mdecl);
+  te->result = (Declaration)tnode_parent(ty);
+  te->u.type_actuals = type_inst_type_actuals(ty);
 
-    return te;
+  return te;
 }
-
-// Type get_type_inst(Use use) {
-//   while (Use_KEY(use) == KEYqual_use)
-//     use = type_use_use(qual_use_from(use));
-
-//   Declaration decl = USE_DECL(use);
-//   if (decl == KEYtype_decl) {
-
-//   }
-// }
 
 static void* do_typechecking(void* ignore, void*node) {
   // find places where Expression, Pattern or Default is used
@@ -481,9 +471,10 @@ static void* do_typechecking(void* ignore, void*node) {
             }
 
             Type_info(ty)->type_sig = infer_type_sig(te, type_decl_type(decl));
-            printf("%d\n", tnode_line_number(ty));
+            printf("filename: %s.aps\n", aps_yyfilename);
+            printf("type_use line number: %d\ntype: ", tnode_line_number(ty));
             print_Type(ty, stdout);
-            printf("\n");
+            printf("\ninferred_signature:");
             print_Signature(Type_info(ty)->type_sig, stdout);
             printf("\n\n");
             break;
