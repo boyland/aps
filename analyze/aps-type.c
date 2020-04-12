@@ -191,13 +191,8 @@ TypeEnvironment build_type_inst_type_environment(Type ty)
 {
   Use mu = module_use_use(type_inst_module(ty));
   Declaration mdecl = USE_DECL(mu);
-  Declaration rdecl = module_decl_result_type(mdecl);
-  Def rdef = some_type_decl_def(rdecl);
   TypeEnvironment te = (TypeEnvironment)HALLOC(sizeof(struct TypeContour));
   Declaration tdecl = (Declaration)tnode_parent(ty);
-  Use tu;
-  Use u;
-  Type fty;
 
   while (ABSTRACT_APS_tnode_phylum(tdecl) != KEYDeclaration)
     tdecl = (Declaration)tnode_parent(tdecl);
