@@ -1,7 +1,18 @@
-module TEST[ElemType] begin
-  type SelfT := LIST[Result];
-  self : LIST[Integer] := SelfT${};
+module NestedModule[Amir] begin
+end;
+
+module TEST[Amir] :: NestedModule[] begin
+  type NestedT := LIST[Amir];
+  variable : NestedT := NestedT${};
 end;
 
 type TestT := TEST[Integer];
-testSelf : LIST[Integer] := TestT$self;
+
+constructor contour() : TestT;
+
+outside : TestT$NestedT := TestT$variable; 
+testInstance : TestT := contour();
+
+type IntegerMaxLattice := MAX_LATTICE[Integer](0);
+
+var latticeInstance: IntegerMaxLattice := 1 + 2;
