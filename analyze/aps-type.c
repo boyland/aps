@@ -164,6 +164,11 @@ Signature infer_type_sig(TypeEnvironment scope, Type type) {
     // Mix in together signatures
     Signature result_sig = mult_sig(self_sig, parent_inferred_signature);
 
+    if (strcmp("Result", decl_name(module_decl_result_type(class_decl))) != 0) {
+      Signature result_decl_sig = infer_type_sig(scope, type_decl_type(module_decl_result_type(class_decl)));
+      result_sig = mult_sig(result_sig, result_decl_sig);
+    }
+
     return result_sig;
   }
   case KEYno_type:
