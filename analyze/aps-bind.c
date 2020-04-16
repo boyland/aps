@@ -47,20 +47,32 @@ static Declaration module_PHYLUM;
 
 static TypeEnvironment current_type_env = 0;
 
+void print_Types(Type* types, int count) {
+  if (count == 0) return;
+  printf("Types of size %d:\n", count);
+  int index;
+  for (index = 0; index < count; index++) {
+    print_Type(types[index], stdout);
+    printf(",");
+  }
+  printf("\n");
+}
+
 static void push_type_contour(Declaration d, TypeActuals tacts, Declaration tdecl) {
+  int type_actuals_count = count_type_actuals(tacts);
   TypeEnvironment new_type_env =
-    (TypeEnvironment)HALLOC(sizeof(struct TypeContour));
+    (TypeEnvironment)HALLOC(sizeof(struct TypeContour) + type_actuals_count);
   new_type_env->outer = current_type_env;
   new_type_env->source = d;
   new_type_env->result = tdecl;
   switch (Declaration_KEY(d)) {
   case KEYsome_class_decl:
     new_type_env->type_formals = some_class_decl_type_formals(d);
-    new_type_env->u.type_actuals = tacts;
+    *new_type_env->type_actuals = flatten_type_actuals(tacts, count_type_actuals);
     break;
   case KEYpolymorphic:
     new_type_env->type_formals = polymorphic_type_formals(d);
-    new_type_env->u.inferred = 0; /* instantiate at each use */
+    new_type_env->inferred = 0; /* instantiate at each use */
     break;
   default:
     fatal_error("push_type_contour called with bad declaration");
@@ -104,9 +116,9 @@ TypeEnvironment instantiate_type_env(TypeEnvironment form)
     for (tf=first_Declaration(tfs); tf != NULL; tf=DECL_NEXT(tf))
       ++n;
     /* allocate one more than necessary */
-    ins->u.inferred = (Type*)HALLOC((n+1)*sizeof(Type));
+    ins->inferred = (Type*)HALLOC((n+1)*sizeof(Type));
     for (i=0; i <= n; ++i)
-      ins->u.inferred[i] = 0;
+      ins->inferred[i] = 0;
     return ins;
   }
   return form;

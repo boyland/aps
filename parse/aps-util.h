@@ -100,3 +100,7 @@ extern Block some_function_decl_body(Declaration);
          _st.push(append_##stype##_l2(_t)); \
 	 _st.push(append_##stype##_l1(_t)); \
          break; } } }
+
+/* TypeActuals utility */
+extern int count_type_actuals(TypeActuals type_actuals);
+extern Type flatten_type_actuals(TypeActuals type_actuals, int count);

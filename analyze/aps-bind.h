@@ -24,6 +24,7 @@ struct TypeContour {
   Declaration source; /* module, class, polymorphic */
   Declarations type_formals; /* numbered for polymorphic */
   Type result; /* type declaration */
+  Type* inferred; // array of Types (initialized to NULL in aps-bind)
   Type type_actuals[0]; /* array of type actuals */
   int num_type_actuals; /* count of type actuals */
 };

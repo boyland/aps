@@ -279,7 +279,8 @@ static void* do_typechecking(void* ignore, void*node) {
 	  te->source = mdecl;
 	  te->type_formals = module_decl_type_formals(mdecl);
 	  te->result = (Declaration)tnode_parent(ty);
-	  te->u.type_actuals = type_inst_type_actuals(ty);
+	  int type_actuals_count = count_type_actuals(type_inst_type_actuals(ty));
+	  *te->type_actuals = flatten_type_actuals(type_inst_type_actuals(ty), type_actuals_count);
 	  aps_yylineno = tnode_line_number(ty);
 	  USE_DECL(tu) = tdecl;
 	  USE_TYPE_ENV(tu) = 0;
@@ -1275,7 +1276,7 @@ void print_TypeEnvironment(TypeEnvironment te, FILE *f)
     Declaration tf = first_Declaration(tfs);
     print_TypeEnvironment(te->outer,f);
     if (Declaration_KEY(te->source) == KEYpolymorphic) {
-      Type *inferred = te->u.inferred;
+      Type *inferred = te->inferred;
       int started = FALSE;
     
       fputc('[',f);
@@ -1288,7 +1289,7 @@ void print_TypeEnvironment(TypeEnvironment te, FILE *f)
 	  fputc('?',f);
       }
     } else {
-      TypeActuals tacts = te->u.type_actuals;
+      TypeActuals tacts = te->type_actuals;
       Type a;
       int started = FALSE;
       fprintf(f,"%s[",decl_name(te->source));
@@ -1447,7 +1448,7 @@ int is_complete(TypeEnvironment type_env)
     int i;
     Declaration tformal = first_Declaration(type_env->type_formals);
     for (i=0; tformal !=0; ++i, tformal = DECL_NEXT(tformal))
-      if (type_env->u.inferred[i] == 0) return FALSE;
+      if (type_env->inferred[i] == 0) return FALSE;
   }
   return is_complete(type_env->outer);
 }
@@ -1681,7 +1682,7 @@ Type type_subst(Use type_envs, Type ty)
 	{
 	  int i = Declaration_info(tdecl)->instance_index;
 	  if (Declaration_KEY((Declaration)parent) == KEYpolymorphic) {
-	    Type t = type_env->u.inferred[i];
+	    Type t = type_env->inferred[i];
 	    if (t == 0) {
 	      aps_error(ty,"type not fully inferred");
 	      aps_error(type_envs,"or perhaps here");
@@ -1693,7 +1694,7 @@ Type type_subst(Use type_envs, Type ty)
 	    }
 	    return t;
 	  }
-	  actuals = type_env->u.type_actuals;
+	  actuals = type_env->type_actuals;
 	  for (a = first_TypeActual(actuals); a!=0 && i; a=TYPE_NEXT(a), --i)
 	    ;
 	  if (!a) {
@@ -1865,7 +1866,7 @@ Use type_inst_envs(Type ty)
   te->source = mdecl;
   te->type_formals = module_decl_type_formals(mdecl);
   te->result = (Declaration)tnode_parent(ty);
-  te->u.type_actuals = type_inst_type_actuals(ty);
+  te->type_actuals = type_inst_type_actuals(ty);
   aps_yylineno = tnode_line_number(ty);
   USE_DECL(tu) = tdecl;
   USE_TYPE_ENV(tu) = 0;
@@ -2152,15 +2153,15 @@ void check_type_subst(void *node, Type t1, Use type_envs, Type t2)
 	{
 	  int i = Declaration_info(tdecl)->instance_index;
 	  if (Declaration_KEY((Declaration)parent) == KEYpolymorphic) {
-	    Type t = type_env->u.inferred[i];
+	    Type t = type_env->inferred[i];
 	    if (t == 0) {
-	      type_env->u.inferred[i] = t1;
+	      type_env->inferred[i] = t1;
 	      check_type_signatures(node,t1,type_envs,some_type_formal_sig(tdecl));
 	    } else {
 	      check_type_equal(node,t1,type_subst(type_envs_nested(type_envs),t));
 	    }
 	  } else {
-	    actuals = type_env->u.type_actuals;
+	    actuals = type_env->type_actuals;
 	    for (a = first_TypeActual(actuals); a!=0 && i; a=TYPE_NEXT(a), --i)
 	      ;
 	    if (!a) {

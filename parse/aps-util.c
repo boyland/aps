@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include "aps-tree.h"
 #include "aps-util.h"
+#include "jbb-alloc.h"
 
 extern char *Declaration_constructors[];
 
@@ -258,5 +259,56 @@ Block some_function_decl_body(Declaration _node) {
 		       Declaration_constructors[Declaration_KEY(_node)]);
   case KEYfunction_decl: return function_decl_body(_node);
   case KEYprocedure_decl: return procedure_decl_body(_node);
+  }
+}
+
+void flatten_type_actuals_helper(TypeActuals type_actuals, Type* types_array, int* index);
+
+void flatten_type_actuals_helper(TypeActuals type_actuals, Type* types_array, int* index) {
+  switch (TypeActuals_KEY(type_actuals)) {
+  case KEYnil_TypeActuals:
+    break;
+  case KEYlist_TypeActuals:
+    types_array[(*index)++] = list_TypeActuals_elem(type_actuals);
+    break;
+  case KEYappend_TypeActuals:
+    flatten_type_actuals_helper(append_TypeActuals_l1(type_actuals), types_array, index);
+    flatten_type_actuals_helper(append_TypeActuals_l2(type_actuals), types_array, index);
+    break;
+  }
+}
+
+/**
+ * Returns the count of number of actuals
+ */
+int count_type_actuals(TypeActuals type_actuals) {
+  switch (TypeActuals_KEY(type_actuals)) {
+  case KEYnil_TypeActuals:
+    return 0;
+  case KEYlist_TypeActuals:
+    return 1;
+  case KEYappend_TypeActuals:
+    return count_type_actuals(append_TypeActuals_l1(type_actuals)) + 
+      count_type_actuals(append_TypeActuals_l2(type_actuals));
+  }
+
+  fatal_error("count_type_actuals called with bad TypeActuals");
+
+  return 0;
+}
+
+/**
+ * Flattens TypeActuals into pointer to an array of Type
+ */
+Type flatten_type_actuals(TypeActuals type_actuals, int count) {
+  if (type_actuals == NULL || count == 0) {
+    return NULL;
+  } else {
+    Type *types = HALLOC(count * (sizeof(Type)));
+
+    int index = 0;
+    flatten_type_actuals_helper(type_actuals, &types, &index);
+    
+    return types;
   }
 }
