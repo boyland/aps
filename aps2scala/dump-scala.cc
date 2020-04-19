@@ -2162,11 +2162,17 @@ static void dump_TypeContour(TypeContour *tc, bool instance, ostream& os)
     }
     break;
   case KEYmodule_decl:
-    for (Type ta = first_TypeActual(tc->type_actuals);
-	 ta ; ta = TYPE_NEXT(ta)) {
+  {
+    Type* tas = tc->type_actuals; 
+    int ta_count = tc->num_type_actuals;
+    int index;
+    for (index = 0;
+    index < ta_count ; index++) {
+      Type ta = tas[index];
       type_actuals.push_back(ta);
     }
     break;
+  }
   default:
     fatal_error("%d: Not a source", tnode_line_number(tc->source));
   }

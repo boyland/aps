@@ -1852,8 +1852,9 @@ Use type_inst_envs(Type ty)
   Declaration mdecl = USE_DECL(mu);
   Declaration rdecl = module_decl_result_type(mdecl);
   Def rdef = some_type_decl_def(rdecl);
+  int type_actuals_count = count_type_actuals(type_inst_type_actuals(ty));
   TypeEnvironment te =
-    (TypeEnvironment)HALLOC(sizeof(struct TypeContour));
+    (TypeEnvironment)HALLOC(sizeof(struct TypeContour) + type_actuals_count);
   extern int aps_yylineno;
   Declaration tdecl = (Declaration)tnode_parent(ty);
   Use tu;
@@ -1866,7 +1867,8 @@ Use type_inst_envs(Type ty)
   te->source = mdecl;
   te->type_formals = module_decl_type_formals(mdecl);
   te->result = (Declaration)tnode_parent(ty);
-  te->type_actuals = type_inst_type_actuals(ty);
+  *te->type_actuals = flatten_type_actuals(type_inst_type_actuals(ty), type_actuals_count);
+  te->num_type_actuals = type_actuals_count;
   aps_yylineno = tnode_line_number(ty);
   USE_DECL(tu) = tdecl;
   USE_TYPE_ENV(tu) = 0;
