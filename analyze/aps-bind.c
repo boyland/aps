@@ -47,17 +47,6 @@ static Declaration module_PHYLUM;
 
 static TypeEnvironment current_type_env = 0;
 
-void print_Types(Type* types, int count) {
-  if (count == 0) return;
-  printf("Types of size %d:\n", count);
-  int index;
-  for (index = 0; index < count; index++) {
-    print_Type(types[index], stdout);
-    printf(",");
-  }
-  printf("\n");
-}
-
 static void push_type_contour(Declaration d, TypeActuals tacts, Declaration tdecl) {
   int type_actuals_count = count_type_actuals(tacts);
   TypeEnvironment new_type_env =
