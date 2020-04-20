@@ -64,11 +64,30 @@ static void push_type_contour(Declaration d, TypeActuals tacts, Declaration tdec
     (TypeEnvironment)HALLOC(sizeof(struct TypeContour) + type_actuals_count);
   new_type_env->outer = current_type_env;
   new_type_env->source = d;
-  new_type_env->result = tdecl;
+
+  if (tdecl == NULL) {
+    new_type_env->result = NULL;
+  } else {
+    switch (Declaration_KEY(tdecl))
+    {
+    case KEYsome_type_formal:
+      // TODO: this causes problem
+      // new_type_env->result = type_formal_sig(tdecl);
+      new_type_env->result = NULL;
+      break;
+    case KEYsome_type_decl:
+      new_type_env->result = some_type_decl_type(tdecl); 
+      break;
+    default:
+      aps_error(tdecl, "Not sure how to get Type from tdecl");
+      break;
+    }
+  }
+
   switch (Declaration_KEY(d)) {
   case KEYsome_class_decl:
     new_type_env->type_formals = some_class_decl_type_formals(d);
-    *new_type_env->type_actuals = flatten_type_actuals(tacts, count_type_actuals);
+    *new_type_env->type_actuals = flatten_type_actuals(tacts, type_actuals_count);
     break;
   case KEYpolymorphic:
     new_type_env->type_formals = polymorphic_type_formals(d);
