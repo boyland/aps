@@ -282,6 +282,8 @@ void flatten_type_actuals_helper(TypeActuals type_actuals, Type* types_array, in
  * Returns the count of number of actuals
  */
 int count_type_actuals(TypeActuals type_actuals) {
+  if (type_actuals == NULL) return 0;
+
   switch (TypeActuals_KEY(type_actuals)) {
   case KEYnil_TypeActuals:
     return 0;
