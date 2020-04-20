@@ -25,8 +25,8 @@ struct TypeContour {
   Declarations type_formals; /* numbered for polymorphic */
   Type result; /* type declaration */
   Type* inferred; // array of Types (initialized to NULL in aps-bind)
-  Type type_actuals[0]; /* array of type actuals */
   int num_type_actuals; /* count of type actuals */
+  Type type_actuals[]; /* array of type actuals */
 };
   
 typedef struct TypeContour *TypeEnvironment;
