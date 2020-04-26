@@ -1289,11 +1289,16 @@ void print_TypeEnvironment(TypeEnvironment te, FILE *f)
 	  fputc('?',f);
       }
     } else {
-      TypeActuals tacts = te->type_actuals;
+      Type* tacts = te->type_actuals;
+      int ta_count = te->num_type_actuals;
       Type a;
       int started = FALSE;
       fprintf(f,"%s[",decl_name(te->source));
-      for (a = first_TypeActual(tacts); a; a=TYPE_NEXT(a)) {
+
+      if (ta_count == 0) a = NULL;
+      int index;
+      for (index = 0; index < ta_count; index++) {
+        a = tacts[index];
         if (started) fputc(',',f); else started = TRUE;
 	print_Type(a,f);
       }
@@ -1694,9 +1699,19 @@ Type type_subst(Use type_envs, Type ty)
 	    }
 	    return t;
 	  }
-	  actuals = type_env->type_actuals;
-	  for (a = first_TypeActual(actuals); a!=0 && i; a=TYPE_NEXT(a), --i)
-	    ;
+	  Type* ta = type_env->type_actuals;
+    int ta_count = type_env->num_type_actuals;
+    int index;
+
+    if (ta_count == 0 && i) a = NULL;
+
+	  for (index = 0; index < ta_count && i; index++, --i) {
+	    a = ta[index];
+      if (index + 1 == ta_count) {
+        a = NULL;
+      }
+    }
+
 	  if (!a) {
 	    aps_error(type_env->result,"too few type parameters");
 	    printf("looking for actual for %s on line %d\n",

@@ -68,6 +68,7 @@ static void push_type_contour(Declaration d, TypeActuals tacts, Declaration tdec
     (TypeEnvironment)HALLOC(sizeof(struct TypeContour) + type_actuals_count);
   new_type_env->outer = current_type_env;
   new_type_env->source = d;
+  new_type_env->num_type_actuals = count_type_actuals;
 
   if (tdecl == NULL) {
     new_type_env->result = NULL;
@@ -87,6 +88,8 @@ static void push_type_contour(Declaration d, TypeActuals tacts, Declaration tdec
       break;
     }
   }
+
+  new_type_env->result = tdecl;
 
   switch (Declaration_KEY(d)) {
   case KEYsome_class_decl:
