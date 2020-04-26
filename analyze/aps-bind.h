@@ -23,7 +23,7 @@ struct TypeContour {
   struct TypeContour *outer; /*  nested type environment */
   Declaration source; /* module, class, polymorphic */
   Declarations type_formals; /* numbered for polymorphic */
-  Type result; /* type declaration */
+  Declaration result; /* type declaration */
   Type* inferred; // array of Types (initialized to NULL in aps-bind)
   int num_type_actuals; /* count of type actuals */
   Type type_actuals[]; /* array of type actuals */
