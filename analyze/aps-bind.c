@@ -49,6 +49,21 @@ static TypeEnvironment current_type_env = 0;
 
 static void push_type_contour(Declaration d, TypeActuals tacts, Declaration tdecl) {
   int type_actuals_count = count_type_actuals(tacts);
+  if (tdecl != NULL) {
+    switch (Declaration_KEY(tdecl))
+    {
+    case KEYsome_type_decl:
+      printf("KEYsome_type_decl\n");
+      break;
+    case KEYtype_formal:
+      printf("KEYtype_formal\n");
+      break;
+    default:
+      printf("%d\n", (int) Declaration_KEY(tdecl));
+      break;
+    }
+  }
+
   TypeEnvironment new_type_env =
     (TypeEnvironment)HALLOC(sizeof(struct TypeContour) + type_actuals_count);
   new_type_env->outer = current_type_env;
@@ -186,6 +201,7 @@ static SCOPE add_ext_sig(SCOPE old, Declaration tdecl, Signature sig) {
 	{ Declaration d = Use_info(class_use_use(cl))->use_decl;
 	  if (d == NULL) fatal_error("%d: class not found",
 				     tnode_line_number(cl));
+             printf("\t\t >>>><<<<< %s\n", decl_name(d));
 	  switch (Declaration_KEY(d)) {
 	  case KEYsome_class_decl:
 	    { SCOPE new_scope = old;
@@ -541,6 +557,9 @@ static void *do_bind(void *vscope, void *node) {
 	  traverse_Declaration_skip(do_bind,new_scope,d); }
 	break;
       case KEYmodule_decl:
+      {
+        printf("%s >>> %d\n", decl_name((Declaration) node), tnode_line_number(node));
+      }
 	if (module_TYPE == 0 && streq(decl_name(d),"TYPE"))
 	  module_TYPE = d;
 	else if (module_PHYLUM == 0 && streq(decl_name(d),"PHYLUM"))
@@ -556,10 +575,12 @@ static void *do_bind(void *vscope, void *node) {
 			       module_decl_result_type(d));
 	  /* handle extension: common case only */
 	  { Declaration rdecl = module_decl_result_type(d);
+    printf("\tresult is %d\n", (int) tnode_line_number(rdecl));
 	    Type ext=some_type_decl_type(rdecl);
 	    switch (Type_KEY(ext)) {
 	    case KEYtype_use:
 	      { Declaration tf = Use_info(type_use_use(ext))->use_decl;
+            printf("\t\ttype formal is %d <%s>\n", (int) tnode_line_number(tf), decl_name(tf));
 		if (tf != NULL) {
 		  switch (Declaration_KEY(tf)) {
 		  case KEYsome_type_formal:
