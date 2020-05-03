@@ -2163,14 +2163,16 @@ static void dump_TypeContour(TypeContour *tc, bool instance, ostream& os)
 	   f; f=DECL_NEXT(f))
 	++n;
       for (int i=0; i < n; ++i) {
-	type_actuals.push_back(tc->inferred[i]);
+	type_actuals.push_back(tc->type_actuals[i]);
       }
     }
     break;
   case KEYmodule_decl:
-    for (Type ta = first_TypeActual(tc->type_actuals);
-	 ta ; ta = TYPE_NEXT(ta)) {
-      type_actuals.push_back(ta);
+    {
+      int index;
+      for (index = 0; index < tc->num_type_actuals; index++) {
+        type_actuals.push_back(tc->type_actuals[index]);
+      }
     }
     break;
   default:

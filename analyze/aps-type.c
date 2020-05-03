@@ -264,8 +264,9 @@ static void* do_typechecking(void* ignore, void*node) {
 	  Declaration mdecl = USE_DECL(mu);
 	  Declaration rdecl = module_decl_result_type(mdecl);
 	  Def rdef = some_type_decl_def(rdecl);
+    int type_actuals_count = count_type_actuals(type_inst_type_actuals(ty));
 	  TypeEnvironment te =
-	    (TypeEnvironment)HALLOC(sizeof(struct TypeContour));
+	    (TypeEnvironment)HALLOC(sizeof(struct TypeContour) + sizeof(Type) * type_actuals_count);
 	  extern int aps_yylineno;
 	  Declaration tdecl = (Declaration)tnode_parent(ty);
 	  Use tu;
@@ -279,8 +280,7 @@ static void* do_typechecking(void* ignore, void*node) {
 	  te->source = mdecl;
 	  te->type_formals = module_decl_type_formals(mdecl);
 	  te->result = (Declaration)tnode_parent(ty);
-	  int type_actuals_count = count_type_actuals(type_inst_type_actuals(ty));
-	  *te->type_actuals = flatten_type_actuals(type_inst_type_actuals(ty), type_actuals_count);
+	  load_type_actuals(type_inst_type_actuals(ty), te);
 	  aps_yylineno = tnode_line_number(ty);
 	  USE_DECL(tu) = tdecl;
 	  USE_TYPE_ENV(tu) = 0;
@@ -1276,31 +1276,35 @@ void print_TypeEnvironment(TypeEnvironment te, FILE *f)
     Declaration tf = first_Declaration(tfs);
     print_TypeEnvironment(te->outer,f);
     if (Declaration_KEY(te->source) == KEYpolymorphic) {
-      Type *inferred = te->inferred;
+      Type inferred = NULL;
       int started = FALSE;
+      int index;
     
       fputc('[',f);
-      for (; tf; tf = DECL_NEXT(tf), ++inferred) {
+      for (index = 0; tf && index < te->num_type_actuals; tf = DECL_NEXT(tf), index++) {
+        inferred = te->type_actuals[index];
         if (started) fputc(',',f); else started = TRUE;
         fprintf(f,"%s=",decl_name(tf));
-        if (*inferred)
-	  print_Type(*inferred,f);
+        if (inferred)
+	  print_Type(inferred,f);
         else
 	  fputc('?',f);
       }
     } else {
-      Type* tacts = te->type_actuals;
-      int ta_count = te->num_type_actuals;
-      Type a;
-      int started = FALSE;
-      fprintf(f,"%s[",decl_name(te->source));
+      {
+        Type *tacts = te->type_actuals;
+        int ta_count = te->num_type_actuals;
+        Type a;
+        int started = FALSE;
+        fprintf(f,"%s[",decl_name(te->source));
 
-      if (ta_count == 0) a = NULL;
-      int index;
-      for (index = 0; index < ta_count; index++) {
-        a = tacts[index];
-        if (started) fputc(',',f); else started = TRUE;
-	print_Type(a,f);
+        if (ta_count == 0) a = NULL;
+        int index;
+        for (index = 0; index < ta_count; index++) {
+          a = tacts[index];
+          if (started) fputc(',',f); else started = TRUE;
+    print_Type(a,f);
+        }
       }
     }
     fputs("].",f);
@@ -1453,7 +1457,7 @@ int is_complete(TypeEnvironment type_env)
     int i;
     Declaration tformal = first_Declaration(type_env->type_formals);
     for (i=0; tformal !=0; ++i, tformal = DECL_NEXT(tformal))
-      if (type_env->inferred[i] == 0) return FALSE;
+      if (type_env->type_actuals[i] == 0) return FALSE;
   }
   return is_complete(type_env->outer);
 }
@@ -1687,7 +1691,7 @@ Type type_subst(Use type_envs, Type ty)
 	{
 	  int i = Declaration_info(tdecl)->instance_index;
 	  if (Declaration_KEY((Declaration)parent) == KEYpolymorphic) {
-	    Type t = type_env->inferred[i];
+	    Type t = type_env->type_actuals[i];
 	    if (t == 0) {
 	      aps_error(ty,"type not fully inferred");
 	      aps_error(type_envs,"or perhaps here");
@@ -1699,16 +1703,19 @@ Type type_subst(Use type_envs, Type ty)
 	    }
 	    return t;
 	  }
-	  Type* ta = type_env->type_actuals;
-    int ta_count = type_env->num_type_actuals;
-    int index;
 
-    if (ta_count == 0 && i) a = NULL;
+    {
+      Type *ta = type_env->type_actuals;
+      int ta_count = type_env->num_type_actuals;
+      int index;
 
-	  for (index = 0; index < ta_count && i; index++, --i) {
-	    a = ta[index];
-      if (index + 1 == ta_count) {
-        a = NULL;
+      if (ta_count == 0 && i) a = NULL;
+
+      for (index = 0; index < ta_count && i; index++, --i) {
+        a = ta[index];
+        if (index + 1 == ta_count) {
+          a = NULL;
+        }
       }
     }
 
@@ -1869,7 +1876,7 @@ Use type_inst_envs(Type ty)
   Def rdef = some_type_decl_def(rdecl);
   int type_actuals_count = count_type_actuals(type_inst_type_actuals(ty));
   TypeEnvironment te =
-    (TypeEnvironment)HALLOC(sizeof(struct TypeContour) + type_actuals_count);
+    (TypeEnvironment)HALLOC(sizeof(struct TypeContour) + sizeof(Type) * type_actuals_count);
   extern int aps_yylineno;
   Declaration tdecl = (Declaration)tnode_parent(ty);
   Use tu;
@@ -1882,7 +1889,7 @@ Use type_inst_envs(Type ty)
   te->source = mdecl;
   te->type_formals = module_decl_type_formals(mdecl);
   te->result = (Declaration)tnode_parent(ty);
-  *te->type_actuals = flatten_type_actuals(type_inst_type_actuals(ty), type_actuals_count);
+  load_type_actuals(type_inst_type_actuals(ty), te);
   te->num_type_actuals = type_actuals_count;
   aps_yylineno = tnode_line_number(ty);
   USE_DECL(tu) = tdecl;
@@ -2170,9 +2177,9 @@ void check_type_subst(void *node, Type t1, Use type_envs, Type t2)
 	{
 	  int i = Declaration_info(tdecl)->instance_index;
 	  if (Declaration_KEY((Declaration)parent) == KEYpolymorphic) {
-	    Type t = type_env->inferred[i];
+	    Type t = type_env->type_actuals[i];
 	    if (t == 0) {
-	      type_env->inferred[i] = t1;
+	      type_env->type_actuals[i] = t1;
 	      check_type_signatures(node,t1,type_envs,some_type_formal_sig(tdecl));
 	    } else {
 	      check_type_equal(node,t1,type_subst(type_envs_nested(type_envs),t));

@@ -2157,7 +2157,7 @@ static void dump_TypeContour(TypeContour *tc, bool instance, ostream& os)
 	   f; f=DECL_NEXT(f))
 	++n;
       for (int i=0; i < n; ++i) {
-	type_actuals.push_back(tc->inferred[i]);
+	type_actuals.push_back(tc->type_actuals[i]);
       }
     }
     break;
