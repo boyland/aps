@@ -24,7 +24,6 @@ struct TypeContour {
   Declaration source; /* module, class, polymorphic */
   Declarations type_formals; /* numbered for polymorphic */
   Declaration result; /* type declaration */
-  Type* inferred; // array of Types (initialized to NULL in aps-bind)
   int num_type_actuals; /* count of type actuals */
   Type type_actuals[]; /* array of type actuals */
 };
@@ -39,3 +38,5 @@ extern int decl_namespaces(Declaration d);
 
 extern int bind_debug;
 #define PRAGMA_ACTIVATION 1
+
+void load_type_actuals(TypeActuals type_actuals, TypeEnvironment te);

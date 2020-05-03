@@ -47,62 +47,47 @@ static Declaration module_PHYLUM;
 
 static TypeEnvironment current_type_env = 0;
 
+
+/**
+ * Load TypeActuals into pointer to an array of Type
+ */
+void load_type_actuals(TypeActuals type_actuals, TypeEnvironment te) {
+  int index = 0;
+  for (Type ta = first_TypeActual(type_actuals); ta != NULL; ta = TYPE_NEXT(ta)) {
+    te->type_actuals[index++] = ta;
+  }
+}
+
 static void push_type_contour(Declaration d, TypeActuals tacts, Declaration tdecl) {
-  int type_actuals_count = count_type_actuals(tacts);
-  if (tdecl != NULL) {
-    switch (Declaration_KEY(tdecl))
-    {
-    case KEYsome_type_decl:
-      printf("KEYsome_type_decl\n");
-      break;
-    case KEYtype_formal:
-      printf("KEYtype_formal\n");
-      break;
-    default:
-      printf("%d\n", (int) Declaration_KEY(tdecl));
-      break;
-    }
-  }
-
-  TypeEnvironment new_type_env =
-    (TypeEnvironment)HALLOC(sizeof(struct TypeContour) + type_actuals_count);
-  new_type_env->outer = current_type_env;
-  new_type_env->source = d;
-  new_type_env->num_type_actuals = count_type_actuals;
-
-  if (tdecl == NULL) {
-    new_type_env->result = NULL;
-  } else {
-    switch (Declaration_KEY(tdecl))
-    {
-    case KEYsome_type_formal:
-      // TODO: this causes problem
-      // new_type_env->result = type_formal_sig(tdecl);
-      new_type_env->result = NULL;
-      break;
-    case KEYsome_type_decl:
-      new_type_env->result = some_type_decl_type(tdecl); 
-      break;
-    default:
-      aps_error(tdecl, "Not sure how to get Type from tdecl");
-      break;
-    }
-  }
-
-  new_type_env->result = tdecl;
-
-  switch (Declaration_KEY(d)) {
+  Declarations formals = NULL;
+  switch (Declaration_KEY(d))
+  {
   case KEYsome_class_decl:
-    new_type_env->type_formals = some_class_decl_type_formals(d);
-    *new_type_env->type_actuals = flatten_type_actuals(tacts, type_actuals_count);
+    formals = some_class_decl_type_formals(d);
     break;
   case KEYpolymorphic:
-    new_type_env->type_formals = polymorphic_type_formals(d);
-    new_type_env->inferred = 0; /* instantiate at each use */
-    break;
+    formals = polymorphic_type_formals(d);
+    break;  
   default:
-    fatal_error("push_type_contour called with bad declaration");
+      aps_error(d, "Not sure how to get formals from declaration");
+      break;
   }
+
+  int type_actuals_count = compute_type_contour_size(tacts, formals);
+  
+  TypeEnvironment new_type_env =
+    (TypeEnvironment)HALLOC(sizeof(struct TypeContour) + sizeof(Type) * type_actuals_count);
+
+  new_type_env->outer = current_type_env;
+  new_type_env->source = d;
+  new_type_env->num_type_actuals = type_actuals_count;
+  new_type_env->type_formals = formals;
+  new_type_env->result = tdecl;
+
+  if (tacts != NULL) {
+    load_type_actuals(tacts, new_type_env);
+  }
+
   current_type_env = new_type_env;
 }
 
@@ -129,22 +114,18 @@ static void pop_type_contour()
 TypeEnvironment instantiate_type_env(TypeEnvironment form)
 {
   if (form != 0 && Declaration_KEY(form->source) == KEYpolymorphic) {
-    TypeEnvironment ins =
-      (TypeEnvironment)HALLOC(sizeof(struct TypeContour));
     Declarations tfs = form->type_formals;
     Declaration tf;
-    int n=0;
+    int n = compute_type_contour_size(NULL, tfs);
     int i;
+    /* allocate one more than necessary */
+    TypeEnvironment ins =
+      (TypeEnvironment)HALLOC(sizeof(struct TypeContour) + sizeof(Type) * (n + 1));
 
     ins->outer = instantiate_type_env(form->outer);
     ins->source = form->source;
     ins->type_formals = tfs;
-    for (tf=first_Declaration(tfs); tf != NULL; tf=DECL_NEXT(tf))
-      ++n;
-    /* allocate one more than necessary */
-    ins->inferred = (Type*)HALLOC((n+1)*sizeof(Type));
-    for (i=0; i <= n; ++i)
-      ins->inferred[i] = 0;
+
     return ins;
   }
   return form;
