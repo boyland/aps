@@ -92,3 +92,23 @@ struct Def_info *Def_info(Def _node) {
   return &(tnode_info(_node)->var.def_info);
 }
 
+
+/**
+ * Returns the count of number of actuals
+ */
+int compute_type_contour_size(TypeActuals type_actuals, Declarations type_formals) {
+  int count = 0;
+  if (type_actuals != NULL) {
+    Type ta;
+    for (ta = first_TypeActual(type_actuals); ta != NULL; ta = TYPE_NEXT(ta)) {
+      count++;
+    }
+  } else if (type_formals != NULL) {
+    Declaration tf;
+    for (tf = first_Declaration(type_formals); tf != NULL; tf = DECL_NEXT(tf)) {
+      count++;
+    }
+  }
+
+  return count;
+}

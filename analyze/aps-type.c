@@ -264,7 +264,7 @@ static void* do_typechecking(void* ignore, void*node) {
 	  Declaration mdecl = USE_DECL(mu);
 	  Declaration rdecl = module_decl_result_type(mdecl);
 	  Def rdef = some_type_decl_def(rdecl);
-    int type_actuals_count = count_type_actuals(type_inst_type_actuals(ty));
+    int type_actuals_count = compute_type_contour_size(type_inst_type_actuals(ty), NULL);
 	  TypeEnvironment te =
 	    (TypeEnvironment)HALLOC(sizeof(struct TypeContour) + sizeof(Type) * type_actuals_count);
 	  extern int aps_yylineno;
@@ -1874,7 +1874,7 @@ Use type_inst_envs(Type ty)
   Declaration mdecl = USE_DECL(mu);
   Declaration rdecl = module_decl_result_type(mdecl);
   Def rdef = some_type_decl_def(rdecl);
-  int type_actuals_count = count_type_actuals(type_inst_type_actuals(ty));
+  int type_actuals_count = compute_type_contour_size(type_inst_type_actuals(ty), NULL);
   TypeEnvironment te =
     (TypeEnvironment)HALLOC(sizeof(struct TypeContour) + sizeof(Type) * type_actuals_count);
   extern int aps_yylineno;
@@ -2185,10 +2185,8 @@ void check_type_subst(void *node, Type t1, Use type_envs, Type t2)
 	      check_type_equal(node,t1,type_subst(type_envs_nested(type_envs),t));
 	    }
 	  } else {
-	    actuals = type_env->type_actuals;
-	    for (a = first_TypeActual(actuals); a!=0 && i; a=TYPE_NEXT(a), --i)
-	      ;
-	    if (!a) {
+      int ta_count = type_env->num_type_actuals;
+	    if (i - ta_count != 0) {
 	      aps_error(type_env->result,"too few type parameters");
 	      printf("looking for actual for %s on line %d\n",
 		     decl_name(tdecl), tnode_line_number(tdecl));

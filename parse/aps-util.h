@@ -100,6 +100,3 @@ extern Block some_function_decl_body(Declaration);
          _st.push(append_##stype##_l2(_t)); \
 	 _st.push(append_##stype##_l1(_t)); \
          break; } } }
-
-/* TypeActuals utility */
-int compute_type_contour_size(TypeActuals type_actuals, TypeFormals type_formals);

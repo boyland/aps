@@ -261,23 +261,3 @@ Block some_function_decl_body(Declaration _node) {
   case KEYprocedure_decl: return procedure_decl_body(_node);
   }
 }
-
-/**
- * Returns the count of number of actuals
- */
-int compute_type_contour_size(TypeActuals type_actuals, TypeFormals type_formals) {
-  int count = 0;
-  if (type_actuals != NULL) {
-    Type ta;
-    for (ta = first_TypeActual(type_actuals); ta != NULL; ta = TYPE_NEXT(ta)) {
-      count++;
-    }
-  } else if (type_formals != NULL) {
-    Declaration tf;
-    for (tf = first_Declaration(type_actuals); tf != NULL; tf = DECL_NEXT(tf)) {
-      count++;
-    }
-  }
-
-  return count;
-}
