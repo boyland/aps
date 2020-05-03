@@ -102,5 +102,4 @@ extern Block some_function_decl_body(Declaration);
          break; } } }
 
 /* TypeActuals utility */
-extern int count_type_actuals(TypeActuals type_actuals);
-extern Type flatten_type_actuals(TypeActuals type_actuals, int count);
+int compute_type_contour_size(TypeActuals type_actuals, TypeFormals type_formals);
