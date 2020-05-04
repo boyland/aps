@@ -1691,6 +1691,11 @@ Type type_subst(Use type_envs, Type ty)
 	    tdecl != class_decl_result_type(type_env->source))
 	{
 	  int i = Declaration_info(tdecl)->instance_index;
+    if (i >= type_env->num_type_actuals) {
+	    aps_error(type_env->result,"too few type parameters");
+	    printf("looking for actual for %s on line %d\n",
+		   decl_name(tdecl), tnode_line_number(tdecl));
+    }
 	  if (Declaration_KEY((Declaration)parent) == KEYpolymorphic) {
 	    Type t = type_env->type_actuals[i];
 	    if (t == 0) {
@@ -1703,26 +1708,12 @@ Type type_subst(Use type_envs, Type ty)
               printf("\n");
 	    }
 	    return t;
-	  }
-
-    {
-      Type *ta = type_env->type_actuals;
-      int ta_count = type_env->num_type_actuals;
-      int index;
-
-      if (ta_count == 0 || i) {
-        a = NULL;
-      }
-
-      for (index = 0; index < ta_count && i; index++, --i) {
-        a = ta[index];
-        if (index + 1 == ta_count) {
-          a = NULL;
-        }
-      }
+	  } else {
+      
     }
 
-	  if (!a) {
+    a = type_env->type_actuals[i];
+	  if (i - type_env->num_type_actuals == 0) {
 	    aps_error(type_env->result,"too few type parameters");
 	    printf("looking for actual for %s on line %d\n",
 		   decl_name(tdecl), tnode_line_number(tdecl));
@@ -2179,24 +2170,25 @@ void check_type_subst(void *node, Type t1, Use type_envs, Type t2)
 	    tdecl != class_decl_result_type(type_env->source))
 	{
 	  int i = Declaration_info(tdecl)->instance_index;
-	  if (Declaration_KEY((Declaration)parent) == KEYpolymorphic) {
-	    Type t = type_env->type_actuals[i];
-	    if (t == 0) {
-	      type_env->type_actuals[i] = t1;
-	      check_type_signatures(node,t1,type_envs,some_type_formal_sig(tdecl));
-	    } else {
-	      check_type_equal(node,t1,type_subst(type_envs_nested(type_envs),t));
-	    }
-	  } else {
-      int ta_count = type_env->num_type_actuals;
-	    if (i - ta_count != 0) {
+    if (i >= type_env->num_type_actuals) {
 	      aps_error(type_env->result,"too few type parameters");
 	      printf("looking for actual for %s on line %d\n",
 		     decl_name(tdecl), tnode_line_number(tdecl));
-	    } else {
-	      check_type_equal(node,t1,type_subst(type_envs_nested(type_envs),a));
-	    }
-	  }
+    } else {
+      if (Declaration_KEY((Declaration)parent) == KEYpolymorphic) {
+        Type t = type_env->type_actuals[i];
+        if (t == 0) {
+          type_env->type_actuals[i] = t1;
+          check_type_signatures(node,t1,type_envs,some_type_formal_sig(tdecl));
+        } else {
+          check_type_equal(node,t1,type_subst(type_envs_nested(type_envs),t));
+        }
+      } else {
+        Type t = type_env->type_actuals[i];
+        check_type_equal(node,t1,type_subst(type_envs_nested(type_envs),t));
+      }
+    }
+
 	  return;
 	}
 	/* FALL THROUGH */

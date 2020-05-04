@@ -746,15 +746,14 @@ void dump_Signature_service_transfers(Type from, ServiceRecord& sr,
       Declaration cd = USE_DECL(some_use_u(sig_inst_class(s)));
       dump_Signature_service_transfers(from,sr,some_class_decl_parent(cd),os,is);
       Block b = some_class_decl_contents(cd);
-      TypeContour tc;
-      tc.outer = 0;
-      tc.source = cd;
-      tc.type_formals = some_class_decl_type_formals(cd);
-      tc.result = some_class_decl_result_type(cd);
-      TypeActuals ta = sig_inst_actuals(s);
+        TypeActuals ta = sig_inst_actuals(s);
       int type_actuals_count = compute_type_contour_size(ta, NULL);
-      // TODO
-      // tc.type_actuals = flatten_type_actuals(ta, type_actuals_count);
+      TypeContour *tcp = (TypeContour *) alloca(sizeof(TypeContour) + type_actuals_count * sizeof(Type));
+      tcp->outer = 0;
+      tcp->source = cd;
+      tcp->type_formals = some_class_decl_type_formals(cd);
+      tcp->result = some_class_decl_result_type(cd);
+      tcp->num_type_actuals = type_actuals_count;
       static Symbol fake_sym = intern_symbol("*fake*");
       static Use fake = use(fake_sym);
       static struct Use_info* ui = Use_info(fake);
