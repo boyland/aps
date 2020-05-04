@@ -280,7 +280,8 @@ static void* do_typechecking(void* ignore, void*node) {
 	  te->source = mdecl;
 	  te->type_formals = module_decl_type_formals(mdecl);
 	  te->result = (Declaration)tnode_parent(ty);
-	  load_type_actuals(type_inst_type_actuals(ty), te);
+	  te->num_type_actuals = type_actuals_count;
+    load_type_actuals(type_inst_type_actuals(ty), te);
 	  aps_yylineno = tnode_line_number(ty);
 	  USE_DECL(tu) = tdecl;
 	  USE_TYPE_ENV(tu) = 0;
@@ -1709,7 +1710,9 @@ Type type_subst(Use type_envs, Type ty)
       int ta_count = type_env->num_type_actuals;
       int index;
 
-      if (ta_count == 0 && i) a = NULL;
+      if (ta_count == 0 || i) {
+        a = NULL;
+      }
 
       for (index = 0; index < ta_count && i; index++, --i) {
         a = ta[index];

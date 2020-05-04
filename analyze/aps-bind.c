@@ -122,6 +122,7 @@ TypeEnvironment instantiate_type_env(TypeEnvironment form)
     TypeEnvironment ins =
       (TypeEnvironment)HALLOC(sizeof(struct TypeContour) + sizeof(Type) * (n + 1));
 
+    ins->num_type_actuals = n;
     ins->outer = instantiate_type_env(form->outer);
     ins->source = form->source;
     ins->type_formals = tfs;

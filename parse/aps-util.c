@@ -5,7 +5,6 @@
 #include <stdio.h>
 #include "aps-tree.h"
 #include "aps-util.h"
-#include "jbb-alloc.h"
 
 extern char *Declaration_constructors[];
 
