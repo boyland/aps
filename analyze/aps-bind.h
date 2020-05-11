@@ -23,7 +23,11 @@ struct TypeContour {
   struct TypeContour *outer; /*  nested type environment */
   Declaration source; /* module, class, polymorphic */
   Declarations type_formals; /* numbered for polymorphic */
-  Declaration result; /* type declaration */
+  union
+  {
+    Declaration result_decl; /* type declaration when use is not available */
+    Type result_type; /* type of type_inst*/
+  } u;
   int num_type_actuals; /* count of type actuals */
   Type type_actuals[]; /* array of type actuals */
 };

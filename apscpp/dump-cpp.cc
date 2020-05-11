@@ -752,7 +752,7 @@ void dump_Signature_service_transfers(Type from, ServiceRecord& sr,
       tcp->outer = 0;
       tcp->source = cd;
       tcp->type_formals = some_class_decl_type_formals(cd);
-      tcp->result = some_class_decl_result_type(cd);
+      tcp->u.result_decl = some_class_decl_result_type(cd);
       tcp->num_type_actuals = type_actuals_count;
       static Symbol fake_sym = intern_symbol("*fake*");
       static Use fake = use(fake_sym);

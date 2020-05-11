@@ -82,7 +82,7 @@ static void push_type_contour(Declaration d, TypeActuals tacts, Declaration tdec
   new_type_env->source = d;
   new_type_env->num_type_actuals = type_actuals_count;
   new_type_env->type_formals = formals;
-  new_type_env->result = tdecl;
+  new_type_env->u.result_decl = tdecl;
 
   if (tacts != NULL) {
     load_type_actuals(tacts, new_type_env);
