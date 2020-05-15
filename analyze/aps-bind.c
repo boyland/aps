@@ -542,9 +542,6 @@ static void *do_bind(void *vscope, void *node) {
 	  traverse_Declaration_skip(do_bind,new_scope,d); }
 	break;
       case KEYmodule_decl:
-      {
-        printf("%s >>> %d\n", decl_name((Declaration) node), tnode_line_number(node));
-      }
 	if (module_TYPE == 0 && streq(decl_name(d),"TYPE"))
 	  module_TYPE = d;
 	else if (module_PHYLUM == 0 && streq(decl_name(d),"PHYLUM"))
