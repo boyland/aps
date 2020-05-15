@@ -8,17 +8,6 @@ extern Pattern first_Pattern(Patterns);
 extern Type first_TypeActual(TypeActuals);
 extern Match first_Match(Matches);
 
-// struct TypeContour {
-//   struct TypeContour *outer; /*  nested type environment */
-//   Declaration source; /* module, class, polymorphic */
-//   Declarations type_formals; /* numbered for polyrmorphic */
-//   Declaration result; /* type declaration */
-//   union {
-//     TypeActuals type_actuals; // for module/class
-//     Type* inferred; // array of Types (initialized to NULL in aps-bind)
-//   } u;
-// };
-
 struct TypeContour {
   struct TypeContour *outer; /*  nested type environment */
   Declaration source; /* module, class, polymorphic */
