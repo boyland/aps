@@ -186,7 +186,6 @@ static SCOPE add_ext_sig(SCOPE old, Declaration tdecl, Signature sig) {
 	{ Declaration d = Use_info(class_use_use(cl))->use_decl;
 	  if (d == NULL) fatal_error("%d: class not found",
 				     tnode_line_number(cl));
-             printf("\t\t >>>><<<<< %s\n", decl_name(d));
 	  switch (Declaration_KEY(d)) {
 	  case KEYsome_class_decl:
 	    { SCOPE new_scope = old;
@@ -557,12 +556,10 @@ static void *do_bind(void *vscope, void *node) {
 			       module_decl_result_type(d));
 	  /* handle extension: common case only */
 	  { Declaration rdecl = module_decl_result_type(d);
-    printf("\tresult is %d\n", (int) tnode_line_number(rdecl));
 	    Type ext=some_type_decl_type(rdecl);
 	    switch (Type_KEY(ext)) {
 	    case KEYtype_use:
 	      { Declaration tf = Use_info(type_use_use(ext))->use_decl;
-            printf("\t\ttype formal is %d <%s>\n", (int) tnode_line_number(tf), decl_name(tf));
 		if (tf != NULL) {
 		  switch (Declaration_KEY(tf)) {
 		  case KEYsome_type_formal:
