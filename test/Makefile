@@ -1,6 +1,8 @@
-APSSCHED=../../bin/apssched
-EXAMPLES=../../examples
-BASE=.:../../base:$(EXAMPLES)
+# Relative path
+RELATIVE_PATH=..
+APSSCHED=$(RELATIVE_PATH)/bin/apssched
+EXAMPLES=$(RELATIVE_PATH)/examples
+BASE=.:$(RELATIVE_PATH)/base:$(EXAMPLES)
 FLAGS=-DCOT
 CASES=simple-binding1 simple-binding2 simple-binding3
 
@@ -14,8 +16,9 @@ CASES=simple-binding1 simple-binding2 simple-binding3
 
 # Compare actual output with expected
 .PHONY: %.compare
-%.compare: %.output | %.expected
-	diff $| $<
+%.compare: %.output
+# maybe there is a better way without using basename ...
+	diff $(basename $@).expected $<
 
 # Generate and verify all outputs
 .PHONY: all
