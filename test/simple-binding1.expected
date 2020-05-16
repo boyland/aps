@@ -1,3 +1,55 @@
+NULL_TYPE >>> 80
+	result is 80
+TYPE >>> 88
+	result is 88
+BOOLEAN >>> 100
+	result is 100
+INTEGER >>> 128
+	result is 128
+IEEE >>> 182
+	result is 182
+CHARACTER >>> 197
+	result is 197
+NULL_PHYLUM >>> 209
+	result is 209
+PHYLUM >>> 243
+	result is 243
+MAKE_LATTICE >>> 324
+	result is 324
+		type formal is 309 <L>
+		 >>>><<<<< BASIC
+MAX_LATTICE >>> 352
+	result is 352
+MIN_LATTICE >>> 354
+	result is 354
+SEQUENCE >>> 449
+	result is 449
+BAG >>> 475
+	result is 475
+LIST >>> 506
+	result is 506
+SET >>> 548
+	result is 548
+MULTISET >>> 568
+	result is 568
+ORDERED_SET >>> 600
+	result is 600
+ORDERED_MULTISET >>> 632
+	result is 632
+UNION_LATTICE >>> 635
+	result is 635
+INTERSECTION_LATTICE >>> 637
+	result is 637
+PAIR >>> 668
+	result is 668
+STRING >>> 674
+	result is 674
+SIMPLE >>> 28
+	result is 28
+NAME_RESOLUTION >>> 158
+	result is 158
+		type formal is 4 <T>
+		 >>>><<<<< SIMPLE
 Scheduling order for Program
 1- G[Program]'shared_info
 1- G[Program]'shared_info$int_shape.entity_used
