@@ -47,7 +47,6 @@ static Declaration module_PHYLUM;
 
 static TypeEnvironment current_type_env = 0;
 
-
 /**
  * Load TypeActuals into pointer to an array of Type
  */
@@ -72,7 +71,6 @@ static void push_type_contour(Declaration d, TypeActuals tacts, Declaration tdec
       aps_error(d, "Not sure how to get formals from declaration");
       break;
   }
-
   int type_actuals_count = compute_type_contour_size(tacts, formals);
   
   TypeEnvironment new_type_env =
@@ -87,7 +85,6 @@ static void push_type_contour(Declaration d, TypeActuals tacts, Declaration tdec
   if (tacts != NULL) {
     load_type_actuals(tacts, new_type_env);
   }
-
   current_type_env = new_type_env;
 }
 

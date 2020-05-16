@@ -179,6 +179,5 @@ extern void *tnode_parent(void *);
 
 #define decl_name(decl) (char*)symbol_name(def_name(declaration_def(decl)))
 
-
 /* TypeActuals utility */
 int compute_type_contour_size(TypeActuals type_actuals, Declarations type_formals);

@@ -281,7 +281,7 @@ static void* do_typechecking(void* ignore, void*node) {
 	  te->type_formals = module_decl_type_formals(mdecl);
 	  te->u.result_decl = (Declaration)tnode_parent(ty);
 	  te->num_type_actuals = type_actuals_count;
-    load_type_actuals(type_inst_type_actuals(ty), te);
+	  load_type_actuals(type_inst_type_actuals(ty), te);
 	  aps_yylineno = tnode_line_number(ty);
 	  USE_DECL(tu) = tdecl;
 	  USE_TYPE_ENV(tu) = 0;
@@ -1691,10 +1691,9 @@ Type type_subst(Use type_envs, Type ty)
 	    tdecl != class_decl_result_type(type_env->source))
 	{
 	  int i = Declaration_info(tdecl)->instance_index;
-    if (i >= type_env->num_type_actuals) {
+	  if (i >= type_env->num_type_actuals) {
 	    aps_error(type_env->u.result_decl,"too few type parameters");
-	    printf("looking for actual for %s on line %d\n",
-		   decl_name(tdecl), tnode_line_number(tdecl));
+	    printf("looking for actual for %s on line %d\n", decl_name(tdecl), tnode_line_number(tdecl));
     }
 	  if (Declaration_KEY((Declaration)parent) == KEYpolymorphic) {
 	    Type t = type_env->type_actuals[i];
