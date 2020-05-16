@@ -7,14 +7,3 @@ module TEST[] begin
   
   b : Boolean := t = Test${} and Test${} = t;
 end;
-
-
--- module FOO[] begin
---     var bar : Integer := 3;
--- end;
-
--- signature GOO := FOO[];
-
--- module QUOD[T :: GOO] extends T begin
---    var quux : Integer := bar;
--- end;
