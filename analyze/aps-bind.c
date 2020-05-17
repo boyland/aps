@@ -57,18 +57,19 @@ void load_type_actuals(TypeActuals type_actuals, TypeEnvironment te) {
   }
 }
 
-static void push_type_contour(Declaration d, TypeActuals tacts, Declaration tdecl) {
+TypeEnvironment create_type_contour(TypeEnvironment outer, Declaration source, TypeActuals tacts, void *result)
+{
   Declarations formals = NULL;
-  switch (Declaration_KEY(d))
+  switch (Declaration_KEY(source))
   {
   case KEYsome_class_decl:
-    formals = some_class_decl_type_formals(d);
+    formals = some_class_decl_type_formals(source);
     break;
   case KEYpolymorphic:
-    formals = polymorphic_type_formals(d);
+    formals = polymorphic_type_formals(source);
     break;  
   default:
-      aps_error(d, "Not sure how to get formals from declaration");
+      aps_error(source, "Not sure how to get formals from declaration");
       break;
   }
   int type_actuals_count = compute_type_contour_size(tacts, formals);
@@ -76,16 +77,35 @@ static void push_type_contour(Declaration d, TypeActuals tacts, Declaration tdec
   TypeEnvironment new_type_env =
     (TypeEnvironment)HALLOC(sizeof(struct TypeContour) + sizeof(Type) * type_actuals_count);
 
-  new_type_env->outer = current_type_env;
-  new_type_env->source = d;
+  new_type_env->outer = outer;
+  new_type_env->source = source;
   new_type_env->num_type_actuals = type_actuals_count;
   new_type_env->type_formals = formals;
-  new_type_env->u.result_decl = tdecl;
 
   if (tacts != NULL) {
     load_type_actuals(tacts, new_type_env);
   }
-  current_type_env = new_type_env;
+
+  if (result != NULL) {
+    switch (ABSTRACT_APS_tnode_phylum(result))
+      {
+      case KEYType:
+        new_type_env->u.result_type = (Type) result;
+        break;
+      case KEYDeclaration:
+        new_type_env->u.result_decl = (Declaration) result;
+        break;
+      default:
+        aps_error(result, "Unexpected result AST node type of %d", (int) ABSTRACT_APS_tnode_phylum(result));
+        break;
+      }
+  }
+
+  return new_type_env;
+}
+
+static void push_type_contour(Declaration d, TypeActuals tacts, Declaration tdecl) {
+  current_type_env = create_type_contour(current_type_env, d, tacts, tdecl);
 }
 
 static void set_instance_index(Declarations ds)
@@ -97,7 +117,6 @@ static void set_instance_index(Declarations ds)
     Declaration_info(formal)->instance_index = i;
   }
 }
-
 
 static void pop_type_contour()
 {

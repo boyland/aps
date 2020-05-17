@@ -32,4 +32,12 @@ extern int decl_namespaces(Declaration d);
 extern int bind_debug;
 #define PRAGMA_ACTIVATION 1
 
+/**
+ * Loads TypeActuals into TypeEnvironment->type_actuals
+ */
 void load_type_actuals(TypeActuals type_actuals, TypeEnvironment te);
+
+/**
+ * Creates TypeEnvironment
+ */
+TypeEnvironment create_type_contour(TypeEnvironment outer, Declaration source, TypeActuals tacts, void *result);
