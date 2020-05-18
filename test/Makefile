@@ -17,10 +17,9 @@ CASES=simple-binding1 simple-binding2 simple-binding3
 # Compare actual output with expected
 .PHONY: %.compare
 %.compare: %.output
-# maybe there is a better way without using basename ...
 	diff $(basename $@).expected $<
 
-# Generate and verify all outputs
+# Verify all outputs
 .PHONY: all
 all: $(addsuffix .compare,$(CASES))
 
@@ -28,6 +27,7 @@ all: $(addsuffix .compare,$(CASES))
 .PHONY: build.expected
 build.expected: $(addsuffix .expected,$(CASES))
 
+# Remove .expected files
 .PHONY: clean.expected
 clean.expected:
 	-rm -f *.expected
