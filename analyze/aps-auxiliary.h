@@ -6,7 +6,6 @@
  * Mimicking sig_inst
  */
 typedef struct InferredSignature_t {
-    struct InferredSignature_t *next;
     Boolean is_input;
     Boolean is_var;
     Class _class;
