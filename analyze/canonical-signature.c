@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include "aps-ag.h"
-#include "hash_table.h"
 #include "jbb-alloc.h"
 
 ht_hash_table *htable = NULL;
@@ -132,8 +131,17 @@ Boolean types_equal(int count, Type *a, Type *b) {
     return result;
 }
 
-InferredSignature create_inferred_sig(Boolean is_input, Boolean is_var, Class class,
-                                      int num_actuals, Type *actuals) {
+long inferred_signature_hash(InferredSignature inferred_signature)
+{
+    
+}
+
+Boolean inferred_signature_equal(InferredSignature is1, InferredSignature is2)
+{
+
+}
+
+InferredSignature new_inferred_sig(bool is_input, bool is_var, Class class, int num_actuals, Type *actuals) {
 
     if (htable == NULL) {
         htable = ht_new();
