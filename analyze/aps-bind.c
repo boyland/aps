@@ -155,6 +155,16 @@ static void *activate_pragmas(void *, void *);
 static SCOPE add_ext_sig(SCOPE old, Declaration tdecl, Signature sig) {
   switch (Signature_KEY(sig)) {
   case KEYno_sig: return old;
+  case KEYsig_use:
+  {
+    Declaration sig_use_decl = USE_DECL(sig_use_use(sig));
+    switch (Declaration_KEY(sig_use_decl))
+    {
+    case KEYsome_class_decl:
+      aps_error(sig, "Missing actuals for %s in the signature", decl_name(sig_use_decl));
+      return old;
+    }
+  }
   case KEYmult_sig:
     return add_ext_sig(add_ext_sig(old,tdecl,mult_sig_sig1(sig)),tdecl,
 		       mult_sig_sig2(sig));
@@ -554,6 +564,28 @@ static void *do_bind(void *vscope, void *node) {
 	    }
 	  }
 	  traverse_Block(do_bind,new_scope,module_decl_contents(d)); }
+    {
+      Declaration type_formal = first_Declaration(module_decl_type_formals(d));
+      for (;type_formal != NULL; type_formal = DECL_NEXT(type_formal))
+      {
+        Signature sig = some_type_formal_sig(type_formal);
+        switch (Signature_KEY(sig))
+        {
+        case KEYsig_use:
+          {
+            Declaration use_decl = USE_DECL(sig_use_use(sig));
+            switch (Declaration_KEY(use_decl))
+            {
+            case KEYsome_class_decl:
+              aps_error(sig, "Missing actuals for %s in the signature", decl_name(use_decl));
+              return NULL;
+              break;
+            }
+            break;
+          }
+        }
+      }
+    }
 	break;
       case KEYattribute_decl:
 	{ Type ftype = attribute_decl_type(d);
