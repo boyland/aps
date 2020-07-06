@@ -662,7 +662,7 @@ static void *do_bind(void *vscope, void *node) {
       aps_error(u,"no binding for %s",symbol_name(name));
     }
   }
-  break;
+    break;
   }
   return vscope;
 }
