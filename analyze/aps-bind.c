@@ -636,15 +636,33 @@ static void *do_bind(void *vscope, void *node) {
     }
     break;
   case KEYUse:
+  {
+    Use u = (Use)node;
+    if (Use_info(u)->use_decl == NULL)
     {
-      Use u = (Use)node;
-      if (Use_info(u)->use_decl == NULL) {
-	Symbol name =
-	  (Use_KEY(u) == KEYqual_use) ? qual_use_name(u) : use_name(u);
-	aps_error(u,"no binding for %s",symbol_name(name));
+      Symbol name = (Use_KEY(u) == KEYqual_use) ? qual_use_name(u) : use_name(u);
+      if (Use_KEY(u) == KEYqual_use && name == intern_symbol("Result"))
+      {
+        Type type = qual_use_from(u);
+        switch (Type_KEY(type))
+        {
+          case KEYtype_use:
+          {
+            Use type_use = type_use_use(type);
+            bind_Use(type_use, NAME_PATTERN, scope);
+            if (USE_DECL(type_use) != NULL && Declaration_KEY(USE_DECL(type_use)) == KEYtype_decl)
+            {
+              Use_info(u)->use_decl = USE_DECL(type_use);
+              return NULL;
+            }
+            break;
+          }
+        }
       }
+      aps_error(u,"no binding for %s",symbol_name(name));
     }
-    break;
+  }
+  break;
   }
   return vscope;
 }

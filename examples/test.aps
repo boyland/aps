@@ -7,3 +7,20 @@ module TEST[] begin
   
   b : Boolean := t = Test${} and Test${} = t;
 end;
+
+
+module GEN[T :: BASIC[]] extends LIST[T]
+begin
+  type S := Integer;
+end;
+
+module EXT[T :: BASIC[]] extends T
+begin
+  type S := Integer;
+end;
+
+type Gen        := GEN[String];
+type Gen_Result := Gen$Result;
+
+type Ext        := EXT[Integer];
+type Ext_Result := Ext$Result;
