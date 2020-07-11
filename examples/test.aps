@@ -7,11 +7,3 @@ module TEST[] begin
   
   b : Boolean := t = Test${} and Test${} = t;
 end;
-
-module GEN[T :: BASIC[]] extends LIST[T]
-begin
-end;
-
-module EXT[T :: BASIC[]] extends T
-begin
-end;
