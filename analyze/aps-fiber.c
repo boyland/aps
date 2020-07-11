@@ -1792,6 +1792,11 @@ void *print_all_ou(void *statep, void *node) {
   switch (ABSTRACT_APS_tnode_phylum(node)) {
   case KEYDeclaration: {
     Declaration decl = (Declaration)node;
+    switch (Declaration_KEY(decl))
+    {
+      case KEYassign:
+        return statep;
+    }
     if (Declaration_info(decl)->oset != NULL) {
       printf("OSET of node: %s\n", decl_name(decl));
       print_oset(Declaration_info(decl)->oset);
@@ -1852,8 +1857,17 @@ int id_decl_node(Declaration decl) {
   FSA_next_node_index += 2;
 
   if (fiber_debug & ALL_FIBERSETS) {
+    switch (Declaration_KEY(decl))
+    {
+      case KEYassign:
+    printf("%d: index for assign is %d\n",tnode_line_number(decl),
+	   index);
+        break;
+      default:
     printf("%d: index for %s is %d\n",tnode_line_number(decl),
 	   decl_name(decl),index);
+        break;
+    }
   }
   Declaration_info(decl)->index = index;
   omega = add_to_nodeset(omega, index);
@@ -2289,10 +2303,22 @@ void *build_FSA(void *vstate, void *node)
         Expression lhs = assign_lhs(decl);
         Expression rhs = assign_rhs(decl);
   
+	if (fiber_debug & ADD_FSA_EDGE) {
+		printf("%d: in assign\n",tnode_line_number(node));
+	}
+
         NODESET M = link_expr_lhs(lhs, EMPTY_NODESET);
         NODESET N = link_expr_rhs(rhs, M);
         link_expr_lhs(lhs, N);
   
+	if (fiber_debug & ADD_FSA_EDGE) {
+		printf("  M=");
+		print_nodeset(M);
+		printf(", N=");
+		print_nodeset(N);
+		printf("\n");
+	}
+
         return NULL;
       } // KEYassign
       case KEYcase_stmt: {
@@ -2526,6 +2552,7 @@ NODESET link_expr_rhs(Expression e, NODESET ns){
 	    return set_of_node(get_node_decl(fdecl)); //{Qd}
 	  } else if ((fdecl = field_ref_p(e)) != NULL) { //field ref: w.f
 	    NODESET n;
+	    if (fiber_debug & ADD_FSA_EDGE) printf("Starting to add edges for field ref of %s\n",decl_name(fdecl));
 	    for (n=ns; n; n = n->rest) {
 	      add_FSA_edge(get_node_expr(e)+1, n->node, fdecl);
 	      add_FSA_edge(get_node_expr(e), n->node, reverse_field(fdecl));
@@ -2537,6 +2564,7 @@ NODESET link_expr_rhs(Expression e, NODESET ns){
 	      link_expr_rhs(object, set_of_node(get_node_expr(e)+1));	// Qe(-)
 	      {
 		OSET oset = doOU(e, EMPTY_USET);
+	    if (fiber_debug & ADD_FSA_EDGE) printf("ending to add edges for field ref of %s\n",decl_name(fdecl));
 		return oset_to_nodeset(oset);
 	      }
 	    }

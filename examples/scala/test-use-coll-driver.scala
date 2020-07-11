@@ -1,4 +1,4 @@
-object TestCollDriver extends App
+object TestUseCollDriver extends App
 {
     val m = new M_TINY("Tiny");
     type T_Tiny = m.T_Result;
@@ -10,7 +10,7 @@ object TestCollDriver extends App
 
     m.finish();
 
-    val m2 = new M_TEST_COLL("Test Coll",m);
+    val m2 = new M_TEST_USE_COLL("Test Use Coll",m);
     val w2 = w.asInstanceOf[m2.T_Root];
 
     m2.finish();

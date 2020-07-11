@@ -20,6 +20,15 @@ Type function_type_return_type(Type ft)
   return value_decl_type(first_Declaration(function_type_return_values(ft)));
 }
 
+Type constructor_return_type(Declaration decl) {
+  Type function_type = constructor_decl_type(decl);
+  Declaration rd = first_Declaration(function_type_return_values(function_type));
+  Type rt = value_decl_type(rd);
+  return rt;
+}
+
+Declaration current_module = NULL;
+
 static void* do_typechecking(void* ignore, void*node) {
   // find places where Expression, Pattern or Default is used
   switch (ABSTRACT_APS_tnode_phylum(node)) {
@@ -44,6 +53,60 @@ static void* do_typechecking(void* ignore, void*node) {
     {
       Declaration decl = (Declaration)node;
       switch (Declaration_KEY(decl)) {
+        case KEYmodule_decl:
+          current_module = (Declaration) node;
+          break;
+        case KEYconstructor_decl:
+        {
+          Declarations formals = function_type_formals(constructor_decl_type(decl));
+          Declaration formals_ptr1, formals_ptr2;
+          int i, j;
+
+          for (formals_ptr1 = first_Declaration(formals), i = 0;
+              formals_ptr1 != NULL;
+              formals_ptr1 = DECL_NEXT(formals_ptr1), i++) {
+
+              char* formal_name = decl_name(formals_ptr1);
+
+              for (formals_ptr2 = DECL_NEXT(formals_ptr1), j = i + 1;
+                formals_ptr2 != NULL;
+                formals_ptr2 = DECL_NEXT(formals_ptr2), j++) {
+                  if (strcmp(formal_name, decl_name(formals_ptr2)) == 0) {
+                    aps_error(decl, "Duplicate constructor formal name: \"%s\" at indices: %i, %i in \"%s\" constructor", formal_name, i, j, decl_name(decl));
+                  }
+              }
+          }
+
+          Type rt = constructor_return_type(decl);
+          switch (Type_KEY(rt))
+          {
+            case KEYremote_type:
+              aps_error(decl, "Constructor for remote type is forbidden (constructor %s(...): remote %s)", decl_name(decl), symbol_name(use_name(type_use_use(remote_type_nodetype(rt)))));
+              break;
+            case KEYtype_use:
+              {
+                TypeEnvironment type_env = Use_info(type_use_use(rt))->use_type_env;
+                while (type_env != NULL) {
+                  switch (Declaration_KEY(type_env->source))
+                  {
+                    case KEYmodule_decl:
+                      if (type_env->source != current_module) {
+                            aps_error(decl, "Adding a constructor \"%s\" in extending module is forbidden", decl_name(decl));
+                      }
+                      break;
+                    default:
+                      break;
+                  }
+
+                  type_env = type_env->outer;
+                }
+                break;
+              }
+            default:
+              break;
+          }
+          break;
+        }
       case KEYvalue_decl:
 	check_default_type(value_decl_default(decl),value_decl_type(decl));
 	break;
@@ -128,7 +191,27 @@ static void* do_typechecking(void* ignore, void*node) {
 	}
 	/* FALL THROUGH */
       case KEYcollect_assign:
-	// TODO: check that lhs decl is declared VAR
+      {
+        Expression lhs = assign_lhs(decl);
+        Declaration lhs_use_decl;
+        switch (Expression_KEY(lhs))
+        {
+          case KEYfuncall:
+            lhs_use_decl = Use_info(value_use_use(funcall_f(lhs)))->use_decl;
+            if (def_is_constant(declaration_def(lhs_use_decl))) {
+              aps_error(lhs_use_decl, "Attribute collection \"%s\" has to be declared as VAR to be assigned", decl_name(lhs_use_decl));
+            }
+            break;
+          case KEYvalue_use:
+            lhs_use_decl = Use_info(value_use_use(lhs))->use_decl;
+            if (def_is_constant(declaration_def(lhs_use_decl))) {
+              aps_error(lhs_use_decl, "Global collection \"%s\" has to be declared as VAR to be assigned", decl_name(lhs_use_decl));
+            }
+            break;
+          default:
+            break;
+        }
+      }
 	check_expr_type(assign_rhs(decl),infer_expr_type(assign_lhs(decl)));
 	return 0;
 	break;

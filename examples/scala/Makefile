@@ -37,7 +37,7 @@ Classic.class : classic-driver.scala
 Classic.class   classic_binding_implicit.class : simple_implicit.class
 Classic.class : classic_binding_implicit.class
 
-test_coll_implicit.class : test-coll.scala
+test_coll_implicit.class : test-coll.scala tiny_implicit.class
 	${SCALAC} ${SCALACFLAGS} $<
 
 test_use_coll_implicit.class : test-use-coll.scala
