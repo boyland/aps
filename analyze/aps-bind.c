@@ -419,6 +419,25 @@ static void bind_Use(Use u, int namespaces, SCOPE scope) {
   case KEYqual_use:
     do_bind(scope,qual_use_from(u));
     {
+      Type type = qual_use_from(u);
+      if (qual_use_name(u) == intern_symbol("Result")) {
+        aps_error(u, "Result is a private member and cannot be accessed directly");
+
+        switch (Type_KEY(type))
+        {
+          case KEYtype_use:
+          {
+            Use type_use = type_use_use(type);
+            bind_Use(type_use, NAME_PATTERN, scope);
+            if (USE_DECL(type_use) != NULL && Declaration_KEY(USE_DECL(type_use)) == KEYtype_decl)
+            {
+              Use_info(u)->use_decl = USE_DECL(type_use);
+            }
+            break;
+          }
+        }
+      }
+
       SCOPE s = type_services(qual_use_from(u));
       bind_Use_by_name(u,qual_use_name(u),namespaces,s);
       if (USE_DECL(u) == 0) {
