@@ -162,8 +162,9 @@ static SCOPE add_ext_sig(SCOPE old, Declaration tdecl, Signature sig) {
     {
     case KEYsome_class_decl:
       aps_error(sig, "Missing actuals for %s in the signature", decl_name(sig_use_decl));
-      return old;
+      break;
     }
+    break;
   }
   case KEYmult_sig:
     return add_ext_sig(add_ext_sig(old,tdecl,mult_sig_sig1(sig)),tdecl,
@@ -578,7 +579,6 @@ static void *do_bind(void *vscope, void *node) {
             {
             case KEYsome_class_decl:
               aps_error(sig, "Missing actuals for %s in the signature", decl_name(use_decl));
-              return NULL;
               break;
             }
             break;
