@@ -1,6 +1,6 @@
 #include "prime.h"
-#include "stdlib.h"
 #include <stdbool.h>
+#include "stdlib.h"
 #include "string.h"
 
 #define INITIAL_TABLE_SIZE 9973
