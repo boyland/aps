@@ -5,6 +5,7 @@
 
 #define HC_INITIAL_BASE_SIZE 61
 #define MAX_DENSITY 0.5
+#define DOUBLE_SIZE(x) ((x << 1) + 1)
 
 /**
  * Initializes a table
@@ -113,7 +114,7 @@ void *hash_cons_get(void *item, size_t temp_size, HASH_CONS_TABLE hc)
 
   if (hc->size > hc->capacity * MAX_DENSITY)
   {
-    const int new_capacity = next_twin_prime((hc->capacity << 1) + 1);
+    const int new_capacity = next_twin_prime(DOUBLE_SIZE(hc->capacity));
     hc_resize(hc, new_capacity);
   }
 

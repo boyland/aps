@@ -9,11 +9,11 @@ typedef bool (*HashCons_Equal)(void *, void *);
 
 typedef struct hash_cons_table
 {
+  HashCons_Hash hashf;
+  HashCons_Equal equalf;
   int size;
   int capacity;
   void **table;
-  HashCons_Hash hashf;
-  HashCons_Equal equalf;
 } * HASH_CONS_TABLE;
 
 /**
