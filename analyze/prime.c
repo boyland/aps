@@ -49,7 +49,7 @@ void sieve_of_eratosthenes(int n)
     if (primes.array[i] == true)
     {
       // Update all multiples of p
-      for (j = (int)pow((double)i, 2); j < n; j += i)
+      for (j = i * i; j < n; j += i)
       {
         primes.array[j] = false;
       }
