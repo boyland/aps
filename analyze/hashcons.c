@@ -102,6 +102,8 @@ static void hc_resize(HASH_CONS_TABLE hc, const int capacity)
       hc_insert(hc, item);
     }
   }
+
+  free(old_table);
 }
 
 /**
