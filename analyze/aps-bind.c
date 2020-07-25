@@ -155,17 +155,6 @@ static void *activate_pragmas(void *, void *);
 static SCOPE add_ext_sig(SCOPE old, Declaration tdecl, Signature sig) {
   switch (Signature_KEY(sig)) {
   case KEYno_sig: return old;
-  case KEYsig_use:
-  {
-    Declaration sig_use_decl = USE_DECL(sig_use_use(sig));
-    switch (Declaration_KEY(sig_use_decl))
-    {
-    case KEYsome_class_decl:
-      aps_error(sig, "Missing actuals for %s in the signature", decl_name(sig_use_decl));
-      break;
-    }
-    break;
-  }
   case KEYmult_sig:
     return add_ext_sig(add_ext_sig(old,tdecl,mult_sig_sig1(sig)),tdecl,
 		       mult_sig_sig2(sig));
@@ -199,6 +188,16 @@ static SCOPE add_ext_sig(SCOPE old, Declaration tdecl, Signature sig) {
 		    tnode_line_number(cl));
       }
     }
+  case KEYsig_use:
+  {
+    Declaration sig_use_decl = USE_DECL(sig_use_use(sig));
+    switch (Declaration_KEY(sig_use_decl))
+    {
+    case KEYsome_class_decl:
+      aps_error(sig, "Missing actuals for %s in the signature", decl_name(sig_use_decl));
+      break;
+    }
+  }
   default:
     fatal_error("%d: signature too complicated",tnode_line_number(sig));
   }
