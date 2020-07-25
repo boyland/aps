@@ -423,7 +423,6 @@ static void bind_Use(Use u, int namespaces, SCOPE scope) {
       if (qual_use_name(u) == intern_symbol("Result")) {
         aps_error(u, "Result is a private member and cannot be accessed directly");
       }
-
       SCOPE s = type_services(qual_use_from(u));
       bind_Use_by_name(u,qual_use_name(u),namespaces,s);
       if (USE_DECL(u) == 0) {
