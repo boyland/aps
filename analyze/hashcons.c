@@ -23,23 +23,18 @@ void hc_initialize(HASH_CONS_TABLE hc, const int capacity)
  * Finds the candidate index intended to get inserted or searched in table
  * @param hc table
  * @param item the item looking to be added or removed
- * @param insert_mode true indicates insert false indicates search
  * @return
  */
-static int hc_candidate_index(HASH_CONS_TABLE hc, void *item, bool insert_mode)
+static int hc_candidate_index(HASH_CONS_TABLE hc, void *item)
 {
   int attempt = 0;
   int hash = hc->hashf(item);
   int index = hash % hc->capacity;
   int step_size = 0;
 
-  while (attempt++ < hc->capacity)
+  while (true)
   {
-    if (insert_mode && hc->table[index] == NULL)
-    {
-      return index;
-    }
-    else if (!insert_mode && hc->equalf(hc->table[index], item))
+    if (hc->table[index] == NULL || hc->equalf(hc->table[index], item))
     {
       return index;
     }
@@ -50,8 +45,17 @@ static int hc_candidate_index(HASH_CONS_TABLE hc, void *item, bool insert_mode)
     }
     index = (index + step_size) % hc->capacity;
   }
+}
 
-  return -1;
+/**
+ * Insert an item into table
+ * @param hc table
+ * @param item the item intended to get inserted into the table
+ */
+static void hc_insert_at(HASH_CONS_TABLE hc, void *item, int index)
+{
+  hc->table[index] = item;
+  hc->size++;
 }
 
 /**
@@ -61,25 +65,29 @@ static int hc_candidate_index(HASH_CONS_TABLE hc, void *item, bool insert_mode)
  */
 static void hc_insert(HASH_CONS_TABLE hc, void *item)
 {
-  int index = hc_candidate_index(hc, item, true);
+  int index = hc_candidate_index(hc, item);
 
-  hc->table[index] = item;
-  hc->size++;
+  hc_insert_at(hc, item, index);
 }
 
 /**
  * Search an item in table
  * @param hc table
  * @param item the item intended to get searched in the table
- * @return the item or null
+ * @return possible index of the item
  */
-static void *hc_search(HASH_CONS_TABLE hc, void *item)
+static int hc_search(HASH_CONS_TABLE hc, void *item)
 {
-  int index = hc_candidate_index(hc, item, false);
+  int index = hc_candidate_index(hc, item);
 
-  return index == -1 ? NULL : hc->table[index];
+  return index;
 }
 
+/**
+ * Resizes the table given new capacity
+ * @param hc table
+ * @param capacity new capacity
+ */
 static void hc_resize(HASH_CONS_TABLE hc, const int capacity)
 {
   void **old_table = hc->table;
@@ -105,8 +113,6 @@ static void hc_resize(HASH_CONS_TABLE hc, const int capacity)
  */
 void *hash_cons_get(void *item, size_t temp_size, HASH_CONS_TABLE hc)
 {
-  void *result;
-
   if (hc->table == NULL)
   {
     hc_initialize(hc, HC_INITIAL_BASE_SIZE);
@@ -118,16 +124,18 @@ void *hash_cons_get(void *item, size_t temp_size, HASH_CONS_TABLE hc)
     hc_resize(hc, new_capacity);
   }
 
-  if ((result = hc_search(hc, item)) != NULL)
+  int candidate_index = hc_search(hc, item);
+
+  if (hc->table[candidate_index] == NULL)
   {
-    return result;
+    return hc->table[candidate_index];
   }
   else
   {
-    result = malloc(temp_size);
+    void *result = malloc(temp_size);
     memcpy(result, item, temp_size);
 
-    hc_insert(hc, result);
+    hc_insert_at(hc, result, candidate_index);
 
     return result;
   }
