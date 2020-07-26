@@ -1,5 +1,4 @@
 #include "prime.h"
-#include <math.h>
 #include <stdbool.h>
 #include "stdlib.h"
 #include "string.h"
@@ -43,7 +42,7 @@ void sieve_of_eratosthenes(int n)
   primes.array[1] = false;
 
   int i, j;
-  for (i = 2; i < (int)sqrt((double)n); i++)
+  for (i = 2; i * i < n; i++)
   {
     // If primes[p] is not changed, then it is a prime
     if (primes.array[i] == true)
