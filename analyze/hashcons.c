@@ -128,7 +128,7 @@ void *hash_cons_get(void *item, size_t temp_size, HASH_CONS_TABLE hc)
 
   int candidate_index = hc_search(hc, item);
 
-  if (hc->table[candidate_index] == NULL)
+  if (hc->table[candidate_index] != NULL)
   {
     return hc->table[candidate_index];
   }
