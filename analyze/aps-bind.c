@@ -188,6 +188,7 @@ static SCOPE add_ext_sig(SCOPE old, Declaration tdecl, Signature sig) {
 		    tnode_line_number(cl));
       }
     }
+  /* FALLTHROUGH */
   case KEYsig_use:
   {
     Declaration sig_use_decl = USE_DECL(sig_use_use(sig));
