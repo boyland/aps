@@ -26,7 +26,7 @@ aps-oag.o : aps-oag.h
 aps-cycle.o aps-dnc.o : aps-cycle.h
 aps-debug.o : aps-debug.h
 prime.o : prime.h
-hashcons.o : hashcons.h
+hashcons.o : prime.o hashcons.h
 
 install: apsc aps-ag.a
 	mv apsc ../bin/apssched
