@@ -8,12 +8,12 @@
 struct canonicalTypeBase { int key; };
 typedef struct canonicalTypeBase CanonicalType;
 
+// Type function_type(Declarations formals,Declarations return_values)
 struct Canonical_function_type {
     int key; /* KEY_CANONICAL_FUNC */
     int num_formals;
     CanonicalType* return_type;
-    CanonicalType* param_types;
-    int param_count;
+    CanonicalType* param_types[];
 };
 
 struct Canonical_qual_type {
@@ -27,6 +27,6 @@ struct Canonical_use {
     Declaration decl;
 };
 
-CanonicalType* from_type(Type ty);
+CanonicalType* canonical_type(Type ty);
 
 #endif
