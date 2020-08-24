@@ -10,7 +10,7 @@
  * @param string
  * @return intger hash value
  */
-int hash_string(unsigned char *str)
+static int hash_string(unsigned char *str)
 {
   unsigned long hash = 5381;
   int c;
@@ -29,7 +29,7 @@ int hash_string(unsigned char *str)
  * @param hash2
  * @return combined hash 
  */
-int hash_mix(int h1, int h2)
+static int hash_mix(int h1, int h2)
 {
   int hash = 17;
   hash = hash * 31 + h1;
@@ -75,7 +75,7 @@ int canonical_type_hash(void *arg)
     return hash_mix(canonical_function_type->key, hash_mix(canonical_function_type->num_formals, hash_mix(param_types_hash, canonical_type_hash(canonical_function_type->return_type))));
   }
   default:
-    break;
+    return 0;
   }
 }
 
@@ -204,7 +204,7 @@ void print_canonical_type(void *untyped, FILE *f)
 }
 
 // Hashcons table for CanonicalTypes
-static struct hash_cons_table canonical_type_table = {NULL, NULL, NULL, canonical_type_hash, canonical_type_equal};
+static struct hash_cons_table canonical_type_table = {canonical_type_hash, canonical_type_equal};
 
 /**
  * Counts number of Declarations
@@ -220,7 +220,7 @@ static int count_declarations(Declarations declarations)
   case KEYlist_Declarations:
     return 1;
   case KEYappend_Declarations:
-    return count_type_actuals(append_Declarations_l1(declarations)) + count_type_actuals(append_Declarations_l2(declarations));
+    return count_declarations(append_Declarations_l1(declarations)) + count_declarations(append_Declarations_l2(declarations));
   }
 }
 
@@ -328,7 +328,8 @@ CanonicalType *canonical_type(Type t)
       Declaration mdecl = USE_DECL(module_use_use(m));
       Block cblock = module_decl_contents(mdecl);
 
-      for (Declaration de = first_Declaration(block_body(cblock)); de; de = DECL_NEXT(de))
+      Declaration de;
+      for (de = first_Declaration(block_body(cblock)); de; de = DECL_NEXT(de))
       {
         switch (Declaration_KEY(de))
         {

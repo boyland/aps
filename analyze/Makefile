@@ -5,7 +5,7 @@ PROJECT-DIR=..
 APSAGOBJS= aps-bind.o aps-read.o aps-info.o aps-ag-util.o \
 	  aps-fiber.o aps-cond.o aps-dnc.o aps-cycle.o aps-oag.o \
 	  aps-analyze.o aps-debug.o aps-type.o table.o alist.o \
-	  aps-auxiliary.o hash_table.o
+	  prime.o hashcons.o canonical-signature.o canonical-type.o
 APSCOBJS= apsc.o ${APSAGOBJS} 
 APSCLIB= ${PROJECT-DIR}/lib/aps-lib.o
 
@@ -25,8 +25,10 @@ aps-fiber.o aps-fiber-callsite.o: aps-fiber.h aps-dnc.h aps-fiber-callsite.h
 aps-oag.o : aps-oag.h
 aps-cycle.o aps-dnc.o : aps-cycle.h
 aps-debug.o : aps-debug.h
-aps-auxiliary.o : aps-auxiliary.h
-hash_table.o : hash_table.h
+prime.o : prime.h
+hashcons.o : hashcons.h
+canonical-signature.o : canonical-signature.h
+canonical-type.o : canonical-type.h
 
 install: apsc aps-ag.a
 	mv apsc ../bin/apssched

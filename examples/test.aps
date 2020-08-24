@@ -1,9 +1,102 @@
-module TEST[] begin
-  type Test := LIST[String];
-  
-  t : Test := Test$single("hello,") ++ Test$single(" world");
-
-  i : Integer := length("hello");
-  
-  b : Boolean := t = Test${} and Test${} = t;
+module GEN[T :: BASIC[]] extends LIST[T]
+begin
+   type A := T;
+   type B := LIST[T];
+   type C;
+   constructor con() : C;
+   function bf1(c1 : C; c2 : C) : Boolean := false;
+   function bf2(c1 : C; c2 : C) : Boolean := true;
+   function cf(c1 : C; c2 : C) : C := c1;
+   type D := Result;
+   type E := MAKE_LATTICE[C](con(),bf1,bf2,cf,cf);
+   type F := Integer;
 end;
+
+module EXT[T :: BASIC[]] extends LIST[T]
+begin
+   type N := T;
+   type O := LIST[T];
+   type P;  -- fresh type
+   constructor con() : P;
+   function bf1(c1 : P; c2 : P) : Boolean := false;
+   function bf2(c1 : P; c2 : P) : Boolean := true;
+   function cf(c1 : P; c2 : P) : P := c1;
+   type Q := Result;
+   type R := MAKE_LATTICE[P](con(),bf1,bf2,cf,cf);
+   type S := Integer;
+
+   type A := B;
+   type B := C;
+   type C := Result;
+
+   -- Use of B should be Result
+end;
+
+-- They should canonicalize as the use of G0 which is a type_decl
+type G0 := GEN[String];
+type G1 := G0;
+type G2 := G0$D;
+type G3 := G1$D;
+
+-- They should canonicalize as the use of H0 which is a type_decl
+type H0 := GEN[String];
+type H1 := H0;
+type H2 := H0$D;
+type H3 := H1$D;
+
+-- G0$C
+type I0 := G0$C;
+type I1 := G1$E;
+
+-- H0$C
+type J0 := H0$C;
+type J1 := H1$E;
+
+-- G0$B
+type K0 := G0$B;
+type K1 := G1$B;
+
+-- H0$B
+type L0 := H0$B;
+type L1 := H1$B;
+
+-- EXT is not a generating modules because it extends an exsisting type but GEN creates new type
+-- use of a string String
+type N0 := EXT[String];
+type N1 := EXT[String];
+type N2 := String;
+type N3 := N1$N;
+type N4 := N0$Q;
+
+-- Integer
+type O0 := EXT[Integer];
+type O1 := G0$F;
+type O2 := H0$F;
+type O3 := N1$S;
+-- type O4 := O0$Result;
+type O5 := O0$Q;
+type O6 := Integer;
+
+-- N0$P
+type P0 := N0$P;
+type P1 := N0$R;
+
+-- I think that Q0 is supposed to be different than P0:
+-- N0 and N1 has the base types but different types
+-- N1$P 
+type Q0 := N1$P;
+type Q1 := N1$R;
+
+-- O0$P
+type R0 := O0$P;
+type R1 := O0$R;
+
+-- N1$O
+type S0 := N1$O;
+
+-- N0$O
+type T0 := N0$O;
+
+-- Use of U0
+type U0 := private Integer;
+

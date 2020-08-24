@@ -8,11 +8,11 @@ typedef int (*Hash_Cons_Hash)(void *);
 typedef bool (*Hash_Cons_Equal)(void *, void *);
 
 typedef struct hash_cons_table {
+  Hash_Cons_Hash hashf;
+  Hash_Cons_Equal equalf;
   int size;
   int capacity;
   void **table;
-  Hash_Cons_Hash hashf;
-  Hash_Cons_Equal equalf;
 } * HASH_CONS_TABLE;
 
 /**
