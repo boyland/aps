@@ -269,7 +269,7 @@ static bool is_inside_module(Declaration mdecl, void *node)
 
   return is_inside_module;
 }
- 
+
 /**
  * Returns the Declaration member of a CanonicalType
  * @param canonical_type
@@ -337,7 +337,7 @@ CanonicalType *canonical_type(Type t)
       case KEYtype_renaming:
         return canonical_type_use(type_renaming_old(td));
       default:
-        fatal_error("Unknown decl type %d", (int) Declaration_KEY(td));
+        fatal_error("Unknown decl type %d", (int)Declaration_KEY(td));
       }
     }
     case KEYqual_use:
@@ -361,11 +361,16 @@ CanonicalType *canonical_type(Type t)
         Use use = type_use_use(udecl_type);
         Declaration thing = Use_info(use)->use_decl;
 
+      resolve_qual_use:
+        // type XXX := {outside declared};
+        // short-circut the logic
         if (!is_inside_module(mdecl, thing))
         {
           return canonical_type_use(thing);
         }
 
+        // type XXX := Result
+        // Get result of module
         if (intern_symbol("Result") == use_name(use))
         {
           if (module_decl_generating(mdecl))
@@ -380,6 +385,8 @@ CanonicalType *canonical_type(Type t)
           }
         }
 
+        // type XXX := formal;
+        // Get actual matching position of the formal
         if (Declaration_KEY(thing) == KEYtype_formal)
         {
           int index = 0;
@@ -407,6 +414,22 @@ CanonicalType *canonical_type(Type t)
           }
 
           return canonical_type_use(USE_DECL(type_use_use(actual)));
+        }
+
+        // Everything failed. Maybe its some kind of type declaration and in that case do a recursive step
+        switch (Declaration_KEY(thing))
+        {
+        case KEYsome_type_decl:
+        {
+          Type thing_type = some_type_decl_type(thing);
+
+          switch (Type_KEY(thing_type))
+          {
+          case KEYtype_use:
+            thing = canonical_type_decl(canonical_type(thing_type));
+            goto resolve_qual_use;
+          }
+        }
         }
       }
       default:

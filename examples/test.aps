@@ -1,4 +1,4 @@
-module GEN[T :: BASIC[]] extends LIST[T]
+module GEN[T :: BASIC[]] 
 begin
    type A := T;
    type B := LIST[T];
@@ -10,9 +10,12 @@ begin
    type D := Result;
    type E := MAKE_LATTICE[C](con(),bf1,bf2,cf,cf);
    type F := Integer;
+
+   type Y := F;
+   type X := Y;
 end;
 
-module EXT[T :: BASIC[]] extends LIST[T]
+module EXT[T :: BASIC[]] extends T
 begin
    type N := T;
    type O := LIST[T];
@@ -43,6 +46,7 @@ type H0 := GEN[String];
 type H1 := H0;
 type H2 := H0$D;
 type H3 := H1$D;
+type H4 := H1$X;
 
 -- G0$C
 type I0 := G0$C;
