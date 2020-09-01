@@ -249,6 +249,12 @@ static CanonicalType *canonical_type_qual(CanonicalType *from, Declaration decl)
   return (CanonicalType *)memory;
 }
 
+/**
+ * Check if node is inside a module
+ * @param mdecl
+ * @param node
+ * @return boolean indicating whether node is inside module or not
+ */
 static bool is_inside_module(Declaration mdecl, void *node)
 {
   bool is_inside_module = false;
@@ -262,6 +268,24 @@ static bool is_inside_module(Declaration mdecl, void *node)
   }
 
   return is_inside_module;
+}
+ 
+/**
+ * Returns the Declaration member of a CanonicalType
+ * @param canonical_type
+ */
+static Declaration canonical_type_decl(CanonicalType *canonical_type)
+{
+  switch (canonical_type->key)
+  {
+  case KEY_CANONICAL_USE:
+  {
+    struct Canonical_use *canonical_use_type = (struct Canonical_use *)canonical_type;
+    return canonical_use_type->decl;
+  }
+  default:
+    aps_error(canonical_type, "Failed to find the module for type use");
+  }
 }
 
 /**
@@ -313,30 +337,15 @@ CanonicalType *canonical_type(Type t)
       case KEYtype_renaming:
         return canonical_type_use(type_renaming_old(td));
       default:
-        fatal_error("Unknown decl type");
+        fatal_error("Unknown decl type %d", (int) Declaration_KEY(td));
       }
     }
     case KEYqual_use:
     {
       CanonicalType *from_canonicalized = canonical_type(qual_use_from(use));
 
-      Module module = NULL;
-      Declaration type_inst_decl = NULL;
-
-      switch (from_canonicalized->key)
-      {
-      case KEY_CANONICAL_USE:
-      {
-        struct Canonical_use *canonical_use_type = (struct Canonical_use *)from_canonicalized;
-
-        module = type_inst_module(type_decl_type(canonical_use_type->decl));
-        type_inst_decl = canonical_use_type->decl;
-
-        break;
-      }
-      default:
-        aps_error(t, "Failed to find the module for type use");
-      }
+      Declaration type_inst_decl = canonical_type_decl(from_canonicalized);
+      Module module = type_inst_module(type_decl_type(type_inst_decl));
 
       Declaration mdecl = USE_DECL(module_use_use(module));
       Declaration udecl = Use_info(use)->use_decl;
@@ -453,7 +462,7 @@ CanonicalType *canonical_type(Type t)
     return (CanonicalType *)memory;
   }
   default:
-    aps_error(t, "Case %d is not implemented in from_type()", (int)Type_KEY(t));
+    aps_error(t, "Case is not implemented in from_type(%d)", (int)Type_KEY(t));
     return NULL;
   }
 }
