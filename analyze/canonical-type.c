@@ -233,7 +233,6 @@ static CanonicalType *canonical_type_use(Declaration decl)
 {
   struct Canonical_use ctype_use = {KEY_CANONICAL_USE, decl};
   void *memory = hash_cons_get(&ctype_use, sizeof(ctype_use), &canonical_type_table);
-  memcpy(memory, &ctype_use, sizeof(ctype_use));
   return (CanonicalType *)memory;
 }
 
@@ -247,8 +246,22 @@ static CanonicalType *canonical_type_qual(CanonicalType *from, Declaration decl)
 {
   struct Canonical_qual_type ctype_qual = {KEY_CANONICAL_QUAL, decl, from};
   void *memory = hash_cons_get(&ctype_qual, sizeof(ctype_qual), &canonical_type_table);
-  memcpy(memory, &ctype_qual, sizeof(ctype_qual));
   return (CanonicalType *)memory;
+}
+
+static bool is_inside_module(Declaration mdecl, void *node)
+{
+  bool is_inside_module = false;
+  void *thing = node;
+  while ((thing = tnode_parent(thing)) != NULL)
+  {
+    if (ABSTRACT_APS_tnode_phylum(thing) == KEYDeclaration && Declaration_KEY((Declaration)thing) == KEYmodule_decl && strcmp(decl_name((Declaration)thing), decl_name(mdecl)) == 0)
+    {
+      is_inside_module = true;
+    }
+  }
+
+  return is_inside_module;
 }
 
 /**
@@ -285,29 +298,29 @@ CanonicalType *canonical_type(Type t)
       {
         switch (Type_KEY(some_type_decl_type(td)))
         {
+        case KEYno_type:
         case KEYtype_inst:
-          return canonical_type_use(td);
         case KEYprivate_type:
           return canonical_type_use(td);
         case KEYtype_use:
           return canonical_type(some_type_decl_type(td));
+        default:
+          fatal_error("Unknown type use_decl type key");
         }
       }
-      case KEYtype_replacement:
+      case KEYtype_replacement: // XXX need to rethink this
         return canonical_type_use(type_replacement_as(td));
       case KEYtype_renaming:
         return canonical_type_use(type_renaming_old(td));
+      default:
+        fatal_error("Unknown decl type");
       }
-
-      return canonical_type_use(USE_DECL(type_use_use(t)));
     }
     case KEYqual_use:
     {
       CanonicalType *from_canonicalized = canonical_type(qual_use_from(use));
-      Declarations use_decl = USE_DECL(type_use_use(t));
-      Declaration d = USE_DECL(type_use_use(t));
 
-      Module m = NULL;
+      Module module = NULL;
       Declaration type_inst_decl = NULL;
 
       switch (from_canonicalized->key)
@@ -316,7 +329,7 @@ CanonicalType *canonical_type(Type t)
       {
         struct Canonical_use *canonical_use_type = (struct Canonical_use *)from_canonicalized;
 
-        m = type_inst_module(type_decl_type(canonical_use_type->decl));
+        module = type_inst_module(type_decl_type(canonical_use_type->decl));
         type_inst_decl = canonical_use_type->decl;
 
         break;
@@ -325,95 +338,74 @@ CanonicalType *canonical_type(Type t)
         aps_error(t, "Failed to find the module for type use");
       }
 
-      Declaration mdecl = USE_DECL(module_use_use(m));
-      Block cblock = module_decl_contents(mdecl);
+      Declaration mdecl = USE_DECL(module_use_use(module));
+      Declaration udecl = Use_info(use)->use_decl;
+      Type udecl_type = type_decl_type(udecl);
 
-      Declaration de;
-      for (de = first_Declaration(block_body(cblock)); de; de = DECL_NEXT(de))
+      switch (Type_KEY(udecl_type))
       {
-        switch (Declaration_KEY(de))
+      case KEYno_type:
+      case KEYtype_inst:
+        return canonical_type_qual(from_canonicalized, udecl);
+      case KEYtype_use:
+      {
+        Use use = type_use_use(udecl_type);
+        Declaration thing = Use_info(use)->use_decl;
+
+        if (!is_inside_module(mdecl, thing))
         {
-        case KEYtype_decl:
+          return canonical_type_use(thing);
+        }
+
+        if (intern_symbol("Result") == use_name(use))
         {
-          if (intern_symbol(decl_name(de)) == qual_use_name(use))
+          if (module_decl_generating(mdecl))
           {
-            // TODO: make sure type is unique
-            if (Type_KEY(type_decl_type(de)) == KEYno_type)
-            {
-              return canonical_type_qual(from_canonicalized, de);
-            }
+            return canonical_type_use(type_inst_decl);
+          }
+          else
+          {
+            Type tdecl_type = base_type(type_decl_type(type_inst_decl));
 
-            if (Type_KEY(type_decl_type(de)) == KEYtype_inst)
-            {
-              return canonical_type_qual(from_canonicalized, de);
-            }
-
-            if (intern_symbol("Result") == use_name(type_use_use(type_decl_type(de))))
-            {
-              if (module_decl_generating(mdecl))
-              {
-                return canonical_type(qual_use_from(use));
-              }
-              else
-              {
-                Type ae = base_type(type_decl_type(type_inst_decl));
-
-                return canonical_type_use(USE_DECL(type_use_use(ae)));
-              }
-            }
-
-            if (Declaration_KEY(USE_DECL(type_use_use(type_decl_type(de)))) == KEYtype_formal)
-            {
-              int index = 0;
-              Declaration first_formal = first_Declaration(module_decl_type_formals(mdecl));
-              while (first_formal != NULL)
-              {
-                if (strcmp(decl_name(first_formal), symbol_name(use_name(type_use_use(type_decl_type(de))))) == 0)
-                {
-                  break;
-                }
-
-                index++;
-                first_formal = DECL_NEXT(first_formal);
-              }
-
-              Type e = first_TypeActual(type_inst_type_actuals(type_decl_type(type_inst_decl)));
-              while (e != NULL)
-              {
-                if (index == 0)
-                {
-                  break;
-                }
-
-                e = TYPE_NEXT(e);
-              }
-
-              if (!module_decl_generating(mdecl))
-              {
-                return canonical_type_use(USE_DECL(type_use_use(e)));
-              }
-              else
-              {
-                return canonical_type_qual(from_canonicalized, USE_DECL(type_use_use(e)));
-              }
-            }
-
-            return canonical_type_use(USE_DECL(type_use_use(type_decl_type(de))));
+            return canonical_type_use(USE_DECL(type_use_use(tdecl_type)));
           }
         }
-        break;
+
+        if (Declaration_KEY(thing) == KEYtype_formal)
+        {
+          int index = 0;
+          Declaration formal = first_Declaration(module_decl_type_formals(mdecl));
+          while (formal != NULL)
+          {
+            if (strcmp(decl_name(formal), symbol_name(use_name(type_use_use(type_decl_type(udecl))))) == 0)
+            {
+              break;
+            }
+
+            index++;
+            formal = DECL_NEXT(formal);
+          }
+
+          Type actual = first_TypeActual(type_inst_type_actuals(type_decl_type(type_inst_decl)));
+          while (actual != NULL)
+          {
+            if (index == 0)
+            {
+              break;
+            }
+
+            actual = TYPE_NEXT(actual);
+          }
+
+          return canonical_type_use(USE_DECL(type_use_use(actual)));
         }
       }
-
-      struct Canonical_qual_type cqual_use = {KEY_CANONICAL_QUAL,
-                                              USE_DECL(type_use_use(t)),
-                                              canonical_type(qual_use_from(use))};
-
-      void *memory = hash_cons_get(&cqual_use, sizeof(cqual_use), &canonical_type_table);
-
-      memcpy(memory, &cqual_use, sizeof(cqual_use));
-
-      return (CanonicalType *)memory;
+      default:
+      {
+        aps_error(t, "Not sure how to canonicalize this");
+        return NULL;
+      }
+      }
     }
     default:
       aps_error(t, "Case of type use %d is not implemented in from_type()", (int)Use_KEY(use));
@@ -451,12 +443,12 @@ CanonicalType *canonical_type(Type t)
         ctype_function->param_types[index++] = canonical_type(normal_formal_type(temp));
         break;
       }
+      default:
+        fatal_error("Not sure to handle the formal while finding canonical function type");
       }
     }
 
-    void *memory = hash_cons_get(&ctype_function, sizeof(ctype_function), &canonical_type_table);
-
-    memcpy(memory, &ctype_function, sizeof(ctype_function));
+    void *memory = hash_cons_get(ctype_function, sizeof(&ctype_function), &canonical_type_table);
 
     return (CanonicalType *)memory;
   }
