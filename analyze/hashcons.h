@@ -23,4 +23,19 @@ typedef struct hash_cons_table {
  */
 void *hash_cons_get(void *temp_item, size_t temp_size, HASH_CONS_TABLE table);
 
+/**
+ * Hash string
+ * @param string
+ * @return intger hash value
+ */
+int hash_string(unsigned char *str);
+
+/**
+ * Combine two hash values into one
+ * @param hash1
+ * @param hash2
+ * @return combined hash 
+ */
+int hash_mix(int h1, int h2);
+
 #endif

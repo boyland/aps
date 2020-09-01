@@ -1,41 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
 #include "aps-ag.h"
 #include "jbb-alloc.h"
-
-/**
- * Hash string
- * @param string
- * @return intger hash value
- */
-static int hash_string(unsigned char *str)
-{
-  unsigned long hash = 5381;
-  int c;
-
-  while (c = *str++)
-  {
-    hash = ((hash << 5) + hash) + c;
-  }
-
-  return hash;
-}
-
-/**
- * Combine two hash values into one
- * @param hash1
- * @param hash2
- * @return combined hash 
- */
-static int hash_mix(int h1, int h2)
-{
-  int hash = 17;
-  hash = hash * 31 + h1;
-  hash = hash * 31 + h2;
-  return hash;
-}
 
 /**
  * Hash CanonicalType
