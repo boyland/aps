@@ -11,8 +11,14 @@ begin
    type E := MAKE_LATTICE[C](con(),bf1,bf2,cf,cf);
    type F := Integer;
 
+   type G := D;
+   type H := G;
+
    type Y := F;
    type X := Y;
+
+   type Z := EXT[T];
+   type l := GEN[T];
 end;
 
 module EXT[T :: BASIC[]] extends T
@@ -32,6 +38,13 @@ begin
    type B := C;
    type C := Result;
 
+   type U := GEN[T]();
+   type V := U$E;
+   type W := U$X;
+   type X := U$A;
+
+   type Z := U$Z;
+   
    -- Use of B should be Result
 end;
 
@@ -46,7 +59,7 @@ type H0 := GEN[String];
 type H1 := H0;
 type H2 := H0$D;
 type H3 := H1$D;
-type H4 := H1$X;
+type H4 := H1$H;
 
 -- G0$C
 type I0 := G0$C;
@@ -71,6 +84,8 @@ type N1 := EXT[String];
 type N2 := String;
 type N3 := N1$N;
 type N4 := N0$Q;
+type N5 := N0$W;
+type N6 := N1$U;
 
 -- Integer
 type O0 := EXT[Integer];
@@ -104,3 +119,4 @@ type T0 := N0$O;
 -- Use of U0
 type U0 := private Integer;
 
+type MutuallyRecursive := N0$Z$S;

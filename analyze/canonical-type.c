@@ -297,14 +297,7 @@ static CanonicalType *canonical_type_use(Use use)
   case KEYtype_formal:
     return new_canonical_type_use(td);
   default:
-    if (use_name(use) == intern_symbol("Result"))
-    {
-      return new_canonical_type_use(td);
-    }
-    else
-    {
-      aps_error(td, "Not sure how handle this decl type while finding canonical type use");
-    }
+    aps_error(td, "Not sure how handle this decl type while finding canonical type use");
   }
 
   return NULL;
