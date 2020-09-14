@@ -262,6 +262,7 @@ static Declaration canonical_type_decl(CanonicalType *canonical_type)
   }
   default:
     aps_error(canonical_type, "Failed to find the module for type use");
+    return NULL;
   }
 }
 
@@ -288,6 +289,7 @@ static CanonicalType *canonical_type_use(Use use)
       return canonical_type(some_type_decl_type(td));
     default:
       fatal_error("Unknown type use_decl type key");
+      return NULL;
     }
   }
   case KEYtype_replacement: // XXX need to rethink this
@@ -428,6 +430,7 @@ static CanonicalType *canonical_type_function(Type t)
     }
     default:
       fatal_error("Not sure to handle the formal while finding canonical function type");
+      return NULL;
     }
   }
 
