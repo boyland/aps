@@ -9,7 +9,7 @@
 typedef struct
 {
   bool *array;
-  unsigned int size
+  unsigned int size;
 } PRIMES;
 
 /**
