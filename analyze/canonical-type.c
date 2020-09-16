@@ -231,6 +231,10 @@ static CanonicalType *new_canonical_type_qual(CanonicalType *from, Declaration d
  */
 static bool is_inside_module(Declaration mdecl, void *node)
 {
+  if (node == NULL) {
+    return false;
+  }
+
   bool is_inside_module = false;
   void *thing = node;
   while ((thing = tnode_parent(thing)) != NULL)
@@ -428,24 +432,24 @@ static CanonicalType *canonical_type_function(Type t)
   ctype_function->num_formals = num_formals;
   ctype_function->return_type = return_type;
 
-  Declaration temp = first_Declaration(function_type_formals(t));
   int index = 0;
+  Declaration f = first_Declaration(function_type_formals(t));
 
-  while ((temp != DECL_NEXT(temp)) != NULL)
+  while ((f = DECL_NEXT(f)) != NULL)
   {
     printf("index: %d\n", index);
 
-    switch (Declaration_KEY(temp))
+    switch (Declaration_KEY(f))
     {
     case KEYseq_formal:
     {
       fatal_error("Not sure how to handle KEYseq_formal");
-      ctype_function->param_types[index++] = canonical_type(seq_formal_type(temp));
+      ctype_function->param_types[index++] = canonical_type(seq_formal_type(f));
       break;
     }
     case KEYnormal_formal:
     {
-      ctype_function->param_types[index++] = canonical_type(normal_formal_type(temp));
+      ctype_function->param_types[index++] = canonical_type(normal_formal_type(f));
       break;
     }
     default:
