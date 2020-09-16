@@ -28,7 +28,7 @@ void *hash_cons_get(void *temp_item, size_t temp_size, HASH_CONS_TABLE table);
  * @param string
  * @return intger hash value
  */
-int hash_string(unsigned char *str);
+int hash_string(char *str);
 
 /**
  * Combine two hash values into one

@@ -143,9 +143,9 @@ void *hash_cons_get(void *item, size_t temp_size, HASH_CONS_TABLE hc)
   }
 }
 
-int hash_string(unsigned char *str)
+int hash_string(char *str)
 {
-  unsigned long hash = 5381;
+  int hash = 5381;
   int c;
 
   while (c = *str++)
@@ -161,5 +161,5 @@ int hash_mix(int h1, int h2)
   int hash = 17;
   hash = hash * 31 + h1;
   hash = hash * 31 + h2;
-  return hash;
+  return hash < 0 ? -hash : hash;
 }

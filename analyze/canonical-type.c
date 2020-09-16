@@ -12,7 +12,9 @@
 int canonical_type_hash(void *arg)
 {
   if (arg == NULL)
+  {
     return 0;
+  }
 
   struct canonicalTypeBase *canonical_type = (struct CanonicalType *)arg;
 
@@ -21,12 +23,12 @@ int canonical_type_hash(void *arg)
   case KEY_CANONICAL_USE:
   {
     struct Canonical_use *canonical_use_type = (struct Canonical_use *)arg;
-    return hash_mix(canonical_use_type->key, hash_string(decl_name(canonical_use_type->decl)));
+    return hash_mix(canonical_use_type->key, (int)canonical_use_type->decl);
   }
   case KEY_CANONICAL_QUAL:
   {
     struct Canonical_qual_type *canonical_qual_type = (struct Canonical_qual_type *)arg;
-    return hash_mix(canonical_qual_type->key, hash_mix(hash_string(decl_name(canonical_qual_type->decl)), canonical_type_hash(canonical_qual_type->source)));
+    return hash_mix(canonical_qual_type->key, hash_mix((int)canonical_qual_type->decl, canonical_type_hash(canonical_qual_type->source)));
   }
   case KEY_CANONICAL_FUNC:
   {
@@ -55,7 +57,9 @@ int canonical_type_hash(void *arg)
 bool canonical_type_equal(void *a, void *b)
 {
   if (a == NULL || b == NULL)
+  {
     return false;
+  }
 
   struct canonicalTypeBase *canonical_type_a = (struct CanonicalType *)a;
   struct canonicalTypeBase *canonical_type_b = (struct CanonicalType *)b;
@@ -79,7 +83,8 @@ bool canonical_type_equal(void *a, void *b)
     struct Canonical_qual_type *canonical_qual_type_a = (struct Canonical_qual_type *)a;
     struct Canonical_qual_type *canonical_qual_type_b = (struct Canonical_qual_type *)b;
 
-    return (canonical_qual_type_a->decl == canonical_qual_type_b->decl) && (canonical_qual_type_a->source && canonical_qual_type_b->source);
+    return (canonical_qual_type_a->decl == canonical_qual_type_b->decl) &&
+           (canonical_qual_type_a->source == canonical_qual_type_b->source);
   }
   case KEY_CANONICAL_FUNC:
   {
@@ -99,7 +104,7 @@ bool canonical_type_equal(void *a, void *b)
       params_equal &= canonical_type_equal(canonical_function_type_a->param_types[index], canonical_function_type_b->param_types[index]);
     }
 
-    return params_equal && (canonical_function_type_a->param_types == canonical_function_type_b->param_types) && (canonical_function_type_a->return_type == canonical_function_type_b->return_type);
+    return params_equal && (canonical_function_type_a->return_type == canonical_function_type_b->return_type);
   }
   default:
     return false;
@@ -114,7 +119,9 @@ bool canonical_type_equal(void *a, void *b)
 void print_canonical_type(void *untyped, FILE *f)
 {
   if (f == 0)
+  {
     f = stdout;
+  }
   if (untyped == 0)
   {
     fprintf(f, "<null>");
@@ -161,7 +168,7 @@ void print_canonical_type(void *untyped, FILE *f)
       print_canonical_type(canonical_func_type->param_types[i], f);
     }
     fputc(')', f);
-    fprintf("=>", f);
+    fprintf(f, "=>");
     print_canonical_type(canonical_func_type->return_type, f);
     break;
   }
@@ -260,6 +267,11 @@ static Declaration canonical_type_decl(CanonicalType *canonical_type)
     struct Canonical_qual_type *canonical_qual_use_type = (struct Canonical_qual_type *)canonical_type;
     return canonical_qual_use_type->decl;
   }
+  case KEY_CANONICAL_FUNC:
+  {
+    struct Canonical_function_type *canonical_use_function_type = (struct Canonical_function_type *)canonical_use_function_type;
+    return NULL;
+  }
   default:
     aps_error(canonical_type, "Failed to find the module for type use");
     return NULL;
@@ -287,8 +299,10 @@ static CanonicalType *canonical_type_use(Use use)
       return new_canonical_type_use(td);
     case KEYtype_use:
       return canonical_type(some_type_decl_type(td));
+    case KEYfunction_type:
+      return canonical_type(some_type_decl_type(td));
     default:
-      fatal_error("Unknown type use_decl type key");
+      fatal_error("Unknown type use_decl type key %d", (int) Type_KEY(some_type_decl_type(td)));
       return NULL;
     }
   }
@@ -321,7 +335,7 @@ static CanonicalType *canonical_type_qual_use(Use use)
   Module module = type_inst_module(type_decl_type(type_inst_decl));
   Declaration mdecl = USE_DECL(module_use_use(module));
 
-  if (tnode_info(inside_decl) != NULL && !is_inside_module(mdecl, inside_decl))
+  if (!is_inside_module(mdecl, inside_decl))
   {
     return new_canonical_type_use(inside_decl);
   }
@@ -399,8 +413,12 @@ static CanonicalType *canonical_type_qual_use(Use use)
  */
 static CanonicalType *canonical_type_function(Type t)
 {
+  printf("Finding canonical type of: ");
+  print_Type(t, stdout);
+  printf("\n");
+
   int num_formals = count_declarations(function_type_formals(t));
-  CanonicalType *return_type = canonical_type(t);
+  CanonicalType *return_type = canonical_type(function_type_return_type(t));
 
   size_t my_size = sizeof(struct Canonical_function_type) + num_formals * (sizeof(CanonicalType *));
 
@@ -415,12 +433,14 @@ static CanonicalType *canonical_type_function(Type t)
 
   while ((temp != DECL_NEXT(temp)) != NULL)
   {
+    printf("index: %d\n", index);
+
     switch (Declaration_KEY(temp))
     {
     case KEYseq_formal:
     {
       fatal_error("Not sure how to handle KEYseq_formal");
-      ctype_function->param_types[index++] = seq_formal_type(temp);
+      ctype_function->param_types[index++] = canonical_type(seq_formal_type(temp));
       break;
     }
     case KEYnormal_formal:
