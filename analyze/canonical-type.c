@@ -163,7 +163,7 @@ void print_canonical_type(void *untyped, FILE *f)
       }
       else
       {
-        started = TRUE;
+        started = true;
       }
       print_canonical_type(canonical_func_type->param_types[i], f);
     }
@@ -231,10 +231,6 @@ static CanonicalType *new_canonical_type_qual(CanonicalType *from, Declaration d
  */
 static bool is_inside_module(Declaration mdecl, void *node)
 {
-  if (node == NULL) {
-    return false;
-  }
-
   bool is_inside_module = false;
   void *thing = node;
   while ((thing = tnode_parent(thing)) != NULL)
@@ -271,11 +267,6 @@ static Declaration canonical_type_decl(CanonicalType *canonical_type)
     struct Canonical_qual_type *canonical_qual_use_type = (struct Canonical_qual_type *)canonical_type;
     return canonical_qual_use_type->decl;
   }
-  case KEY_CANONICAL_FUNC:
-  {
-    struct Canonical_function_type *canonical_use_function_type = (struct Canonical_function_type *)canonical_use_function_type;
-    return NULL;
-  }
   default:
     aps_error(canonical_type, "Failed to find the module for type use");
     return NULL;
@@ -306,7 +297,7 @@ static CanonicalType *canonical_type_use(Use use)
     case KEYfunction_type:
       return canonical_type(some_type_decl_type(td));
     default:
-      fatal_error("Unknown type use_decl type key %d", (int) Type_KEY(some_type_decl_type(td)));
+      fatal_error("Unknown type use_decl type key %d", (int)Type_KEY(some_type_decl_type(td)));
       return NULL;
     }
   }
@@ -332,6 +323,11 @@ static CanonicalType *canonical_type_qual_use(Use use)
 {
   CanonicalType *from_canonicalized = canonical_type(qual_use_from(use));
   CanonicalType *inside_canonicalized = canonical_type_use(use);
+
+  if (inside_canonicalized != NULL && inside_canonicalized->key == KEY_CANONICAL_FUNC)
+  {
+    return inside_canonicalized;
+  }
 
   Declaration type_inst_decl = canonical_type_decl(from_canonicalized);
   Declaration inside_decl = canonical_type_decl(inside_canonicalized);
@@ -378,31 +374,27 @@ static CanonicalType *canonical_type_qual_use(Use use)
     // Get actual matching position of the formal
     if (Declaration_KEY(thing) == KEYtype_formal)
     {
-      int index = 0;
-      Declaration formal = first_Declaration(module_decl_type_formals(mdecl));
-      while (formal != NULL)
+      Declaration f;
+      Type actual;
+
+      for (f = first_Declaration(module_decl_type_formals(mdecl)),
+          actual = first_TypeActual(type_inst_type_actuals(type_decl_type(type_inst_decl)));
+           f != NULL; f = DECL_NEXT(f), actual = TYPE_NEXT(actual))
       {
-        if (strcmp(decl_name(formal), symbol_name(use_name(type_use_use(type_decl_type(udecl))))) == 0)
+        if (strcmp(decl_name(f), symbol_name(use_name(type_use_use(type_decl_type(udecl))))) == 0)
         {
-          break;
+          printf("%s\n", USE_DECL(type_use_use(type_decl_type(udecl))) == f ? "true" : "false");
+
+          return new_canonical_type_use(USE_DECL(type_use_use(actual)));
         }
 
-        index++;
-        formal = DECL_NEXT(formal);
+        // if (USE_DECL(type_use_use(type_decl_type(udecl))) == f)
+        // {
+        //   return new_canonical_type_use(USE_DECL(type_use_use(actual)));
+        // }
       }
 
-      Type actual = first_TypeActual(type_inst_type_actuals(type_decl_type(type_inst_decl)));
-      while (actual != NULL)
-      {
-        if (index == 0)
-        {
-          break;
-        }
-
-        actual = TYPE_NEXT(actual);
-      }
-
-      return new_canonical_type_use(USE_DECL(type_use_use(actual)));
+      printf("we are here!");
     }
 
     return canonical_type_use_nested;
@@ -435,7 +427,7 @@ static CanonicalType *canonical_type_function(Type t)
   int index = 0;
   Declaration f = first_Declaration(function_type_formals(t));
 
-  while ((f = DECL_NEXT(f)) != NULL)
+  while (f != NULL)
   {
     printf("index: %d\n", index);
 
@@ -456,6 +448,8 @@ static CanonicalType *canonical_type_function(Type t)
       fatal_error("Not sure to handle the formal while finding canonical function type");
       return NULL;
     }
+
+    f = DECL_NEXT(f);
   }
 
   void *memory = hash_cons_get(ctype_function, sizeof(&ctype_function), &canonical_type_table);
