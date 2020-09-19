@@ -381,20 +381,11 @@ static CanonicalType *canonical_type_qual_use(Use use)
           actual = first_TypeActual(type_inst_type_actuals(type_decl_type(type_inst_decl)));
            f != NULL; f = DECL_NEXT(f), actual = TYPE_NEXT(actual))
       {
-        if (strcmp(decl_name(f), symbol_name(use_name(type_use_use(type_decl_type(udecl))))) == 0)
+        if (USE_DECL(type_use_use(type_decl_type(udecl))) == f)
         {
-          printf("%s\n", USE_DECL(type_use_use(type_decl_type(udecl))) == f ? "true" : "false");
-
           return new_canonical_type_use(USE_DECL(type_use_use(actual)));
         }
-
-        // if (USE_DECL(type_use_use(type_decl_type(udecl))) == f)
-        // {
-        //   return new_canonical_type_use(USE_DECL(type_use_use(actual)));
-        // }
       }
-
-      printf("we are here!");
     }
 
     return canonical_type_use_nested;
@@ -409,10 +400,6 @@ static CanonicalType *canonical_type_qual_use(Use use)
  */
 static CanonicalType *canonical_type_function(Type t)
 {
-  printf("Finding canonical type of: ");
-  print_Type(t, stdout);
-  printf("\n");
-
   int num_formals = count_declarations(function_type_formals(t));
   CanonicalType *return_type = canonical_type(function_type_return_type(t));
 
@@ -429,8 +416,6 @@ static CanonicalType *canonical_type_function(Type t)
 
   while (f != NULL)
   {
-    printf("index: %d\n", index);
-
     switch (Declaration_KEY(f))
     {
     case KEYseq_formal:
@@ -452,7 +437,7 @@ static CanonicalType *canonical_type_function(Type t)
     f = DECL_NEXT(f);
   }
 
-  void *memory = hash_cons_get(ctype_function, sizeof(&ctype_function), &canonical_type_table);
+  void *memory = hash_cons_get(ctype_function, my_size, &canonical_type_table);
 
   return (CanonicalType *)memory;
 }
