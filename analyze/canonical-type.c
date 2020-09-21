@@ -231,17 +231,16 @@ static CanonicalType *new_canonical_type_qual(CanonicalType *from, Declaration d
  */
 static bool is_inside_module(Declaration mdecl, void *node)
 {
-  bool is_inside_module = false;
   void *thing = node;
   while ((thing = tnode_parent(thing)) != NULL)
   {
-    if (ABSTRACT_APS_tnode_phylum(thing) == KEYDeclaration && Declaration_KEY((Declaration)thing) == KEYmodule_decl && !strcmp(decl_name((Declaration)thing), decl_name(mdecl)))
+    if (ABSTRACT_APS_tnode_phylum(thing) == KEYDeclaration && Declaration_KEY((Declaration)thing) == KEYmodule_decl && (Declaration)thing == mdecl)
     {
-      is_inside_module = true;
+      return true;
     }
   }
 
-  return is_inside_module;
+  return false;
 }
 
 /**
@@ -268,7 +267,7 @@ static Declaration canonical_type_decl(CanonicalType *canonical_type)
     return canonical_qual_use_type->decl;
   }
   default:
-    aps_error(canonical_type, "Failed to find the module for type use");
+    aps_error(canonical_type, "Failed to find the decl for CanonicalType");
     return NULL;
   }
 }
@@ -315,6 +314,52 @@ static CanonicalType *canonical_type_use(Use use)
 }
 
 /**
+ * Subtutute formals and result types if type is inside a module and is being referenced from outside
+ * @param thing current declaration
+ * @param mdecl module declaration
+ * @param type_inst_decl type_inst_declaration
+ * @param fallback fallback canonical type in case
+ * @return substituted canonical type
+ */
+static CanonicalType *type_substitution(Declaration thing, Declarations mdecl, Declaration type_inst_decl, CanonicalType *fallback)
+{
+  // type XXX := Result
+  // Get result of module
+  if (module_decl_result_type(mdecl) == thing)
+  {
+    if (module_decl_generating(mdecl))
+    {
+      return new_canonical_type_use(type_inst_decl);
+    }
+    else
+    {
+      Type tdecl_type = base_type(type_decl_type(type_inst_decl));
+
+      return canonical_type(tdecl_type);
+    }
+  }
+  // type XXX := formal;
+  // Get actual matching position of the formal
+  else if (Declaration_KEY(thing) == KEYtype_formal)
+  {
+    Declaration f;
+    Type actual;
+
+    for (f = first_Declaration(module_decl_type_formals(mdecl)),
+        actual = first_TypeActual(type_inst_type_actuals(type_decl_type(type_inst_decl)));
+         f != NULL; f = DECL_NEXT(f), actual = TYPE_NEXT(actual))
+    {
+      if (thing == f)
+      {
+        return canonical_type(actual);
+      }
+    }
+  }
+
+  return fallback;
+}
+
+/**
  * Canonical type given a qual use
  * @param use any use
  * @return canonical type qual use
@@ -324,20 +369,23 @@ static CanonicalType *canonical_type_qual_use(Use use)
   CanonicalType *from_canonicalized = canonical_type(qual_use_from(use));
   CanonicalType *inside_canonicalized = canonical_type_use(use);
 
-  if (inside_canonicalized != NULL && inside_canonicalized->key == KEY_CANONICAL_FUNC)
-  {
-    return inside_canonicalized;
-  }
-
   Declaration type_inst_decl = canonical_type_decl(from_canonicalized);
-  Declaration inside_decl = canonical_type_decl(inside_canonicalized);
 
   Module module = type_inst_module(type_decl_type(type_inst_decl));
   Declaration mdecl = USE_DECL(module_use_use(module));
 
-  if (!is_inside_module(mdecl, inside_decl))
+  if (inside_canonicalized->key != KEY_CANONICAL_FUNC)
   {
-    return new_canonical_type_use(inside_decl);
+    Declaration inside_decl = canonical_type_decl(inside_canonicalized);
+
+    if (!is_inside_module(mdecl, inside_decl))
+    {
+      return new_canonical_type_use(inside_decl);
+    }
+    else
+    {
+      // Continue ...
+    }
   }
 
   Declaration udecl = Use_info(use)->use_decl;
@@ -354,41 +402,35 @@ static CanonicalType *canonical_type_qual_use(Use use)
     CanonicalType *canonical_type_use_nested = canonical_type_use(use);
     Declaration thing = canonical_type_decl(canonical_type_use_nested);
 
-    // type XXX := Result
-    // Get result of module
-    if (module_decl_result_type(mdecl) == thing || module_decl_result_type(mdecl) == USE_DECL(use))
-    {
-      if (module_decl_generating(mdecl))
-      {
-        return new_canonical_type_use(type_inst_decl);
-      }
-      else
-      {
-        Type tdecl_type = base_type(type_decl_type(type_inst_decl));
+    // substitute type use
+    return type_substitution(thing, mdecl, type_inst_decl, canonical_type_use_nested);
+  }
+  case KEYfunction_type:
+  {
+    struct Canonical_function_type *canonical_function_type = (struct Canonical_function_type *)inside_canonicalized;
+    size_t my_size = sizeof(struct Canonical_function_type) + canonical_function_type->num_formals * (sizeof(CanonicalType *));
 
-        return new_canonical_type_use(USE_DECL(type_use_use(tdecl_type)));
-      }
+    struct Canonical_function_type *result = (struct Canonical_function_type *)alloca(my_size);
+
+    result->key = KEY_CANONICAL_FUNC;
+    result->num_formals = canonical_function_type->num_formals;
+
+    // substitute formals
+    int i;
+    for (i = 0; i < canonical_function_type->num_formals; i++)
+    {
+      Declaration thing = canonical_type_decl(canonical_function_type->param_types[i]);
+
+      result->param_types[i] = type_substitution(thing, mdecl, type_inst_decl, canonical_function_type->param_types[i]);
     }
 
-    // type XXX := formal;
-    // Get actual matching position of the formal
-    if (Declaration_KEY(thing) == KEYtype_formal)
-    {
-      Declaration f;
-      Type actual;
+    // substitute return types
+    Declaration thing = canonical_type_decl(canonical_function_type->return_type);
+    result->return_type = type_substitution(thing, mdecl, type_inst_decl, canonical_function_type->return_type);
 
-      for (f = first_Declaration(module_decl_type_formals(mdecl)),
-          actual = first_TypeActual(type_inst_type_actuals(type_decl_type(type_inst_decl)));
-           f != NULL; f = DECL_NEXT(f), actual = TYPE_NEXT(actual))
-      {
-        if (USE_DECL(type_use_use(type_decl_type(udecl))) == f)
-        {
-          return new_canonical_type_use(USE_DECL(type_use_use(actual)));
-        }
-      }
-    }
+    void *memory = hash_cons_get(result, my_size, &canonical_type_table);
 
-    return canonical_type_use_nested;
+    return (CanonicalType *)memory;
   }
   }
 }
