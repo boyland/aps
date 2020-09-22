@@ -2822,6 +2822,7 @@ void print_cycles(STATE *s, FILE *stream) {
       case control_fiber_dependency:
       case indirect_fiber_dependency:
       case fiber_dependency:
+        case indirect_circular_dependency:
 	fprintf(stream,"fiber ");
 	/* fall through */
       default:
@@ -2843,6 +2844,7 @@ void print_cycles(STATE *s, FILE *stream) {
       case control_fiber_dependency:
       case indirect_fiber_dependency:
       case fiber_dependency:
+      case indirect_circular_dependency:
 	fprintf(stream,"fiber ");
 	/* fall through */
       default:

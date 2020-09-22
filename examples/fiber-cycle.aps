@@ -1,0 +1,31 @@
+with "simple";
+-- Simple example of fiber cycle
+module FIBER_CYCLE[T :: var SIMPLE[]] extends T begin
+  phylum Foo;
+  constructor foo() : Foo;
+
+  attribute Foo.foo_inherited : Integer;
+  attribute Foo.foo_synthesized : Integer;
+
+  attribute Expr.expr_foo : Foo;
+  attribute Stmt.total : Integer;
+
+  pragma inherited(foo_inherited);
+  pragma synthesized(foo_synthesized, total, expr_foo);
+
+  match ?s:Stmt=assign_stmt(?e1:Expr,?e2:Expr) begin
+    foo1 : Foo := e1.expr_foo;
+    foo2 : Foo := e2.expr_foo;
+
+    foo1.foo_inherited := foo2.foo_synthesized;
+    foo2.foo_inherited := foo1.foo_synthesized;
+    
+    s.total := foo1.foo_synthesized + foo2.foo_synthesized;
+  end;
+  
+  match ?e:Expr=intconstant(?i:Integer) begin
+    foo_var: Foo := foo();
+    foo_var.foo_synthesized := foo_var.foo_inherited;
+    e.expr_foo := foo_var;
+  end;
+end;

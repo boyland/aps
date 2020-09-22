@@ -1,0 +1,26 @@
+with "tiny";
+
+module TINY_COLL[T :: var TINY[]] extends T
+begin
+  type Integers := SET[Integer];
+  type LeafRemote := remote Wood;
+  type Leaves := SET[LeafRemote];
+
+  collection attribute Wood.sum : Integer :> 0, (+);
+  var collection leaves: Leaves := Leaves${};
+
+  pragma synthesized(sum);
+
+  match ?l=leaf(?x) begin
+    l.sum :> x;
+  end;
+  match ?b=branch(?x,?y) begin
+    b.sum :> x.sum;
+
+    b.sum :> y.sum;
+  end;
+
+  match ?p=root(?b) begin
+  end;
+
+end;

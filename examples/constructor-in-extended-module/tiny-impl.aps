@@ -1,0 +1,15 @@
+with "tiny";
+
+module TINY_IMPL[T :: var TINY[]] extends T
+begin
+  constructor amir() : Root;
+
+  match ?l=leaf(?x) begin
+  end;
+  match ?b=branch(?x,?y) begin
+  end;
+
+  match ?p=root(?b) begin
+  end;
+
+end;

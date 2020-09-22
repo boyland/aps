@@ -1,0 +1,34 @@
+with "basic";
+with "tiny";
+
+module TINY_CIRCULAR_SIMPLE[T :: TINY[]] extends T
+begin
+    type IntegerLattice := MAX_LATTICE[Integer](0);
+
+    circular attribute Wood.s_bag1 : IntegerLattice;
+    circular attribute Wood.s_bag2 : IntegerLattice;
+    attribute Wood.s : Integer;
+    attribute Root.result : Integer;
+        
+    pragma synthesized(s_bag1, s, result);
+    pragma inherited(s_bag2);
+
+    match ?l=leaf(?x) begin
+        l.s_bag1 := x;
+        l.s := l.s_bag2;
+    end;
+
+    match ?b=branch(?x,?y) begin
+        circular i : IntegerLattice := b.s_bag2;
+        x.s_bag2 := i;
+        y.s_bag2 := i;
+        b.s_bag1 := x.s_bag1 + y.s_bag1;
+        b.s := x.s + y.s;
+    end;
+
+    match ?p=root(?b) begin
+        circular i : IntegerLattice := b.s_bag1;
+        b.s_bag2 := max(i, 5);
+        p.result := b.s;
+    end;
+end;

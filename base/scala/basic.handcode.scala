@@ -57,6 +57,10 @@ object basic_implicit {
   val t_AndLattice = new M_MAKE_LATTICE[T_Boolean]("AndLattice",t_Boolean,v_true,v_andc,v_revimplies,v_and,v_or);
   type T_AndLattice = T_Boolean;
 
+  type T_MAX_LATTICE[T] = T;
+  type T_MIN_LATTICE[T] = T;
+
+
   type T_BAG[T] = List[T];
   type T_LIST[T] = List[T];
   type T_SET[T] = scala.collection.immutable.Set[T];
@@ -1378,3 +1382,38 @@ class M__basic_24[T_Node <: Node](t_Node:C_PHYLUM[T_Node]) {
     v_x.asInstanceOf[Node].lineNumber;
 };
 
+class M_MAX_LATTICE_Numeric[T_TO <: T_Integer]
+(name : String, t_TO:C_ORDERED[T_TO] with C_NUMERIC[T_TO],v_min_element : T_TO)
+  extends M_MAX_LATTICE[T_TO](name, t_TO, v_min_element)
+  with C_NUMERIC[T_TO]    // <-- New trait thanks to <: T_Integer
+{
+  override def v_zero: T_TO = t_TO.v_zero
+  override def v_one: T_TO = t_TO.v_one
+
+  override val v_plus: (T_TO, T_TO) => T_TO = t_TO.v_plus
+  override val v_minus: (T_TO, T_TO) => T_TO = t_TO.v_minus
+  override val v_times: (T_TO, T_TO) => T_TO = t_TO.v_times
+  override val v_divide: (T_TO, T_TO) => T_TO= t_TO.v_divide
+  override val v_unary_plus: T_TO => T_TO= t_TO.v_unary_plus
+  override val v_unary_minus: T_TO => T_TO = t_TO.v_unary_minus
+  override val v_unary_times: T_TO => T_TO = t_TO.v_unary_times
+  override val v_unary_divide: T_TO => T_TO = t_TO.v_unary_divide
+}
+
+class M_MIN_LATTICE_Numeric[T_TO <: T_Integer]
+(name : String, t_TO:C_ORDERED[T_TO] with C_NUMERIC[T_TO],v_max_element : T_TO)
+  extends M_MIN_LATTICE[T_TO](name, t_TO, v_max_element)
+  with C_NUMERIC[T_TO]    // <-- New trait thanks to <: T_Integer
+{
+  override def v_zero: T_TO = t_TO.v_zero
+  override def v_one: T_TO = t_TO.v_one
+
+  override val v_plus: (T_TO, T_TO) => T_TO = t_TO.v_plus
+  override val v_minus: (T_TO, T_TO) => T_TO = t_TO.v_minus
+  override val v_times: (T_TO, T_TO) => T_TO = t_TO.v_times
+  override val v_divide: (T_TO, T_TO) => T_TO= t_TO.v_divide
+  override val v_unary_plus: T_TO => T_TO= t_TO.v_unary_plus
+  override val v_unary_minus: T_TO => T_TO = t_TO.v_unary_minus
+  override val v_unary_times: T_TO => T_TO = t_TO.v_unary_times
+  override val v_unary_divide: T_TO => T_TO = t_TO.v_unary_divide
+}

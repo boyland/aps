@@ -1,0 +1,20 @@
+with "symbol";
+with "table";
+type I = Symbol;
+
+module FIRST[] begin
+  phylum Program;
+
+  phylum Item;
+  phylum Items := SEQUENCE[Item];
+
+  phylum Stmt;
+  phylum Stmts := SEQUENCE[Stmt];
+
+  constructor terminal(s: Symbol) : Item;
+  constructor nonterminal(s: Symbol) : Item;
+  constructor stmt(nt: Symbol; children: Items) : Stmt;
+  constructor program(stmts: Stmts) : Program;
+
+  pragma root_phylum(type Program);
+end;

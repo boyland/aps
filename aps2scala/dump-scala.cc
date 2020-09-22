@@ -450,7 +450,7 @@ public:
     int namespaces = decl_namespaces(d);
     if (namespaces) {
       (*this)[def_name(declaration_def(d))] |= namespaces;
-      // cout << decl_name(d) << " is added to the service record." << endl;
+      cout << decl_name(d) << " is added to the service record." << endl;
     }
   }
   int missing(Declaration d) {
@@ -858,6 +858,7 @@ void dump_some_class_decl(Declaration decl, ostream& oss)
   for (Declaration d=first_Declaration(body); d; d=DECL_NEXT(d)) {
     const char *n = decl_code_name(d);
     bool is_phylum = false;
+    bool is_lattice = strstr(n, "Lattice") ? 1 : 0;
     switch (Declaration_KEY(d)) {
     default:
       aps_warning(d,"nested thing not handled in APS class");
@@ -869,7 +870,7 @@ void dump_some_class_decl(Declaration decl, ostream& oss)
       oss << indent() << "type T_" << n << (is_phylum ? " <: Node" : "")
 	  << ";\n";
       oss << indent() << "val t_" << n << " : C_"
-	  << (is_phylum ? "PHYLUM" : "TYPE")
+	  << (is_phylum ? "PHYLUM" : (is_lattice ? "NULL" : "TYPE"))
 	  << "[T_" << n << "]";
       dump_Type_Signature(some_type_decl_type(d),string("T_") + n,oss);
       oss << ";\n";
@@ -1041,6 +1042,14 @@ static string type_inst_as_scala_type(Type ty)
 #endif
 }
 
+char* concat(const char *s1, const char *s2)
+{
+    char *result = (char *)malloc(strlen(s1) + strlen(s2) + 1); // +1 for the null-terminator
+    strcpy(result, s1);
+    strcat(result, s2);
+    return result;
+}
+
 static void dump_type_inst(string n, string nameArg, Type ti, ostream& oss)
 {
   Module m = type_inst_module(ti);
@@ -1068,7 +1077,17 @@ static void dump_type_inst(string n, string nameArg, Type ti, ostream& oss)
     break;
   case KEYmodule_use:
     // rname = decl_name(module_decl_result_type(USE_DECL(module_use_use(m))));
-    oss << "M_" << symbol_name(use_name(module_use_use(m)));
+
+    {
+
+      // If we have a lattice of an integer then ...
+      const char* n = symbol_name(use_name(module_use_use(m)));
+      bool is_lattice = (strstr(n, "MAX_LATTICE") || strstr(n, "MIN_LATTICE")) ? 1 : 0;
+      const char* name = is_lattice ? concat(n, "_Numeric") : n;
+
+      oss << "M_" << name;
+    }
+
     break;
   }
   bool started = false;

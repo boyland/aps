@@ -1,0 +1,41 @@
+with "basic";
+with "tiny";
+
+module TINY_CIRCULAR[T :: var TINY[]] extends T
+begin
+    phylum S;
+    type RemoteS := remote S;
+    type Integers := SET[Integer];
+    type IntegerLattice := UNION_LATTICE[Integer, Integers];
+
+    circular collection attribute S.s_bag1 : IntegerLattice := {};
+    circular collection attribute S.s_bag2 : IntegerLattice := {};
+
+    attribute Root.result : Integers;
+    attribute Wood.w_s : RemoteS;
+        
+    pragma synthesized(w_s, result);
+    pragma inherited();
+
+    constructor s_constructor() : S;
+
+    match ?l=leaf(?x) begin
+        t : S := s_constructor();
+        t.s_bag1 :> { x };
+        l.w_s := t;
+    end;
+
+    match ?b=branch(?x,?y) begin
+        v : S := s_constructor();
+        b.w_s := v;
+        circular i : IntegerLattice := v.s_bag2;
+        v.s_bag1 :> i;
+        -- v.s_bag1 :> v.s_bag2;
+    end;
+
+    match ?p=root(?b) begin
+        circular i : IntegerLattice := b.w_s.s_bag1;
+        b.w_s.s_bag2 :> i \/ { 1, 2, 3 };
+        p.result := b.w_s.s_bag1;
+    end;
+end;
