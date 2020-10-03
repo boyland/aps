@@ -29,4 +29,6 @@ struct Canonical_use {
 
 CanonicalType* canonical_type(Type ty);
 
+CanonicalType *canonical_type_base_type(CanonicalType *canonicalType);
+
 #endif
