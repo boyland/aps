@@ -19,6 +19,14 @@ begin
 
    type Z := EXT[T];
    type l := GEN[T];
+
+   type F1 := function(c1 : C; c2 : C) : C;
+   type F2 := function(c1 : String; c2 : String) : String;
+   type F3 := function(c1 : A; c2 : A) : A;
+   type F4 := function(c1 : B; c2 : C) : B;
+   type F5 := function(c1 : T; c2 : Y) : D;
+   type F6 := function(c1 : Integer; c2 : Y) : D;
+   type F7 := function(c1 : Integer; c2 : Y) : X;
 end;
 
 module EXT[T :: BASIC[]] extends T
@@ -33,7 +41,7 @@ begin
    type Q := Result;
    type R := MAKE_LATTICE[P](con(),bf1,bf2,cf,cf);
    type S := Integer;
-
+   type Interesting := MAKE_LATTICE[Boolean](con(),bf1,bf2,cf,cf);
    type A := B;
    type B := C;
    type C := Result;
@@ -43,23 +51,41 @@ begin
    type W := U$X;
    type X := U$A;
 
-   type Z := U$Z;
+   -- type Z := U$Z$X;
    
    -- Use of B should be Result
+  type Test2 := function(c1 : C; c2 : T) : T;
+
+
+  type F1 := function(c1 : C; c2 : C) : C;
+  type F2 := function(c1 : X; c2 : C) : String;
+  type F3 := function(c1 : C; c2 : Q) : X;
+  type F4 := function(c1 : B; c2 : C) : C;
+  type F5 := function(c1 : T; c2 : Q) : Q;
+
+  type iU := Integer;
+  type orU := OrLattice;
 end;
 
--- They should canonicalize as the use of G0 which is a type_decl
+-- String
 type G0 := GEN[String];
 type G1 := G0;
 type G2 := G0$D;
 type G3 := G1$D;
 
--- They should canonicalize as the use of H0 which is a type_decl
+-- String
 type H0 := GEN[String];
 type H1 := H0;
 type H2 := H0$D;
 type H3 := H1$D;
 type H4 := H1$H;
+
+-- String
+type A0 := GEN[Integer];
+type A1 := A0;
+type A2 := A0$D;
+type A3 := A1$D;
+type A4 := A1$H;
 
 -- G0$C
 type I0 := G0$C;
@@ -95,10 +121,13 @@ type O3 := N1$S;
 -- type O4 := O0$Result;
 type O5 := O0$Q;
 type O6 := Integer;
+type O7 := O0$C;
 
 -- N0$P
 type P0 := N0$P;
 type P1 := N0$R;
+
+type P2 := N0$Interesting;
 
 -- I think that Q0 is supposed to be different than P0:
 -- N0 and N1 has the base types but different types
@@ -119,4 +148,19 @@ type T0 := N0$O;
 -- Use of U0
 type U0 := private Integer;
 
-type MutuallyRecursive := N0$Z$S;
+type G0F1 := G0$F1; -- (C,C)=>C
+type G0F2 := G0$F2; -- (String,String)=>String
+type G0F3 := G0$F3; -- (String,String)=>String
+type G0F4 := G0$F4; -- (B,C)=>B
+type G0F5 := G0$F5; -- (String,Integer)=>G0
+type G0F6 := G0$F6; -- (Integer,Integer)=>G0
+type G0F7 := G0$F7; -- (Integer,Integer)=>Integer
+
+type N0F1 := N0$F1; -- (String,String)=>String
+type N0F2 := N0$F2; -- (String,String)=>String
+type N0F3 := N0$F3; -- (String,String)=>String
+type N0F4 := N0$F4; -- (String,String)=>String
+type N0F5 := N0$F5; -- (String,String)=>String
+
+type iU := Integer;
+type orU := OrLattice;

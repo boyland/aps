@@ -39,7 +39,7 @@ static int hc_candidate_index(HASH_CONS_TABLE hc, void *item)
       return index;
     }
 
-    if (attempt == 0)
+    if (attempt++ == 0)
     {
       step_size = hash % (hc->capacity - 2);
     }

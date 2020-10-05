@@ -339,6 +339,24 @@ static CanonicalType *canonical_type_use(Use use)
   return NULL;
 }
 
+static Type get_actual_given_formal(Declaration type_inst_decl, Declaration mdecl, Declaration formal)
+{
+  Declaration f;
+  Type actual;
+
+  for (f = first_Declaration(module_decl_type_formals(mdecl)),
+      actual = first_TypeActual(type_inst_type_actuals(type_decl_type(type_inst_decl)));
+       f != NULL; f = DECL_NEXT(f), actual = TYPE_NEXT(actual))
+  {
+    if (formal == f)
+    {
+      return actual;
+    }
+  }
+
+  return NULL;
+}
+
 /**
  * Subtutute formals and result types if type is inside a module and is being referenced from outside
  * @param thing current declaration
@@ -349,6 +367,11 @@ static CanonicalType *canonical_type_use(Use use)
  */
 static CanonicalType *canonical_type_helper(Declaration thing, Declarations mdecl, Declaration type_inst_decl, CanonicalType *fallback)
 {
+  if (thing == NULL)
+  {
+    return fallback;
+  }
+
   Declaration rdecl = module_decl_result_type(mdecl);
 
   // When module is not generating and thing is of type of KEYtype_formal, it means we are actually referring to the result of module
@@ -368,17 +391,11 @@ static CanonicalType *canonical_type_helper(Declaration thing, Declarations mdec
   // Get actual matching position of the formal
   else if (Declaration_KEY(thing) == KEYtype_formal)
   {
-    Declaration f;
-    Type actual;
+    Type actual = get_actual_given_formal(type_inst_decl, mdecl, thing);
 
-    for (f = first_Declaration(module_decl_type_formals(mdecl)),
-        actual = first_TypeActual(type_inst_type_actuals(type_decl_type(type_inst_decl)));
-         f != NULL; f = DECL_NEXT(f), actual = TYPE_NEXT(actual))
+    if (actual != NULL)
     {
-      if (thing == f)
-      {
-        return canonical_type(actual);
-      }
+      return canonical_type(actual);
     }
   }
 
@@ -396,8 +413,6 @@ static CanonicalType *canonical_type_qual_use(Use use)
   CanonicalType *inside_canonicalized = canonical_type_use(use);
 
   Declaration type_inst_decl = canonical_type_decl(from_canonicalized);
-
-  // printf("\ntype_inst_decl: %s\n", decl_name(type_inst_decl));
 
   Module module = type_inst_module(type_decl_type(type_inst_decl));
   Declaration mdecl = USE_DECL(module_use_use(module));
@@ -430,25 +445,15 @@ static CanonicalType *canonical_type_qual_use(Use use)
     CanonicalType *canonical_type_use_nested = canonical_type_use(use);
     Declaration thing = canonical_type_decl(canonical_type_use_nested);
 
-    // substitute type use
+    // call helper function
     return canonical_type_helper(thing, mdecl, type_inst_decl, canonical_type_use_nested);
   }
   case KEYfunction_type:
   {
-
-  //     printf("\n>>>");
-  // print_canonical_type((CanonicalType *)inside_canonicalized, stdout);
-  // printf("\n<<< done");
-
     struct Canonical_function_type *canonical_function_type = (struct Canonical_function_type *)inside_canonicalized;
     size_t my_size = sizeof(struct Canonical_function_type) + canonical_function_type->num_formals * (sizeof(CanonicalType *));
 
     struct Canonical_function_type *result = shallow_clone_canonical_function_types(canonical_function_type);
-
-  // printf("\n>>> ");
-  // print_canonical_type(result, stdout);
-  // printf(" \n");
-  // printf("\n<<<");
 
     int i;
     for (i = 0; i < canonical_function_type->num_formals; i++)
@@ -512,15 +517,7 @@ static CanonicalType *canonical_type_function(Type t)
     f = DECL_NEXT(f);
   }
 
-  // printf("\n>>>");
-  // print_canonical_type(ctype_function, stdout);
-  // printf("\n<<<");
-
   void *memory = hash_cons_get(ctype_function, my_size, &canonical_type_table);
-
-  // printf("\n>>>");
-  // print_canonical_type((CanonicalType *)memory, stdout);
-  // printf("\n<<<");
 
   return (CanonicalType *)memory;
 }
@@ -599,6 +596,7 @@ CanonicalType *canonical_type_base_type(CanonicalType *canonicalType)
       {
         Use mu = module_use_use(type_inst_module(t));
         Declaration mdecl = USE_DECL(mu);
+        Declaration rdecl = module_decl_result_type(mdecl);
 
         if (module_decl_generating(mdecl))
         {
@@ -606,28 +604,20 @@ CanonicalType *canonical_type_base_type(CanonicalType *canonicalType)
         }
         else
         {
-          Declaration m_result_decl = module_decl_result_type(mdecl);
+          Declaration thing = canonical_type_decl(canonical_type(some_type_decl_type(rdecl))); // this needs to be corrected because it maybe formal and needs to be replaced by actual
 
-          Type et = type_subst(mu, base_type(some_type_decl_type(tdecl)));
-          return base_type(et);
-
-          // Get base-type of a module
-          return canonical_type_base_type(canonical_type((type_subst(mu, base_type(t)))));
+          return canonical_type_base_type(canonical_type(get_actual_given_formal(tdecl, mdecl, thing)));
         }
       }
       default:
-      {
-        printf("Type unknown %d \n", (int)Type_KEY(t));
-      }
-        return canonical_type_base_type(canonical_type(base_type(type_subst(NULL, t))));
+        aps_error(t, "Case of type use %d is not implemented in canonical_type_base_type() for type", (int)Type_KEY(t));
+        return NULL;
       }
     }
-    break;
     default:
-      aps_error(tdecl, "unknown type decl");
+      aps_error(tdecl, "Case of type use %d is not implemented in canonical_type_base_type() for type", (int)Declaration_KEY(tdecl));
+      return NULL;
     }
-
-    break;
   }
   case KEY_CANONICAL_QUAL:
   {
@@ -635,7 +625,7 @@ CanonicalType *canonical_type_base_type(CanonicalType *canonicalType)
 
     CanonicalType *source_base = canonical_type_base_type(canonical_type_qual->source);
 
-    // Short-circut
+    // Short-circut if there has been no change
     if (canonical_type_qual->source == source_base)
     {
       return canonicalType;
@@ -659,6 +649,7 @@ CanonicalType *canonical_type_base_type(CanonicalType *canonicalType)
       {
         Use mu = module_use_use(type_inst_module(t));
         Declaration mdecl = USE_DECL(mu);
+        Declaration rdecl = module_decl_result_type(mdecl);
 
         if (module_decl_generating(mdecl))
         {
@@ -666,43 +657,10 @@ CanonicalType *canonical_type_base_type(CanonicalType *canonicalType)
         }
         else
         {
-          // Get base-type of a module
-          result = canonical_type_base_type(canonical_type((type_subst(mu, base_type(t)))));
+          Declaration source_rdecl = canonical_type_decl(canonical_type(some_type_decl_type(rdecl))); // this needs to be corrected because it maybe formal and needs to be replaced by actual
 
+          CanonicalType *result = canonical_type_base_type(canonical_type(get_actual_given_formal(tdecl, mdecl, source_rdecl)));
           Declaration thing = canonical_type_decl(result);
-
-          // type XXX := Result
-          // Get result of module
-          if (module_decl_result_type(mdecl) == thing)
-          {
-            if (module_decl_generating(mdecl))
-            {
-              result = new_canonical_type_use(tdecl);
-            }
-            else
-            {
-              Type tdecl_type = base_type(type_decl_type(tdecl));
-
-              result = canonical_type(tdecl_type);
-            }
-          }
-          // type XXX := formal;
-          // Get actual matching position of the formal
-          else if (Declaration_KEY(thing) == KEYtype_formal)
-          {
-            Declaration f;
-            Type actual;
-
-            for (f = first_Declaration(module_decl_type_formals(mdecl)),
-                actual = first_TypeActual(type_inst_type_actuals(type_decl_type(NULL)));
-                 f != NULL; f = DECL_NEXT(f), actual = TYPE_NEXT(actual))
-            {
-              if (thing == f)
-              {
-                result = canonical_type(actual);
-              }
-            }
-          }
 
           if (!is_inside_module(mdecl, thing))
           {
@@ -713,35 +671,20 @@ CanonicalType *canonical_type_base_type(CanonicalType *canonicalType)
         }
       }
       default:
-      {
         fatal_error("Fatal error because it means we haven't done it right");
+        return NULL;
       }
-      }
-
+    }
+    default:
       fatal_error("Fatal error because it means we haven't done it right");
-
       return NULL;
     }
-    break;
-    default:
-      aps_error(tdecl, "unknown type decl");
-    }
-
-    return canonicalType;
   }
   case KEY_CANONICAL_FUNC:
   {
-  printf("\n>>>");
-  print_canonical_type((CanonicalType *)canonicalType, stdout);
-  printf("\n<<<");
-   
     struct Canonical_function_type *canonical_type_function = (struct Canonical_function_type *)shallow_clone_canonical_function_types((struct Canonical_function_type *)canonicalType);
 
-  printf("\n>>>");
-  print_canonical_type((CanonicalType *)canonicalType, stdout);
-  printf("\n<<<");
-
-    size_t my_size = sizeof(*canonicalType);
+    size_t my_size = sizeof(struct Canonical_function_type) + canonical_type_function->num_formals * (sizeof(CanonicalType *));
 
     canonical_type_function->return_type = canonical_type_base_type(canonical_type_function->return_type);
     int i;
