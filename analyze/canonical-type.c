@@ -305,8 +305,6 @@ static CanonicalType *canonical_type_use(Use use)
 {
   Declaration td = Use_info(use)->use_decl;
 
-  // printf("use: %s %d\n", decl_name(td), (int)Declaration_KEY(td));
-
   switch (Declaration_KEY(td))
   {
   case KEYsome_type_decl:
@@ -339,21 +337,22 @@ static CanonicalType *canonical_type_use(Use use)
   return NULL;
 }
 
-static Type get_actual_given_formal(Declaration type_inst_decl, Declaration mdecl, Declaration formal)
+/**
+ * Returns actual Type given formal declaration, type declaration and module declaration
+ * @param tdecl type declaration
+ * @param mdecl module declaration
+ * @param formal formal declaration
+ * @return actual Type (or NULL if it does not find a match)
+ */
+static Type get_actual_given_formal(Declaration tdecl, Declaration mdecl, Declaration formal)
 {
   Declaration f;
   Type actual;
 
   for (f = first_Declaration(module_decl_type_formals(mdecl)),
-      actual = first_TypeActual(type_inst_type_actuals(type_decl_type(type_inst_decl)));
+      actual = first_TypeActual(type_inst_type_actuals(type_decl_type(tdecl)));
        f != NULL; f = DECL_NEXT(f), actual = TYPE_NEXT(actual))
   {
-    // printf("formal: %s\nactual: ", decl_name(f));
-    // print_Type(actual, stdout);
-    // printf("\n");
-
-    // printf("canonicalized actual: %s\n", decl_name(canonical_type_decl(canonical_type(actual))));
-
     if (formal == f)
     {
       return actual;
@@ -495,13 +494,15 @@ static bool has_canonical_type_changed(CanonicalType *before, CanonicalType *aft
   }
 }
 
-static Declaration substitute_decl(Declaration decl, Declaration tdecl, Declaration mdecl)
+/**
+ * Simple function that tries to recursively resolve the decl given tdecl and mdecl
+ * @param decl declaration source
+ * @param tdecl type declaration
+ * @param mdecl module declaration
+ * @return resolved declaration
+ */
+static Declaration resolve_decl(Declaration decl, Declaration tdecl, Declaration mdecl)
 {
-  printf("mdecl: %s\n", mdecl == NULL ? "null" : decl_name(mdecl));
-  printf("tdecl: %s\n", tdecl == NULL ? "null" : decl_name(tdecl));
-  printf("decl: %s\n", decl == NULL ? "null" : decl_name(decl));
-  printf("\n");
-
   switch (Declaration_KEY(decl))
   {
   case KEYsome_type_decl:
@@ -519,29 +520,27 @@ static Declaration substitute_decl(Declaration decl, Declaration tdecl, Declarat
       }
       else
       {
-        Declaration rdecl = module_decl_result_type(nested_mdecl);
-        Declaration temp = substitute_decl(rdecl, decl, nested_mdecl);
+        decl = resolve_decl(module_decl_result_type(nested_mdecl), decl, nested_mdecl);
 
-        return decl == temp ? decl : substitute_decl(temp, tdecl, mdecl);
+        return resolve_decl(decl, tdecl, mdecl);
       }
     }
     case KEYtype_use:
     {
-      return substitute_decl(canonical_type_decl(canonical_type(some_type_decl_type(decl))), tdecl, mdecl);
+      return resolve_decl(canonical_type_decl(canonical_type(tdecl_type)), tdecl, mdecl);
     }
     case KEYno_type:
     case KEYprivate_type:
       return decl;
-      break;
     default:
-      printf("default case x %d\n", (int)Type_KEY(some_type_decl_type(decl)));
+      aps_error(tdecl_type, "Unexpected type %d in resolve_decl()", (int)Type_KEY(tdecl_type));
       return decl;
     }
   }
   case KEYsome_type_formal:
     return canonical_type_decl(canonical_type(get_actual_given_formal(tdecl, mdecl, decl)));
   default:
-    printf("default case y %d\n", (int)Declaration_KEY(decl));
+    aps_error(decl, "Unexpected decl %d in resolve_decl()", (int)Declaration_KEY(decl));
     return decl;
   }
 }
@@ -698,12 +697,6 @@ CanonicalType *canonical_type_base_type(CanonicalType *canonicalType)
 
     CanonicalType *source_base = canonical_type_base_type(canonical_type_qual->source);
 
-    printf("\nbefore\t");
-    print_canonical_type(canonicalType, stdout);
-    printf("\nafter\t");
-    print_canonical_type(source_base, stdout);
-    printf("\n");
-
     // Short-circut if there has been no change
     if (canonical_type_qual->source == source_base)
     {
@@ -714,17 +707,14 @@ CanonicalType *canonical_type_base_type(CanonicalType *canonicalType)
     Declaration tdecl = canonical_type_decl(canonical_type_qual->source);
     Declaration mdecl = USE_DECL(module_use_use(type_inst_module(some_type_decl_type(tdecl))));
 
-    printf("before result: %s\n", decl_name(thing));
-    Declaration result = substitute_decl(thing, tdecl, mdecl);
-    printf("After result: %s\n", decl_name(result));
-
-    if (!is_inside_module(mdecl, result))
+    Declaration resolved_decl = resolve_decl(thing, tdecl, mdecl);
+    if (!is_inside_module(mdecl, resolved_decl))
     {
-      return new_canonical_type_use(result);
+      return new_canonical_type_use(resolved_decl);
     }
     else
     {
-      return new_canonical_type_qual(canonical_type_qual->source, result);
+      return new_canonical_type_qual(canonical_type_qual->source, resolved_decl);
     }
   }
   case KEY_CANONICAL_FUNC:
