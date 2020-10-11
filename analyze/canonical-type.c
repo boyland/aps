@@ -668,18 +668,20 @@ CanonicalType *canonical_type_base_type(CanonicalType *canonicalType)
       {
         Use mu = module_use_use(type_inst_module(t));
         Declaration mdecl = USE_DECL(mu);
-        Declaration rdecl = module_decl_result_type(mdecl);
+        Declaration thing = module_decl_result_type(mdecl);
 
-        if (module_decl_generating(mdecl))
+        Declaration resolved_decl = resolve_decl(thing, tdecl, mdecl);
+
+        if (!is_inside_module(mdecl, resolved_decl))
         {
-          return canonicalType;
+          return canonical_type_base_type(new_canonical_type_use(resolved_decl));
         }
         else
         {
-          Declaration thing = canonical_type_decl(canonical_type(some_type_decl_type(rdecl))); // this needs to be corrected because it maybe formal and needs to be replaced by actual
-
-          return canonical_type_base_type(canonical_type(get_actual_given_formal(tdecl, mdecl, thing)));
+          return new_canonical_type_qual(canonical_type_qual->source, resolved_decl);
         }
+
+        return canonical_type_base_type(new_canonical_type_use(resolved_decl));
       }
       default:
         aps_error(t, "Case of type use %d is not implemented in canonical_type_base_type() for type", (int)Type_KEY(t));
@@ -710,7 +712,7 @@ CanonicalType *canonical_type_base_type(CanonicalType *canonicalType)
     Declaration resolved_decl = resolve_decl(thing, tdecl, mdecl);
     if (!is_inside_module(mdecl, resolved_decl))
     {
-      return new_canonical_type_use(resolved_decl);
+      return canonical_type_base_type(new_canonical_type_use(resolved_decl));
     }
     else
     {
