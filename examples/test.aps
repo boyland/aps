@@ -1,166 +1,531 @@
-module GEN[T :: BASIC[]] 
+module GEN[T :: BASIC[]]
 begin
-   type A := T;
-   type B := LIST[T];
-   type C;
-   constructor con() : C;
-   function bf1(c1 : C; c2 : C) : Boolean := false;
-   function bf2(c1 : C; c2 : C) : Boolean := true;
-   function cf(c1 : C; c2 : C) : C := c1;
-   type D := Result;
-   type E := MAKE_LATTICE[C](con(),bf1,bf2,cf,cf);
-   type F := Integer;
+  -- simple (non-polymiorphic)
+  type A := T;        
+  type B := Integer;  
+  type C;             
+  type D := Result;
 
-   type G := D;
-   type H := G;
+  pragma test_canonical_type(type A, "T");
+  pragma test_canonical_type(type B, "Integer");
+  pragma test_canonical_type(type C, "C");
+  pragma test_canonical_type(type D, "Result");
 
-   type Y := F;
-   type X := Y;
+  pragma test_canonical_base_type(type A, "T");
+  pragma test_canonical_base_type(type B, "Integer");
+  pragma test_canonical_base_type(type C, "C");
+  pragma test_canonical_base_type(type D, "Result");
 
-   type Z := EXT[T];
-   type l := GEN[T];
+  -------------------------------------------------------
 
-   type F1 := function(c1 : C; c2 : C) : C;
-   type F2 := function(c1 : String; c2 : String) : String;
-   type F3 := function(c1 : A; c2 : A) : A;
-   type F4 := function(c1 : B; c2 : C) : B;
-   type F5 := function(c1 : T; c2 : Y) : D;
-   type F6 := function(c1 : Integer; c2 : Y) : D;
-   type F7 := function(c1 : Integer; c2 : Y) : X;
+  -- type use 1 level
+  type E := A;
+  type F := B;
+  type G := C;
+  type H := D;
+
+  pragma test_canonical_type(type E, "T");
+  pragma test_canonical_type(type F, "Integer");
+  pragma test_canonical_type(type G, "C");
+  pragma test_canonical_type(type H, "Result");
+
+  pragma test_canonical_base_type(type E, "T");
+  pragma test_canonical_base_type(type F, "Integer");
+  pragma test_canonical_base_type(type G, "C");
+  pragma test_canonical_base_type(type H, "Result");  
+
+  -------------------------------------------------------
+
+  -- type use 2 level
+  type E2 := E;
+  type F2 := F;
+  type G2 := G;
+  type H2 := H;
+
+  pragma test_canonical_type(type E2, "T");
+  pragma test_canonical_type(type F2, "Integer");
+  pragma test_canonical_type(type G2, "C");
+  pragma test_canonical_type(type H2, "Result");
+
+  pragma test_canonical_base_type(type E2, "T");
+  pragma test_canonical_base_type(type F2, "Integer");
+  pragma test_canonical_base_type(type G2, "C");
+  pragma test_canonical_base_type(type H2, "Result"); 
+
+  -------------------------------------------------------
+
+  -- polymiorphic (generating)
+  type I := GEN[A];
+  type J := GEN[B];
+  type K := GEN[C];
+  type L := GEN[D];
+
+  pragma test_canonical_type(type I, "I");
+  pragma test_canonical_type(type J, "J");
+  pragma test_canonical_type(type K, "K");
+  pragma test_canonical_type(type L, "L");
+
+  pragma test_canonical_base_type(type I, "I");
+  pragma test_canonical_base_type(type J, "J");
+  pragma test_canonical_base_type(type K, "K");
+  pragma test_canonical_base_type(type L, "L");
+
+  -------------------------------------------------------
+
+  -- polymiorphic (generating) 1 level type use
+  type I1 := GEN[E];
+  type J1 := GEN[F];
+  type K1 := GEN[G];
+  type L1 := GEN[H];
+
+  pragma test_canonical_type(type I1, "I1");
+  pragma test_canonical_type(type J1, "J1");
+  pragma test_canonical_type(type K1, "K1");
+  pragma test_canonical_type(type L1, "L1");
+
+  pragma test_canonical_base_type(type I1, "I1");
+  pragma test_canonical_base_type(type J1, "J1");
+  pragma test_canonical_base_type(type K1, "K1");
+  pragma test_canonical_base_type(type L1, "L1");
+
+  -------------------------------------------------------
+
+  -- polymiorphic (generating) 2 level type use
+  type I2 := GEN[E2];
+  type J2 := GEN[F2];
+  type K2 := GEN[G2];
+  type L2 := GEN[H2];
+
+  pragma test_canonical_type(type I2, "I2");
+  pragma test_canonical_type(type J2, "J2");
+  pragma test_canonical_type(type K2, "K2");
+  pragma test_canonical_type(type L2, "L2");
+
+  pragma test_canonical_base_type(type I2, "I2");
+  pragma test_canonical_base_type(type J2, "J2");
+  pragma test_canonical_base_type(type K2, "K2");
+  pragma test_canonical_base_type(type L2, "L2");
+
+  -------------------------------------------------------
+
+  -- polymiorphic (non-generating)
+  type M := EXT[A];
+  type N := EXT[B];
+  type O := EXT[C];
+  type P := EXT[D];
+
+  pragma test_canonical_type(type M, "M");
+  pragma test_canonical_type(type N, "N");
+  pragma test_canonical_type(type O, "O");
+  pragma test_canonical_type(type P, "P");
+
+  pragma test_canonical_base_type(type M, "T");
+  pragma test_canonical_base_type(type N, "Integer");
+  pragma test_canonical_base_type(type O, "C");
+  pragma test_canonical_base_type(type P, "Result");
+
+  -------------------------------------------------------
+
+  -- polymiorphic (non-generating) 1 level type use
+  type M1 := EXT[E];
+  type N1 := EXT[F];
+  type O1 := EXT[G];
+  type P1 := EXT[H];
+
+  pragma test_canonical_type(type M1, "M1");
+  pragma test_canonical_type(type N1, "N1");
+  pragma test_canonical_type(type O1, "O1");
+  pragma test_canonical_type(type P1, "P1");
+
+  pragma test_canonical_base_type(type M1, "T");
+  pragma test_canonical_base_type(type N1, "Integer");
+  pragma test_canonical_base_type(type O1, "C");
+  pragma test_canonical_base_type(type P1, "Result");
+
+  -------------------------------------------------------
+
+  -- polymiorphic (non-generating) 2 level type use
+  type M2 := EXT[E2];
+  type N2 := EXT[F2];
+  type O2 := EXT[G2];
+  type P2 := EXT[H2];
+
+  pragma test_canonical_type(type M2, "M2");
+  pragma test_canonical_type(type N2, "N2");
+  pragma test_canonical_type(type O2, "O2");
+  pragma test_canonical_type(type P2, "P2");
+
+  pragma test_canonical_base_type(type M2, "T");
+  pragma test_canonical_base_type(type N2, "Integer");
+  pragma test_canonical_base_type(type O2, "C");
+  pragma test_canonical_base_type(type P2, "Result");
+
+  -------------------------------------------------------
+
+  -- type inst nested
+  type Q := GEN[T];
+  type R := EXT[T];
+
+  pragma test_canonical_type(type Q, "Q");
+  pragma test_canonical_type(type R, "R");
+
+  pragma test_canonical_base_type(type Q, "Q");
+  pragma test_canonical_base_type(type R, "T");
+
+  -------------------------------------------------------
+
+  -- type inst Q $ simple
+  type QA := Q$A;
+  type QB := Q$B;
+  type QC := Q$C;
+  type QD := Q$D;
+
+  pragma test_canonical_type(type QA, "T");
+  pragma test_canonical_type(type QB, "Integer");
+  pragma test_canonical_type(type QC, "Q$C");
+  pragma test_canonical_type(type QD, "Q");
+
+  pragma test_canonical_base_type(type QA, "T");
+  pragma test_canonical_base_type(type QB, "Integer");
+  pragma test_canonical_base_type(type QC, "Q$C");
+  pragma test_canonical_base_type(type QD, "Q");
+
+  -------------------------------------------------------
+
+  -- type inst R $ simple
+  type RA := R$A;
+  type RB := R$B;
+  type RC := R$C;
+  type RD := R$D;
+
+  pragma test_canonical_type(type RA, "T");
+  pragma test_canonical_type(type RB, "Integer");
+  pragma test_canonical_type(type RC, "R$C");
+  pragma test_canonical_type(type RD, "R");
+
+  pragma test_canonical_base_type(type RA, "T");
+  pragma test_canonical_base_type(type RB, "Integer");
+  pragma test_canonical_base_type(type RC, "R$C");
+  pragma test_canonical_base_type(type RD, "T");
+
+  -------------------------------------------------------
+
+  -- type inst Q $ type use 2 level
+  type QE2 := Q$E;
+  type QF2 := Q$F;
+  type QG2 := Q$G;
+  type QH2 := Q$H;
+
+  pragma test_canonical_type(type QE2, "T");
+  pragma test_canonical_type(type QF2, "Integer");
+  pragma test_canonical_type(type QG2, "Q$C");
+  pragma test_canonical_type(type QH2, "Q");
+
+  pragma test_canonical_base_type(type QE2, "T");
+  pragma test_canonical_base_type(type QF2, "Integer");
+  pragma test_canonical_base_type(type QG2, "Q$C");
+  pragma test_canonical_base_type(type QH2, "Q");
+
+  -------------------------------------------------------
+
+  -- type inst R $ type use 2 level
+  type RE2 := R$E2;
+  type RF2 := R$F2;
+  type RG2 := R$G2;
+  type RH2 := R$H2;
+
+  pragma test_canonical_type(type RE2, "T");
+  pragma test_canonical_type(type RF2, "Integer");
+  pragma test_canonical_type(type RG2, "R$C");
+  pragma test_canonical_type(type RH2, "R");
+
+  pragma test_canonical_base_type(type RE2, "T");
+  pragma test_canonical_base_type(type RF2, "Integer");
+  pragma test_canonical_base_type(type RG2, "R$C");
+  pragma test_canonical_base_type(type RH2, "T");
+
+  -------------------------------------------------------
+
+  -- type inst Q $ polymiorphic (generating) 2 level
+  type QI2 := Q$I2;
+  type QJ2 := Q$J2;
+  type QK2 := Q$K2;
+  type QL2 := Q$L2;
+
+  pragma test_canonical_type(type QI2, "Q$I2");
+  pragma test_canonical_type(type QJ2, "Q$J2");
+  pragma test_canonical_type(type QK2, "Q$K2");
+  pragma test_canonical_type(type QL2, "Q$L2");
+
+  pragma test_canonical_base_type(type QI2, "Q$I2");
+  pragma test_canonical_base_type(type QJ2, "Q$J2");
+  pragma test_canonical_base_type(type QK2, "Q$K2");
+  pragma test_canonical_base_type(type QL2, "Q$L2");
+
+  -------------------------------------------------------
+
+  -- -- type inst R $ polymiorphic (generating) 2 level
+  -- type RI2 := R$I2;
+  -- type RJ2 := R$J2;
+  -- type RK2 := R$K2;
+  -- type RL2 := R$L2;
+
+  -- -- type inst Q $ polymiorphic (non-generating) 2 level
+  -- type QM2 := Q$M2;
+  -- type QN2 := Q$N2;
+  -- type QO2 := Q$O2;
+  -- type QP2 := Q$P2;
+
+  -- -- type inst R $ polymiorphic (non-generating) 2 level
+  -- type RM2 := R$M2;
+  -- type RN2 := R$N2;
+  -- type RO2 := R$O2;
+  -- type RP2 := R$P2;  
 end;
 
 module EXT[T :: BASIC[]] extends T
 begin
-   type N := T;
-   type O := LIST[T];
-   type P;  -- fresh type
-   constructor con() : P;
-   function bf1(c1 : P; c2 : P) : Boolean := false;
-   function bf2(c1 : P; c2 : P) : Boolean := true;
-   function cf(c1 : P; c2 : P) : P := c1;
-   type Q := Result;
-   type R := MAKE_LATTICE[P](con(),bf1,bf2,cf,cf);
-   type S := Integer;
-   type Interesting := MAKE_LATTICE[Boolean](con(),bf1,bf2,cf,cf);
-   type A := B;
-   type B := C;
-   type C := Result;
+  -- simple (non-polymiorphic)
+  type A := T;
+  type B := Integer;
+  type C;
+  type D := Result;
 
-   type U := GEN[T]();
-   type V := U$E;
-   type W := U$X;
-   type X := U$A;
+  -- type use 1 level
+  type E := A;
+  type F := B;
+  type G := C;
+  type H := D;
 
-   -- type Z := U$Z$X;
-   
-   -- Use of B should be Result
-  type Test2 := function(c1 : C; c2 : T) : T;
+  -- type use 2 level
+  type E2 := E;
+  type F2 := F;
+  type G2 := G;
+  type H2 := H;
 
+  -- polymiorphic (generating)
+  type I := LIST[A];
+  type J := LIST[B];
+  type K := LIST[C];
+  type L := LIST[D];
 
-  type F1 := function(c1 : C; c2 : C) : C;
-  type F2 := function(c1 : X; c2 : C) : String;
-  type F3 := function(c1 : C; c2 : Q) : X;
-  type F4 := function(c1 : B; c2 : C) : C;
-  type F5 := function(c1 : T; c2 : Q) : Q;
+  -- polymiorphic (generating) 1 level type use
+  type I1 := LIST[E];
+  type J1 := LIST[F];
+  type K1 := LIST[G];
+  type L1 := LIST[H];
 
-  type iU := Integer;
-  type orU := OrLattice;
+  -- polymiorphic (generating) 2 level type use
+  type I2 := LIST[E2];
+  type J2 := LIST[F2];
+  type K2 := LIST[G2];
+  type L2 := LIST[H2];
+
+  -- polymiorphic (non-generating)
+  type M := EXT[A];
+  type N := EXT[B];
+  type O := EXT[C];
+  type P := EXT[D];
+
+  -- polymiorphic (non-generating) 1 level type use
+  type M1 := EXT[E];
+  type N1 := EXT[F];
+  type O1 := EXT[G];
+  type P1 := EXT[H];
+
+  -- polymiorphic (non-generating) 2 level type use
+  type M2 := EXT[E2];
+  type N2 := EXT[F2];
+  type O2 := EXT[G2];
+  type P2 := EXT[H2];
 end;
 
--- String
+-- type inst
 type G0 := GEN[String];
-type G1 := G0;
-type G2 := G0$D;
-type G3 := G1$D;
+type E0 := EXT[String];
 
--- String
-type H0 := GEN[String];
-type H1 := H0;
-type H2 := H0$D;
-type H3 := H1$D;
-type H4 := H1$H;
+pragma test_canonical_type(type G0, "G0");
+pragma test_canonical_type(type E0, "E0");
 
--- String
-type A0 := GEN[Integer];
-type A1 := A0;
-type A2 := A0$D;
-type A3 := A1$D;
-type A4 := A1$H;
+pragma test_canonical_base_type(type G0, "G0");
+pragma test_canonical_base_type(type E0, "String");
 
--- G0$C
-type I0 := G0$C;
-type I1 := G1$E;
+-------------------------------------------------------
 
--- H0$C
-type J0 := H0$C;
-type J1 := H1$E;
+-- G0 $ simple
+type G0A := G0$A;
+type G0B := G0$B;
+type G0C := G0$C;
+type G0D := G0$D;
 
--- G0$B
-type K0 := G0$B;
-type K1 := G1$B;
+pragma test_canonical_type(type G0A, "String");
+pragma test_canonical_type(type G0B, "Integer");
+pragma test_canonical_type(type G0C, "G0$C");
+pragma test_canonical_type(type G0D, "G0");
 
--- H0$B
-type L0 := H0$B;
-type L1 := H1$B;
+pragma test_canonical_base_type(type G0A, "String");
+pragma test_canonical_base_type(type G0B, "Integer");
+pragma test_canonical_base_type(type G0C, "G0$C");
+pragma test_canonical_base_type(type G0D, "G0");
 
--- EXT is not a generating modules because it extends an exsisting type but GEN creates new type
--- use of a string String
-type N0 := EXT[String];
-type N1 := EXT[String];
-type N2 := String;
-type N3 := N1$N;
-type N4 := N0$Q;
-type N5 := N0$W;
-type N6 := N1$U;
+-------------------------------------------------------
 
--- Integer
-type O0 := EXT[Integer];
-type O1 := G0$F;
-type O2 := H0$F;
-type O3 := N1$S;
--- type O4 := O0$Result;
-type O5 := O0$Q;
-type O6 := Integer;
-type O7 := O0$C;
+-- E0 $ simple
+type E0A := E0$A;
+type E0B := E0$B;
+type E0C := E0$C;
+type E0D := E0$D;
 
--- N0$P
-type P0 := N0$P;
-type P1 := N0$R;
+pragma test_canonical_type(type E0A, "String");
+pragma test_canonical_type(type E0B, "Integer");
+pragma test_canonical_type(type E0C, "E0$C");
+pragma test_canonical_type(type E0D, "E0");
 
-type P2 := N0$Interesting;
+pragma test_canonical_base_type(type E0A, "String");
+pragma test_canonical_base_type(type E0B, "Integer");
+pragma test_canonical_base_type(type E0C, "E0$C");
+pragma test_canonical_base_type(type E0D, "String");
 
--- I think that Q0 is supposed to be different than P0:
--- N0 and N1 has the base types but different types
--- N1$P 
-type Q0 := N1$P;
-type Q1 := N1$R;
+-------------------------------------------------------
 
--- O0$P
-type R0 := O0$P;
-type R1 := O0$R;
+-- G0 $ type use 1 level
+type G0E := G0$E;
+type G0F := G0$F;
+type G0G := G0$G;
+type G0H := G0$H;
 
--- N1$O
-type S0 := N1$O;
+pragma test_canonical_type(type G0E, "String");
+pragma test_canonical_type(type G0F, "Integer");
+pragma test_canonical_type(type G0G, "G0$C");
+pragma test_canonical_type(type G0H, "G0");
 
--- N0$O
-type T0 := N0$O;
+pragma test_canonical_base_type(type G0E, "String");
+pragma test_canonical_base_type(type G0F, "Integer");
+pragma test_canonical_base_type(type G0G, "G0$C");
+pragma test_canonical_base_type(type G0H, "G0");
 
--- Use of U0
-type U0 := private Integer;
+-------------------------------------------------------
 
-type G0F1 := G0$F1; -- (C,C)=>C
-type G0F2 := G0$F2; -- (String,String)=>String
-type G0F3 := G0$F3; -- (String,String)=>String
-type G0F4 := G0$F4; -- (B,C)=>B
-type G0F5 := G0$F5; -- (String,Integer)=>G0
-type G0F6 := G0$F6; -- (Integer,Integer)=>G0
-type G0F7 := G0$F7; -- (Integer,Integer)=>Integer
+-- E0 $ type use 1 level
+type E0E := E0$E;
+type E0F := E0$F;
+type E0G := E0$G;
+type E0H := E0$H;
 
-type N0F1 := N0$F1; -- (String,String)=>String
-type N0F2 := N0$F2; -- (String,String)=>String
-type N0F3 := N0$F3; -- (String,String)=>String
-type N0F4 := N0$F4; -- (String,String)=>String
-type N0F5 := N0$F5; -- (String,String)=>String
+pragma test_canonical_type(type E0E, "String");
+pragma test_canonical_type(type E0F, "Integer");
+pragma test_canonical_type(type E0G, "E0$C");
+pragma test_canonical_type(type E0H, "E0");
 
-type iU := Integer;
-type orU := OrLattice;
+pragma test_canonical_base_type(type E0E, "String");
+pragma test_canonical_base_type(type E0F, "Integer");
+pragma test_canonical_base_type(type E0G, "E0$C");
+pragma test_canonical_base_type(type E0H, "String");
+
+-------------------------------------------------------
+
+-- G0 $ type use 2 level
+type G0E2 := G0$E2;
+type G0F2 := G0$F2;
+type G0G2 := G0$G2;
+type G0H2 := G0$H2;
+
+pragma test_canonical_type(type G0E2, "String");
+pragma test_canonical_type(type G0F2, "Integer");
+pragma test_canonical_type(type G0G2, "G0$C");
+pragma test_canonical_type(type G0H2, "G0");
+
+pragma test_canonical_base_type(type G0E2, "String");
+pragma test_canonical_base_type(type G0F2, "Integer");
+pragma test_canonical_base_type(type G0G2, "G0$C");
+pragma test_canonical_base_type(type G0H2, "G0");
+
+-------------------------------------------------------
+
+-- E0 $ type use 2 level
+type E0E2 := E0$E2;
+type E0F2 := E0$F2;
+type E0G2 := E0$G2;
+type E0H2 := E0$H2;
+
+pragma test_canonical_type(type E0E2, "String");
+pragma test_canonical_type(type E0F2, "Integer");
+pragma test_canonical_type(type E0G2, "E0$C");
+pragma test_canonical_type(type E0H2, "E0");
+
+pragma test_canonical_base_type(type E0E2, "String");
+pragma test_canonical_base_type(type E0F2, "Integer");
+pragma test_canonical_base_type(type E0G2, "E0$C");
+pragma test_canonical_base_type(type E0H2, "String");
+
+-------------------------------------------------------
+
+-- G0 $ polymiorphic (generating) 2 level type use
+type G0I2 := G0$I2;
+type G0J2 := G0$J2;
+type G0K2 := G0$K2;
+type G0L2 := G0$L2;
+
+pragma test_canonical_type(type G0I2, "G0$I2");
+pragma test_canonical_type(type G0J2, "G0$J2");
+pragma test_canonical_type(type G0K2, "G0$K2");
+pragma test_canonical_type(type G0L2, "G0$L2");
+
+pragma test_canonical_base_type(type G0I2, "G0$I2");
+pragma test_canonical_base_type(type G0J2, "G0$J2");
+pragma test_canonical_base_type(type G0K2, "G0$K2");
+pragma test_canonical_base_type(type G0L2, "G0$L2");
+
+-------------------------------------------------------
+
+-- E0 $ polymiorphic (generating) 2 level type use
+type E0I2 := E0$I2;
+type E0J2 := E0$J2;
+type E0K2 := E0$K2;
+type E0L2 := E0$L2;
+
+pragma test_canonical_type(type E0I2, "E0$I2");
+pragma test_canonical_type(type E0J2, "E0$J2");
+pragma test_canonical_type(type E0K2, "E0$K2");
+pragma test_canonical_type(type E0L2, "E0$L2");
+
+pragma test_canonical_base_type(type E0I2, "E0$I2");
+pragma test_canonical_base_type(type E0J2, "E0$J2");
+pragma test_canonical_base_type(type E0K2, "E0$K2");
+pragma test_canonical_base_type(type E0L2, "E0$L2");
+
+-------------------------------------------------------
+
+-- G0 $ polymiorphic (non-generating) 2 level type use
+type G0M2 := G0$M2;
+type G0N2 := G0$N2;
+type G0O2 := G0$O2;
+type G0P2 := G0$P2;
+
+pragma test_canonical_type(type G0M2, "G0$M2");
+pragma test_canonical_type(type G0N2, "G0$N2");
+pragma test_canonical_type(type G0O2, "G0$O2");
+pragma test_canonical_type(type G0P2, "G0$P2");
+
+pragma test_canonical_base_type(type G0M2, "String");
+pragma test_canonical_base_type(type G0N2, "Integer");
+pragma test_canonical_base_type(type G0O2, "G0$C");
+pragma test_canonical_base_type(type G0P2, "G0");
+
+-------------------------------------------------------
+
+-- E0 $ polymiorphic (non-generating) 2 level type use
+type E0M2 := E0$M2;
+type E0N2 := E0$N2;
+type E0O2 := E0$O2;
+type E0P2 := E0$P2;
+
+pragma test_canonical_type(type E0M2, "E0$M2");
+pragma test_canonical_type(type E0N2, "E0$N2");
+pragma test_canonical_type(type E0O2, "E0$O2");
+pragma test_canonical_type(type E0P2, "E0$P2");
+
+pragma test_canonical_base_type(type E0M2, "String");
+pragma test_canonical_base_type(type E0N2, "Integer");
+pragma test_canonical_base_type(type E0O2, "E0$C");
+pragma test_canonical_base_type(type E0P2, "String");

@@ -3,6 +3,7 @@
 #include <string.h>
 #include "jbb-alloc.h"
 #include "aps-ag.h"
+#include <ctype.h>
 
 int type_debug = FALSE;
 
@@ -365,6 +366,128 @@ static void init_types() {
   error_type = Boolean_Type;
 }
 
+static char* clean_string_const_token(char* p) {
+  p++;
+  p[strlen(p)-1] = 0;
+  return p;
+}
+
+static void* print_base_types(void* ignore, void*node) {
+  int SIZE = 100;
+  Symbol symb_test_canonical_type = intern_symbol("test_canonical_type");
+  Symbol symb_test_canonical_base_type = intern_symbol("test_canonical_base_type");
+
+  switch (ABSTRACT_APS_tnode_phylum(node))
+  {
+  case KEYDeclaration:
+  {
+    Declaration decl = (Declaration) node;
+    switch (Declaration_KEY(decl))
+    {
+    case KEYpragma_call:
+    {
+      if (symb_test_canonical_type == pragma_call_name(decl)) {
+        Expressions exprs = pragma_call_parameters(decl);
+        Expression type_expr = first_Expression(exprs);
+        Expression result_expr = Expression_info(type_expr)->next_expr;
+
+        Type type = type_value_T(type_expr);
+        String expected = string_const_token(result_expr);
+
+        char buffer1[SIZE];
+        FILE* f = fmemopen(buffer1, sizeof(buffer1), "w");
+        print_canonical_type(canonical_type(type), f);
+        fclose(f);
+
+        char buffer2[SIZE];
+        sprintf(buffer2, "%s", expected);
+
+        char buffer3[SIZE];
+        FILE* f2 = fmemopen(buffer3, sizeof(buffer3), "w");
+        print_Type(type, f2);
+        fclose(f2);
+
+        char* expected_cleaned = clean_string_const_token(&buffer2);
+        
+        if (strcmp(buffer1, expected_cleaned) != 0) {
+          aps_error(type,"Failed: canonical type %s:%d  expected `%s` but got `%s`", buffer3, tnode_line_number(type), expected_cleaned, buffer1);
+          print_canonical_type(canonical_type(type), stdout);
+          printf("\n");
+          canonical_type(type);
+        }
+      } else if (symb_test_canonical_base_type == pragma_call_name(decl)) {
+        Expressions exprs = pragma_call_parameters(decl);
+        Expression type_expr = first_Expression(exprs);
+        Expression result_expr = Expression_info(type_expr)->next_expr;
+
+        Type type = type_value_T(type_expr);
+        String expected = string_const_token(result_expr);
+
+        char buffer1[SIZE];
+        FILE* f = fmemopen(buffer1, sizeof(buffer1), "w");
+        print_canonical_type(canonical_type_base_type(canonical_type(type)), f);
+        fclose(f);
+
+        char buffer2[SIZE];
+        sprintf(buffer2, "%s", expected);
+
+        char buffer3[SIZE];
+        FILE* f2 = fmemopen(buffer3, sizeof(buffer3), "w");
+        print_Type(type, f2);
+        fclose(f2);
+
+        char* expected_cleaned = clean_string_const_token(&buffer2);
+
+        if (strcmp(buffer1, expected_cleaned) != 0) {
+          aps_error(type,"Failed: canonical base type %s:%d expected `%s` but got `%s`", buffer3, tnode_line_number(type), expected_cleaned, buffer1);
+          print_canonical_type(canonical_type(type), stdout);
+          printf("\n");
+          canonical_type_base_type(canonical_type(type));
+        }
+      }
+      break;
+    }
+    // case KEYtype_decl:
+    //   {
+    //     Type t = type_decl_type(decl);
+
+    //     if (Type_KEY(t) == KEYtype_use) 
+    //     {
+    //       char* name = symbol_name(def_name(type_decl_def(decl)));
+    //       if (true) {
+    //         printf("decl: %s\n", decl_name(decl));
+    //         printf("Line number: %d\n", tnode_line_number(node));
+
+    //         if (tnode_line_number(node) == 405) {
+    //           printf("here");
+    //         }
+
+    //         // printf("%s\n", name);
+    //         printf("Type:      ");
+    //         print_Type(t, stdout);
+    //         printf("\n");
+    //         printf("Base Type old: ");
+    //         print_Type(base_type(t), stdout);
+    //         printf("\nCanonical Type: ");
+    //         print_canonical_type(canonical_type(t), stdout);
+
+    //         printf("\nCanonical Base Type: ");
+    //         print_canonical_type(canonical_type_base_type(canonical_type(t)), stdout);
+    //         printf("\n\n");
+    //       }
+    //     }
+    //     return NULL;
+    //   }
+    default:
+      break;
+    }
+  }
+  default:
+    break;
+  }
+  return node;
+}
+
 
 void type_Program(Program p)
 {
@@ -388,6 +511,8 @@ void type_Program(Program p)
   if (type_debug) printf("Type checking code in \"%s.aps\"\n",aps_yyfilename);
   traverse_Program(do_typechecking,p,p);
   aps_yyfilename = saved_filename;
+
+  traverse_Program(print_base_types,p,p);
 }
 
 Type infer_expr_type(Expression e)
