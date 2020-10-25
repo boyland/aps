@@ -264,23 +264,58 @@ begin
 
   -------------------------------------------------------
 
-  -- -- type inst R $ polymiorphic (generating) 2 level
-  -- type RI2 := R$I2;
-  -- type RJ2 := R$J2;
-  -- type RK2 := R$K2;
-  -- type RL2 := R$L2;
+  -- type inst R $ polymiorphic (generating) 2 level
+  type RI2 := R$I2;
+  type RJ2 := R$J2;
+  type RK2 := R$K2;
+  type RL2 := R$L2;
 
-  -- -- type inst Q $ polymiorphic (non-generating) 2 level
-  -- type QM2 := Q$M2;
-  -- type QN2 := Q$N2;
-  -- type QO2 := Q$O2;
-  -- type QP2 := Q$P2;
+  pragma test_canonical_type(type RI2, "R$I2");
+  pragma test_canonical_type(type RJ2, "R$J2");
+  pragma test_canonical_type(type RK2, "R$K2");
+  pragma test_canonical_type(type RL2, "R$L2");
 
-  -- -- type inst R $ polymiorphic (non-generating) 2 level
-  -- type RM2 := R$M2;
-  -- type RN2 := R$N2;
-  -- type RO2 := R$O2;
-  -- type RP2 := R$P2;  
+  pragma test_canonical_base_type(type RI2, "R$I2");
+  pragma test_canonical_base_type(type RJ2, "R$J2");
+  pragma test_canonical_base_type(type RK2, "R$K2");
+  pragma test_canonical_base_type(type RL2, "R$L2");
+
+  -------------------------------------------------------
+
+  -- type inst Q $ polymiorphic (non-generating) 2 level
+  type QM2 := Q$M2;
+  type QN2 := Q$N2;
+  type QO2 := Q$O2;
+  type QP2 := Q$P2;
+
+  pragma test_canonical_type(type QM2, "Q$M2");
+  pragma test_canonical_type(type QN2, "Q$N2");
+  pragma test_canonical_type(type QO2, "Q$O2");
+  pragma test_canonical_type(type QP2, "Q$P2");
+
+  pragma test_canonical_base_type(type QM2, "T");
+  pragma test_canonical_base_type(type QN2, "Integer");
+  pragma test_canonical_base_type(type QO2, "Q$C");
+  pragma test_canonical_base_type(type QP2, "Q");  
+
+  -------------------------------------------------------
+
+  -- type inst R $ polymiorphic (non-generating) 2 level
+  type RM2 := R$M2;
+  type RN2 := R$N2;
+  type RO2 := R$O2;
+  type RP2 := R$P2;
+
+  pragma test_canonical_type(type RM2, "R$M2");
+  pragma test_canonical_type(type RN2, "R$N2");
+  pragma test_canonical_type(type RO2, "R$O2");
+  pragma test_canonical_type(type RP2, "R$P2");
+
+  pragma test_canonical_base_type(type RM2, "T");
+  pragma test_canonical_base_type(type RN2, "Integer");
+  pragma test_canonical_base_type(type RO2, "R$C");
+  pragma test_canonical_base_type(type RP2, "T");
+
 end;
 
 module EXT[T :: BASIC[]] extends T
@@ -529,3 +564,21 @@ pragma test_canonical_base_type(type E0M2, "String");
 pragma test_canonical_base_type(type E0N2, "Integer");
 pragma test_canonical_base_type(type E0O2, "E0$C");
 pragma test_canonical_base_type(type E0P2, "String");
+
+-------------------------------------------------------
+
+-- G0 $ polymiorphic (non-generating) 2 level type use
+type G0M2M2 := G0$M2$M2;
+type G0N2N2 := G0$N2$N2;
+type G0O2O2 := G0$O2$O2;
+type G0P2P2 := G0$P2$P2;
+
+pragma test_canonical_type(type G0M2M2, "G0$M2$M2");
+pragma test_canonical_type(type G0N2N2, "G0$N2$N2");
+pragma test_canonical_type(type G0O2O2, "G0$O2$O2");
+pragma test_canonical_type(type G0P2P2, "G0$P2$P2");
+
+pragma test_canonical_base_type(type G0M2M2, "String");
+pragma test_canonical_base_type(type G0N2N2, "Integer");
+pragma test_canonical_base_type(type G0O2O2, "G0$O2$C");
+pragma test_canonical_base_type(type G0P2P2, "G0");
