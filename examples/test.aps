@@ -339,22 +339,22 @@ begin
   type H2 := H;
 
   -- polymiorphic (generating)
-  type I := LIST[A];
-  type J := LIST[B];
-  type K := LIST[C];
-  type L := LIST[D];
+  type I := GEN[A];
+  type J := GEN[B];
+  type K := GEN[C];
+  type L := GEN[D];
 
   -- polymiorphic (generating) 1 level type use
-  type I1 := LIST[E];
-  type J1 := LIST[F];
-  type K1 := LIST[G];
-  type L1 := LIST[H];
+  type I1 := GEN[E];
+  type J1 := GEN[F];
+  type K1 := GEN[G];
+  type L1 := GEN[H];
 
   -- polymiorphic (generating) 2 level type use
-  type I2 := LIST[E2];
-  type J2 := LIST[F2];
-  type K2 := LIST[G2];
-  type L2 := LIST[H2];
+  type I2 := GEN[E2];
+  type J2 := GEN[F2];
+  type K2 := GEN[G2];
+  type L2 := GEN[H2];
 
   -- polymiorphic (non-generating)
   type M := EXT[A];
@@ -567,7 +567,7 @@ pragma test_canonical_base_type(type E0P2, "String");
 
 -------------------------------------------------------
 
--- G0 $ polymiorphic (non-generating) 2 level type use
+-- G0 $ polymiorphic (non-generating) 2 level type use $ polymiorphic (non-generating) 2 level type use
 type G0M2M2 := G0$M2$M2;
 type G0N2N2 := G0$N2$N2;
 type G0O2O2 := G0$O2$O2;
@@ -582,3 +582,57 @@ pragma test_canonical_base_type(type G0M2M2, "String");
 pragma test_canonical_base_type(type G0N2N2, "Integer");
 pragma test_canonical_base_type(type G0O2O2, "G0$O2$C");
 pragma test_canonical_base_type(type G0P2P2, "G0");
+
+-------------------------------------------------------
+
+-- E0 $ polymiorphic (non-generating) 2 level type use $ polymiorphic (non-generating) 2 level type use
+type E0M2M2 := E0$M2$M2;
+type E0N2N2 := E0$N2$N2;
+type E0O2O2 := E0$O2$O2;
+type E0P2P2 := E0$P2$P2;
+
+pragma test_canonical_type(type E0M2M2, "E0$M2$M2");
+pragma test_canonical_type(type E0N2N2, "E0$N2$N2");
+pragma test_canonical_type(type E0O2O2, "E0$O2$O2");
+pragma test_canonical_type(type E0P2P2, "E0$P2$P2");
+
+pragma test_canonical_base_type(type E0M2M2, "String");
+pragma test_canonical_base_type(type E0N2N2, "Integer");
+pragma test_canonical_base_type(type E0O2O2, "E0$O2$C");
+pragma test_canonical_base_type(type E0P2P2, "String");
+
+-------------------------------------------------------
+
+-- G0 $ polymiorphic (generating) 2 level type use $ polymiorphic (generating) 2 level type use
+type G0I2I2 := G0$I2$I2;
+type G0J2J2 := G0$J2$J2;
+type G0K2K2 := G0$K2$K2;
+type G0L2L2 := G0$L2$L2;
+
+pragma test_canonical_type(type G0I2I2, "G0$I2$I2");
+pragma test_canonical_type(type G0J2J2, "G0$J2$J2");
+pragma test_canonical_type(type G0K2K2, "G0$K2$K2");
+pragma test_canonical_type(type G0L2L2, "G0$L2$L2");
+
+pragma test_canonical_base_type(type G0I2I2, "G0$I2$I2");
+pragma test_canonical_base_type(type G0J2J2, "G0$J2$J2");
+pragma test_canonical_base_type(type G0K2K2, "G0$K2$K2");
+pragma test_canonical_base_type(type G0L2L2, "G0$L2$L2");
+
+-------------------------------------------------------
+
+-- E0 $ polymiorphic (generating) 2 level type use $ polymiorphic (generating) 2 level type use
+type E0I2I2 := E0$I2$I2;
+type E0J2J2 := E0$J2$J2;
+type E0K2K2 := E0$K2$K2;
+type E0L2L2 := E0$L2$L2;
+
+pragma test_canonical_type(type E0I2I2, "E0$I2$I2");
+pragma test_canonical_type(type E0J2J2, "E0$J2$J2");
+pragma test_canonical_type(type E0K2K2, "E0$K2$K2");
+pragma test_canonical_type(type E0L2L2, "E0$L2$L2");
+
+pragma test_canonical_base_type(type E0I2I2, "E0$I2$I2");
+pragma test_canonical_base_type(type E0J2J2, "E0$J2$J2");
+pragma test_canonical_base_type(type E0K2K2, "E0$K2$K2");
+pragma test_canonical_base_type(type E0L2L2, "E0$L2$L2");

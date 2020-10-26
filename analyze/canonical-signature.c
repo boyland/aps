@@ -11,7 +11,7 @@ int hash_class(Class cl);
  * @param types
  * @return combined hash 
  */
-int hash_canonical_types(int count, CanonicalType* types)
+int hash_canonical_types(int count, CanonicalType *types)
 {
   int h = 0;
   int i;
@@ -23,6 +23,9 @@ int hash_canonical_types(int count, CanonicalType* types)
   return h;
 }
 
+/**
+ * Hash type
+ */
 int hash_type(Type t)
 {
   if (t == 0)
@@ -44,7 +47,7 @@ int hash_type(Type t)
     Declarations fs = function_type_formals(t);
     Declarations rs = function_type_return_values(t);
     Declaration a, r;
-    int started = FALSE;
+    int started = false;
     for (a = first_Declaration(fs); a; a = DECL_NEXT(a))
     {
       h = hash_mix(h, hash_string(decl_name(a)));
@@ -151,7 +154,7 @@ bool inferred_signature_equal(void *untyped1, void *untyped2)
   int i;
   for (i = 0; i < inferred_sig1->num_actuals; i++)
   {
-    result &= canonical_type_equal(&inferred_sig1->actuals[i], &inferred_sig2->actuals[i]);
+    result &= (&inferred_sig1->actuals[i] == &inferred_sig2->actuals[i]);
   }
 
   return inferred_sig1->is_input == inferred_sig2->is_input && inferred_sig1->is_var == inferred_sig2->is_var && inferred_sig1->_class == inferred_sig2->_class;
