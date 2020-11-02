@@ -2,7 +2,6 @@
 #include "aps-ag.h"
 #include "jbb-alloc.h"
 
-int hash_use(Use u);
 int hash_class(Class cl);
 
 /**
@@ -24,102 +23,13 @@ int hash_canonical_types(int count, CanonicalType *types)
 }
 
 /**
- * Hash type
- */
-int hash_type(Type t)
-{
-  if (t == 0)
-  {
-    return 0;
-  }
-  switch (Type_KEY(t))
-  {
-  case KEYtype_use:
-    return hash_use(type_use_use(t));
-  case KEYprivate_type:
-    return hash_mix(hash_string("private"), hash_type(private_type_rep(t)));
-  case KEYremote_type:
-    return hash_mix(hash_string("remote"), hash_type(remote_type_nodetype(t)));
-  case KEYfunction_type:
-  {
-    unsigned long h = hash_string("function");
-
-    Declarations fs = function_type_formals(t);
-    Declarations rs = function_type_return_values(t);
-    Declaration a, r;
-    int started = false;
-    for (a = first_Declaration(fs); a; a = DECL_NEXT(a))
-    {
-      h = hash_mix(h, hash_string(decl_name(a)));
-    }
-
-    for (r = first_Declaration(rs); r; r = DECL_NEXT(r))
-    {
-      h = hash_mix(h, hash_string(decl_name(r)));
-    }
-
-    return h;
-  }
-  case KEYtype_inst:
-  {
-    unsigned long h = hash_use(module_use_use(type_inst_module(t)));
-
-    TypeActuals as = type_inst_type_actuals(t);
-    Type a;
-    for (a = first_TypeActual(as); a; a = TYPE_NEXT(a))
-    {
-      h = hash_mix(h, hash_type(a));
-    }
-    return h;
-  }
-  case KEYno_type:
-    return hash_string("<notype>");
-    break;
-  default:
-    return 0x1ffffffffu;
-  }
-}
-
-/**
- * Hashes Use
- * @param u
- * @return hash value
- */
-int hash_use(Use u)
-{
-  if (u == 0)
-  {
-    return 0;
-  }
-  switch (Use_KEY(u))
-  {
-  case KEYuse:
-    return hash_string(symbol_name(use_name(u)));
-  case KEYqual_use:
-    return hash_mix(hash_type(qual_use_from(u)), hash_string(symbol_name(qual_use_name(u))));
-  default:
-    return 0x1ffffffffu;
-  }
-}
-
-/**
  * Hashes Class
  * @param cl
  * @return hash value
  */
 int hash_class(Class cl)
 {
-  if (cl == 0)
-  {
-    return 0;
-  }
-  switch (Class_KEY(cl))
-  {
-  case KEYclass_use:
-    return hash_use(class_use_use(cl));
-  default:
-    return 0x1ffffffffu;
-  }
+  return (int)cl;
 }
 
 /**
@@ -127,9 +37,9 @@ int hash_class(Class cl)
  * @param untyped InferredSignature
  * @return hash value
  */
-int inferred_signature_hash(void *untyped)
+int canonical_signature_hash(void *untyped)
 {
-  struct InferredSignature_t *inferred_sig = (struct InferredSignature_t *)untyped;
+  struct CanonicalSignature_type *inferred_sig = (struct CanonicalSignature_type *)untyped;
 
   return hash_mix((int)inferred_sig->is_input, hash_mix((int)inferred_sig->is_var, hash_mix(hash_class(inferred_sig->_class), hash_canonical_types(inferred_sig->num_actuals, inferred_sig->actuals))));
 }
@@ -140,10 +50,10 @@ int inferred_signature_hash(void *untyped)
  * @param untyped2 untyped CanonicalType
  * @return boolean indicating the result of equality
  */
-bool inferred_signature_equal(void *untyped1, void *untyped2)
+bool canonical_signature_equal(void *untyped1, void *untyped2)
 {
-  struct InferredSignature_t *inferred_sig1 = (struct InferredSignature_t *)untyped1;
-  struct InferredSignature_t *inferred_sig2 = (struct InferredSignature_t *)untyped2;
+  struct CanonicalSignature_type *inferred_sig1 = (struct CanonicalSignature_type *)untyped1;
+  struct CanonicalSignature_type *inferred_sig2 = (struct CanonicalSignature_type *)untyped2;
 
   if (inferred_sig1->num_actuals != inferred_sig2->num_actuals)
   {
@@ -160,9 +70,13 @@ bool inferred_signature_equal(void *untyped1, void *untyped2)
   return inferred_sig1->is_input == inferred_sig2->is_input && inferred_sig1->is_var == inferred_sig2->is_var && inferred_sig1->_class == inferred_sig2->_class;
 }
 
-static struct hash_cons_table *canonical_signature_table = {inferred_signature_hash, inferred_signature_equal};
+static struct hash_cons_table *canonical_signature_table = {canonical_signature_hash, canonical_signature_equal};
 
-InferredSignature inferred_sig(bool is_input, bool is_var, Class class, int num_actuals, CanonicalType *actuals)
+/**
+ * TODO: actuals needs to be canonical base types
+ * LIST of integer should signature of LIST of integer lattice
+ */
+CanonicalSignature *new_canonical_signature(bool is_input, bool is_var, Class class, int num_actuals, CanonicalType *actuals)
 {
   int long_key =
       hash_mix((int)is_input,
@@ -170,11 +84,11 @@ InferredSignature inferred_sig(bool is_input, bool is_var, Class class, int num_
                         hash_mix(hash_class(class),
                                  hash_mix(num_actuals, hash_canonical_types(num_actuals, actuals)))));
 
-  size_t struct_size = sizeof(struct InferredSignature_t) + num_actuals * (sizeof(CanonicalType *));
+  size_t struct_size = sizeof(struct CanonicalSignature_type) + num_actuals * (sizeof(CanonicalType *));
 
-  struct InferredSignature_t *result = (struct InferredSignature_t *)alloca(struct_size);
+  struct CanonicalSignature_type *result = (struct CanonicalSignature_type *)alloca(struct_size);
 
-  result = (InferredSignature)HALLOC(sizeof(struct InferredSignature_t));
+  result = (CanonicalSignature *)alloca(sizeof(struct CanonicalSignature_type));
   result->is_input = is_input;
   result->is_var = is_var;
   result->_class = class;
@@ -183,9 +97,85 @@ InferredSignature inferred_sig(bool is_input, bool is_var, Class class, int num_
   int i;
   for (i = 0; i < num_actuals; i++)
   {
-    result->actuals[i] = actuals[i];
+    *result->actuals[i] = (actuals[i]);
   }
 
   void *memory = hash_cons_get(&result, struct_size, &canonical_signature_table);
-  return (InferredSignature *)memory;
+  return (CanonicalSignature *)memory;
+}
+
+/**
+ * Returns a single canonical signature set
+ * @param cSig canonical signature
+ * @return canonical signature set 
+ */
+static CanonicalSignatureSet *new_canonical_signature_set(CanonicalSignature *cSig)
+{
+  size_t my_size = sizeof(struct canonicalSignatureSet_type) + 1 * (sizeof(CanonicalSignature *));
+
+  struct canonicalSignatureSet_type *result = (struct canonicalSignatureSet_type *)malloc(my_size);
+
+  result->size = 1;
+  result->members[0] = cSig;
+
+  return result;
+}
+
+// Total order that is only returns tree for things that are equal
+static int canonical_signature_compare(CanonicalSignature *sig1, CanonicalSignature *sig2)
+{
+  int h1 = hash_canonical_signature(sig1);
+  int h2 = hash_canonical_signature(sig2);
+
+  return h1 == h2 ? 0 : (h1 < h2 ? -1 : 1);
+}
+
+/**
+ * Function that merges two sorted canonical signature lists
+ * @param set1 canonical signature list A
+ * @param set1 canonical signature list B
+ * @return resuling canonical signature result
+ */
+CanonicalSignatureSet *union_canonical_signature_set(CanonicalSignatureSet *set1, CanonicalSignatureSet *set2)
+{
+  if (set1 == EMPTY_CANONICAL_SIGNATURE_SET)
+  {
+    return set2;
+  }
+  else if (set2 == EMPTY_CANONICAL_SIGNATURE_SET)
+  {
+    return set1;
+  }
+  else
+  {
+    size_t my_size = sizeof(struct canonicalSignatureSet_type) + set1->size + set2->size * (sizeof(CanonicalSignature *));
+
+    struct canonicalSignatureSet_type *result = (struct canonicalSignatureSet_type *)malloc(my_size);
+
+    int i = 0,
+        j = 0, k = 0;
+    while (k++ < set1->size + set2->size)
+    {
+      switch (canonical_signature_compare(set1->members[i], set2->members[j]))
+      {
+      case 0:
+        result->members[k++] = set1->members[i++, j++];
+        break;
+      case -1:
+        result->members[k] = set1->members[i++];
+        result->size++;
+        break;
+      case 1:
+        result->members[k] = set1->members[j++];
+        result->size++;
+        break;
+      }
+    }
+
+    return result;
+  }
+}
+
+CanonicalSignatureSet *infer_canonical_signatures(CanonicalType *ctype)
+{
 }

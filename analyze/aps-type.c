@@ -423,6 +423,12 @@ static void* print_base_types(void* ignore, void*node) {
         Type type = type_value_T(type_expr);
         String expected = string_const_token(result_expr);
 
+        printf(">> %d\n", tnode_line_number(type));
+
+        if (tnode_line_number(type) == 190) {
+          printf("here!");
+        }
+
         char buffer1[SIZE];
         FILE* f = fmemopen(buffer1, sizeof(buffer1), "w");
         print_canonical_type(canonical_type_base_type(canonical_type(type)), f);
