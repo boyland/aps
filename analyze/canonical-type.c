@@ -197,7 +197,7 @@ static int count_declarations(Declarations declarations)
   switch (Declarations_KEY(declarations))
   {
   default:
-    fatal_error("count_type_actuals crashed");
+    fatal_error("count_declarations crashed");
   case KEYnil_Declarations:
     return 0;
   case KEYlist_Declarations:

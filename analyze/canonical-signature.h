@@ -1,7 +1,7 @@
 #ifndef CANONICAL_SIGNATURE_H
 #define CANONICAL_SIGNATURE_H
 
-#define EMPTY_CANONICAL_SIGNATURE_SET NULL
+#define EMPTY_CANONICAL_SIGNATURE_SET (CanonicalSignature *) { 0, NULL }
 
 struct CanonicalSignature_type
 {
@@ -14,15 +14,19 @@ struct CanonicalSignature_type
 
 typedef struct CanonicalSignature_type CanonicalSignature;
 
-// Immutable Set with total ordering property
-struct canonicalSignatureSet_type
+struct CanonicalSignatureSet_type
 {
   int size;
   CanonicalSignature *members[]; /* MUST be sorted because otherwise it won't be unique*/
 };
 
-typedef struct canonicalSignatureSet_type CanonicalSignatureSet;
+typedef struct CanonicalSignatureSet_type CanonicalSignatureSet;
 
+/**
+ * Should accumulate the signatures in a restrictive way not additive mannger
+ * @param ctype canonical type
+ * @return canonical signature set
+ */
 CanonicalSignatureSet *infer_canonical_signatures(CanonicalType *ctype);
 
 #endif

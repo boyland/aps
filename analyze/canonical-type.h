@@ -27,6 +27,15 @@ struct Canonical_use {
     Declaration decl;
 };
 
+// Immutable Set with total ordering property
+struct CanonicalTypeSet_type
+{
+  int size;
+  CanonicalType *members[];
+};
+
+typedef struct CanonicalTypeSet_type CanonicalTypeSet;
+
 CanonicalType* canonical_type(Type ty);
 
 CanonicalType *canonical_type_base_type(CanonicalType *canonicalType);
