@@ -1,8 +1,6 @@
 #ifndef CANONICAL_SIGNATURE_H
 #define CANONICAL_SIGNATURE_H
 
-#define EMPTY_CANONICAL_SIGNATURE_SET (CanonicalSignature *) { 0, NULL }
-
 struct CanonicalSignature_type
 {
   bool is_input;
