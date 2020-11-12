@@ -5,7 +5,7 @@ struct CanonicalSignature_type
 {
   bool is_input;
   bool is_var;
-  Class _class;
+  Declaration source_class;
   int num_actuals;
   CanonicalType *actuals[];
 };
@@ -15,7 +15,7 @@ typedef struct CanonicalSignature_type CanonicalSignature;
 struct CanonicalSignatureSet_type
 {
   int size;
-  CanonicalSignature *members[]; /* MUST be sorted because otherwise it won't be unique*/
+  CanonicalSignature *members[]; /* MUST be sorted because otherwise it won't be unique */
 };
 
 typedef struct CanonicalSignatureSet_type CanonicalSignatureSet;
@@ -26,5 +26,12 @@ typedef struct CanonicalSignatureSet_type CanonicalSignatureSet;
  * @return canonical signature set
  */
 CanonicalSignatureSet *infer_canonical_signatures(CanonicalType *ctype);
+
+/**
+ * Initializes the necessary stuff needed to find the canonical signatures
+ * @param module_PHYLUM
+ * @param type_PHYLUM
+ */
+void initialize_canonical_signature(Declaration module_PHYLUM, Declaration type_PHYLUM);
 
 #endif

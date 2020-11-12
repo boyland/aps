@@ -11,7 +11,7 @@
  * @param isBaseType flag indicating if we are resolving base type
  * @return resuling canonical base type
  */
-static CanonicalType *canonical_type_join(CanonicalType *ctypeOuter, CanonicalType *ctypeInner, bool isBaseType);
+CanonicalType *canonical_type_join(CanonicalType *ctypeOuter, CanonicalType *ctypeInner, bool isBaseType);
 
 /**
  * Hash CanonicalType
@@ -941,7 +941,7 @@ static CanonicalType *canonical_type_qual_qual_join(struct Canonical_qual_type *
  * @param isBaseType true means base type requested, false is the opposite
  * @return resuling canonical base type
  */
-static CanonicalType *canonical_type_join(CanonicalType *ctypeOuter, CanonicalType *ctypeInner, bool isBaseType)
+CanonicalType *canonical_type_join(CanonicalType *ctypeOuter, CanonicalType *ctypeInner, bool isBaseType)
 {
   switch (ctypeOuter->key)
   {

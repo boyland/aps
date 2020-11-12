@@ -4,13 +4,17 @@
 #include "aps-ag.h"
 #include "jbb-alloc.h"
 
-int hash_class(Class cl);
+int hash_source_class(Declaration cl);
 
 static CanonicalSignatureSet *from_sig(Signature sig);
 static CanonicalSignatureSet *union_canonical_signature_set(CanonicalSignatureSet *set1, CanonicalSignatureSet *set2);
 static CanonicalSignatureSet *new_canonical_signature_set(CanonicalSignature *cSig);
+static CanonicalSignatureSet *from_type(Type t);
 
-static struct CanonicalSignatureSet_type EMPTY_CANONICAL_SIGNATURE_SET = {0, NULL};
+static CanonicalSignatureSet *EMPTY_CANONICAL_SIGNATURE_SET;
+static Declaration module_PHYLUM;
+static Declaration type_PHYLUM;
+static bool initialized = false;
 
 void print_canonical_signature(void *untyped, FILE *f)
 {
@@ -26,7 +30,7 @@ void print_canonical_signature(void *untyped, FILE *f)
 
   struct CanonicalSignature_type *canonical_signature = (struct CanonicalSignature_type *)untyped;
 
-  print_Use(class_use_use(canonical_signature->_class), f);
+  fprintf(f, "%s", decl_name(canonical_signature->source_class));
   fputc('[', f);
 
   int started = false;
@@ -55,13 +59,13 @@ void print_canonical_signature_set(void *untyped, FILE *f)
   }
   if (untyped == 0)
   {
-    fprintf(f, "[]");
+    fprintf(f, "{ }");
     return;
   }
 
   struct CanonicalSignatureSet_type *canonical_signature_set = (struct CanonicalSignatureSet_type *)untyped;
 
-  fputc('[', f);
+  fprintf(f, "{ ");
 
   int started = false;
   int i;
@@ -69,7 +73,7 @@ void print_canonical_signature_set(void *untyped, FILE *f)
   {
     if (started)
     {
-      fputc(',', f);
+      fprintf(f, ", ");
     }
     else
     {
@@ -78,7 +82,7 @@ void print_canonical_signature_set(void *untyped, FILE *f)
     print_canonical_signature(canonical_signature_set->members[i], f);
   }
 
-  fputc(']', f);
+  fprintf(f, " }");
 }
 
 /**
@@ -87,13 +91,13 @@ void print_canonical_signature_set(void *untyped, FILE *f)
  * @param types
  * @return combined hash 
  */
-int hash_canonical_types(int count, CanonicalType *types)
+int hash_canonical_types(int count, CanonicalType **types)
 {
   int h = 0;
   int i;
   for (i = 0; i < count; i++)
   {
-    h = hash_mix(h, canonical_type_hash(&types[i]));
+    h = hash_mix(h, canonical_type_hash(types[i]));
   }
 
   return h;
@@ -104,7 +108,7 @@ int hash_canonical_types(int count, CanonicalType *types)
  * @param cl
  * @return hash value
  */
-int hash_class(Class cl)
+int hash_source_class(Declaration cl)
 {
   return (int)cl;
 }
@@ -118,7 +122,7 @@ int canonical_signature_hash(void *untyped)
 {
   struct CanonicalSignature_type *inferred_sig = (struct CanonicalSignature *)untyped;
 
-  return hash_mix((int)inferred_sig->is_input, hash_mix((int)inferred_sig->is_var, hash_mix(hash_class(inferred_sig->_class), hash_canonical_types(inferred_sig->num_actuals, inferred_sig->actuals))));
+  return hash_mix((int)inferred_sig->is_input, hash_mix((int)inferred_sig->is_var, hash_mix(hash_source_class(inferred_sig->source_class), hash_canonical_types(inferred_sig->num_actuals, inferred_sig->actuals))));
 }
 
 /**
@@ -141,10 +145,10 @@ bool canonical_signature_equal(void *untyped1, void *untyped2)
   int i;
   for (i = 0; i < inferred_sig1->num_actuals; i++)
   {
-    result &= (&inferred_sig1->actuals[i] == &inferred_sig2->actuals[i]);
+    result &= (inferred_sig1->actuals[i] == inferred_sig2->actuals[i]);
   }
 
-  return inferred_sig1->is_input == inferred_sig2->is_input && inferred_sig1->is_var == inferred_sig2->is_var && inferred_sig1->_class == inferred_sig2->_class;
+  return inferred_sig1->is_input == inferred_sig2->is_input && inferred_sig1->is_var == inferred_sig2->is_var && inferred_sig1->source_class == inferred_sig2->source_class;
 }
 
 int canonical_signature_set_hash(void *c)
@@ -189,14 +193,14 @@ static struct hash_cons_table canonical_signature_set_table = {canonical_signatu
  * TODO: actuals needs to be canonical base types
  * LIST of integer should signature of LIST of integer lattice
  */
-CanonicalSignature *new_canonical_signature(bool is_input, bool is_var, Class class, int num_actuals, CanonicalType *actuals[])
+CanonicalSignature *new_canonical_signature(bool is_input, bool is_var, Declaration source_class, int num_actuals, CanonicalType *actuals[])
 {
   size_t struct_size = sizeof(struct CanonicalSignature_type) + num_actuals * (sizeof(CanonicalType *));
 
   struct CanonicalSignature_type *result = (struct CanonicalSignature_type *)alloca(struct_size);
   result->is_input = is_input;
   result->is_var = is_var;
-  result->_class = class;
+  result->source_class = source_class;
   result->num_actuals = num_actuals;
 
   int i;
@@ -227,7 +231,7 @@ static int count_actuals(TypeActuals type_actuals)
   }
 }
 
-static CanonicalSignature *from_sig_inst(Signature sig)
+static CanonicalSignatureSet *from_sig_inst(Signature sig)
 {
   TypeActuals actuals = sig_inst_actuals(sig);
   int num_actuals = count_actuals(actuals);
@@ -244,7 +248,7 @@ static CanonicalSignature *from_sig_inst(Signature sig)
     i++;
   }
 
-  return new_canonical_signature(sig_inst_is_input(sig), sig_inst_is_var(sig), sig_inst_class(sig), num_actuals, result);
+  return new_canonical_signature_set(new_canonical_signature(sig_inst_is_input(sig), sig_inst_is_var(sig), USE_DECL(class_use_use(sig_inst_class(sig))), num_actuals, result));
 }
 
 static CanonicalSignatureSet *from_mult_sig(Signature sig)
@@ -252,20 +256,31 @@ static CanonicalSignatureSet *from_mult_sig(Signature sig)
   return union_canonical_signature_set(from_sig(mult_sig_sig1(sig)), from_sig(mult_sig_sig2(sig)));
 }
 
+static CanonicalSignatureSet *from_sig_use(Signature sig)
+{
+  Use use = sig_use_use(sig);
+  switch (Use_KEY(use))
+  {
+  case KEYuse:
+    return EMPTY_CANONICAL_SIGNATURE_SET;
+  case KEYqual_use:
+    return from_type(qual_use_from(use));
+  }
+}
+
 static CanonicalSignatureSet *from_sig(Signature sig)
 {
-  // printf("key %d\n", (int)Signature_KEY(sig));
-
   switch (Signature_KEY(sig))
   {
   case KEYsig_inst:
-    return new_canonical_signature_set(from_sig_inst(sig));
+    return from_sig_inst(sig);
   case KEYmult_sig:
     return from_mult_sig(sig);
   case KEYsig_use:
+    return from_sig_use(sig);
   case KEYno_sig:
   case KEYfixed_sig:
-    return &EMPTY_CANONICAL_SIGNATURE_SET;
+    return EMPTY_CANONICAL_SIGNATURE_SET;
   }
 }
 
@@ -296,10 +311,11 @@ static CanonicalSignatureSet *new_canonical_signature_set(CanonicalSignature *cS
 */
 static int canonical_signature_compare(CanonicalSignature *sig1, CanonicalSignature *sig2)
 {
-  int h1 = canonical_signature_hash(sig1);
-  int h2 = canonical_signature_hash(sig2);
+  // Use line number
+  int v1 = tnode_line_number(sig1->source_class);
+  int v2 = tnode_line_number(sig2->source_class);
 
-  return h1 == h2 ? 0 : (h1 < h2 ? -1 : 1);
+  return v1 == v2 ? 0 : (v1 < v2 ? -1 : 1);
 }
 
 /**
@@ -320,7 +336,7 @@ static CanonicalSignatureSet *union_canonical_signature_set(CanonicalSignatureSe
   }
   else if (set1->size == 0 && set2->size == 0)
   {
-    return &EMPTY_CANONICAL_SIGNATURE_SET;
+    return EMPTY_CANONICAL_SIGNATURE_SET;
   }
   else
   {
@@ -371,15 +387,99 @@ static CanonicalSignatureSet *union_canonical_signature_set(CanonicalSignatureSe
   }
 }
 
+static CanonicalSignatureSet *from_type(Type t)
+{
+  switch (Type_KEY(t))
+  {
+  case KEYtype_inst:
+  {
+    Module m = type_inst_module(t);
+    int num_actuals = count_actuals(type_inst_type_actuals(t));
+    size_t my_size = num_actuals * (sizeof(CanonicalSignature *));
+    CanonicalType **result = (CanonicalType *)alloca(my_size);
+    int i = 0;
+    Type type = first_TypeActual(type_inst_type_actuals(t));
+
+    while (type != NULL)
+    {
+      result[i] = canonical_type_base_type(canonical_type(type));
+      type = TYPE_NEXT(type);
+      i++;
+    }
+
+    return new_canonical_signature_set(new_canonical_signature(true, true, USE_DECL(module_use_use(m)), num_actuals, result));
+  }
+  case KEYno_type:
+    // Either TYPE[] or PHYLUM[]
+    return new_canonical_signature_set(new_canonical_signature(true, true, type_PHYLUM, 0, NULL));
+  }
+}
+
+static CanonicalSignatureSet *from_declaration(Declaration decl)
+{
+  switch (Declaration_KEY(decl))
+  {
+  case KEYsome_type_decl:
+  {
+    Signature sig = some_type_decl_sig(decl);
+    if (Signature_KEY(sig) == KEYno_sig)
+    {
+      Type t = some_type_decl_type(decl);
+      return from_type(t);
+    }
+    else
+    {
+      return from_sig(sig);
+    }
+  }
+  case KEYsome_type_formal:
+  {
+    Signature sig = some_type_formal_sig(decl);
+    return from_sig(sig);
+  }
+  }
+}
+
+static CanonicalSignatureSet *substitute_canonical_signature_set_actuals(CanonicalType *source, CanonicalSignatureSet *sig_set)
+{
+  size_t my_size = sizeof(struct CanonicalSignatureSet_type) + sig_set->size * (sizeof(CanonicalSignature *));
+  struct CanonicalSignatureSet_type *result = (struct CanonicalSignatureSet_type *)alloca(my_size);
+  result->size = sig_set->size;
+
+  int i;
+  for (i = 0; i < sig_set->size; i++)
+  {
+    CanonicalSignature *canonical_sig = sig_set->members[i];
+
+    int num_actuals = canonical_sig->num_actuals;
+    size_t actuals_size = num_actuals * sizeof(CanonicalType *);
+    CanonicalType **joined_actuals = (CanonicalType **)alloca(actuals_size);
+    int j;
+    for (j = 0; j < num_actuals; j++)
+    {
+      joined_actuals[j] = canonical_type_join(source, canonical_sig->actuals[j], true);
+    }
+
+    result->members[i] = new_canonical_signature(canonical_sig->is_input, canonical_sig->is_var, canonical_sig->source_class, canonical_sig->num_actuals, joined_actuals);
+  }
+
+  return hash_cons_get(result, my_size, &canonical_signature_set_table);
+}
+
 // Don't accumulate the fixed sigs
 CanonicalSignatureSet *infer_canonical_signatures(CanonicalType *ctype)
 {
-  CanonicalSignatureSet *result = &EMPTY_CANONICAL_SIGNATURE_SET;
+  if (!initialized)
+  {
+    fatal_error("canonical signature set is not initialized");
+  }
+
+  CanonicalSignatureSet *result = EMPTY_CANONICAL_SIGNATURE_SET;
   bool flag = true;
 
   if (ctype == NULL)
   {
-    return &EMPTY_CANONICAL_SIGNATURE_SET;
+    return EMPTY_CANONICAL_SIGNATURE_SET;
   }
 
   do
@@ -391,47 +491,15 @@ CanonicalSignatureSet *infer_canonical_signatures(CanonicalType *ctype)
       struct Canonical_use *canonical_use_type = (struct Canonical_use *)ctype;
 
       Declaration decl = canonical_use_type->decl;
-      switch (Declaration_KEY(decl))
-      {
-      case KEYsome_type_decl:
-      {
-        Signature sig = some_type_decl_sig(decl);
-        result = union_canonical_signature_set(result, from_sig(sig));
-        break;
-      }
-      case KEYsome_type_formal:
-      {
-        Signature sig = some_type_formal_sig(decl);
-        result = union_canonical_signature_set(result, from_sig(sig));
-        break;
-      }
-      }
-
+      result = union_canonical_signature_set(result, from_declaration(decl));
       break;
     }
     case KEY_CANONICAL_QUAL:
     {
       struct Canonical_qual_type *canonical_qual_type = (struct Canonical_qual_type *)ctype;
 
-      result = union_canonical_signature_set(result, infer_canonical_signatures(canonical_qual_type->source));
-
       Declaration decl = canonical_qual_type->decl;
-      switch (Declaration_KEY(decl))
-      {
-      case KEYsome_type_decl:
-      {
-        Signature sig = some_type_decl_sig(decl);
-        result = union_canonical_signature_set(result, from_sig(sig));
-        break;
-      }
-      case KEYsome_type_formal:
-      {
-        Signature sig = some_type_formal_sig(decl);
-        result = union_canonical_signature_set(result, from_sig(sig));
-        break;
-      }
-      }
-
+      result = union_canonical_signature_set(result, substitute_canonical_signature_set_actuals(canonical_qual_type->source, from_declaration(decl)));
       break;
     }
     case KEY_CANONICAL_FUNC:
@@ -452,4 +520,22 @@ CanonicalSignatureSet *infer_canonical_signatures(CanonicalType *ctype)
   size_t my_size = sizeof(struct CanonicalSignatureSet_type) + result->size * (sizeof(CanonicalSignature *));
 
   return hash_cons_get(result, my_size, &canonical_signature_set_table);
+}
+
+/**
+ * Initializes the necessary stuff needed to find the canonical signatures
+ * @param module_PHYLUM
+ * @param type_PHYLUM
+ */
+void initialize_canonical_signature(Declaration module_PHYLUM_decl, Declaration type_PHYLUM_decl)
+{
+  module_PHYLUM = module_PHYLUM_decl;
+  type_PHYLUM = type_PHYLUM_decl;
+
+  size_t empty_set_size = sizeof(struct CanonicalSignature_type);
+  CanonicalSignatureSet *empty_set = alloca(empty_set_size);
+  empty_set->size = 0;
+  EMPTY_CANONICAL_SIGNATURE_SET = hash_cons_get(empty_set, empty_set_size, &canonical_signature_set_table);
+
+  initialized = true;
 }
