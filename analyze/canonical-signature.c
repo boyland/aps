@@ -459,17 +459,17 @@ static CanonicalSignatureSet *from_type(Type t)
     size_t my_size = num_actuals * (sizeof(CanonicalSignature *));
     CanonicalType **result = (CanonicalType *)alloca(my_size);
 
-    Declaration rdecl = module_decl_result_type(mdecl);
-    switch (Declaration_KEY(rdecl))
-    {
-    case KEYsome_type_decl:
-      {
-        Type nested = some_type_decl_type(rdecl);
-        if (Type_KEY(nested) != KEYno_type) {
-          return from_type(some_type_decl_type(rdecl));
-        }
-      }
-    }
+    // Declaration rdecl = module_decl_result_type(mdecl);
+    // switch (Declaration_KEY(rdecl))
+    // {
+    // case KEYsome_type_decl:
+    //   {
+    //     Type nested = some_type_decl_type(rdecl);
+    //     if (Type_KEY(nested) != KEYno_type) {
+    //       return from_type(some_type_decl_type(rdecl));
+    //     }
+    //   }
+    // }
 
     int i = 0;
     Type type = first_TypeActual(type_inst_type_actuals(t));

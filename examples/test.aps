@@ -2,9 +2,22 @@ module GEN[T :: BASIC[]]
 begin
   -- simple (non-polymiorphic)
   type A := T;        
-  type B := Integer;  
+  type B := Integer;
   type C;             
   type D := Result;
+
+  type Amir1 := Real;
+  type Amir2 := String;
+  type Amir3 := Range;
+  type Amir4 := OrLattice;
+
+  type IntegerMaxLattice := MAX_LATTICE[Integer](0);
+
+  -- pragma test_canonical_signature(type Amir1, "{IEEE[]}");
+  -- pragma test_canonical_signature(type Amir2, "{STRING[]}");
+  -- pragma test_canonical_signature(type Amir3, "{LIST[Integer]}");
+  -- pragma test_canonical_signature(type Amir4, "{BASIC[],PRINTABLE[],MAKE_LATTICE[Boolean]}");
+    pragma test_canonical_signature(type IntegerMaxLattice, "{BASIC[],PRINTABLE[],MAKE_LATTICE[Boolean]}");
 
   pragma test_canonical_type(type A, "T");
   pragma test_canonical_type(type B, "Integer");
@@ -15,6 +28,11 @@ begin
   pragma test_canonical_base_type(type B, "Integer");
   pragma test_canonical_base_type(type C, "C");
   pragma test_canonical_base_type(type D, "Result");
+
+  -- pragma test_canonical_signature(type A, "{BASIC[]}");
+  -- pragma test_canonical_signature(type Amir2, "{STRING[]}");
+  -- pragma test_canonical_signature(type C, "{LIST[Integer]}");
+  -- pragma test_canonical_signature(type D, "{BASIC[],PRINTABLE[],MAKE_LATTICE[Boolean]}");
 
   -------------------------------------------------------
 
