@@ -1860,20 +1860,13 @@ int id_decl_node(Declaration decl) {
     switch (Declaration_KEY(decl))
     {
       case KEYassign:
-<<<<<<< HEAD
-=======
     printf("%d: index for assign is %d\n",tnode_line_number(decl),
 	   index);
->>>>>>> boyland-master
         break;
       default:
     printf("%d: index for %s is %d\n",tnode_line_number(decl),
 	   decl_name(decl),index);
-<<<<<<< HEAD
-     break;
-=======
         break;
->>>>>>> boyland-master
     }
   }
   Declaration_info(decl)->index = index;
@@ -2578,13 +2571,8 @@ NODESET link_expr_rhs(Expression e, NODESET ns){
 	      Expression object = field_ref_object(e);
 	      link_expr_rhs(object, set_of_node(get_node_expr(e)+1));	// Qe(-)
 	      {
-<<<<<<< HEAD
     USET eu = get_uset(e);
 		OSET oset = doOU(e, eu);
-=======
-		OSET oset = doOU(e, EMPTY_USET);
-	    if (fiber_debug & ADD_FSA_EDGE) printf("ending to add edges for field ref of %s\n",decl_name(fdecl));
->>>>>>> boyland-master
 		return oset_to_nodeset(oset);
 	      }
 	    }
