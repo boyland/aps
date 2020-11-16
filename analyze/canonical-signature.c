@@ -104,7 +104,7 @@ void print_canonical_signature_set(void *untyped, FILE *f)
  */
 int hash_canonical_types(int count, CanonicalType **types)
 {
-  int h = 0;
+  int h = 7;
   int i;
   for (i = 0; i < count; i++)
   {
@@ -159,7 +159,7 @@ bool canonical_signature_equal(void *untyped1, void *untyped2)
     result &= (inferred_sig1->actuals[i] == inferred_sig2->actuals[i]);
   }
 
-  return inferred_sig1->is_input == inferred_sig2->is_input && inferred_sig1->is_var == inferred_sig2->is_var && inferred_sig1->source_class == inferred_sig2->source_class;
+  return result && inferred_sig1->is_input == inferred_sig2->is_input && inferred_sig1->is_var == inferred_sig2->is_var && inferred_sig1->source_class == inferred_sig2->source_class;
 }
 
 /**
