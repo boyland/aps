@@ -2571,6 +2571,7 @@ NODESET link_expr_rhs(Expression e, NODESET ns){
 	      Expression object = field_ref_object(e);
 	      link_expr_rhs(object, set_of_node(get_node_expr(e)+1));	// Qe(-)
 	      {
+	    if (fiber_debug & ADD_FSA_EDGE) printf("ending to add edges for field ref of %s\n",decl_name(fdecl));
 		USET eu = get_uset(e);
 		OSET oset = doOU(e, eu);
 		return oset_to_nodeset(oset);
