@@ -79,7 +79,7 @@ DEPENDENCY dependency_trans(DEPENDENCY k1, DEPENDENCY k2)
 	   (k2 & DEPENDENCY_NOT_JUST_FIBER)) |
 	  ((k1 & DEPENDENCY_MAYBE_CARRYING)&
 	   (k2 & DEPENDENCY_MAYBE_CARRYING)) |
-    ((k1 & DEPENDENCY_MAYBE_SIMPLE)&
+	  ((k1 & DEPENDENCY_MAYBE_SIMPLE)&
 	   (k2 & DEPENDENCY_MAYBE_SIMPLE)) | 
 	  SOME_DEPENDENCY);
 }
@@ -1345,7 +1345,7 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
 	record_expression_dependencies(&sink,cond,kind,NULL,rhs,aug_graph);
 	record_condition_dependencies(&sink,cond,aug_graph);
       } else if ((fdecl = local_call_p(lhs)) != NULL) {     
-  if (!decl_is_circular(fdecl)) new_kind |= DEPENDENCY_MAYBE_SIMPLE; else new_kind = kind;
+	if (!decl_is_circular(fdecl)) new_kind |= DEPENDENCY_MAYBE_SIMPLE; else new_kind = kind;
 	Declaration result = some_function_decl_result(decl);
 	Declaration proxy = Expression_info(lhs)->funcall_proxy;
 	if (mod == NO_MODIFIER) {
@@ -1475,10 +1475,10 @@ static void *get_edges(void *vaug_graph, void *node) {
 		source.modifier = &dot_mod;
 		DEPENDENCY new_kind = fiber_dependency;
 		if (decl_is_circular(fdecl)) {
-      new_kind &= ~DEPENDENCY_MAYBE_SIMPLE;
-    } else {
-      new_kind |= DEPENDENCY_MAYBE_SIMPLE;
-    }
+		   new_kind &= ~DEPENDENCY_MAYBE_SIMPLE;
+		} else {
+		   new_kind |= DEPENDENCY_MAYBE_SIMPLE;
+		}
 
 		add_edges_to_graph(&source,&sink,cond,new_kind,
 				   aug_graph);
