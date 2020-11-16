@@ -2007,7 +2007,7 @@ static void init_analysis_state(STATE *s, Declaration module) {
     }
     { int phyla_count = 0;
       if (edecls == NULL) {
-	aps_error(module,"no extension to module %s",
+	fatal_error("no extension to module %s",
 		  symbol_name(def_name(declaration_def(module))));
       } else {
 	Declaration edecl = first_Declaration(edecls);

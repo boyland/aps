@@ -57,6 +57,10 @@ object basic_implicit {
   val t_AndLattice = new M_MAKE_LATTICE[T_Boolean]("AndLattice",t_Boolean,v_true,v_andc,v_revimplies,v_and,v_or);
   type T_AndLattice = T_Boolean;
 
+  type T_MAX_LATTICE[T] = T;
+  type T_MIN_LATTICE[T] = T;
+
+
   type T_BAG[T] = List[T];
   type T_LIST[T] = List[T];
   type T_SET[T] = scala.collection.immutable.Set[T];
