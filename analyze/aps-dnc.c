@@ -1479,7 +1479,6 @@ static void *get_edges(void *vaug_graph, void *node) {
 		} else {
 		   new_kind |= DEPENDENCY_MAYBE_SIMPLE;
 		}
-
 		add_edges_to_graph(&source,&sink,cond,new_kind,
 				   aug_graph);
 	      }
