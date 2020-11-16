@@ -17,35 +17,42 @@ Several phases:
 static void *analyze_thing(void *ignore, void *node)
 {
   STATE *s;
+  DEPENDENCY d;
   if (ABSTRACT_APS_tnode_phylum(node) == KEYDeclaration) {
     Declaration decl = (Declaration)node;
     switch (Declaration_KEY(decl)) {
     case KEYmodule_decl:
       s = compute_dnc(decl);
-      switch (analysis_state_cycle(s)) {
+      d = analysis_state_cycle(s);
+      switch (d) {
       default:
-	aps_error(decl,"Cycle detected; Attribute grammar is not DNC");
+	aps_error(decl,"Cycle detected; Attribute grammar is not DNC %d", d);
 	break;
+      case indirect_circular_dependency:
+        break_fiber_cycles(decl,s, indirect_circular_dependency);
+        compute_oag(decl,s);
+        break;
       case indirect_control_fiber_dependency:
       case control_fiber_dependency:
       case indirect_fiber_dependency:
       case fiber_dependency:
 	printf("Fiber cycle detected; cycle being removed\n");
-	break_fiber_cycles(decl,s);
+	break_fiber_cycles(decl,s, fiber_dependency);
 	/* fall through */
       case no_dependency:
 	compute_oag(decl,s);
-	switch (analysis_state_cycle(s)) {
+  d = analysis_state_cycle(s);
+	switch (d) {
 	case no_dependency:
 	  break;
 	default:
-	  aps_error(decl,"Cycle detected; Attribute grammar is not OAG");
+	  aps_error(decl,"Cycle detected; Attribute grammar is not OAG %d", d);
 	  break;
 	}
 	break;
       }
       if (cycle_debug & PRINT_CYCLE) {
-	print_cycles(s,stdout);
+      print_cycles(s,stdout);
       }
       Declaration_info(decl)->analysis_state = s;
       break;

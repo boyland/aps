@@ -6,4 +6,8 @@ module TEST[] begin
   i : Integer := length("hello");
   
   b : Boolean := t = Test${} and Test${} = t;
+
+  type IntegerMaxLattice := MAX_LATTICE[Integer](0);
+  
+  var taha: IntegerMaxLattice := 1 + 2;
 end;

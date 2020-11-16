@@ -4,7 +4,7 @@
  * Routines for breaking cycles involving only fibers.
  */
 
-extern void break_fiber_cycles(Declaration,STATE *);
+extern void break_fiber_cycles(Declaration,STATE *, DEPENDENCY d);
 extern int cycle_debug;
 
 typedef struct cycle_description {

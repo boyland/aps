@@ -1,0 +1,26 @@
+with "basic";
+with "tiny";
+
+module TINY_IMPL[T :: var TINY[]] extends T
+begin
+
+  match ?l=leaf(?x) begin
+  end;
+
+  match ?b=branch(?x,?y) begin
+  end;
+
+  match ?p=root(?b) begin
+  end;
+
+  procedure identity_procedure(arg : Integer) : Integer begin
+    -- we can can a function from procedure
+    result := identity_function(arg);
+  end;
+
+  function identity_function(arg: Integer) : Integer begin
+    -- we should not be able to call a procedure from function
+    result := identity_procedure(arg);
+  end;
+
+end;
