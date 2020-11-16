@@ -2071,7 +2071,7 @@ void *compute_OU(void *u, void *node)
 
 	add_to_oset(decl, doOU(rhs, get_uset(decl)));
 	add_to_uset(decl, doUO(lhs, get_oset(decl)));
-
+	
 	return NULL;
 	break;
       }
@@ -2540,7 +2540,7 @@ NODESET link_expr_rhs(Expression e, NODESET ns){
 	} // for end
 	
 	{ 
-    USET eu = get_uset(e);
+	  USET eu = get_uset(e);
 	  OSET oset = doOU(e, eu);
 	  return oset_to_nodeset(oset);
 	}
@@ -2571,7 +2571,7 @@ NODESET link_expr_rhs(Expression e, NODESET ns){
 	      Expression object = field_ref_object(e);
 	      link_expr_rhs(object, set_of_node(get_node_expr(e)+1));	// Qe(-)
 	      {
-    USET eu = get_uset(e);
+		USET eu = get_uset(e);
 		OSET oset = doOU(e, eu);
 		return oset_to_nodeset(oset);
 	      }
@@ -2670,7 +2670,7 @@ NODESET link_expr_lhs(Expression e, NODESET ns) {
 	      Expression object = field_ref_object(e);
 	      link_expr_lhs(object, set_of_node(get_node_expr(e)+1) );	// Qe(-)
 	      {
-    USET eu = get_uset(e);
+		USET eu = get_uset(e);
 		USET uset = doUO(e, eu);
 		// printf("DEBUG: after doUO in link_expr.\n");
 		return uset_to_nodeset(uset);
