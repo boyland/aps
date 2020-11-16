@@ -13,11 +13,12 @@ begin
 
   type IntegerMaxLattice := MAX_LATTICE[Integer](0);
 
-  -- pragma test_canonical_signature(type Amir1, "{IEEE[]}");
-  -- pragma test_canonical_signature(type Amir2, "{STRING[]}");
-  -- pragma test_canonical_signature(type Amir3, "{LIST[Integer]}");
-  -- pragma test_canonical_signature(type Amir4, "{BASIC[],PRINTABLE[],MAKE_LATTICE[Boolean]}");
-    pragma test_canonical_signature(type IntegerMaxLattice, "{BASIC[],PRINTABLE[],MAKE_LATTICE[Boolean]}");
+  pragma test_canonical_signature(type Amir1, "{IEEE[]}");
+  pragma test_canonical_signature(type Amir2, "{STRING[]}");
+  pragma test_canonical_signature(type Amir3, "{LIST[Integer]}");
+  pragma test_canonical_signature(type Amir4, "{BASIC[],PRINTABLE[],MAKE_LATTICE[Boolean]}");
+  pragma test_canonical_signature(type IntegerMaxLattice, "{PRINTABLE[],ORDERED[],NUMERIC[],MAKE_LATTICE[Boolean],MAX_LATTICE[Integer]}");
+
 
   pragma test_canonical_type(type A, "T");
   pragma test_canonical_type(type B, "Integer");
@@ -29,10 +30,10 @@ begin
   pragma test_canonical_base_type(type C, "C");
   pragma test_canonical_base_type(type D, "Result");
 
-  -- pragma test_canonical_signature(type A, "{BASIC[]}");
-  -- pragma test_canonical_signature(type Amir2, "{STRING[]}");
-  -- pragma test_canonical_signature(type C, "{LIST[Integer]}");
-  -- pragma test_canonical_signature(type D, "{BASIC[],PRINTABLE[],MAKE_LATTICE[Boolean]}");
+  pragma test_canonical_signature(type A, "{BASIC[]}");
+  pragma test_canonical_signature(type B, "{PRINTABLE[],ORDERED[],NUMERIC[]}");
+  pragma test_canonical_signature(type C, "{TYPE[]}");
+  pragma test_canonical_signature(type D, "{TYPE[]}");
 
   -------------------------------------------------------
 
@@ -50,7 +51,12 @@ begin
   pragma test_canonical_base_type(type E, "T");
   pragma test_canonical_base_type(type F, "Integer");
   pragma test_canonical_base_type(type G, "C");
-  pragma test_canonical_base_type(type H, "Result");  
+  pragma test_canonical_base_type(type H, "Result");
+
+  pragma test_canonical_signature(type E, "{BASIC[]}");
+  pragma test_canonical_signature(type F, "{STRING[]}");
+  pragma test_canonical_signature(type G, "{LIST[Integer]}");
+  pragma test_canonical_signature(type H, "{BASIC[],PRINTABLE[],MAKE_LATTICE[Boolean]}");
 
   -------------------------------------------------------
 
@@ -70,6 +76,11 @@ begin
   pragma test_canonical_base_type(type G2, "C");
   pragma test_canonical_base_type(type H2, "Result"); 
 
+  pragma test_canonical_signature(type E2, "{BASIC[]}");
+  pragma test_canonical_signature(type F2, "{STRING[]}");
+  pragma test_canonical_signature(type G2, "{LIST[Integer]}");
+  pragma test_canonical_signature(type H2, "{BASIC[],PRINTABLE[],MAKE_LATTICE[Boolean]}");
+
   -------------------------------------------------------
 
   -- polymiorphic (generating)
@@ -87,6 +98,11 @@ begin
   pragma test_canonical_base_type(type J, "J");
   pragma test_canonical_base_type(type K, "K");
   pragma test_canonical_base_type(type L, "L");
+
+  pragma test_canonical_signature(type I, "{BASIC[]}");
+  pragma test_canonical_signature(type J, "{STRING[]}");
+  pragma test_canonical_signature(type K, "{LIST[Integer]}");
+  pragma test_canonical_signature(type L, "{BASIC[],PRINTABLE[],MAKE_LATTICE[Boolean]}");
 
   -------------------------------------------------------
 
@@ -106,6 +122,11 @@ begin
   pragma test_canonical_base_type(type K1, "K1");
   pragma test_canonical_base_type(type L1, "L1");
 
+  pragma test_canonical_signature(type I1, "{BASIC[]}");
+  pragma test_canonical_signature(type J1, "{STRING[]}");
+  pragma test_canonical_signature(type K1, "{LIST[Integer]}");
+  pragma test_canonical_signature(type L1, "{BASIC[],PRINTABLE[],MAKE_LATTICE[Boolean]}");
+
   -------------------------------------------------------
 
   -- polymiorphic (generating) 2 level type use
@@ -123,6 +144,11 @@ begin
   pragma test_canonical_base_type(type J2, "J2");
   pragma test_canonical_base_type(type K2, "K2");
   pragma test_canonical_base_type(type L2, "L2");
+
+  pragma test_canonical_signature(type I2, "{BASIC[]}");
+  pragma test_canonical_signature(type J2, "{STRING[]}");
+  pragma test_canonical_signature(type K2, "{LIST[Integer]}");
+  pragma test_canonical_signature(type L2, "{BASIC[],PRINTABLE[],MAKE_LATTICE[Boolean]}");
 
   -------------------------------------------------------
 
@@ -142,6 +168,11 @@ begin
   pragma test_canonical_base_type(type O, "C");
   pragma test_canonical_base_type(type P, "Result");
 
+  pragma test_canonical_signature(type M, "{BASIC[]}");
+  pragma test_canonical_signature(type N, "{STRING[]}");
+  pragma test_canonical_signature(type O, "{LIST[Integer]}");
+  pragma test_canonical_signature(type P, "{BASIC[],PRINTABLE[],MAKE_LATTICE[Boolean]}");
+
   -------------------------------------------------------
 
   -- polymiorphic (non-generating) 1 level type use
@@ -160,6 +191,11 @@ begin
   pragma test_canonical_base_type(type O1, "C");
   pragma test_canonical_base_type(type P1, "Result");
 
+  pragma test_canonical_signature(type M1, "{BASIC[]}");
+  pragma test_canonical_signature(type N1, "{STRING[]}");
+  pragma test_canonical_signature(type O1, "{LIST[Integer]}");
+  pragma test_canonical_signature(type P1, "{BASIC[],PRINTABLE[],MAKE_LATTICE[Boolean]}");
+  
   -------------------------------------------------------
 
   -- polymiorphic (non-generating) 2 level type use
@@ -178,6 +214,11 @@ begin
   pragma test_canonical_base_type(type O2, "C");
   pragma test_canonical_base_type(type P2, "Result");
 
+  pragma test_canonical_signature(type M2, "{BASIC[]}");
+  pragma test_canonical_signature(type N2, "{STRING[]}");
+  pragma test_canonical_signature(type O2, "{LIST[Integer]}");
+  pragma test_canonical_signature(type P2, "{BASIC[],PRINTABLE[],MAKE_LATTICE[Boolean]}");
+
   -------------------------------------------------------
 
   -- type inst nested
@@ -189,6 +230,9 @@ begin
 
   pragma test_canonical_base_type(type Q, "Q");
   pragma test_canonical_base_type(type R, "T");
+
+  pragma test_canonical_signature(type Q, "{LIST[Integer]}");
+  pragma test_canonical_signature(type R, "{BASIC[],PRINTABLE[],MAKE_LATTICE[Boolean]}");
 
   -------------------------------------------------------
 
@@ -208,6 +252,11 @@ begin
   pragma test_canonical_base_type(type QC, "Q$C");
   pragma test_canonical_base_type(type QD, "Q");
 
+  pragma test_canonical_signature(type QA, "{BASIC[]}");
+  pragma test_canonical_signature(type QB, "{STRING[]}");
+  pragma test_canonical_signature(type QC, "{LIST[Integer]}");
+  pragma test_canonical_signature(type QD, "{BASIC[],PRINTABLE[],MAKE_LATTICE[Boolean]}");
+
   -------------------------------------------------------
 
   -- type inst R $ simple
@@ -225,6 +274,11 @@ begin
   pragma test_canonical_base_type(type RB, "Integer");
   pragma test_canonical_base_type(type RC, "R$C");
   pragma test_canonical_base_type(type RD, "T");
+
+  pragma test_canonical_signature(type RA, "{BASIC[]}");
+  pragma test_canonical_signature(type RB, "{STRING[]}");
+  pragma test_canonical_signature(type RC, "{LIST[Integer]}");
+  pragma test_canonical_signature(type RD, "{BASIC[],PRINTABLE[],MAKE_LATTICE[Boolean]}");
 
   -------------------------------------------------------
 
@@ -244,6 +298,11 @@ begin
   pragma test_canonical_base_type(type QG2, "Q$C");
   pragma test_canonical_base_type(type QH2, "Q");
 
+  pragma test_canonical_signature(type QE2, "{BASIC[]}");
+  pragma test_canonical_signature(type QF2, "{STRING[]}");
+  pragma test_canonical_signature(type QG2, "{LIST[Integer]}");
+  pragma test_canonical_signature(type QH2, "{BASIC[],PRINTABLE[],MAKE_LATTICE[Boolean]}");
+
   -------------------------------------------------------
 
   -- type inst R $ type use 2 level
@@ -261,6 +320,11 @@ begin
   pragma test_canonical_base_type(type RF2, "Integer");
   pragma test_canonical_base_type(type RG2, "R$C");
   pragma test_canonical_base_type(type RH2, "T");
+
+  pragma test_canonical_signature(type RE2, "{BASIC[]}");
+  pragma test_canonical_signature(type RF2, "{STRING[]}");
+  pragma test_canonical_signature(type RG2, "{LIST[Integer]}");
+  pragma test_canonical_signature(type RH2, "{BASIC[],PRINTABLE[],MAKE_LATTICE[Boolean]}");
 
   -------------------------------------------------------
 
@@ -280,6 +344,11 @@ begin
   pragma test_canonical_base_type(type QK2, "Q$K2");
   pragma test_canonical_base_type(type QL2, "Q$L2");
 
+  pragma test_canonical_signature(type QI2, "{BASIC[]}");
+  pragma test_canonical_signature(type QJ2, "{STRING[]}");
+  pragma test_canonical_signature(type QK2, "{LIST[Integer]}");
+  pragma test_canonical_signature(type QL2, "{BASIC[],PRINTABLE[],MAKE_LATTICE[Boolean]}");
+
   -------------------------------------------------------
 
   -- type inst R $ polymiorphic (generating) 2 level
@@ -297,6 +366,11 @@ begin
   pragma test_canonical_base_type(type RJ2, "R$J2");
   pragma test_canonical_base_type(type RK2, "R$K2");
   pragma test_canonical_base_type(type RL2, "R$L2");
+
+  pragma test_canonical_signature(type RI2, "{BASIC[]}");
+  pragma test_canonical_signature(type RJ2, "{STRING[]}");
+  pragma test_canonical_signature(type RK2, "{LIST[Integer]}");
+  pragma test_canonical_signature(type RL2, "{BASIC[],PRINTABLE[],MAKE_LATTICE[Boolean]}");
 
   -------------------------------------------------------
 
@@ -316,6 +390,11 @@ begin
   pragma test_canonical_base_type(type QO2, "Q$C");
   pragma test_canonical_base_type(type QP2, "Q");  
 
+  pragma test_canonical_signature(type QM2, "{BASIC[]}");
+  pragma test_canonical_signature(type QN2, "{STRING[]}");
+  pragma test_canonical_signature(type QO2, "{LIST[Integer]}");
+  pragma test_canonical_signature(type QP2, "{BASIC[],PRINTABLE[],MAKE_LATTICE[Boolean]}");
+
   -------------------------------------------------------
 
   -- type inst R $ polymiorphic (non-generating) 2 level
@@ -333,6 +412,11 @@ begin
   pragma test_canonical_base_type(type RN2, "Integer");
   pragma test_canonical_base_type(type RO2, "R$C");
   pragma test_canonical_base_type(type RP2, "T");
+
+  pragma test_canonical_signature(type RM2, "{BASIC[]}");
+  pragma test_canonical_signature(type RN2, "{STRING[]}");
+  pragma test_canonical_signature(type RO2, "{LIST[Integer]}");
+  pragma test_canonical_signature(type RP2, "{BASIC[],PRINTABLE[],MAKE_LATTICE[Boolean]}");
 
 end;
 
@@ -421,6 +505,11 @@ pragma test_canonical_base_type(type G0B, "Integer");
 pragma test_canonical_base_type(type G0C, "G0$C");
 pragma test_canonical_base_type(type G0D, "G0");
 
+pragma test_canonical_signature(type G0A, "{BASIC[]}");
+pragma test_canonical_signature(type G0B, "{STRING[]}");
+pragma test_canonical_signature(type G0C, "{LIST[Integer]}");
+pragma test_canonical_signature(type G0D, "{BASIC[],PRINTABLE[],MAKE_LATTICE[Boolean]}");
+
 -------------------------------------------------------
 
 -- E0 $ simple
@@ -438,6 +527,11 @@ pragma test_canonical_base_type(type E0A, "String");
 pragma test_canonical_base_type(type E0B, "Integer");
 pragma test_canonical_base_type(type E0C, "E0$C");
 pragma test_canonical_base_type(type E0D, "String");
+
+pragma test_canonical_signature(type E0A, "{BASIC[]}");
+pragma test_canonical_signature(type E0B, "{STRING[]}");
+pragma test_canonical_signature(type E0C, "{LIST[Integer]}");
+pragma test_canonical_signature(type E0D, "{BASIC[],PRINTABLE[],MAKE_LATTICE[Boolean]}");
 
 -------------------------------------------------------
 
@@ -457,6 +551,11 @@ pragma test_canonical_base_type(type G0F, "Integer");
 pragma test_canonical_base_type(type G0G, "G0$C");
 pragma test_canonical_base_type(type G0H, "G0");
 
+pragma test_canonical_signature(type G0E, "{BASIC[]}");
+pragma test_canonical_signature(type G0F, "{STRING[]}");
+pragma test_canonical_signature(type G0G, "{LIST[Integer]}");
+pragma test_canonical_signature(type G0H, "{BASIC[],PRINTABLE[],MAKE_LATTICE[Boolean]}");
+
 -------------------------------------------------------
 
 -- E0 $ type use 1 level
@@ -474,6 +573,11 @@ pragma test_canonical_base_type(type E0E, "String");
 pragma test_canonical_base_type(type E0F, "Integer");
 pragma test_canonical_base_type(type E0G, "E0$C");
 pragma test_canonical_base_type(type E0H, "String");
+
+pragma test_canonical_signature(type E0E, "{BASIC[]}");
+pragma test_canonical_signature(type E0F, "{STRING[]}");
+pragma test_canonical_signature(type E0G, "{LIST[Integer]}");
+pragma test_canonical_signature(type E0H, "{BASIC[],PRINTABLE[],MAKE_LATTICE[Boolean]}");
 
 -------------------------------------------------------
 
@@ -493,6 +597,11 @@ pragma test_canonical_base_type(type G0F2, "Integer");
 pragma test_canonical_base_type(type G0G2, "G0$C");
 pragma test_canonical_base_type(type G0H2, "G0");
 
+pragma test_canonical_signature(type G0E2, "{BASIC[]}");
+pragma test_canonical_signature(type G0F2, "{STRING[]}");
+pragma test_canonical_signature(type G0G2, "{LIST[Integer]}");
+pragma test_canonical_signature(type G0H2, "{BASIC[],PRINTABLE[],MAKE_LATTICE[Boolean]}");
+
 -------------------------------------------------------
 
 -- E0 $ type use 2 level
@@ -510,6 +619,11 @@ pragma test_canonical_base_type(type E0E2, "String");
 pragma test_canonical_base_type(type E0F2, "Integer");
 pragma test_canonical_base_type(type E0G2, "E0$C");
 pragma test_canonical_base_type(type E0H2, "String");
+
+pragma test_canonical_signature(type E0E2, "{BASIC[]}");
+pragma test_canonical_signature(type E0F2, "{STRING[]}");
+pragma test_canonical_signature(type E0G2, "{LIST[Integer]}");
+pragma test_canonical_signature(type E0H2, "{BASIC[],PRINTABLE[],MAKE_LATTICE[Boolean]}");
 
 -------------------------------------------------------
 
@@ -529,6 +643,11 @@ pragma test_canonical_base_type(type G0J2, "G0$J2");
 pragma test_canonical_base_type(type G0K2, "G0$K2");
 pragma test_canonical_base_type(type G0L2, "G0$L2");
 
+pragma test_canonical_signature(type G0I2, "{BASIC[]}");
+pragma test_canonical_signature(type G0J2, "{STRING[]}");
+pragma test_canonical_signature(type G0K2, "{LIST[Integer]}");
+pragma test_canonical_signature(type G0L2, "{BASIC[],PRINTABLE[],MAKE_LATTICE[Boolean]}");
+
 -------------------------------------------------------
 
 -- E0 $ polymiorphic (generating) 2 level type use
@@ -546,6 +665,11 @@ pragma test_canonical_base_type(type E0I2, "E0$I2");
 pragma test_canonical_base_type(type E0J2, "E0$J2");
 pragma test_canonical_base_type(type E0K2, "E0$K2");
 pragma test_canonical_base_type(type E0L2, "E0$L2");
+
+pragma test_canonical_signature(type E0I2, "{BASIC[]}");
+pragma test_canonical_signature(type E0J2, "{STRING[]}");
+pragma test_canonical_signature(type E0K2, "{LIST[Integer]}");
+pragma test_canonical_signature(type E0L2, "{BASIC[],PRINTABLE[],MAKE_LATTICE[Boolean]}");
 
 -------------------------------------------------------
 
@@ -565,6 +689,11 @@ pragma test_canonical_base_type(type G0N2, "Integer");
 pragma test_canonical_base_type(type G0O2, "G0$C");
 pragma test_canonical_base_type(type G0P2, "G0");
 
+pragma test_canonical_signature(type G0M2, "{BASIC[]}");
+pragma test_canonical_signature(type G0N2, "{STRING[]}");
+pragma test_canonical_signature(type G0O2, "{LIST[Integer]}");
+pragma test_canonical_signature(type G0P2, "{BASIC[],PRINTABLE[],MAKE_LATTICE[Boolean]}");
+
 -------------------------------------------------------
 
 -- E0 $ polymiorphic (non-generating) 2 level type use
@@ -582,6 +711,11 @@ pragma test_canonical_base_type(type E0M2, "String");
 pragma test_canonical_base_type(type E0N2, "Integer");
 pragma test_canonical_base_type(type E0O2, "E0$C");
 pragma test_canonical_base_type(type E0P2, "String");
+
+pragma test_canonical_signature(type E0M2, "{BASIC[]}");
+pragma test_canonical_signature(type E0N2, "{STRING[]}");
+pragma test_canonical_signature(type E0O2, "{LIST[Integer]}");
+pragma test_canonical_signature(type E0P2, "{BASIC[],PRINTABLE[],MAKE_LATTICE[Boolean]}");
 
 -------------------------------------------------------
 
@@ -601,6 +735,11 @@ pragma test_canonical_base_type(type G0N2N2, "Integer");
 pragma test_canonical_base_type(type G0O2O2, "G0$O2$C");
 pragma test_canonical_base_type(type G0P2P2, "G0");
 
+pragma test_canonical_signature(type G0M2M2, "{BASIC[]}");
+pragma test_canonical_signature(type G0N2N2, "{STRING[]}");
+pragma test_canonical_signature(type G0O2O2, "{LIST[Integer]}");
+pragma test_canonical_signature(type G0P2P2, "{BASIC[],PRINTABLE[],MAKE_LATTICE[Boolean]}");
+
 -------------------------------------------------------
 
 -- E0 $ polymiorphic (non-generating) 2 level type use $ polymiorphic (non-generating) 2 level type use
@@ -618,6 +757,11 @@ pragma test_canonical_base_type(type E0M2M2, "String");
 pragma test_canonical_base_type(type E0N2N2, "Integer");
 pragma test_canonical_base_type(type E0O2O2, "E0$O2$C");
 pragma test_canonical_base_type(type E0P2P2, "String");
+
+pragma test_canonical_signature(type E0M2M2, "{BASIC[]}");
+pragma test_canonical_signature(type E0N2N2, "{STRING[]}");
+pragma test_canonical_signature(type E0O2O2, "{LIST[Integer]}");
+pragma test_canonical_signature(type E0P2P2, "{BASIC[],PRINTABLE[],MAKE_LATTICE[Boolean]}");
 
 -------------------------------------------------------
 
@@ -637,6 +781,11 @@ pragma test_canonical_base_type(type G0J2J2, "G0$J2$J2");
 pragma test_canonical_base_type(type G0K2K2, "G0$K2$K2");
 pragma test_canonical_base_type(type G0L2L2, "G0$L2$L2");
 
+pragma test_canonical_signature(type G0I2I2, "{BASIC[]}");
+pragma test_canonical_signature(type G0J2J2, "{STRING[]}");
+pragma test_canonical_signature(type G0K2K2, "{LIST[Integer]}");
+pragma test_canonical_signature(type G0L2L2, "{BASIC[],PRINTABLE[],MAKE_LATTICE[Boolean]}");
+
 -------------------------------------------------------
 
 -- E0 $ polymiorphic (generating) 2 level type use $ polymiorphic (generating) 2 level type use
@@ -654,3 +803,8 @@ pragma test_canonical_base_type(type E0I2I2, "E0$I2$I2");
 pragma test_canonical_base_type(type E0J2J2, "E0$J2$J2");
 pragma test_canonical_base_type(type E0K2K2, "E0$K2$K2");
 pragma test_canonical_base_type(type E0L2L2, "E0$L2$L2");
+
+pragma test_canonical_signature(type E0I2I2, "{BASIC[]}");
+pragma test_canonical_signature(type E0J2J2, "{STRING[]}");
+pragma test_canonical_signature(type E0K2K2, "{LIST[Integer]}");
+pragma test_canonical_signature(type E0L2L2, "{BASIC[],PRINTABLE[],MAKE_LATTICE[Boolean]}");

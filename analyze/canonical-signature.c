@@ -273,8 +273,8 @@ static CanonicalSignatureSet *from_sig_inst(Signature sig)
   size_t my_size = num_actuals * sizeof(CanonicalType *);
   CanonicalType **result = (CanonicalType **)alloca(my_size);
 
-  printf("result: %s\nhere: ", decl_name(mdecl));
-  print_Signature(class_decl_parent(mdecl), stdout);
+  // printf("result: %s\nhere: ", decl_name(mdecl));
+  // print_Signature(class_decl_parent(mdecl), stdout);
 
   int i = 0;
   Type type = first_TypeActual(actuals);
@@ -323,8 +323,8 @@ static CanonicalSignatureSet *from_sig_use(Signature sig)
  */
 static CanonicalSignatureSet *from_sig(Signature sig)
 {
-  print_Signature(sig, stdout);
-  printf("\n");
+  // print_Signature(sig, stdout);
+  // printf("\n");
 
   switch (Signature_KEY(sig))
   {
@@ -445,9 +445,9 @@ static CanonicalSignatureSet *union_canonical_signature_set(CanonicalSignatureSe
  */
 static CanonicalSignatureSet *from_type(Type t)
 {
-  printf("Type\n");
-  print_Type(t, stdout);
-  printf("\n");
+  // printf("Type\n");
+  // print_Type(t, stdout);
+  // printf("\n");
 
   switch (Type_KEY(t))
   {
@@ -483,6 +483,7 @@ static CanonicalSignatureSet *from_type(Type t)
   }
   case KEYno_type:
     // Either TYPE[] or PHYLUM[]
+    // type_is_phylum(t) ? type_PHYLUM : module_PHYLUM
     return new_canonical_signature_set(new_canonical_signature(true, true, type_PHYLUM, 0, NULL));
   default:
     aps_error(t, "Not sure how to find the canonical signature set given Type with Type_KEY of %d", (int)Type_KEY(t));
@@ -497,7 +498,7 @@ static CanonicalSignatureSet *from_type(Type t)
  */
 static CanonicalSignatureSet *from_declaration(Declaration decl)
 {
-  printf("decl: %s\n", decl_name(decl));
+  // printf("decl: %s\n", decl_name(decl));
 
   switch (Declaration_KEY(decl))
   {
@@ -577,8 +578,8 @@ CanonicalSignatureSet *infer_canonical_signatures(CanonicalType *ctype)
     return EMPTY_CANONICAL_SIGNATURE_SET;
   }
 
-  print_canonical_type(ctype, stdout);
-  printf("done\n");
+  // print_canonical_type(ctype, stdout);
+  // printf("done\n");
 
   do
   {
