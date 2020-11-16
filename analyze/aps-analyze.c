@@ -41,7 +41,7 @@ static void *analyze_thing(void *ignore, void *node)
 	/* fall through */
       case no_dependency:
 	compute_oag(decl,s);
-  d = analysis_state_cycle(s);
+	d = analysis_state_cycle(s);
 	switch (d) {
 	case no_dependency:
 	  break;
