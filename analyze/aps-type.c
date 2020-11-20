@@ -373,7 +373,7 @@ static char* clean_string_const_token(char* p) {
 }
 
 static void* print_base_types(void* ignore, void*node) {
-  int BUFFER_SIZE = 100;
+  int BUFFER_SIZE = 200;
   Symbol symb_test_canonical_type = intern_symbol("test_canonical_type");
   Symbol symb_test_canonical_base_type = intern_symbol("test_canonical_base_type");
   Symbol symb_test_canonical_signature = intern_symbol("test_canonical_signature");
@@ -387,6 +387,8 @@ static void* print_base_types(void* ignore, void*node) {
     {
     case KEYpragma_call:
     {
+      // printf("\nline number %d\n", tnode_line_number(decl));
+
       if (symb_test_canonical_signature == pragma_call_name(decl)) {
         Expressions exprs = pragma_call_parameters(decl);
         Expression type_expr = first_Expression(exprs);

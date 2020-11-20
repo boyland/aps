@@ -212,7 +212,7 @@ static int count_declarations(Declarations declarations)
  * @param decl
  * @return Canonical_use
  */
-static CanonicalType *new_canonical_type_use(Declaration decl)
+CanonicalType *new_canonical_type_use(Declaration decl)
 {
   struct Canonical_use ctype_use = {KEY_CANONICAL_USE, decl};
   void *memory = hash_cons_get(&ctype_use, sizeof(ctype_use), &canonical_type_table);
@@ -398,7 +398,7 @@ static Type get_actual_given_formal(Declaration tdecl, Declaration mdecl, Declar
   Type actual;
 
   for (f = first_Declaration(module_decl_type_formals(mdecl)),
-      actual = first_TypeActual(type_inst_type_actuals(type_decl_type(tdecl)));
+      actual = first_TypeActual(type_inst_type_actuals(some_type_decl_type(tdecl)));
        f != NULL; f = DECL_NEXT(f), actual = TYPE_NEXT(actual))
   {
     if (formal == f)
@@ -548,7 +548,7 @@ CanonicalType *canonical_type_base_type(CanonicalType *ctype)
       case KEYtype_inst:
       {
         Declaration tdecl = decl;
-        Declaration mdecl = USE_DECL(module_use_use(type_inst_module(type_decl_type(tdecl))));
+        Declaration mdecl = USE_DECL(module_use_use(type_inst_module(some_type_decl_type(tdecl))));
         if (module_decl_generating(mdecl))
         {
           return ctype; // No change
@@ -588,7 +588,7 @@ CanonicalType *canonical_type_base_type(CanonicalType *ctype)
       case KEYtype_inst:
       {
         Declaration tdecl = decl;
-        Declaration mdecl = USE_DECL(module_use_use(type_inst_module(type_decl_type(tdecl))));
+        Declaration mdecl = USE_DECL(module_use_use(type_inst_module(some_type_decl_type(tdecl))));
         if (module_decl_generating(mdecl))
         {
           return ctype; // No change
@@ -692,7 +692,7 @@ static CanonicalType *canonical_type_use_use_join(struct Canonical_use *ctypeOut
   case KEYsome_type_decl:
   {
     tdecl = some_decl;
-    mdecl = USE_DECL(module_use_use(type_inst_module(type_decl_type(tdecl))));
+    mdecl = USE_DECL(module_use_use(type_inst_module(some_type_decl_type(tdecl))));
     break;
   }
   default:
@@ -766,7 +766,7 @@ static CanonicalType *canonical_type_qual_use_join(struct Canonical_qual_type *c
   case KEYsome_type_decl:
   {
     tdecl = some_decl;
-    mdecl = USE_DECL(module_use_use(type_inst_module(type_decl_type(tdecl))));
+    mdecl = USE_DECL(module_use_use(type_inst_module(some_type_decl_type(tdecl))));
     break;
   }
   default:
@@ -858,7 +858,7 @@ static CanonicalType *canonical_type_qual_qual_join(struct Canonical_qual_type *
   case KEYsome_type_decl:
   {
     tdecl = some_decl;
-    mdecl = USE_DECL(module_use_use(type_inst_module(type_decl_type(tdecl))));
+    mdecl = USE_DECL(module_use_use(type_inst_module(some_type_decl_type(tdecl))));
     break;
   }
   default:
@@ -969,5 +969,67 @@ CanonicalType *canonical_type_join(CanonicalType *ctypeOuter, CanonicalType *cty
     }
   default:
     fatal_error("canonical_type_join failed");
+  }
+}
+
+int canonical_type_compare(CanonicalType *ctype1, CanonicalType *ctype2)
+{
+  if (ctype1->key != ctype2->key)
+  {
+    return ctype1->key > ctype1->key ? 1 : -1;
+  }
+
+  switch (ctype1->key)
+  {
+  case KEY_CANONICAL_USE:
+  {
+    struct Canonical_use *canonical_use_type1 = (struct Canonical_use *)ctype1;
+    struct Canonical_use *canonical_use_type2 = (struct Canonical_use *)ctype2;
+
+    return tnode_line_number(canonical_use_type1->decl) - tnode_line_number(canonical_use_type2->decl);
+  }
+  case KEY_CANONICAL_QUAL:
+  {
+    struct Canonical_qual_type *canonical_qual_type1 = (struct Canonical_qual_type *)ctype1;
+    struct Canonical_qual_type *canonical_qual_type2 = (struct Canonical_qual_type *)ctype2;
+
+    if (tnode_line_number(canonical_qual_type1->decl) != tnode_line_number(canonical_qual_type2->decl))
+    {
+      return tnode_line_number(canonical_qual_type1->decl) - tnode_line_number(canonical_qual_type2->decl);
+    }
+
+    return canonical_type_compare(canonical_qual_type1->source, canonical_qual_type2->source);
+  }
+  case KEY_CANONICAL_FUNC:
+  {
+    struct Canonical_function_type *canonical_function_type1 = (struct Canonical_function_type *)ctype1;
+    struct Canonical_function_type *canonical_function_type2 = (struct Canonical_function_type *)ctype2;
+
+    if (canonical_function_type1->num_formals != canonical_function_type2->num_formals)
+    {
+      return canonical_function_type1->num_formals - canonical_function_type2->num_formals > 0 ? 1 : -1;
+    }
+
+    int return_type_comp = canonical_type_compare(canonical_function_type1->return_type, canonical_function_type2->return_type);
+    if (return_type_comp != 0)
+    {
+      return return_type_comp;
+    }
+
+    int i;
+    for (i = 0; i < canonical_function_type1->num_formals; i++)
+    {
+      int formal_type_comp = canonical_type_compare(canonical_function_type1->param_types[i], canonical_function_type2->param_types[i]);
+      if (formal_type_comp != 0)
+      {
+        return formal_type_comp > 0 ? 1 : -1;
+      }
+    }
+
+    return 0;
+  }
+  default:
+    fatal_error("canonical_type_compare failed");
+    return 0;
   }
 }

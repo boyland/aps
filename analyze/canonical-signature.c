@@ -11,11 +11,16 @@ static CanonicalSignatureSet *from_type(Type t);
 static CanonicalSignatureSet *from_declaration(Declaration decl);
 static CanonicalSignatureSet *union_canonical_signature_set(CanonicalSignatureSet *set1, CanonicalSignatureSet *set2);
 static CanonicalSignatureSet *new_canonical_signature_set(CanonicalSignature *cSig);
+static CanonicalSignatureSet *substitute_canonical_signature_set_actuals(CanonicalType *source, CanonicalSignatureSet *sig_set);
 
 static CanonicalSignatureSet *EMPTY_CANONICAL_SIGNATURE_SET;
+static Declaration module_TYPE;
 static Declaration module_PHYLUM;
-static Declaration type_PHYLUM;
 static bool initialized = false;
+
+#define union_canonical_signature_set2(a, b) (union_canonical_signature_set(a, b))
+#define union_canonical_signature_set3(a, b, c) (union_canonical_signature_set(a, union_canonical_signature_set(b, c)))
+#define union_canonical_signature_set4(a, b, c, d) (union_canonical_signature_set(a, union_canonical_signature_set3(b, c, d)))
 
 /**
  * Prints canonical signature 
@@ -273,9 +278,6 @@ static CanonicalSignatureSet *from_sig_inst(Signature sig)
   size_t my_size = num_actuals * sizeof(CanonicalType *);
   CanonicalType **result = (CanonicalType **)alloca(my_size);
 
-  // printf("result: %s\nhere: ", decl_name(mdecl));
-  // print_Signature(class_decl_parent(mdecl), stdout);
-
   int i = 0;
   Type type = first_TypeActual(actuals);
 
@@ -323,9 +325,6 @@ static CanonicalSignatureSet *from_sig_use(Signature sig)
  */
 static CanonicalSignatureSet *from_sig(Signature sig)
 {
-  // print_Signature(sig, stdout);
-  // printf("\n");
-
   switch (Signature_KEY(sig))
   {
   case KEYsig_inst:
@@ -365,10 +364,37 @@ static CanonicalSignatureSet *new_canonical_signature_set(CanonicalSignature *cS
 */
 static int canonical_signature_compare(CanonicalSignature *sig1, CanonicalSignature *sig2)
 {
-  int v1 = tnode_line_number(sig1->source_class);
-  int v2 = tnode_line_number(sig2->source_class);
+  if (sig1->is_input != sig2->is_input)
+  {
+    return sig1->is_input > sig2->is_input ? 1 : -1;
+  }
 
-  return v1 == v2 ? 0 : (v1 < v2 ? -1 : 1);
+  if (sig1->is_var != sig2->is_var)
+  {
+    return sig1->is_var > sig2->is_var ? 1 : -1;
+  }
+
+  if (tnode_line_number(sig1->source_class) != tnode_line_number(sig2->source_class))
+  {
+    return tnode_line_number(sig1->source_class) - tnode_line_number(sig2->source_class);
+  }
+
+  if (sig1->num_actuals != sig2->num_actuals)
+  {
+    return sig1->num_actuals - sig2->num_actuals;
+  }
+
+  int i;
+  for (i = 0; i < sig1->num_actuals; i++)
+  {
+    int actual_comp = canonical_type_compare(sig1->actuals[i], sig2->actuals[i]);
+    if (actual_comp != 0)
+    {
+      return actual_comp > 0 ? 1 : -1;
+    }
+  }
+
+  return 0;
 }
 
 /**
@@ -393,13 +419,36 @@ static CanonicalSignatureSet *union_canonical_signature_set(CanonicalSignatureSe
   }
   else
   {
-    size_t my_size = sizeof(struct CanonicalSignatureSet_type) + (set1->size + set2->size) * (sizeof(CanonicalSignature *));
+    // int a, b;
+    // for (a = 0; a < set1->size; a++)
+    // {
+    //   if (set1->members[a] == NULL)
+    //   {
+    //     printf("Something went wrong!\n");
+    //   }
+    //   else
+    //   {
+    //     printf(">");
+    //     print_canonical_signature(set1->members[a], stdout);
+    //     printf("<\n");
+    //   }
+    // }
 
-    // printf("\nA: ");
-    // print_canonical_signature_set(set1, stdout);
-    // printf("\nB: ");
-    // print_canonical_signature_set(set2, stdout);
-    // printf("\n");
+    // for (b = 0; b < set2->size; b++)
+    // {
+    //   if (set2->members[b] == NULL)
+    //   {
+    //     printf("Something went wrong!\n");
+    //   }
+    //   else
+    //   {
+    //     printf(">");
+    //     print_canonical_signature(set2->members[b], stdout);
+    //     printf("<\n");
+    //   }
+    // }
+
+    size_t my_size = sizeof(struct CanonicalSignatureSet_type) + (set1->size + set2->size) * (sizeof(CanonicalSignature *));
 
     struct CanonicalSignatureSet_type *result = (struct CanonicalSignatureSet_type *)alloca(my_size);
     result->size = set1->size + set2->size;
@@ -411,17 +460,23 @@ static CanonicalSignatureSet *union_canonical_signature_set(CanonicalSignatureSe
       int comp = canonical_signature_compare(set1->members[i], set2->members[j]);
       if (comp == 0)
       {
-        result->members[k++] = set1->members[i++, j++];
+        result->members[k] = set1->members[i];
         result->size--;
+        i++;
+        j++;
       }
       else if (comp < 0)
       {
-        result->members[k++] = set1->members[i++];
+        result->members[k] = set1->members[i];
+        i++;
       }
       else
       {
-        result->members[k++] = set2->members[j++];
+        result->members[k] = set2->members[j];
+        j++;
       }
+
+      k++;
     }
 
     while (i < set1->size)
@@ -445,12 +500,16 @@ static CanonicalSignatureSet *union_canonical_signature_set(CanonicalSignatureSe
  */
 static CanonicalSignatureSet *from_type(Type t)
 {
-  // printf("Type\n");
+  // printf("from_type\n");
   // print_Type(t, stdout);
   // printf("\n");
 
   switch (Type_KEY(t))
   {
+  case KEYtype_formal:
+    return EMPTY_CANONICAL_SIGNATURE_SET;
+  case KEYtype_use:
+    return infer_canonical_signatures(canonical_type(t));
   case KEYtype_inst:
   {
     Module m = type_inst_module(t);
@@ -458,18 +517,28 @@ static CanonicalSignatureSet *from_type(Type t)
     int num_actuals = count_actuals(type_inst_type_actuals(t));
     size_t my_size = num_actuals * (sizeof(CanonicalSignature *));
     CanonicalType **result = (CanonicalType *)alloca(my_size);
+    Declaration rdecl = module_decl_result_type(mdecl);
 
-    // Declaration rdecl = module_decl_result_type(mdecl);
-    // switch (Declaration_KEY(rdecl))
-    // {
-    // case KEYsome_type_decl:
-    //   {
-    //     Type nested = some_type_decl_type(rdecl);
-    //     if (Type_KEY(nested) != KEYno_type) {
-    //       return from_type(some_type_decl_type(rdecl));
-    //     }
-    //   }
-    // }
+    // printf("rdecl: %s\nrdecl type:", decl_name(rdecl));
+    // print_Type(some_type_decl_type(rdecl), stdout);
+    // printf("\nparent signature: ");
+    // print_Signature(module_decl_parent(mdecl), stdout);
+    // printf("\n");
+
+    CanonicalSignatureSet *rdecl_sig_set = union_canonical_signature_set(from_declaration(rdecl), from_sig(module_decl_parent(mdecl)));
+    Type rdecl_type = some_type_decl_type(rdecl);
+
+    switch (Type_KEY(rdecl_type))
+    {
+    case KEYtype_inst:
+      rdecl_sig_set = substitute_canonical_signature_set_actuals(new_canonical_type_use(rdecl), rdecl_sig_set);
+      // printf("parent re: ");
+      // print_canonical_signature_set(from_sig(module_decl_parent(mdecl)), stdout);
+      // printf("\nparent sub re: ");
+      // print_canonical_signature_set(rdecl_sig_set, stdout);
+      // printf("\n");
+      break;
+    }
 
     int i = 0;
     Type type = first_TypeActual(type_inst_type_actuals(t));
@@ -479,12 +548,12 @@ static CanonicalSignatureSet *from_type(Type t)
       type = TYPE_NEXT(type);
     }
 
-    return new_canonical_signature_set(new_canonical_signature(true, true, mdecl, num_actuals, result));
+    return union_canonical_signature_set2(rdecl_sig_set, new_canonical_signature_set(new_canonical_signature(true, true, mdecl, num_actuals, result)));
   }
   case KEYno_type:
     // Either TYPE[] or PHYLUM[]
     // type_is_phylum(t) ? type_PHYLUM : module_PHYLUM
-    return new_canonical_signature_set(new_canonical_signature(true, true, type_PHYLUM, 0, NULL));
+    return new_canonical_signature_set(new_canonical_signature(true, true, type_is_phylum(t) ? module_PHYLUM : module_TYPE, 0, NULL));
   default:
     aps_error(t, "Not sure how to find the canonical signature set given Type with Type_KEY of %d", (int)Type_KEY(t));
     return NULL;
@@ -498,8 +567,9 @@ static CanonicalSignatureSet *from_type(Type t)
  */
 static CanonicalSignatureSet *from_declaration(Declaration decl)
 {
-  // printf("decl: %s\n", decl_name(decl));
+  // printf("from_declaration: %s\n", decl_name(decl));
 
+  CanonicalSignatureSet *re;
   switch (Declaration_KEY(decl))
   {
   case KEYsome_type_decl:
@@ -508,22 +578,30 @@ static CanonicalSignatureSet *from_declaration(Declaration decl)
     if (Signature_KEY(sig) == KEYno_sig)
     {
       Type t = some_type_decl_type(decl);
-      return from_type(t);
+      re = from_type(t);
     }
     else
     {
-      return from_sig(sig);
+      re = from_sig(sig);
     }
+    break;
   }
   case KEYsome_type_formal:
   {
     Signature sig = some_type_formal_sig(decl);
-    return from_sig(sig);
+    re = from_sig(sig);
+    break;
   }
   default:
     aps_error(decl, "Not sure how to find the canonical signature set given Declaration with Declaration_KEY of %d", (int)Declaration_KEY(decl));
     return NULL;
   }
+
+  // printf("re: ");
+  // print_canonical_signature_set(re, stdout);
+  // printf("\nfrom_declaration done\n");
+
+  return re;
 }
 
 /**
@@ -570,6 +648,10 @@ CanonicalSignatureSet *infer_canonical_signatures(CanonicalType *ctype)
     fatal_error("canonical signature set is not initialized");
   }
 
+  // printf("infer_canonical_signatures: ");
+  // print_canonical_type(ctype, stdout);
+  // printf("\n");
+
   CanonicalSignatureSet *result = EMPTY_CANONICAL_SIGNATURE_SET;
   bool flag = true;
 
@@ -577,9 +659,6 @@ CanonicalSignatureSet *infer_canonical_signatures(CanonicalType *ctype)
   {
     return EMPTY_CANONICAL_SIGNATURE_SET;
   }
-
-  // print_canonical_type(ctype, stdout);
-  // printf("done\n");
 
   do
   {
@@ -614,6 +693,11 @@ CanonicalSignatureSet *infer_canonical_signatures(CanonicalType *ctype)
 
     ctype = base_type;
 
+    if (flag)
+    {
+      // printf("next base type\n");
+    }
+
   } while (flag);
 
   size_t my_size = sizeof(struct CanonicalSignatureSet_type) + result->size * (sizeof(CanonicalSignature *));
@@ -623,13 +707,13 @@ CanonicalSignatureSet *infer_canonical_signatures(CanonicalType *ctype)
 
 /**
  * Initializes the necessary stuff needed to find the canonical signatures
- * @param module_PHYLUM module decl for PHYLUM[]
- * @param type_PHYLUM type decl for TYPE[]
+ * @param module_TYPE_decl module decl for PHYLUM[]
+ * @param module_PHYLUM_decl type decl for TYPE[]
  */
-void initialize_canonical_signature(Declaration module_PHYLUM_decl, Declaration type_PHYLUM_decl)
+void initialize_canonical_signature(Declaration module_TYPE_decl, Declaration module_PHYLUM_decl)
 {
+  module_TYPE = module_TYPE_decl;
   module_PHYLUM = module_PHYLUM_decl;
-  type_PHYLUM = type_PHYLUM_decl;
 
   size_t empty_set_size = sizeof(struct CanonicalSignature_type);
   CanonicalSignatureSet *empty_set = alloca(empty_set_size);

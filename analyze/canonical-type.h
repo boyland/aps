@@ -33,13 +33,6 @@ struct Canonical_use
   Declaration decl;
 };
 
-// Immutable Set with total ordering property
-struct CanonicalTypeSet_type
-{
-  int size;
-  CanonicalType *members[];
-};
-
 typedef struct CanonicalTypeSet_type CanonicalTypeSet;
 
 CanonicalType *canonical_type(Type ty);
@@ -47,5 +40,9 @@ CanonicalType *canonical_type(Type ty);
 CanonicalType *canonical_type_base_type(CanonicalType *canonicalType);
 
 CanonicalType *canonical_type_join(CanonicalType *ctypeOuter, CanonicalType *ctypeInner, bool isBaseType);
+
+CanonicalType *new_canonical_type_use(Declaration decl);
+
+int canonical_type_compare(CanonicalType *ctype1, CanonicalType *ctype2);
 
 #endif

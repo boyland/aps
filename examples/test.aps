@@ -13,7 +13,7 @@ begin
   type Amir5 := MAX_LATTICE[Integer](0);
 
   pragma test_canonical_signature(type Amir1, "{IEEE[]}");
-  pragma test_canonical_signature(type Amir2, "{STRING[]}");
+  pragma test_canonical_signature(type Amir2, "{BASIC[],PRINTABLE[],ORDERED[],ORDERED_COLLECTION[Character],CONCATENATING[],LIST[Character],STRING[]}");
   pragma test_canonical_signature(type Amir3, "{LIST[Integer]}");
   pragma test_canonical_signature(type Amir4, "{BASIC[],PRINTABLE[],MAKE_LATTICE[Boolean]}");
   pragma test_canonical_signature(type Amir5, "{PRINTABLE[],ORDERED[],NUMERIC[],MAKE_LATTICE[Integer],MAX_LATTICE[Integer]}");
