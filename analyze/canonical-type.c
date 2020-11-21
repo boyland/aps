@@ -324,7 +324,7 @@ static bool is_some_result_decl(Declaration decl)
       switch (Declaration_KEY(current_decl))
       {
       case KEYmodule_decl:
-        return module_decl_result_type(current_decl) == decl;
+        return some_class_decl_result_type(current_decl) == decl;
       }
     }
   }
@@ -555,7 +555,7 @@ CanonicalType *canonical_type_base_type(CanonicalType *ctype)
         }
         else
         {
-          return canonical_type_join(new_canonical_type_use(decl), new_canonical_type_use(module_decl_result_type(mdecl)), true);
+          return canonical_type_join(new_canonical_type_use(decl), new_canonical_type_use(some_class_decl_result_type(mdecl)), true);
         }
       }
       }
@@ -595,7 +595,7 @@ CanonicalType *canonical_type_base_type(CanonicalType *ctype)
         }
         else
         {
-          return canonical_type_join(ctype_qual->source, canonical_type_join(new_canonical_type_use(decl), new_canonical_type_use(module_decl_result_type(mdecl)), true), true);
+          return canonical_type_join(ctype_qual->source, canonical_type_join(new_canonical_type_use(decl), new_canonical_type_use(some_class_decl_result_type(mdecl)), true), true);
         }
       }
       }
@@ -685,6 +685,14 @@ static CanonicalType *canonical_type_use_use_join(struct Canonical_use *ctypeOut
   Declaration mdecl = NULL;
   Declaration tdecl = NULL;
 
+  // printf("outer: ");
+  // print_canonical_type(ctypeOuter, stdout);
+  // printf("\n");
+
+  // printf("inner: ");
+  // print_canonical_type(ctypeInner, stdout);
+  // printf("\n");
+
   // Tries to resolve mdecl and tdecl from ctypeOuter
   Declaration some_decl = canonical_type_decl(ctypeOuter);
   switch (Declaration_KEY(some_decl))
@@ -692,6 +700,10 @@ static CanonicalType *canonical_type_use_use_join(struct Canonical_use *ctypeOut
   case KEYsome_type_decl:
   {
     tdecl = some_decl;
+    // if (Type_KEY(some_type_decl_type(tdecl)) == KEYno_type)
+    // {
+    //   return ctypeInner;
+    // }
     mdecl = USE_DECL(module_use_use(type_inst_module(some_type_decl_type(tdecl))));
     break;
   }
@@ -710,14 +722,14 @@ static CanonicalType *canonical_type_use_use_join(struct Canonical_use *ctypeOut
   if (!isBaseType)
   {
     // If decl is the Result of module then return type decl
-    if (module_decl_result_type(mdecl) == decl)
+    if (some_class_decl_result_type(mdecl) == decl)
     {
       return new_canonical_type_use(tdecl);
     }
   }
 
   // Going deeper will be a dead-end or G0$Result
-  if (module_decl_generating(mdecl) && decl == module_decl_result_type(mdecl))
+  if (module_decl_generating(mdecl) && decl == some_class_decl_result_type(mdecl))
   {
     return ctypeOuter;
   }
@@ -785,13 +797,13 @@ static CanonicalType *canonical_type_qual_use_join(struct Canonical_qual_type *c
   {
 
     // If decl is the Result of module then return type decl
-    if (module_decl_result_type(mdecl) == decl)
+    if (some_class_decl_result_type(mdecl) == decl)
     {
       return new_canonical_type_use(tdecl);
     }
   }
 
-  if (module_decl_generating(mdecl) && decl == module_decl_result_type(mdecl))
+  if (module_decl_generating(mdecl) && decl == some_class_decl_result_type(mdecl))
   {
     return ctypeOuter;
   }
@@ -815,7 +827,7 @@ static CanonicalType *canonical_type_qual_use_join(struct Canonical_qual_type *c
       }
       else
       {
-        CanonicalType *first = canonical_type_join(new_canonical_type_use(decl), new_canonical_type_use(module_decl_result_type(nested_mdecl)), isBaseType);
+        CanonicalType *first = canonical_type_join(new_canonical_type_use(decl), new_canonical_type_use(some_class_decl_result_type(nested_mdecl)), isBaseType);
         CanonicalType *second = canonical_type_join(new_canonical_type_use(ctypeOuter->decl), first, isBaseType);
         CanonicalType *third = canonical_type_join(ctypeOuter->source, second, isBaseType);
 
@@ -876,14 +888,14 @@ static CanonicalType *canonical_type_qual_qual_join(struct Canonical_qual_type *
   if (!isBaseType)
   {
     // If decl is the Result of module then return type decl
-    if (module_decl_result_type(mdecl) == decl)
+    if (some_class_decl_result_type(mdecl) == decl)
     {
       return new_canonical_type_use(tdecl);
     }
   }
 
   // Going deeper will be a dead-end or G0$Result
-  if (module_decl_generating(mdecl) && decl == module_decl_result_type(mdecl))
+  if (module_decl_generating(mdecl) && decl == some_class_decl_result_type(mdecl))
   {
     return ctypeOuter;
   }
@@ -908,7 +920,7 @@ static CanonicalType *canonical_type_qual_qual_join(struct Canonical_qual_type *
       }
       else
       {
-        CanonicalType *first = canonical_type_join(new_canonical_type_use(decl), new_canonical_type_use(module_decl_result_type(nested_mdecl)), isBaseType);
+        CanonicalType *first = canonical_type_join(new_canonical_type_use(decl), new_canonical_type_use(some_class_decl_result_type(nested_mdecl)), isBaseType);
         CanonicalType *second = canonical_type_join(ctypeInner->source, first, isBaseType);
         CanonicalType *third = canonical_type_join(new_canonical_type_use(ctypeOuter->decl), second, isBaseType);
         CanonicalType *fourth = canonical_type_join(ctypeOuter->source, third, isBaseType);
