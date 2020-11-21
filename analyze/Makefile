@@ -26,9 +26,9 @@ aps-oag.o : aps-oag.h
 aps-cycle.o aps-dnc.o : aps-cycle.h
 aps-debug.o : aps-debug.h
 prime.o : prime.h
-hashcons.o : hashcons.h
-canonical-signature.o : canonical-signature.h
-canonical-type.o : canonical-type.h
+hashcons.o : prime.o hashcons.h
+canonical-type.o : hashcons.o canonical-type.h
+canonical-signature.o : hashcons.o canonical-type.o canonical-signature.h
 
 install: apsc aps-ag.a
 	mv apsc ../bin/apssched

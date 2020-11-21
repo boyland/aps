@@ -21,8 +21,9 @@ static PRIMES primes = {NULL, 0};
  * Create a boolean array "prime[0..n]" and initialize
  * all entries as true. A value in prime[i] will
  * finally be false if i is not a prime, else true.
+ * @param n size of the lookup array
  */
-void sieve_of_eratosthenes(int n)
+static void sieve_of_eratosthenes(int n)
 {
   primes.size = n;
 
@@ -36,10 +37,10 @@ void sieve_of_eratosthenes(int n)
     primes.array = realloc(primes.array, bytes);
   }
 
-  memset(primes.array, 1, bytes);
+  memset(primes.array, true, bytes);
 
-  primes.array[0] = false;
-  primes.array[1] = false;
+  primes.array[0] = false;  // 0 is not a prime
+  primes.array[1] = false;  // 1 is not a prime
 
   int i, j;
   for (i = 2; i * i < n; i++)
@@ -59,8 +60,10 @@ void sieve_of_eratosthenes(int n)
 /**
  * Return the next prime number n great that or equal to the argument
  * such that n -2 is also prime
+ * @param x lower bound prime number
+ * @return larger of the next twin prime 
  */
-int next_twin_prime(int x)
+int next_twin_prime(int p)
 {
   // If array is not initialized
   if (primes.array == NULL)
@@ -69,14 +72,14 @@ int next_twin_prime(int x)
   }
 
   // If array size is not enough then resize the array
-  if (x >= primes.size)
+  if (p >= primes.size)
   {
     int new_size = DOUBLE_SIZE(primes.size);
 
     // Resized array is also not enough
-    if (new_size <= x)
+    if (new_size <= p)
     {
-      new_size = DOUBLE_SIZE(x);
+      new_size = DOUBLE_SIZE(p);
     }
 
     sieve_of_eratosthenes(new_size);
@@ -85,9 +88,9 @@ int next_twin_prime(int x)
   while (true)
   {
     int i;
-    for (i = x; i < primes.size; i++)
+    for (i = p; i < primes.size; i++)
     {
-      if (primes.array[i] == true && primes.array[i - 2] == true)
+      if (primes.array[i] && primes.array[i - 2])
       {
         return i;
       }

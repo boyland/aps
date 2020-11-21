@@ -145,6 +145,7 @@ void *hash_cons_get(void *item, size_t temp_size, HASH_CONS_TABLE hc)
 
 /**
  * Hash string
+ * Source: http://www.cse.yorku.ca/~oz/hash.html
  * @param string
  * @return intger hash value
  */

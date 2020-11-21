@@ -423,6 +423,44 @@ begin
   pragma test_canonical_signature(type RO2, "{BASIC[],PHYLUM[],EXT[R$O2$C]}");
   pragma test_canonical_signature(type RP2, "{BASIC[],EXT[T]}");
 
+  -------------------------------------------------------
+
+  type FT1 := function(a: A   ; b : B   ; c: C   ; d: D)  : D;
+  type FT2 := function(a: E   ; b : F   ; c: G   ; d: H) : H;
+  type FT3 := function(a: E2  ; b : F2  ; c: G2  ; d: H2) : H2;
+  type FT4 := function(a: I   ; b : J   ; c: K   ; d: L)  : L2;
+  type FT5 := function(a: I2  ; b : J2  ; c: K2  ; d: L2) : L2;
+  type FT6 := function(a: M   ; b : N   ; c: O   ; d: P)  : P;
+  type FT7 := function(a: M1  ; b : N1  ; c: O1  ; d: P1) : P1;
+  type FT8 := function(a: M2  ; b : N2  ; c: O2  ; d: P2) : P2;
+
+  pragma test_canonical_type(type FT1, "(T,Integer,C,Result)=>Result");
+  pragma test_canonical_type(type FT2, "(T,Integer,C,Result)=>Result");
+  pragma test_canonical_type(type FT3, "(T,Integer,C,Result)=>Result");
+  pragma test_canonical_type(type FT4, "(I,J,K,L)=>L2");
+  pragma test_canonical_type(type FT5, "(I2,J2,K2,L2)=>L2");
+  pragma test_canonical_type(type FT6, "(M,N,O,P)=>P");
+  pragma test_canonical_type(type FT7, "(M1,N1,O1,P1)=>P1");
+  pragma test_canonical_type(type FT8, "(M2,N2,O2,P2)=>P2");
+
+  pragma test_canonical_base_type(type FT1, "(T,Integer,C,Result)=>Result");
+  pragma test_canonical_base_type(type FT2, "(T,Integer,C,Result)=>Result");
+  pragma test_canonical_base_type(type FT3, "(T,Integer,C,Result)=>Result");
+  pragma test_canonical_base_type(type FT4, "(I,J,K,L)=>L2");
+  pragma test_canonical_base_type(type FT5, "(I2,J2,K2,L2)=>L2");
+  pragma test_canonical_base_type(type FT6, "(T,Integer,C,Result)=>Result");
+  pragma test_canonical_base_type(type FT7, "(T,Integer,C,Result)=>Result");
+  pragma test_canonical_base_type(type FT8, "(T,Integer,C,Result)=>Result");
+
+  pragma test_canonical_signature(type FT1, "R$M2");
+  pragma test_canonical_signature(type FT2, "R$N2");
+  pragma test_canonical_signature(type FT3, "R$M2");
+  pragma test_canonical_signature(type FT4, "R$N2");
+  pragma test_canonical_signature(type FT5, "R$M2");
+  pragma test_canonical_signature(type FT6, "R$N2");
+  pragma test_canonical_signature(type FT7, "R$M2");
+  pragma test_canonical_signature(type FT8, "R$N2");
+
 end;
 
 module EXT[T :: BASIC[]] extends T

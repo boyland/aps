@@ -416,11 +416,11 @@ static CanonicalSignatureSet *single_canonical_signature_set(CanonicalSignature 
 }
 
 /**
-* Compares two canonical signatures using line number of source class
-* @param sig1 Canonical signature
-* @param sig2 Canonical signature
-* @return 0, -1, 1 indicating the result of comparison
-*/
+ * Comparator for two canonical signature
+ * @param sig1 first canonical signature
+ * @param sig2 second canonical signature
+ * @return integer value representing the comparaison
+ */
 static int canonical_signature_compare(CanonicalSignature *sig1, CanonicalSignature *sig2)
 {
   if (sig1->is_input != sig2->is_input)
@@ -764,13 +764,7 @@ CanonicalSignatureSet *infer_canonical_signatures(CanonicalType *ctype)
 
     CanonicalType *base_type = canonical_type_base_type(ctype);
     flag &= !(base_type == NULL || base_type == ctype);
-
     ctype = base_type;
-
-    if (flag)
-    {
-      // printf("next base type\n");
-    }
 
   } while (flag);
 

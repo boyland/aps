@@ -39,7 +39,7 @@ CanonicalType *canonical_type(Type ty);
 
 CanonicalType *canonical_type_base_type(CanonicalType *canonicalType);
 
-CanonicalType *canonical_type_join(CanonicalType *ctypeOuter, CanonicalType *ctypeInner, bool isBaseType);
+CanonicalType *canonical_type_join(CanonicalType *ctype_outer, CanonicalType *ctype_inner, bool is_base_type);
 
 CanonicalType *new_canonical_type_use(Declaration decl);
 
