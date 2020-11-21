@@ -6,19 +6,23 @@ begin
   type C;             
   type D := Result;
 
-  type Amir0 := Integer;
-  type Amir1 := Real;
-  type Amir2 := String;
-  type Amir3 := Range;
-  type Amir4 := OrLattice;
-  type Amir5 := MAX_LATTICE[Integer](0);
+  type Misc0 := Integer;
+  type Misc1 := Real;
+  type Misc2 := String;
+  type Misc3 := Range;
+  type Misc4 := OrLattice;
+  type Misc5 := MAX_LATTICE[Integer](0);
+  type Misc6 := IEEEsingle;
+  type Misc7 := IEEEdouble;
 
-  pragma test_canonical_signature(type Amir0, "{PRINTABLE[],ORDERED[],NUMERIC[]}");
-  pragma test_canonical_signature(type Amir1, "{PRINTABLE[],REAL[],IEEE[],PHYLUM[]}");
-  pragma test_canonical_signature(type Amir2, "{BASIC[],PRINTABLE[],ORDERED[],ORDERED_COLLECTION[Character],CONCATENATING[],PHYLUM[],LIST[Character],STRING[]}");
-  pragma test_canonical_signature(type Amir3, "{BASIC[],ORDERED_COLLECTION[Integer],CONCATENATING[],PHYLUM[],LIST[Integer]}");
-  pragma test_canonical_signature(type Amir4, "{BASIC[],PRINTABLE[],COMBINABLE[],LATTICE[],MAKE_LATTICE[Boolean]}");
-  pragma test_canonical_signature(type Amir5, "{BASIC[],PRINTABLE[],ORDERED[],NUMERIC[],COMBINABLE[],LATTICE[],MAKE_LATTICE[Integer],MAX_LATTICE[Integer]}");
+  pragma test_canonical_signature(type Misc0, "{PRINTABLE[],ORDERED[],NUMERIC[]}");
+  pragma test_canonical_signature(type Misc1, "{PRINTABLE[],REAL[],IEEE[],PHYLUM[]}");
+  pragma test_canonical_signature(type Misc2, "{BASIC[],PRINTABLE[],ORDERED[],ORDERED_COLLECTION[Character],CONCATENATING[],PHYLUM[],LIST[Character],STRING[]}");
+  pragma test_canonical_signature(type Misc3, "{BASIC[],ORDERED_COLLECTION[Integer],CONCATENATING[],PHYLUM[],LIST[Integer]}");
+  pragma test_canonical_signature(type Misc4, "{BASIC[],PRINTABLE[],COMBINABLE[],LATTICE[],MAKE_LATTICE[Boolean]}");
+  pragma test_canonical_signature(type Misc5, "{BASIC[],PRINTABLE[],ORDERED[],NUMERIC[],COMBINABLE[],LATTICE[],MAKE_LATTICE[Integer],MAX_LATTICE[Integer]}");
+  pragma test_canonical_signature(type Misc6, "{PRINTABLE[],REAL[],IEEE[],PHYLUM[]}");
+  pragma test_canonical_signature(type Misc7, "{PRINTABLE[],REAL[],IEEE[],PHYLUM[]}");
 
 
   pragma test_canonical_type(type A, "T");

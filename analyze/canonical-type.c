@@ -6,12 +6,12 @@
 
 /**
  * Monadic way of finding canonical type
- * @param ctypeOuter outer canonical type
- * @param ctypeInner inner canonical type
+ * @param ctype_outer outer canonical type
+ * @param ctype_inner inner canonical type
  * @param isBaseType flag indicating if we are resolving base type
  * @return resuling canonical base type
  */
-CanonicalType *canonical_type_join(CanonicalType *ctypeOuter, CanonicalType *ctypeInner, bool isBaseType);
+CanonicalType *canonical_type_join(CanonicalType *ctype_outer, CanonicalType *ctype_inner, bool isBaseType);
 
 /**
  * Hash CanonicalType
@@ -419,10 +419,10 @@ static Type get_actual_given_formal(Declaration tdecl, Declaration mdecl, Declar
  */
 static CanonicalType *canonical_type_qual_use(Use use)
 {
-  CanonicalType *ctypeOuter = canonical_type(qual_use_from(use));
-  CanonicalType *ctypeInner = canonical_type_use(use);
+  CanonicalType *ctype_outer = canonical_type(qual_use_from(use));
+  CanonicalType *ctype_inner = canonical_type_use(use);
 
-  return canonical_type_join(ctypeOuter, ctypeInner, false);
+  return canonical_type_join(ctype_outer, ctype_inner, false);
 }
 
 /**
@@ -650,22 +650,22 @@ static CanonicalType *canonical_type_left_refactor(struct Canonical_use *ctypeLe
 
 /**
  * Monad join of any type of canonical type with a function canonical type
- * @param ctypeOuter outer canonical type any
- * @param ctypeInner inner canonical type function
+ * @param ctype_outer outer canonical type any
+ * @param ctype_inner inner canonical type function
  * @param isBaseType
  * @return resuling canonical base type
  */
-static CanonicalType *canonical_type_any_function_join(CanonicalType *ctypeOuter, struct Canonical_function_type *ctypeInner, bool isBaseType)
+static CanonicalType *canonical_type_any_function_join(CanonicalType *ctype_outer, struct Canonical_function_type *ctype_inner, bool isBaseType)
 {
-  struct Canonical_function_type *canonical_type_function = (struct Canonical_function_type *)shallow_clone_canonical_function_types(ctypeInner);
+  struct Canonical_function_type *canonical_type_function = (struct Canonical_function_type *)shallow_clone_canonical_function_types(ctype_inner);
 
   size_t my_size = sizeof(struct Canonical_function_type) + canonical_type_function->num_formals * (sizeof(CanonicalType *));
 
-  canonical_type_function->return_type = canonical_type_join(ctypeOuter, canonical_type_function->return_type, isBaseType);
+  canonical_type_function->return_type = canonical_type_join(ctype_outer, canonical_type_function->return_type, isBaseType);
   int i;
   for (i = 0; i < canonical_type_function->param_types[i]; i++)
   {
-    canonical_type_function->param_types[i] = canonical_type_join(ctypeOuter, canonical_type_function->param_types[i], isBaseType);
+    canonical_type_function->param_types[i] = canonical_type_join(ctype_outer, canonical_type_function->param_types[i], isBaseType);
   }
 
   void *memory = hash_cons_get(canonical_type_function, my_size, &canonical_type_table);
@@ -680,21 +680,21 @@ static CanonicalType *canonical_type_any_function_join(CanonicalType *ctypeOuter
  * @param isBaseType true means base type requested, false is the opposite
  * @return resulting canonical type 
  */
-static CanonicalType *canonical_type_use_use_join(struct Canonical_use *ctypeOuter, struct Canonical_use *ctypeInner, bool isBaseType)
+static CanonicalType *canonical_type_use_use_join(struct Canonical_use *ctype_outer, struct Canonical_use *ctype_inner, bool isBaseType)
 {
   Declaration mdecl = NULL;
   Declaration tdecl = NULL;
 
   // printf("outer: ");
-  // print_canonical_type(ctypeOuter, stdout);
+  // print_canonical_type(ctype_outer, stdout);
   // printf("\n");
 
   // printf("inner: ");
-  // print_canonical_type(ctypeInner, stdout);
+  // print_canonical_type(ctype_inner, stdout);
   // printf("\n");
 
-  // Tries to resolve mdecl and tdecl from ctypeOuter
-  Declaration some_decl = canonical_type_decl(ctypeOuter);
+  // Tries to resolve mdecl and tdecl from ctype_outer
+  Declaration some_decl = canonical_type_decl(ctype_outer);
   switch (Declaration_KEY(some_decl))
   {
   case KEYsome_type_decl:
@@ -702,7 +702,7 @@ static CanonicalType *canonical_type_use_use_join(struct Canonical_use *ctypeOut
     tdecl = some_decl;
     // if (Type_KEY(some_type_decl_type(tdecl)) == KEYno_type)
     // {
-    //   return ctypeInner;
+    //   return ctype_inner;
     // }
     mdecl = USE_DECL(module_use_use(type_inst_module(some_type_decl_type(tdecl))));
     break;
@@ -711,7 +711,7 @@ static CanonicalType *canonical_type_use_use_join(struct Canonical_use *ctypeOut
     fatal_error("Not sure what type of canonical type it is");
   }
 
-  Declaration decl = ctypeInner->decl;
+  Declaration decl = ctype_inner->decl;
 
   // If decl is not inside the module then short-circuit
   if (!is_inside_module(mdecl, decl))
@@ -731,7 +731,7 @@ static CanonicalType *canonical_type_use_use_join(struct Canonical_use *ctypeOut
   // Going deeper will be a dead-end or G0$Result
   if (module_decl_generating(mdecl) && decl == some_class_decl_result_type(mdecl))
   {
-    return ctypeOuter;
+    return ctype_outer;
   }
 
   switch (Declaration_KEY(decl))
@@ -746,9 +746,9 @@ static CanonicalType *canonical_type_use_use_join(struct Canonical_use *ctypeOut
     case KEYno_type:
     case KEYprivate_type:
     case KEYtype_inst:
-      return new_canonical_type_qual(ctypeOuter, decl);
+      return new_canonical_type_qual(ctype_outer, decl);
     case KEYtype_use:
-      return canonical_type_join(ctypeOuter, canonical_type(t), isBaseType);
+      return canonical_type_join(ctype_outer, canonical_type(t), isBaseType);
     default:
       aps_error(t, "Case of type use %d is not implemented in canonical_type_base_type() for type", (int)Type_KEY(t));
       return NULL;
@@ -766,13 +766,13 @@ static CanonicalType *canonical_type_use_use_join(struct Canonical_use *ctypeOut
  * @param inner canonical type use
  * @return resulting canonical base type 
  */
-static CanonicalType *canonical_type_qual_use_join(struct Canonical_qual_type *ctypeOuter, struct Canonical_use *ctypeInner, bool isBaseType)
+static CanonicalType *canonical_type_qual_use_join(struct Canonical_qual_type *ctype_outer, struct Canonical_use *ctype_inner, bool isBaseType)
 {
   Declaration mdecl = NULL;
   Declaration tdecl = NULL;
 
-  // Tries to resolve mdecl and tdecl from ctypeOuter
-  Declaration some_decl = canonical_type_decl(ctypeOuter);
+  // Tries to resolve mdecl and tdecl from ctype_outer
+  Declaration some_decl = canonical_type_decl(ctype_outer);
   switch (Declaration_KEY(some_decl))
   {
   case KEYsome_type_decl:
@@ -785,7 +785,7 @@ static CanonicalType *canonical_type_qual_use_join(struct Canonical_qual_type *c
     fatal_error("Not sure what type of canonical type it is");
   }
 
-  Declaration decl = ctypeInner->decl;
+  Declaration decl = ctype_inner->decl;
 
   // If decl is not inside the module then short-circuit
   if (!is_inside_module(mdecl, decl))
@@ -795,7 +795,6 @@ static CanonicalType *canonical_type_qual_use_join(struct Canonical_qual_type *c
 
   if (!isBaseType)
   {
-
     // If decl is the Result of module then return type decl
     if (some_class_decl_result_type(mdecl) == decl)
     {
@@ -805,7 +804,7 @@ static CanonicalType *canonical_type_qual_use_join(struct Canonical_qual_type *c
 
   if (module_decl_generating(mdecl) && decl == some_class_decl_result_type(mdecl))
   {
-    return ctypeOuter;
+    return ctype_outer;
   }
 
   switch (Declaration_KEY(decl))
@@ -821,31 +820,31 @@ static CanonicalType *canonical_type_qual_use_join(struct Canonical_qual_type *c
 
       if (module_decl_generating(nested_mdecl))
       {
-        CanonicalType *first = canonical_type_join(new_canonical_type_use(ctypeOuter->decl), new_canonical_type_use(decl), isBaseType);
-        CanonicalType *second = canonical_type_join(ctypeOuter->source, first, isBaseType);
+        CanonicalType *first = canonical_type_join(new_canonical_type_use(ctype_outer->decl), new_canonical_type_use(decl), isBaseType);
+        CanonicalType *second = canonical_type_join(ctype_outer->source, first, isBaseType);
         return second;
       }
       else
       {
         CanonicalType *first = canonical_type_join(new_canonical_type_use(decl), new_canonical_type_use(some_class_decl_result_type(nested_mdecl)), isBaseType);
-        CanonicalType *second = canonical_type_join(new_canonical_type_use(ctypeOuter->decl), first, isBaseType);
-        CanonicalType *third = canonical_type_join(ctypeOuter->source, second, isBaseType);
+        CanonicalType *second = canonical_type_join(new_canonical_type_use(ctype_outer->decl), first, isBaseType);
+        CanonicalType *third = canonical_type_join(ctype_outer->source, second, isBaseType);
 
         return third;
       }
     }
     case KEYtype_use:
-      return canonical_type_join(ctypeOuter, canonical_type(tdecl_type), isBaseType);
+      return canonical_type_join(ctype_outer, canonical_type(tdecl_type), isBaseType);
     case KEYno_type:
     case KEYprivate_type:
-      return new_canonical_type_qual(ctypeOuter, decl);
+      return new_canonical_type_qual(ctype_outer, decl);
     default:
       aps_error(tdecl_type, "Unexpected type %d in resolve_canonical_base_type()", (int)Type_KEY(tdecl_type));
       return decl;
     }
   }
   case KEYsome_type_formal:
-    return canonical_type_join(ctypeOuter->source, canonical_type(get_actual_given_formal(tdecl, mdecl, decl)), isBaseType);
+    return canonical_type_join(ctype_outer->source, canonical_type(get_actual_given_formal(tdecl, mdecl, decl)), isBaseType);
   default:
     aps_error(decl, "Unexpected decl %d in resolve_canonical_base_type()", (int)Declaration_KEY(decl));
     return decl;
@@ -858,13 +857,13 @@ static CanonicalType *canonical_type_qual_use_join(struct Canonical_qual_type *c
  * @param inner canonical type qual
  * @return resulting canonical base type 
  */
-static CanonicalType *canonical_type_qual_qual_join(struct Canonical_qual_type *ctypeOuter, struct Canonical_qual_type *ctypeInner, bool isBaseType)
+static CanonicalType *canonical_type_qual_qual_join(struct Canonical_qual_type *ctype_outer, struct Canonical_qual_type *ctype_inner, bool isBaseType)
 {
   Declaration mdecl = NULL;
   Declaration tdecl = NULL;
 
-  // Tries to resolve mdecl and tdecl from ctypeOuter
-  Declaration some_decl = canonical_type_decl(ctypeOuter);
+  // Tries to resolve mdecl and tdecl from ctype_outer
+  Declaration some_decl = canonical_type_decl(ctype_outer);
   switch (Declaration_KEY(some_decl))
   {
   case KEYsome_type_decl:
@@ -877,7 +876,7 @@ static CanonicalType *canonical_type_qual_qual_join(struct Canonical_qual_type *
     fatal_error("Not sure what type of canonical type it is");
   }
 
-  Declaration decl = ctypeInner->decl;
+  Declaration decl = ctype_inner->decl;
 
   // If decl is not inside the module then short-circuit
   if (!is_inside_module(mdecl, decl))
@@ -897,7 +896,7 @@ static CanonicalType *canonical_type_qual_qual_join(struct Canonical_qual_type *
   // Going deeper will be a dead-end or G0$Result
   if (module_decl_generating(mdecl) && decl == some_class_decl_result_type(mdecl))
   {
-    return ctypeOuter;
+    return ctype_outer;
   }
 
   switch (Declaration_KEY(decl))
@@ -913,33 +912,33 @@ static CanonicalType *canonical_type_qual_qual_join(struct Canonical_qual_type *
 
       if (module_decl_generating(nested_mdecl))
       {
-        CanonicalType *first = canonical_type_join(new_canonical_type_use(ctypeOuter->decl), new_canonical_type_use(decl), isBaseType);
-        CanonicalType *second = canonical_type_join(ctypeOuter->source, first, isBaseType);
+        CanonicalType *first = canonical_type_join(new_canonical_type_use(ctype_outer->decl), new_canonical_type_use(decl), isBaseType);
+        CanonicalType *second = canonical_type_join(ctype_outer->source, first, isBaseType);
 
         return second;
       }
       else
       {
         CanonicalType *first = canonical_type_join(new_canonical_type_use(decl), new_canonical_type_use(some_class_decl_result_type(nested_mdecl)), isBaseType);
-        CanonicalType *second = canonical_type_join(ctypeInner->source, first, isBaseType);
-        CanonicalType *third = canonical_type_join(new_canonical_type_use(ctypeOuter->decl), second, isBaseType);
-        CanonicalType *fourth = canonical_type_join(ctypeOuter->source, third, isBaseType);
+        CanonicalType *second = canonical_type_join(ctype_inner->source, first, isBaseType);
+        CanonicalType *third = canonical_type_join(new_canonical_type_use(ctype_outer->decl), second, isBaseType);
+        CanonicalType *fourth = canonical_type_join(ctype_outer->source, third, isBaseType);
 
         return fourth;
       }
     }
     case KEYtype_use:
-      return canonical_type_join(ctypeOuter, canonical_type(tdecl_type), isBaseType);
+      return canonical_type_join(ctype_outer, canonical_type(tdecl_type), isBaseType);
     case KEYno_type:
     case KEYprivate_type:
-      return canonical_type_left_refactor(ctypeOuter, ctypeInner);
+      return canonical_type_left_refactor(ctype_outer, ctype_inner);
     default:
       aps_error(tdecl_type, "Unexpected type %d in resolve_canonical_base_type()", (int)Type_KEY(tdecl_type));
       return decl;
     }
   }
   case KEYsome_type_formal:
-    return canonical_type_join(ctypeOuter->source, canonical_type(get_actual_given_formal(tdecl, mdecl, decl)), isBaseType);
+    return canonical_type_join(ctype_outer->source, canonical_type(get_actual_given_formal(tdecl, mdecl, decl)), isBaseType);
   default:
     aps_error(decl, "Unexpected decl %d in resolve_canonical_base_type()", (int)Declaration_KEY(decl));
     return decl;
@@ -948,36 +947,36 @@ static CanonicalType *canonical_type_qual_qual_join(struct Canonical_qual_type *
 
 /**
  * Joining canonical types in case-by-case analysis fashion
- * @param ctypeOuter outer canonical type
- * @param ctypeInner inner canonical type
+ * @param ctype_outer outer canonical type
+ * @param ctype_inner inner canonical type
  * @param isBaseType true means base type requested, false is the opposite
  * @return resuling canonical base type
  */
-CanonicalType *canonical_type_join(CanonicalType *ctypeOuter, CanonicalType *ctypeInner, bool isBaseType)
+CanonicalType *canonical_type_join(CanonicalType *ctype_outer, CanonicalType *ctype_inner, bool isBaseType)
 {
-  switch (ctypeOuter->key)
+  switch (ctype_outer->key)
   {
   case KEY_CANONICAL_USE:
-    switch (ctypeInner->key)
+    switch (ctype_inner->key)
     {
     case KEY_CANONICAL_USE:
-      return canonical_type_use_use_join((struct Canonical_use *)ctypeOuter, (struct Canonical_use *)ctypeInner, isBaseType);
+      return canonical_type_use_use_join((struct Canonical_use *)ctype_outer, (struct Canonical_use *)ctype_inner, isBaseType);
     case KEY_CANONICAL_FUNC:
-      return canonical_type_any_function_join(ctypeOuter, (struct Canonical_function_type *)ctypeInner, isBaseType);
+      return canonical_type_any_function_join(ctype_outer, (struct Canonical_function_type *)ctype_inner, isBaseType);
     case KEY_CANONICAL_QUAL:
-      return canonical_type_left_refactor((struct Canonical_use *)ctypeOuter, (struct Canonical_qual_type *)ctypeInner);
+      return canonical_type_left_refactor((struct Canonical_use *)ctype_outer, (struct Canonical_qual_type *)ctype_inner);
     default:
       fatal_error("canonical_type_join failed");
     }
   case KEY_CANONICAL_QUAL:
-    switch (ctypeInner->key)
+    switch (ctype_inner->key)
     {
     case KEY_CANONICAL_USE:
-      return canonical_type_qual_use_join((struct Canonical_qual_type *)ctypeOuter, (struct Canonical_use *)ctypeInner, isBaseType);
+      return canonical_type_qual_use_join((struct Canonical_qual_type *)ctype_outer, (struct Canonical_use *)ctype_inner, isBaseType);
     case KEY_CANONICAL_QUAL:
-      return canonical_type_qual_qual_join((struct Canonical_qual_type *)ctypeOuter, (struct Canonical_qual_type *)ctypeInner, isBaseType);
+      return canonical_type_qual_qual_join((struct Canonical_qual_type *)ctype_outer, (struct Canonical_qual_type *)ctype_inner, isBaseType);
     case KEY_CANONICAL_FUNC:
-      return canonical_type_any_function_join(ctypeOuter, (struct Canonical_function_type *)ctypeInner, isBaseType);
+      return canonical_type_any_function_join(ctype_outer, (struct Canonical_function_type *)ctype_inner, isBaseType);
     }
   default:
     fatal_error("canonical_type_join failed");
@@ -1034,7 +1033,7 @@ int canonical_type_compare(CanonicalType *ctype1, CanonicalType *ctype2)
       int formal_type_comp = canonical_type_compare(canonical_function_type1->param_types[i], canonical_function_type2->param_types[i]);
       if (formal_type_comp != 0)
       {
-        return formal_type_comp > 0 ? 1 : -1;
+        return formal_type_comp;
       }
     }
 
