@@ -488,6 +488,9 @@ pragma test_canonical_type(type E0, "E0");
 pragma test_canonical_base_type(type G0, "G0");
 pragma test_canonical_base_type(type E0, "String");
 
+pragma test_canonical_signature(type G0, "{PHYLUM[],GEN[String]}");
+pragma test_canonical_signature(type E0, "{BASIC[],PRINTABLE[],ORDERED[],ORDERED_COLLECTION[Character],CONCATENATING[],PHYLUM[],EXT[String],LIST[Character],STRING[]}");
+
 -------------------------------------------------------
 
 -- G0 $ simple
@@ -509,7 +512,7 @@ pragma test_canonical_base_type(type G0D, "G0");
 pragma test_canonical_signature(type G0A, "{BASIC[],PRINTABLE[],ORDERED[],ORDERED_COLLECTION[Character],CONCATENATING[],PHYLUM[],LIST[Character],STRING[]}");
 pragma test_canonical_signature(type G0B, "{PRINTABLE[],ORDERED[],NUMERIC[]}");
 pragma test_canonical_signature(type G0C, "{PHYLUM[]}");
-pragma test_canonical_signature(type G0D, "{BASIC[],PRINTABLE[],MAKE_LATTICE[Boolean]}");
+pragma test_canonical_signature(type G0D, "{PHYLUM[],GEN[String]}");
 
 -------------------------------------------------------
 
@@ -647,7 +650,7 @@ pragma test_canonical_base_type(type G0L2, "G0$L2");
 pragma test_canonical_signature(type G0I2, "{PHYLUM[],GEN[String]}");
 pragma test_canonical_signature(type G0J2, "{PHYLUM[],GEN[Integer]}");
 pragma test_canonical_signature(type G0K2, "{PHYLUM[],GEN[G0$K2$C]}");
-pragma test_canonical_signature(type G0L2, "{BASIC[],PRINTABLE[],MAKE_LATTICE[Boolean]}");
+pragma test_canonical_signature(type G0L2, "{PHYLUM[],GEN[G0$L2]}");
 
 -------------------------------------------------------
 
