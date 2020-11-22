@@ -108,7 +108,7 @@ bool canonical_type_equal(void *a, void *b)
     bool params_equal = true;
     int index;
 
-    for (index = 0; index < canonical_function_type_a->num_formals; index++)
+    for (index = 0; index < canonical_function_type_a->num_formals && params_equal; index++)
     {
       params_equal &= canonical_type_equal(canonical_function_type_a->param_types[index], canonical_function_type_b->param_types[index]);
     }
