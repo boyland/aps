@@ -1,0 +1,9 @@
+module TEST[] begin
+  type Test := LIST[String];
+
+  t : Test := Test$single("hello,") ++ Test$single(" world");
+
+  i : Integer := length("hello");
+
+  b : Boolean := t = Test${} and Test${} = t;
+end;
