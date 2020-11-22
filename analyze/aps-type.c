@@ -387,7 +387,7 @@ static void* print_base_types(void* ignore, void*node) {
     {
     case KEYpragma_call:
     {
-      printf("\nline number %d\n", tnode_line_number(decl));
+      // printf("\nline number %d\n", tnode_line_number(decl));
 
       if (symb_test_canonical_signature == pragma_call_name(decl)) {
         Expressions exprs = pragma_call_parameters(decl);

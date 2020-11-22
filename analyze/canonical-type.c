@@ -604,15 +604,7 @@ CanonicalType *canonical_type_base_type(CanonicalType *ctype)
   }
   case KEY_CANONICAL_FUNC:
   {
-    printf("starting base type: ");
-    print_canonical_type(ctype, stdout);
-    printf("\n");
-
     struct Canonical_function_type *canonical_type_function = (struct Canonical_function_type *)shallow_clone_canonical_function_types(ctype);
-
-    printf("cloned base type: ");
-    print_canonical_type(canonical_type_function, stdout);
-    printf("\n");
 
     size_t my_size = sizeof(struct Canonical_function_type) + canonical_type_function->num_formals * (sizeof(CanonicalType *));
 
@@ -1004,7 +996,7 @@ int canonical_type_compare(CanonicalType *ctype1, CanonicalType *ctype2)
 {
   if (ctype1->key != ctype2->key)
   {
-    return ctype1->key > ctype1->key ? 1 : -1;
+    return ctype1->key - ctype2->key;
   }
 
   switch (ctype1->key)
