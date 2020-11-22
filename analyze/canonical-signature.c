@@ -291,37 +291,22 @@ static CanonicalSignatureSet *from_mdecl(Declaration mdecl)
 
   CanonicalSignatureSet *result = union_canonical_signature_set(from_declaration(rdecl), from_sig(parent_sig));
 
-  // printf("from_mdecl: %s\n", decl_name(mdecl));
-
-  // printf("from_mdecl before: ");
-  // print_canonical_signature_set(result, stdout);
-  // printf("\n");
-
-  // printf("rdecl: %s %d\n", decl_name(rdecl), Declaration_KEY(rdecl));
-
   switch (Declaration_KEY(rdecl))
   {
   case KEYsome_type_decl:
   {
     Type rdecl_type = some_type_decl_type(rdecl);
 
-    // printf("type key: %d\n", Type_KEY(rdecl_type));
-
     switch (Type_KEY(rdecl_type))
     {
     case KEYtype_inst:
     {
       result = substitute_canonical_signature_set_actuals(new_canonical_type_use(rdecl), result);
-      // printf("substituted %s\n", decl_name(rdecl));
       break;
     }
     }
   }
   }
-
-  // printf("from_mdecl after: ");
-  // print_canonical_signature_set(result, stdout);
-  // printf("\n");
 
   return result;
 }
@@ -333,10 +318,6 @@ static CanonicalSignatureSet *from_mdecl(Declaration mdecl)
  */
 static CanonicalSignatureSet *from_sig_inst(Signature sig)
 {
-  // printf("from_sig_inst: ");
-  // print_Signature(sig, stdout);
-  // printf("\n");
-
   Declaration mdecl = USE_DECL(class_use_use(sig_inst_class(sig)));
   TypeActuals actuals = sig_inst_actuals(sig);
   int num_actuals = count_actuals(actuals);
@@ -478,35 +459,6 @@ static CanonicalSignatureSet *union_canonical_signature_set(CanonicalSignatureSe
   }
   else
   {
-    // int a, b;
-    // for (a = 0; a < set1->size; a++)
-    // {
-    //   if (set1->members[a] == NULL)
-    //   {
-    //     printf("Something went wrong!\n");
-    //   }
-    //   else
-    //   {
-    //     printf(">");
-    //     print_canonical_signature(set1->members[a], stdout);
-    //     printf("<\n");
-    //   }
-    // }
-
-    // for (b = 0; b < set2->size; b++)
-    // {
-    //   if (set2->members[b] == NULL)
-    //   {
-    //     printf("Something went wrong!\n");
-    //   }
-    //   else
-    //   {
-    //     printf(">");
-    //     print_canonical_signature(set2->members[b], stdout);
-    //     printf("<\n");
-    //   }
-    // }
-
     size_t my_size = sizeof(struct CanonicalSignatureSet_type) + (set1->size + set2->size) * (sizeof(CanonicalSignature *));
 
     struct CanonicalSignatureSet_type *result = (struct CanonicalSignatureSet_type *)alloca(my_size);
@@ -559,10 +511,6 @@ static CanonicalSignatureSet *union_canonical_signature_set(CanonicalSignatureSe
  */
 static CanonicalSignatureSet *from_type(Type t)
 {
-  // printf("from_type:");
-  // print_Type(t, stdout);
-  // printf("\n");
-
   switch (Type_KEY(t))
   {
   case KEYtype_formal:
@@ -585,10 +533,6 @@ static CanonicalSignatureSet *from_type(Type t)
       type = TYPE_NEXT(type);
     }
 
-    // Declaration amir = some_class_decl_result_type(mdecl);
-    // printf(amir);
-    // printf("mdecl: %s <%s> %d\n", decl_name(mdecl), decl_name(some_class_decl_result_type(mdecl)), Declaration_KEY(some_class_decl_result_type(mdecl)));
-
     return union_canonical_signature_set(from_mdecl(mdecl), single_canonical_signature_set(new_canonical_signature(true, true, mdecl, num_actuals, result)));
   }
   case KEYno_type:
@@ -608,9 +552,6 @@ static CanonicalSignatureSet *from_type(Type t)
  */
 static CanonicalSignatureSet *from_declaration(Declaration decl)
 {
-  // int key = rand() % 100;
-  // printf("%d from_declaration: %s %d\n", key, decl_name(decl), Declaration_KEY(decl));
-
   CanonicalSignatureSet *re;
   switch (Declaration_KEY(decl))
   {
@@ -625,12 +566,6 @@ static CanonicalSignatureSet *from_declaration(Declaration decl)
     else
     {
       re = from_sig(sig);
-      // printf("before sub: ");
-      // print_canonical_signature_set(re, stdout);
-
-      // printf("\nafter sub: ");
-      // print_canonical_signature_set(re, stdout);
-      // printf("\n");
     }
 
     switch (Type_KEY(some_type_decl_type(decl)))
@@ -641,7 +576,6 @@ static CanonicalSignatureSet *from_declaration(Declaration decl)
       break;
     }
     }
-
     break;
   }
   case KEYsome_type_formal:
@@ -654,10 +588,6 @@ static CanonicalSignatureSet *from_declaration(Declaration decl)
     aps_error(decl, "Not sure how to find the canonical signature set given Declaration with Declaration_KEY of %d", (int)Declaration_KEY(decl));
     return NULL;
   }
-
-  // printf("re: ");
-  // print_canonical_signature_set(re, stdout);
-  // printf("\n%d from_declaration done\n", key);
 
   return re;
 }
@@ -699,12 +629,6 @@ static CanonicalSignatureSet *substitute_canonical_signature_set_actuals(Canonic
     {
       members[size++] = c_sig_candidate;
     }
-    else
-    {
-      printf("found duplicate\n");
-      print_canonical_signature(c_sig_candidate, stdout);
-      printf("\n");
-    }
   }
 
   return new_canonical_signature_set(size, members);
@@ -721,10 +645,6 @@ CanonicalSignatureSet *infer_canonical_signatures(CanonicalType *ctype)
   {
     fatal_error("canonical signature set is not initialized");
   }
-
-  // printf("infer_canonical_signatures: ");
-  // print_canonical_type(ctype, stdout);
-  // printf("\n");
 
   CanonicalSignatureSet *result = EMPTY_CANONICAL_SIGNATURE_SET;
   bool flag = true;
