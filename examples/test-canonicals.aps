@@ -10,14 +10,32 @@ begin
   type Misc6 := IEEEsingle;
   type Misc7 := IEEEdouble;
 
-  pragma test_canonical_signature(type Misc0, "{PRINTABLE[],ORDERED[],NUMERIC[]}");
-  pragma test_canonical_signature(type Misc1, "{PRINTABLE[],REAL[],IEEE[],PHYLUM[]}");
-  pragma test_canonical_signature(type Misc2, "{BASIC[],PRINTABLE[],ORDERED[],ORDERED_COLLECTION[Character],CONCATENATING[],PHYLUM[],LIST[Character],STRING[]}");
-  pragma test_canonical_signature(type Misc3, "{BASIC[],ORDERED_COLLECTION[Integer],CONCATENATING[],PHYLUM[],LIST[Integer]}");
-  pragma test_canonical_signature(type Misc4, "{BASIC[],PRINTABLE[],COMBINABLE[],LATTICE[],MAKE_LATTICE[Boolean]}");
-  pragma test_canonical_signature(type Misc5, "{BASIC[],PRINTABLE[],ORDERED[],NUMERIC[],COMBINABLE[],LATTICE[],MAKE_LATTICE[Integer],MAX_LATTICE[Integer]}");
-  pragma test_canonical_signature(type Misc6, "{PRINTABLE[],REAL[],IEEE[],PHYLUM[]}");
-  pragma test_canonical_signature(type Misc7, "{PRINTABLE[],REAL[],IEEE[],PHYLUM[]}");
+  pragma test_canonical_type(type Misc0, "Integer");
+  pragma test_canonical_type(type Misc1, "IEEEdouble");
+  pragma test_canonical_type(type Misc2, "String");  
+  pragma test_canonical_type(type Misc3, "Range");
+  pragma test_canonical_type(type Misc4, "OrLattice");
+  pragma test_canonical_type(type Misc5, "Misc5");  
+  pragma test_canonical_type(type Misc6, "IEEEsingle");
+  pragma test_canonical_type(type Misc7, "IEEEdouble");  
+
+  pragma test_canonical_base_type(type Misc0, "Integer");
+  pragma test_canonical_base_type(type Misc1, "IEEEdouble");
+  pragma test_canonical_base_type(type Misc2, "String");  
+  pragma test_canonical_base_type(type Misc3, "Range");
+  pragma test_canonical_base_type(type Misc4, "Boolean");
+  pragma test_canonical_base_type(type Misc5, "Integer");  
+  pragma test_canonical_base_type(type Misc6, "IEEEsingle");
+  pragma test_canonical_base_type(type Misc7, "IEEEdouble");  
+
+  pragma test_canonical_signature(type Misc0, "{NULL[],BASIC[],PRINTABLE[],COMPARABLE[],ORDERED[],NUMERIC[]}");
+  pragma test_canonical_signature(type Misc1, "{NULL[],BASIC[],PRINTABLE[],COMPARABLE[],ORDERED[],NUMERIC[],REAL[],IEEE[],PHYLUM[]}");
+  pragma test_canonical_signature(type Misc2, "{NULL[],BASIC[],PRINTABLE[],COMPARABLE[],ORDERED[],READ_ONLY_COLLECTION[Character],COLLECTION[Character],READ_ONLY_ORDERED_COLLECTION[Character],ORDERED_COLLECTION[Character],CONCATENATING[],PHYLUM[],LIST[Character],STRING[]}");
+  pragma test_canonical_signature(type Misc3, "{NULL[],BASIC[],READ_ONLY_COLLECTION[Integer],COLLECTION[Integer],READ_ONLY_ORDERED_COLLECTION[Integer],ORDERED_COLLECTION[Integer],CONCATENATING[],PHYLUM[],LIST[Integer]}");
+  pragma test_canonical_signature(type Misc4, "{NULL[],BASIC[],PRINTABLE[],COMBINABLE[],COMPLETE_PARTIAL_ORDER[],LATTICE[],MAKE_LATTICE[Boolean]}");
+  pragma test_canonical_signature(type Misc5, "{NULL[],BASIC[],PRINTABLE[],COMPARABLE[],ORDERED[],NUMERIC[],COMBINABLE[],COMPLETE_PARTIAL_ORDER[],LATTICE[],MAKE_LATTICE[Integer],MAX_LATTICE[Integer]}");
+  pragma test_canonical_signature(type Misc6, "{NULL[],BASIC[],PRINTABLE[],COMPARABLE[],ORDERED[],NUMERIC[],REAL[],IEEE[],PHYLUM[]}");
+  pragma test_canonical_signature(type Misc7, "{NULL[],BASIC[],PRINTABLE[],COMPARABLE[],ORDERED[],NUMERIC[],REAL[],IEEE[],PHYLUM[]}");
 
   -------------------------------------------------------
 
@@ -37,8 +55,8 @@ begin
   pragma test_canonical_base_type(type C, "C");
   pragma test_canonical_base_type(type D, "Result");
 
-  pragma test_canonical_signature(type A, "{BASIC[]}");
-  pragma test_canonical_signature(type B, "{PRINTABLE[],ORDERED[],NUMERIC[]}");
+  pragma test_canonical_signature(type A, "{NULL[],BASIC[]}");
+  pragma test_canonical_signature(type B, "{NULL[],BASIC[],PRINTABLE[],COMPARABLE[],ORDERED[],NUMERIC[]}");
   pragma test_canonical_signature(type C, "{PHYLUM[]}");
   pragma test_canonical_signature(type D, "{PHYLUM[]}");
 
@@ -60,8 +78,8 @@ begin
   pragma test_canonical_base_type(type G, "C");
   pragma test_canonical_base_type(type H, "Result");
 
-  pragma test_canonical_signature(type E, "{BASIC[]}");
-  pragma test_canonical_signature(type F, "{PRINTABLE[],ORDERED[],NUMERIC[]}");
+  pragma test_canonical_signature(type E, "{NULL[],BASIC[]}");
+  pragma test_canonical_signature(type F, "{NULL[],BASIC[],PRINTABLE[],COMPARABLE[],ORDERED[],NUMERIC[]}");
   pragma test_canonical_signature(type G, "{PHYLUM[]}");
   pragma test_canonical_signature(type H, "{PHYLUM[]}");
 
@@ -83,8 +101,8 @@ begin
   pragma test_canonical_base_type(type G2, "C");
   pragma test_canonical_base_type(type H2, "Result"); 
 
-  pragma test_canonical_signature(type E2, "{BASIC[]}");
-  pragma test_canonical_signature(type F2, "{PRINTABLE[],ORDERED[],NUMERIC[]}");
+  pragma test_canonical_signature(type E2, "{NULL[],BASIC[]}");
+  pragma test_canonical_signature(type F2, "{NULL[],BASIC[],PRINTABLE[],COMPARABLE[],ORDERED[],NUMERIC[]}");
   pragma test_canonical_signature(type G2, "{PHYLUM[]}");
   pragma test_canonical_signature(type H2, "{PHYLUM[]}");
 
@@ -108,8 +126,8 @@ begin
 
   pragma test_canonical_signature(type I, "{PHYLUM[],GEN[T]}");
   pragma test_canonical_signature(type J, "{PHYLUM[],GEN[Integer]}");
-  pragma test_canonical_signature(type K, "{PHYLUM[],GEN[K$C]}");
-  pragma test_canonical_signature(type L, "{PHYLUM[],GEN[L]}");
+  pragma test_canonical_signature(type K, "{PHYLUM[],GEN[C]}");
+  pragma test_canonical_signature(type L, "{PHYLUM[],GEN[Result]}");
 
   -------------------------------------------------------
 
@@ -131,8 +149,8 @@ begin
 
   pragma test_canonical_signature(type I1, "{PHYLUM[],GEN[T]}");
   pragma test_canonical_signature(type J1, "{PHYLUM[],GEN[Integer]}");
-  pragma test_canonical_signature(type K1, "{PHYLUM[],GEN[K1$C]}");
-  pragma test_canonical_signature(type L1, "{PHYLUM[],GEN[L1]}");
+  pragma test_canonical_signature(type K1, "{PHYLUM[],GEN[C]}");
+  pragma test_canonical_signature(type L1, "{PHYLUM[],GEN[Result]}");
 
   -------------------------------------------------------
 
@@ -154,8 +172,8 @@ begin
 
   pragma test_canonical_signature(type I2, "{PHYLUM[],GEN[T]}");
   pragma test_canonical_signature(type J2, "{PHYLUM[],GEN[Integer]}");
-  pragma test_canonical_signature(type K2, "{PHYLUM[],GEN[K2$C]}");
-  pragma test_canonical_signature(type L2, "{PHYLUM[],GEN[L2]}");
+  pragma test_canonical_signature(type K2, "{PHYLUM[],GEN[C]}");
+  pragma test_canonical_signature(type L2, "{PHYLUM[],GEN[Result]}");
 
   -------------------------------------------------------
 
@@ -175,10 +193,10 @@ begin
   pragma test_canonical_base_type(type O, "C");
   pragma test_canonical_base_type(type P, "Result");
 
-  pragma test_canonical_signature(type M, "{BASIC[],EXT[T]}");
-  pragma test_canonical_signature(type N, "{BASIC[],PRINTABLE[],ORDERED[],NUMERIC[],EXT[Integer]}");
-  pragma test_canonical_signature(type O, "{BASIC[],PHYLUM[],EXT[C]}");
-  pragma test_canonical_signature(type P, "{BASIC[],PHYLUM[],EXT[Result]}");
+  pragma test_canonical_signature(type M, "{NULL[],BASIC[],EXT[T]}");
+  pragma test_canonical_signature(type N, "{NULL[],BASIC[],PRINTABLE[],COMPARABLE[],ORDERED[],NUMERIC[],EXT[Integer]}");
+  pragma test_canonical_signature(type O, "{NULL[],BASIC[],PHYLUM[],EXT[C]}");
+  pragma test_canonical_signature(type P, "{NULL[],BASIC[],PHYLUM[],EXT[Result]}");
 
   -------------------------------------------------------
 
@@ -198,10 +216,10 @@ begin
   pragma test_canonical_base_type(type O1, "C");
   pragma test_canonical_base_type(type P1, "Result");
 
-  pragma test_canonical_signature(type M1, "{BASIC[],EXT[T]}");
-  pragma test_canonical_signature(type N1, "{BASIC[],PRINTABLE[],ORDERED[],NUMERIC[],EXT[Integer]}");
-  pragma test_canonical_signature(type O1, "{BASIC[],PHYLUM[],EXT[C]}");
-  pragma test_canonical_signature(type P1, "{BASIC[],PHYLUM[],EXT[Result]}");
+  pragma test_canonical_signature(type M1, "{NULL[],BASIC[],EXT[T]}");
+  pragma test_canonical_signature(type N1, "{NULL[],BASIC[],PRINTABLE[],COMPARABLE[],ORDERED[],NUMERIC[],EXT[Integer]}");
+  pragma test_canonical_signature(type O1, "{NULL[],BASIC[],PHYLUM[],EXT[C]}");
+  pragma test_canonical_signature(type P1, "{NULL[],BASIC[],PHYLUM[],EXT[Result]}");
   
   -------------------------------------------------------
 
@@ -221,10 +239,10 @@ begin
   pragma test_canonical_base_type(type O2, "C");
   pragma test_canonical_base_type(type P2, "Result");
 
-  pragma test_canonical_signature(type M2, "{BASIC[],EXT[T]}");
-  pragma test_canonical_signature(type N2, "{BASIC[],PRINTABLE[],ORDERED[],NUMERIC[],EXT[Integer]}");
-  pragma test_canonical_signature(type O2, "{BASIC[],PHYLUM[],EXT[C]}");
-  pragma test_canonical_signature(type P2, "{BASIC[],PHYLUM[],EXT[Result]}");
+  pragma test_canonical_signature(type M2, "{NULL[],BASIC[],EXT[T]}");
+  pragma test_canonical_signature(type N2, "{NULL[],BASIC[],PRINTABLE[],COMPARABLE[],ORDERED[],NUMERIC[],EXT[Integer]}");
+  pragma test_canonical_signature(type O2, "{NULL[],BASIC[],PHYLUM[],EXT[C]}");
+  pragma test_canonical_signature(type P2, "{NULL[],BASIC[],PHYLUM[],EXT[Result]}");
 
   -------------------------------------------------------
 
@@ -239,7 +257,7 @@ begin
   pragma test_canonical_base_type(type R, "T");
 
   pragma test_canonical_signature(type Q, "{PHYLUM[],GEN[T]}");
-  pragma test_canonical_signature(type R, "{BASIC[],EXT[T]}");
+  pragma test_canonical_signature(type R, "{NULL[],BASIC[],EXT[T]}");
 
   -------------------------------------------------------
 
@@ -259,8 +277,8 @@ begin
   pragma test_canonical_base_type(type QC, "Q$C");
   pragma test_canonical_base_type(type QD, "Q");
 
-  pragma test_canonical_signature(type QA, "{BASIC[]}");
-  pragma test_canonical_signature(type QB, "{PRINTABLE[],ORDERED[],NUMERIC[]}");
+  pragma test_canonical_signature(type QA, "{NULL[],BASIC[]}");
+  pragma test_canonical_signature(type QB, "{NULL[],BASIC[],PRINTABLE[],COMPARABLE[],ORDERED[],NUMERIC[]}");
   pragma test_canonical_signature(type QC, "{PHYLUM[]}");
   pragma test_canonical_signature(type QD, "{PHYLUM[],GEN[T]}");
 
@@ -282,10 +300,10 @@ begin
   pragma test_canonical_base_type(type RC, "R$C");
   pragma test_canonical_base_type(type RD, "T");
 
-  pragma test_canonical_signature(type RA, "{BASIC[]}");
-  pragma test_canonical_signature(type RB, "{PRINTABLE[],ORDERED[],NUMERIC[]}");
+  pragma test_canonical_signature(type RA, "{NULL[],BASIC[]}");
+  pragma test_canonical_signature(type RB, "{NULL[],BASIC[],PRINTABLE[],COMPARABLE[],ORDERED[],NUMERIC[]}");
   pragma test_canonical_signature(type RC, "{PHYLUM[]}");
-  pragma test_canonical_signature(type RD, "{BASIC[],EXT[T]}");
+  pragma test_canonical_signature(type RD, "{NULL[],BASIC[],EXT[T]}");
 
   -------------------------------------------------------
 
@@ -305,8 +323,8 @@ begin
   pragma test_canonical_base_type(type QG2, "Q$C");
   pragma test_canonical_base_type(type QH2, "Q");
 
-  pragma test_canonical_signature(type QE2, "{BASIC[]}");
-  pragma test_canonical_signature(type QF2, "{PRINTABLE[],ORDERED[],NUMERIC[]}");
+  pragma test_canonical_signature(type QE2, "{NULL[],BASIC[]}");
+  pragma test_canonical_signature(type QF2, "{NULL[],BASIC[],PRINTABLE[],COMPARABLE[],ORDERED[],NUMERIC[]}");
   pragma test_canonical_signature(type QG2, "{PHYLUM[]}");
   pragma test_canonical_signature(type QH2, "{PHYLUM[],GEN[T]}");
 

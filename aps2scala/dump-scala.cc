@@ -450,7 +450,7 @@ public:
     int namespaces = decl_namespaces(d);
     if (namespaces) {
       (*this)[def_name(declaration_def(d))] |= namespaces;
-      // cout << decl_name(d) << " is added to the service record." << endl;
+      cout << decl_name(d) << " is added to the service record." << endl;
     }
   }
   int missing(Declaration d) {
@@ -566,7 +566,7 @@ void dump_Type_service_transfers(ServiceRecord& sr,
 				 bool is_phylum,
 				 Type ty, ostream& oss)
 {
-  // cout << "transfer from " << from << " as " << ty << endl;
+  cout << "transfer from " << from << " as " << ty << endl;
   switch (Type_KEY(ty)) {
   case KEYno_type:
     {
@@ -826,6 +826,150 @@ void dump_TypeFormal_value(Declaration tf, ostream& os) {
 
 void dump_Type_Signature(Type,string,ostream&);
 
+void dump_TypeDecl_Traits(Declaration tdecl, Type ti, TypeActuals tas, string n, int u, ostream &oss)
+{
+  Declaration mdecl = USE_DECL(module_use_use(type_inst_module(ti)));
+  if (module_decl_generating(mdecl))
+    return;
+
+  ServiceRecord sr;
+  ServiceRecord sr_final;
+  vector<Declaration> services;
+
+  Declarations body;
+  Declaration service_decl;
+  
+  body = block_body(some_class_decl_contents(mdecl));
+  service_decl = first_Declaration(body);
+  while (service_decl != NULL)
+  {
+    sr.add(service_decl);
+
+    service_decl = DECL_NEXT(service_decl);
+  }
+
+  oss << indent() << indent() << "with C_TYPE[T_Integer]\n";
+
+  CanonicalSignatureSet *csig_set = infer_canonical_signatures(canonical_type_base_type(new_canonical_type_use(tdecl)));
+
+  int i, j;
+  for (i = 0; i < csig_set->size; i++)
+  {
+    CanonicalSignature *csig = csig_set->members[i];
+
+    body = block_body(some_class_decl_contents(csig->source_class));
+    service_decl = first_Declaration(body);
+    while (service_decl != NULL)
+    {
+      if (sr.missing(service_decl) && sr_final.missing(service_decl))
+      {
+        services.push_back(service_decl);
+        sr_final.add(service_decl);
+      }
+      service_decl = DECL_NEXT(service_decl);
+    }
+
+    oss << (i > 0 ? "\n" : "") << indent() << indent() << "with C_" << decl_name(csig->source_class) << "[";
+
+    bool started = false;
+    for (Type ta = first_TypeActual(tas); ta; ta = TYPE_NEXT(ta))
+    {
+      if (started)
+        oss << ",";
+      else
+      {
+        started = true;
+      }
+      switch (Type_KEY(ta))
+      {
+      default:
+        oss << ta;
+        break;
+      case KEYtype_inst:
+      {
+        oss << "T_" << n << u;
+        break;
+      }
+      }
+    }
+
+    for (j = 0; j < csig->num_actuals; j++)
+    {
+      if (started)
+        oss << ",";
+      else
+      {
+        started = true;
+      }
+
+      CanonicalType *cactual = csig->actuals[j];
+      switch (cactual->key)
+      {
+      case KEY_CANONICAL_USE:
+      {
+        struct Canonical_use *canonical_use_type = (struct Canonical_use *)cactual;
+        oss << "T_" << decl_name(canonical_use_type->decl);
+        break;
+      }
+      }
+    }
+
+    oss << "]";
+  }
+
+  body = block_body(some_class_decl_contents(get_module_PHYLUM()));
+  service_decl = first_Declaration(body);
+  while (service_decl != NULL)
+  {
+    if (sr.missing(service_decl) && sr_final.missing(service_decl))
+    {
+      services.push_back(service_decl);
+    }
+    service_decl = DECL_NEXT(service_decl);
+  }
+
+  oss << " {\n";
+
+  string from = "t_Integer";
+  string prefix = "override ";
+
+  vector<Declaration>::iterator it;
+  for (it = services.begin(); it != services.end(); it++)
+  {
+    Declaration d = *it;
+
+    string n = decl_code_name(d);
+    switch (Declaration_KEY(d))
+    {
+    default:
+      break;
+    case KEYpattern_decl:
+    case KEYconstructor_decl:
+      oss << indent() << prefix << " " << "val p_" << n
+          << " = " << from << ".p_" << n << ";\n";
+      if (Declaration_KEY(d) == KEYpattern_decl)
+        break;
+      /* fall through */
+    case KEYvalue_decl:
+    case KEYvalue_renaming:
+    case KEYfunction_decl:
+    case KEYattribute_decl:
+      oss << indent() << prefix << "val v_" << n
+          << " = " << from << ".v_" << n << ";\n";
+      break;
+    case KEYtype_decl:
+    case KEYphylum_decl:
+    case KEYtype_renaming:
+      oss << indent() << "type T_" << n
+          << " = " << from << ".T_" << n << ";\n";
+      oss << indent() << "val t_" << n
+          << " = " << from << ".t_" << n << ";\n";
+      break;
+    }
+  }
+
+  oss << "\n" << indent() << "}";
+}
 void dump_some_class_decl(Declaration decl, ostream& oss)
 {
   // cout << "dump_some_class_decl(" << decl_name(decl) << ")" << endl;
@@ -1041,7 +1185,7 @@ static string type_inst_as_scala_type(Type ty)
 #endif
 }
 
-static void dump_type_inst(string n, string nameArg, Type ti, ostream& oss)
+static void dump_type_inst(string n, string nameArg, Declaration decl, Type ti, ostream& oss)
 {
   Module m = type_inst_module(ti);
   TypeActuals tas = type_inst_type_actuals(ti);
@@ -1055,7 +1199,7 @@ static void dump_type_inst(string n, string nameArg, Type ti, ostream& oss)
       {
 	ostringstream ss;
 	ss << n << ++u;
-	dump_type_inst(ss.str(),nameArg+"+\"$\"+"+ss.str(),ta,oss);
+	dump_type_inst(ss.str(),nameArg+"+\"$\"+"+ss.str(),decl, ta,oss);
 	break;
       }
     }
@@ -1108,7 +1252,10 @@ static void dump_type_inst(string n, string nameArg, Type ti, ostream& oss)
   for (Expression a = first_Actual(as); a; a = EXPR_NEXT(a)) {
     oss << "," << a;
   }
-  oss << ");\n";
+  oss << ")" << "\n";
+  indent();
+  dump_TypeDecl_Traits(decl,ti, tas, n, u, oss);
+  oss  << "\n";
   oss << indent() << "type T_" << n << " = "
       << type_inst_as_scala_type(ti) << ";\n";
 }
@@ -1537,7 +1684,7 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
 	}
 	break;
       case KEYtype_inst:
-	dump_type_inst(name,qname,type,oss);
+	dump_type_inst(name,qname,decl,type,oss);
 	break;
       default:
 	oss << indent() << "type T_" << name << " = " << type << ";\n";

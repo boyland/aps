@@ -45,4 +45,6 @@ CanonicalType *new_canonical_type_use(Declaration decl);
 
 int canonical_type_compare(CanonicalType *ctype1, CanonicalType *ctype2);
 
+Declaration canonical_type_decl(CanonicalType *canonical_type);
+
 #endif

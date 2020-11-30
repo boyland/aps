@@ -34,4 +34,8 @@ CanonicalSignatureSet *infer_canonical_signatures(CanonicalType *ctype);
  */
 void initialize_canonical_signature(Declaration module_PHYLUM, Declaration type_PHYLUM);
 
+
+Declaration get_module_TYPE();
+Declaration get_module_PHYLUM();
+
 #endif
