@@ -365,92 +365,21 @@ static CanonicalSignatureSet *subtract_canonical_signature_set(CanonicalSignatur
   }
 }
 
-struct ForwardActualsResult_type
-{
-  CanonicalSignatureSet *changed_csig_set;
-  CanonicalSignatureSet *substituted_csig_set;
-};
-
-typedef struct ForwardActualsResult_type ForwardActualsResult;
-
-// Given a canonical signature and a canonical signature set
-// 1) loops through each canonical signature member
-// 2) replace the actual
-// 3) return a tuple of affected subset and substituted canonical signatures
-ForwardActualsResult forward_actuals(CanonicalSignature *source_csig, CanonicalSignatureSet *csig_set)
-{
-  // printf("  @@source_csig: ");
-  // print_canonical_signature(source_csig, stdout);
-  // printf("\n");
-  Declaration mdecl = source_csig->source_class;
-  Declaration rdecl = some_class_decl_result_type(mdecl);
-
-  CanonicalSignatureSet *changed_subset = EMPTY_CANONICAL_SIGNATURE_SET;
-  CanonicalSignatureSet *substituted_subset = EMPTY_CANONICAL_SIGNATURE_SET;
-
-  int i, j, k;
-  for (i = 0; i < csig_set->size; i++)
-  {
-    CanonicalSignature *canonical_sig = csig_set->members[i];
-    CanonicalType **substituted_actuals = (CanonicalType **)alloca(canonical_sig->num_actuals);
-    bool any_change = canonical_sig->num_actuals == 0;
-
-    for (j = 0; j < canonical_sig->num_actuals; j++)
-    {
-      substituted_actuals[j] = canonical_sig->actuals[j];
-      Declaration f1 = canonical_type_decl(canonical_sig->actuals[j]);
-
-      k = 0;
-      Declaration f2 = first_Declaration(some_class_decl_type_formals(mdecl));
-      while (f2 != NULL)
-      {
-        if (f1 == f2)
-        {
-          substituted_actuals[j] = source_csig->actuals[k];
-          any_change = true;
-          // printf("f2[%s] <-- f1[%s] in ", decl_name(f2), decl_name(f1));
-          // print_canonical_signature(canonical_sig, stdout);
-          // printf(" thing: ");
-          // print_canonical_type(source_csig->actuals[k], stdout);
-          // printf("\n");
-        }
-
-        k++;
-        f2 = DECL_NEXT(f2);
-      }
-    }
-
-    if (any_change)
-    {
-      substituted_subset = union_canonical_signature_set(substituted_subset, single_canonical_signature_set(new_canonical_signature(canonical_sig->is_input, canonical_sig->is_var, canonical_sig->source_class, canonical_sig->num_actuals, substituted_actuals)));
-      changed_subset = union_canonical_signature_set(changed_subset, single_canonical_signature_set(canonical_sig));
-    }
-  }
-
-  // printf("   $$ substituted_subset: ");
-  // print_canonical_signature_set(substituted_subset, stdout);
-  // printf("\n   $$ changed_subset: ");
-  // print_canonical_signature_set(changed_subset, stdout);
-  // printf("\n");
-
-  ForwardActualsResult result = {changed_subset, substituted_subset};
-
-  return result;
-}
-
 // Collects parents and result canonical signatures
-static CanonicalSignatureSet *from_mdecl(CanonicalSignature *csig)
+static CanonicalSignatureSet *from_ctype(CanonicalSignature *csig)
 {
   Declaration mdecl = csig->source_class;
   Signature parent_sig = some_class_decl_parent(mdecl);
   Declaration rdecl = some_class_decl_result_type(mdecl);
 
-  if (ACCUMULATION_METHOD == KEY_ADDITIVE)
-  {
-    return union_canonical_signature_set(from_declaration(rdecl), from_sig(parent_sig));
-  }
+  // if (ACCUMULATION_METHOD == KEY_ADDITIVE)
+  // {
+  //   return ;
+  // }
 
-  return EMPTY_CANONICAL_SIGNATURE_SET;
+  // Should follow the result unless it is generating
+
+  return from_declaration(rdecl);
 }
 
 /**
@@ -460,7 +389,12 @@ static CanonicalSignatureSet *from_mdecl(CanonicalSignature *csig)
  */
 static CanonicalSignatureSet *from_sig_inst(Signature sig)
 {
+  // printf("from_sig_inst: ");
+  // print_Signature(sig, stdout);
+  // printf("\n");
+
   Declaration mdecl = USE_DECL(class_use_use(sig_inst_class(sig)));
+
   TypeActuals actuals = sig_inst_actuals(sig);
   int num_actuals = count_actuals(actuals);
   size_t my_size = num_actuals * sizeof(CanonicalType *);
@@ -476,9 +410,18 @@ static CanonicalSignatureSet *from_sig_inst(Signature sig)
     i++;
   }
 
+  // printf("from_sig_inst: mdecl: %s public: %s\n", decl_name(mdecl), def_is_public(some_class_decl_def(mdecl)) ? "true" : "false");
+
   CanonicalSignature *csig = new_canonical_signature(sig_inst_is_input(sig), sig_inst_is_var(sig), mdecl, num_actuals, cactuals);
 
-  return union_canonical_signature_set(from_mdecl(csig), single_canonical_signature_set(csig));
+  // if (def_is_public(some_class_decl_def(mdecl)))
+  // {
+  return union_canonical_signature_set(from_ctype(csig), single_canonical_signature_set(csig));
+  // }
+  // else
+  // {
+  //   return from_ctype(csig);
+  // }
 }
 
 /**
@@ -515,6 +458,10 @@ static CanonicalSignatureSet *from_sig_use(Signature sig)
  */
 static CanonicalSignatureSet *from_sig(Signature sig)
 {
+  // printf("from_sig: ");
+  // print_Signature(sig, stdout);
+  // printf("\n");
+
   switch (Signature_KEY(sig))
   {
   case KEYsig_inst:
@@ -679,12 +626,23 @@ static CanonicalSignatureSet *from_type(Type t)
       type = TYPE_NEXT(type);
     }
 
+    // printf("from_type: mdecl: %s public: %s\n", decl_name(mdecl), def_is_public(some_class_decl_def(mdecl)) ? "true" : "false");
+
     CanonicalSignature *csig = new_canonical_signature(true, true, mdecl, num_actuals, cactuals);
-    return union_canonical_signature_set(from_mdecl(csig), single_canonical_signature_set(csig));
+
+    // if (def_is_public(some_class_decl_def(mdecl)))
+    // {
+    return union_canonical_signature_set(from_ctype(csig), single_canonical_signature_set(csig));
+    // }
+    // else
+    // {
+    //   return from_ctype(csig);
+    // }
   }
   case KEYno_type:
     // Either TYPE[] or PHYLUM[]
     // type_is_phylum(t) ? type_PHYLUM : module_PHYLUM
+    // printf("type_is_phylum(t): %s\n", type_is_phylum(t) ? "true" : "false");
     return single_canonical_signature_set(new_canonical_signature(true, true, type_is_phylum(t) ? module_PHYLUM : module_TYPE, 0, NULL));
   default:
     aps_error(t, "Not sure how to find the canonical signature set given Type with Type_KEY of %d", (int)Type_KEY(t));
@@ -712,8 +670,18 @@ static CanonicalSignatureSet *from_declaration(Declaration decl)
     }
     else
     {
-      re = from_sig(sig);
+      // printf("from_declaration: %d", Type_KEY(some_type_decl_type(decl)));
+      // print_Type(some_type_decl_type(decl), stdout);
+      // printf("\nset: ");
+      // print_canonical_signature_set(from_type(some_type_decl_type(decl)), stdout);
+      // printf("\n");
+
+      re = union_canonical_signature_set(from_sig(sig), from_type(some_type_decl_type(decl)));
     }
+
+    // printf("type:> %d ", Type_KEY(some_type_decl_type(decl)));
+    // print_Type(some_type_decl_type(decl), stdout);
+    // printf("\n");
 
     switch (Type_KEY(some_type_decl_type(decl)))
     {
@@ -739,6 +707,72 @@ static CanonicalSignatureSet *from_declaration(Declaration decl)
   return re;
 }
 
+static CanonicalSignature *substitute_canonical_signature_actuals(CanonicalType *source_ctype, CanonicalSignature *canonical_sig)
+{
+  switch (source_ctype->key)
+  {
+  case KEY_CANONICAL_FUNC:
+  {
+    aps_warning(source_ctype, "Not sure how to run substitution of actuals given function types");
+    return canonical_sig;
+  }
+  case KEY_CANONICAL_QUAL:
+  {
+    struct Canonical_qual_type *ctype_qual = (struct Canonical_qual_type *)source_ctype;
+    return substitute_canonical_signature_actuals(ctype_qual->source, substitute_canonical_signature_actuals(new_canonical_type_use(ctype_qual->decl), canonical_sig));
+  }
+  case KEY_CANONICAL_USE:
+  {
+    struct Canonical_use_type *ctype_use = (struct Canonical_use_type *)source_ctype;
+
+    Declaration tdecl = ctype_use->decl;
+    Declaration mdecl = USE_DECL(module_use_use(type_inst_module(some_type_decl_type(tdecl))));
+
+    CanonicalType **substituted_actuals = (CanonicalType **)alloca(canonical_sig->num_actuals);
+
+    int i, j, k;
+    for (i = 0; i < canonical_sig->num_actuals; i++)
+    {
+      substituted_actuals[i] = canonical_sig->actuals[i];
+      // substituted_actuals[i] = canonical_type_join(source_ctype, canonical_sig->actuals[i], false);
+      Declaration f1 = canonical_type_decl(canonical_sig->actuals[i]);
+
+      j = 0;
+      Declaration f2 = first_Declaration(some_class_decl_type_formals(mdecl));
+      while (f2 != NULL)
+      {
+        if (f1 == f2)
+        {
+          k = 0;
+          Type ta = first_TypeActual(type_inst_type_actuals(some_type_decl_type(tdecl)));
+          while (ta != NULL)
+          {
+            if (j == k)
+            {
+              substituted_actuals[i] = canonical_type_base_type(canonical_type(ta));
+            }
+
+            k++;
+            ta = TYPE_NEXT(ta);
+          }
+
+          // printf("f2[%s] <-- f1[%s] in ", decl_name(f2), decl_name(f1));
+          // print_canonical_signature(canonical_sig, stdout);
+          // printf(" thing: ");
+          // print_canonical_type(canonical_sig->actuals[k], stdout);
+          // printf("\n");
+        }
+
+        j++;
+        f2 = DECL_NEXT(f2);
+      }
+    }
+
+    return new_canonical_signature(canonical_sig->is_input, canonical_sig->is_var, canonical_sig->source_class, canonical_sig->num_actuals, substituted_actuals);
+  }
+  }
+}
+
 /**
  * Given a canonical signature set and source canonical type, it would go through each and substitute
  * @param source source canonical type
@@ -753,115 +787,15 @@ static CanonicalSignatureSet *substitute_canonical_signature_set_actuals(Canonic
   // print_canonical_signature_set(sig_set, stdout);
   // printf("\n");
 
-  CanonicalSignatureSet *changed_subset = EMPTY_CANONICAL_SIGNATURE_SET;
-  CanonicalSignatureSet *substituted_subset = EMPTY_CANONICAL_SIGNATURE_SET;
-  CanonicalSignatureSet *unchanged_subset = sig_set;
+  CanonicalSignatureSet *result = EMPTY_CANONICAL_SIGNATURE_SET;
 
-  int i, j;
-  bool any_change;
-  Declaration source_decl = canonical_type_decl(source_ctype);
-  switch (Declaration_KEY(source_decl))
+  int i;
+  for (i = 0; i < sig_set->size; i++)
   {
-  case KEYsome_type_decl:
-  {
-    Type source_decl_type = some_type_decl_type(source_decl);
-    switch (Type_KEY(source_decl_type))
-    {
-    case KEYtype_inst:
-    {
-      Declaration mdecl = USE_DECL(module_use_use(type_inst_module(source_decl_type)));
-
-      for (i = 0; i < sig_set->size; i++)
-      {
-        CanonicalSignature *csig_member = sig_set->members[i];
-
-        if (mdecl == csig_member->source_class)
-        {
-          CanonicalSignature *root_csig = csig_member;
-
-          // No need to run the substitution on the root of current canonical signature set
-          changed_subset = single_canonical_signature_set(root_csig);
-          substituted_subset = single_canonical_signature_set(root_csig);
-          unchanged_subset = subtract_canonical_signature_set(sig_set, changed_subset);
-          // printf("  found root_csig! ctype: ");
-          // print_canonical_type(source_ctype, stdout);
-          // printf(" sig: ");
-          // print_canonical_signature(root_csig, stdout);
-          // printf("\n");
-
-          break;
-        }
-      }
-    }
-    }
-  }
+    result = union_canonical_signature_set(result, single_canonical_signature_set(substitute_canonical_signature_actuals(source_ctype, sig_set->members[i])));
   }
 
-  CanonicalSignatureSet *unchanged_subset_clone = unchanged_subset;
-
-  for (i = 0; i < unchanged_subset_clone->size; i++)
-  {
-    CanonicalSignature *canonical_sig = unchanged_subset_clone->members[i];
-
-    int num_actuals = canonical_sig->num_actuals;
-    size_t actuals_size = num_actuals * sizeof(CanonicalType *);
-    CanonicalType **substituted_actuals = (CanonicalType **)alloca(actuals_size);
-    any_change = num_actuals == 0;
-
-    for (j = 0; j < num_actuals; j++)
-    {
-      CanonicalType *cactual = canonical_type_join(source_ctype, canonical_sig->actuals[j], true);
-
-      if (cactual != canonical_sig->actuals[j])
-      {
-        any_change = true;
-      }
-
-      substituted_actuals[j] = cactual;
-    }
-
-    if (any_change)
-    {
-      substituted_subset = union_canonical_signature_set(substituted_subset, single_canonical_signature_set(new_canonical_signature(canonical_sig->is_input, canonical_sig->is_var, canonical_sig->source_class, canonical_sig->num_actuals, substituted_actuals)));
-      changed_subset = union_canonical_signature_set(changed_subset, single_canonical_signature_set(canonical_sig));
-      unchanged_subset = subtract_canonical_signature_set(sig_set, changed_subset);
-    }
-  }
-
-  // printf("\n  ** substituted_subset: ");
-  // print_canonical_signature_set(substituted_subset, stdout);
-  // printf("\n  ** changed_subset: ");
-  // print_canonical_signature_set(changed_subset, stdout);
-  // printf("\n  ** unchanged_subset: ");
-  // print_canonical_signature_set(unchanged_subset, stdout);
-  // printf("\n");
-
-  any_change = !(substituted_subset->size > 0 && unchanged_subset->size == 0);
-
-  while (any_change && unchanged_subset->size > 0)
-  {
-    // printf("  >any_change: %s\tunchanged_subset count: %d\n", any_change ? "true" : "false", unchanged_subset->size);
-    any_change = false;
-    for (i = 0; i < substituted_subset->size; i++)
-    {
-      ForwardActualsResult partial_result = forward_actuals(substituted_subset->members[i], unchanged_subset);
-      CanonicalSignatureSet *temp = subtract_canonical_signature_set(unchanged_subset, partial_result.changed_csig_set);
-
-      any_change |= (temp->size != unchanged_subset->size);
-      unchanged_subset = temp;
-
-      substituted_subset = union_canonical_signature_set(substituted_subset, partial_result.substituted_csig_set);
-      // printf("    >>any_change: %s\n", any_change ? "true" : "false");
-    }
-  }
-
-  CanonicalSignatureSet *final = union_canonical_signature_set(substituted_subset, unchanged_subset);
-
-  // printf("    final result: ");
-  // print_canonical_signature_set(final, stdout);
-  // printf("\n\n");
-
-  return final;
+  return result;
 }
 
 /**
@@ -894,7 +828,7 @@ CanonicalSignatureSet *infer_canonical_signatures(CanonicalType *ctype)
     {
     case KEY_CANONICAL_USE:
     {
-      struct Canonical_use *canonical_use_type = (struct Canonical_use *)ctype;
+      struct Canonical_use_type *canonical_use_type = (struct Canonical_use_type *)ctype;
 
       Declaration decl = canonical_use_type->decl;
       result = union_canonical_signature_set(result, from_declaration(decl));
@@ -915,6 +849,8 @@ CanonicalSignatureSet *infer_canonical_signatures(CanonicalType *ctype)
       break;
     }
     }
+
+    // Lets revisit this
 
     CanonicalType *base_type = canonical_type_base_type(ctype);
     flag &= !(base_type == NULL || base_type == ctype);

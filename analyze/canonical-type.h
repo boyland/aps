@@ -27,7 +27,7 @@ struct Canonical_qual_type
   CanonicalType *source;
 };
 
-struct Canonical_use
+struct Canonical_use_type
 {
   int key; /* KEY_CANONICAL_USE */
   Declaration decl;
@@ -42,6 +42,8 @@ CanonicalType *canonical_type_base_type(CanonicalType *canonicalType);
 CanonicalType *canonical_type_join(CanonicalType *ctype_outer, CanonicalType *ctype_inner, bool is_base_type);
 
 CanonicalType *new_canonical_type_use(Declaration decl);
+
+CanonicalType *new_canonical_type_qual(CanonicalType *from, Declaration decl);
 
 int canonical_type_compare(CanonicalType *ctype1, CanonicalType *ctype2);
 
