@@ -43,8 +43,6 @@ CanonicalType *canonical_type_join(CanonicalType *ctype_outer, CanonicalType *ct
 
 CanonicalType *new_canonical_type_use(Declaration decl);
 
-CanonicalType *new_canonical_type_qual(CanonicalType *from, Declaration decl);
-
 int canonical_type_compare(CanonicalType *ctype1, CanonicalType *ctype2);
 
 Declaration canonical_type_decl(CanonicalType *canonical_type);

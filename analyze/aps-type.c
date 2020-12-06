@@ -371,9 +371,9 @@ static char* clean_string_const_token(char* p) {
   p[strlen(p)-1] = 0;
   return p;
 }
-
-static void* print_base_types(void* ignore, void*node) {
-  int BUFFER_SIZE = 500;
+int bad = 0;
+static void* validate_canonicals(void* ignore, void*node) {
+  int BUFFER_SIZE = 1000;
   Symbol symb_test_canonical_type = intern_symbol("test_canonical_type");
   Symbol symb_test_canonical_base_type = intern_symbol("test_canonical_base_type");
   Symbol symb_test_canonical_signature = intern_symbol("test_canonical_signature");
@@ -387,9 +387,14 @@ static void* print_base_types(void* ignore, void*node) {
     {
     case KEYpragma_call:
     {
+      if (tnode_line_number(decl) != 374) {
+        // return;
+      }
+
       // printf("\nline number %d\n", tnode_line_number(decl));
 
       if (symb_test_canonical_signature == pragma_call_name(decl)) {
+        // return NULL;
         Expressions exprs = pragma_call_parameters(decl);
         Expression type_expr = first_Expression(exprs);
         Expression result_expr = Expression_info(type_expr)->next_expr;
@@ -414,9 +419,10 @@ static void* print_base_types(void* ignore, void*node) {
         
         if (strcmp(buffer1, expected_cleaned) != 0) {
           aps_error(type,"Failed: canonical signature %s:%d  expected `%s` but got `%s`", buffer3, tnode_line_number(type), expected_cleaned, buffer1);
-          print_canonical_signature_set(infer_canonical_signatures(canonical_type(type)), f);
-          printf("\n");
+          // print_canonical_signature_set(infer_canonical_signatures(canonical_type(type)), stdout);
+          // printf("\n");
           // infer_canonical_signatures(canonical_type(type));
+          bad++;
         }
       }
       else if (symb_test_canonical_type == pragma_call_name(decl)) {
@@ -546,9 +552,10 @@ void type_Program(Program p)
   aps_yyfilename = saved_filename;
 
   traverse_Program(set_start_phylum, p, p);
-  initialize_canonical_signature(module_PHYLUM, module_TYPE);
+  initialize_canonical_signature(module_TYPE, module_PHYLUM);
 
-  traverse_Program(print_base_types,p,p);
+  traverse_Program(validate_canonicals,p,p);
+  printf("bad: %d\n", bad);
 }
 
 Type infer_expr_type(Expression e)
