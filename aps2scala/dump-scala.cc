@@ -826,6 +826,26 @@ void dump_TypeFormal_value(Declaration tf, ostream& os) {
 
 void dump_Type_Signature(Type,string,ostream&);
 
+string canonical_type_to_string(string prefix, CanonicalType* ctype)
+{
+  switch (ctype->key)
+  {
+  case KEY_CANONICAL_USE:
+  {
+    struct Canonical_use_type *canonical_use_type = (struct Canonical_use_type *)ctype;
+    return decl_name(canonical_use_type->decl);
+  }
+  case KEY_CANONICAL_QUAL:
+  {
+    struct Canonical_qual_type *canonical_qual_type = (struct Canonical_qual_type *)ctype;
+    return canonical_type_to_string(prefix, canonical_qual_type->source) + "." + decl_name(canonical_qual_type->decl);
+  }
+  case KEY_CANONICAL_FUNC:
+    aps_error(ctype, "Not sure how to convert canonical type function type to string");
+    return NULL;
+  }
+}
+
 void dump_TypeDecl_Traits(Declaration tdecl, Type ti, string n, ostream &oss)
 {
   Declaration mdecl = USE_DECL(module_use_use(type_inst_module(ti)));
@@ -879,6 +899,11 @@ void dump_TypeDecl_Traits(Declaration tdecl, Type ti, string n, ostream &oss)
   {
     CanonicalSignature *csig = csig_set->members[i];
 
+    // TODO: should we include private canonical signatures?
+    if (!def_is_public(some_class_decl_def(csig->source_class))) {
+      // continue;
+    }
+
     // If module is missing these inherited services add them
     body = block_body(some_class_decl_contents(csig->source_class));
     service_decl = first_Declaration(body);
@@ -926,22 +951,7 @@ void dump_TypeDecl_Traits(Declaration tdecl, Type ti, string n, ostream &oss)
       }
 
       CanonicalType *cactual = csig->actuals[j];
-      switch (cactual->key)
-      {
-      case KEY_CANONICAL_USE:
-      {
-        struct Canonical_use_type *canonical_use_type = (struct Canonical_use_type *)cactual;
-        oss << "T_" << decl_name(canonical_use_type->decl);
-        break;
-      }
-      case KEY_CANONICAL_QUAL:
-      {
-        // TODO: use dot
-        struct Canonical_use_type *canonical_use_type = (struct Canonical_use_type *)cactual;
-        oss << "T_" << decl_name(canonical_use_type->decl);
-        break;
-      }
-      }
+      oss << canonical_type_to_string("T_", cactual);
     }
 
     oss << "]";

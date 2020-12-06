@@ -825,9 +825,7 @@ CanonicalSignatureSet *infer_canonical_signatures(CanonicalType *ctype)
       struct Canonical_qual_type *canonical_qual_type = (struct Canonical_qual_type *)ctype;
 
       Declaration decl = canonical_qual_type->decl;
-      CanonicalSignatureSet *intermediate_csig = from_declaration(decl);
-      // printf("from qual\n");
-      result = union_canonical_signature_set(result, join_canonical_signature_set_actuals(canonical_qual_type->source, intermediate_csig));
+      result = union_canonical_signature_set(result, join_canonical_signature_set_actuals(canonical_qual_type->source, from_declaration(decl)));
       break;
     }
     case KEY_CANONICAL_FUNC:
