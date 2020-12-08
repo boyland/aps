@@ -826,23 +826,27 @@ void dump_TypeFormal_value(Declaration tf, ostream& os) {
 
 void dump_Type_Signature(Type,string,ostream&);
 
-string canonical_type_to_string(string prefix, CanonicalType* ctype)
+void dump_CanonicalType(CanonicalType* ctype, ostream& oss)
 {
   switch (ctype->key)
   {
   case KEY_CANONICAL_USE:
   {
     struct Canonical_use_type *canonical_use_type = (struct Canonical_use_type *)ctype;
-    return decl_name(canonical_use_type->decl);
+    oss << decl_name(canonical_use_type->decl);
+    break;
   }
   case KEY_CANONICAL_QUAL:
   {
     struct Canonical_qual_type *canonical_qual_type = (struct Canonical_qual_type *)ctype;
-    return canonical_type_to_string(prefix, canonical_qual_type->source) + "." + decl_name(canonical_qual_type->decl);
+    ostringstream buffer;
+    dump_CanonicalType(canonical_qual_type->source, oss);
+    oss << buffer.str() << "." << decl_name(canonical_qual_type->decl);
+    break;
   }
   case KEY_CANONICAL_FUNC:
     aps_error(ctype, "Not sure how to convert canonical type function type to string");
-    return NULL;
+    break;
   }
 }
 
@@ -854,6 +858,8 @@ void dump_TypeDecl_Traits(Declaration tdecl, Type ti, string n, ostream &oss)
   }
 
   int nesting_level = 2;
+  oss << indent(nesting_level) << "/* dumping traits */" << "\n";
+
   TypeActuals tas = type_inst_type_actuals(ti);
  
   vector<Declaration> sv;
@@ -862,26 +868,14 @@ void dump_TypeDecl_Traits(Declaration tdecl, Type ti, string n, ostream &oss)
   Declarations body;
   Declaration service_decl;
 
-  string from = n;
+  string actual = "null";
   string prefix = "override";
 
-  Type ta = first_TypeActual(tas);
-  while (ta != NULL) {
-    switch (Type_KEY(ta)) {
-    default:
-    {
-      ostringstream buffer;
-      buffer << as_val(ta);
-      from = buffer.str();
-      break;
-    }
-    case KEYtype_inst: 
-      from = "t_" + n;
-      break;
-    }
-    ta = TYPE_NEXT(ta);
-  }
-  
+  CanonicalType* actual_canonical_type = canonical_type_base_type(new_canonical_type_use(tdecl));
+  ostringstream buffer;
+  dump_CanonicalType(actual_canonical_type, buffer);
+  actual = buffer.str();
+
   // Add all module services
   body = block_body(some_class_decl_contents(mdecl));
   service_decl = first_Declaration(body);
@@ -899,9 +893,8 @@ void dump_TypeDecl_Traits(Declaration tdecl, Type ti, string n, ostream &oss)
   {
     CanonicalSignature *csig = csig_set->members[i];
 
-    // TODO: should we include private canonical signatures?
     if (!def_is_public(some_class_decl_def(csig->source_class))) {
-      // continue;
+      continue;
     }
 
     // If module is missing these inherited services add them
@@ -919,39 +912,17 @@ void dump_TypeDecl_Traits(Declaration tdecl, Type ti, string n, ostream &oss)
 
     oss << (i > 0 ? "\n" : "") << indent(nesting_level) << "with C_" << decl_name(csig->source_class) << "[";
 
-    bool started = false;
-    for (Type ta = first_TypeActual(tas); ta; ta = TYPE_NEXT(ta))
-    {
-      if (started)
-        oss << ",";
-      else
-      {
-        started = true;
-      }
-      switch (Type_KEY(ta))
-      {
-      default:
-        oss << ta;
-        break;
-      case KEYtype_inst:
-      {
-        oss << "T_" << n;
-        break;
-      }
-      }
-    }
+    // dump result type
+    oss << "T_" << actual;
 
     for (j = 0; j < csig->num_actuals; j++)
     {
-      if (started)
-        oss << ",";
-      else
-      {
-        started = true;
-      }
+      oss << ",";
 
       CanonicalType *cactual = csig->actuals[j];
-      oss << canonical_type_to_string("T_", cactual);
+      buffer.clear();
+      dump_CanonicalType(cactual, buffer);
+      oss << buffer.str();
     }
 
     oss << "]";
@@ -959,6 +930,7 @@ void dump_TypeDecl_Traits(Declaration tdecl, Type ti, string n, ostream &oss)
 
   oss << " {\n";
   nesting_level++;
+  string from = "t_" + actual;
 
   vector<Declaration>::iterator it;
   for (it = sv.begin(); it != sv.end(); it++)

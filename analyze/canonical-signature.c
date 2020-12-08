@@ -747,12 +747,6 @@ static CanonicalSignature *substitute_canonical_signature_actuals(CanonicalType 
             k++;
             ta = TYPE_NEXT(ta);
           }
-
-          // printf("f2[%s] <-- f1[%s] in ", decl_name(f2), decl_name(f1));
-          // print_canonical_signature(canonical_sig, stdout);
-          // printf(" thing: ");
-          // print_canonical_type(canonical_sig->actuals[k], stdout);
-          // printf("\n");
         }
 
         j++;
