@@ -1,0 +1,103 @@
+with "symbol";
+with "table";
+with "first";
+
+module FIRST_IMPL[T :: var FIRST[]] extends T begin
+
+  phylum S;
+  type Symbols := SET[Symbol];
+  type SymbolTable := TABLE[Symbol, Symbols];
+  type SymbolLattice := UNION_LATTICE[Symbol, Symbols];
+  type RemoteS := remote S;
+  type RemoteSSet := SET[RemoteS];
+
+  circular collection attribute S.s_first : SymbolLattice;
+  pragma synthesized(s_first);
+
+  -- instead of RemoteSSet I should use lattices
+  type DeclarationTable := TABLE[Symbol, RemoteSSet];
+  var collection declarationTable : DeclarationTable;
+
+  attribute Item.item_is_terminal : Boolean;
+  attribute Item.item_symbol : Symbol;
+  pragma synthesized(item_is_terminal, item_symbol);
+
+  circular attribute Items.items_first : SymbolLattice;
+  pragma synthesized(items_first);
+
+  attribute Program.program_first : DeclarationTable;
+  pragma synthesized(program_first);
+
+  constructor s_constructor() : S;
+
+  epsilon : Symbol := make_symbol("Nil");
+
+  match ?self:Item=terminal(?s:I) begin
+    self.item_symbol := s;
+    self.item_is_terminal := true;
+  end;
+
+  match ?self:Item=nonterminal(?s:I) begin
+    self.item_symbol := s;
+    self.item_is_terminal := false;
+  end;
+
+  match ?self:Stmt=stmt(?nt:Symbol, ?items: Items) begin
+    s_obj : S := s_constructor();
+    s_obj.s_first :> items.items_first;
+    declarationTable :> DeclarationTable$table_entry(nt, { s_obj });
+  end;
+
+  match ?self:Program=program(?stmts: Stmts) begin
+    self.program_first := declarationTable;
+  end;
+
+  match ?self : Items = Items$none() begin
+    self.items_first :> { epsilon };
+  end;
+
+  match ?self : Items = Items$single(?item : Item) begin
+    if item.item_is_terminal then
+      self.items_first :> { item.item_symbol };
+    else
+      case DeclarationTable$select(declarationTable, item.item_symbol) begin
+        match DeclarationTable$table_entry(?,?item_first_objs) begin
+          case item_first_objs begin
+            match RemoteSSet${?first,...} begin
+              self.items_first :> first.s_first;
+            end;
+          end;
+        end;
+      end;
+    endif;
+  end;
+
+  match ?self : Items = Items$append(?items1,?items2 : Items) begin
+    self.items_first := black_dot(items1.items_first, items2.items_first);
+  end;
+
+  match ?self : Stmts = Stmts$none() begin
+
+  end;
+
+  match ?self : Stmts = Stmts$single(?stmt : Stmt) begin
+
+  end;
+
+  match ?self : Stmts = Stmts$append(?stmts1,?stmts2 : Stmts) begin
+
+  end;
+
+  var function contains_epsilon(s_set: Symbols) :Boolean begin
+    result := Symbols$member(epsilon, s_set);
+  end;
+
+  var function black_dot(s1 :Symbols; s2 :Symbols) : Symbols begin
+    if contains_epsilon(s1) then
+      result := (s1 /\~ { epsilon }) \/ s2;
+    else
+      result := s1;
+    endif;
+  end;
+
+end;

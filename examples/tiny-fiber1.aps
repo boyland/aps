@@ -1,0 +1,44 @@
+with "basic";
+with "tiny";
+
+module TINY_CIRCULAR[T :: var TINY[]] extends T
+begin
+    phylum S;
+    type RemoteS := remote S;
+    -- type Integers := SET[Integer];
+
+    -- type min_lattice := MIN_LATTICE[Integer](0);
+
+    attribute S.s_synthesized : Integer := 0;
+    attribute Wood.wood_inherited : Integer := 0;
+
+    attribute Root.result : Integer;
+    attribute Wood.w_s : RemoteS;
+        
+    pragma synthesized(w_s, result);
+    pragma inherited(wood_inherited);
+
+    -- this pragma doesn't do anything
+    -- pragma fiber_cyclic(s_synthesized);
+
+    constructor s_constructor() : S;
+
+    match ?l=leaf(?x) begin
+        t : S := s_constructor();
+        t.s_synthesized := l.wood_inherited + x;
+        l.w_s := t;
+    end;
+
+    match ?b=branch(?x,?y) begin
+        v : S := s_constructor();
+        v.s_synthesized := x.w_s.s_synthesized + y.w_s.s_synthesized;
+        x.wood_inherited := b.wood_inherited;
+        y.wood_inherited := b.wood_inherited;
+        b.w_s := v;
+    end;
+
+    match ?p=root(?b) begin
+        -- b.wood_inherited := b.w_s.s_synthesized;
+        p.result := b.w_s.s_synthesized;
+    end;
+end;

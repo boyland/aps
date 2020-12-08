@@ -10,6 +10,8 @@ module TEST_CYCLE[] begin
   var circular collection leaves : IntegerLattice;
   circular attribute Wood.partial : IntegerLattice;
 
+  pragma root_phylum(type Wood);
+
   match ?l=leaf(?x) begin
     l.partial := (leaves \ x) \/ {x+1} ;
     leaves :> {x-1};

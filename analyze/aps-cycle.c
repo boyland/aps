@@ -10,6 +10,7 @@
 #include "aps-ag.h"
 
 int cycle_debug = 0;
+DEPENDENCY current_dependency = no_dependency;
 
 /* We use a union-find algorithm to detect strongly connected components.
  * We use a dynamically allocated array to hold the pointers,
@@ -400,9 +401,9 @@ static void add_up_down_attributes(STATE *s) {
 		if (kcycle || lcycle) {
 		  phy->mingraph[k*n+l] = no_dependency;
 		  if (!lcycle) {
-		    phy->mingraph[downindex*n+l] = fiber_dependency;
+		    phy->mingraph[downindex*n+l] = current_dependency;
 		  } else if (!kcycle) {
-		    phy->mingraph[k*n+upindex] = fiber_dependency;
+		    phy->mingraph[k*n+upindex] = current_dependency;
 		  }
 		}
 	      }
@@ -410,7 +411,7 @@ static void add_up_down_attributes(STATE *s) {
 	  }
 	}
 	phy->mingraph[upindex*n+upindex] = no_dependency;
-	phy->mingraph[upindex*n+downindex] = fiber_dependency; /* set! */
+	phy->mingraph[upindex*n+downindex] = current_dependency; /* set! */
 	phy->mingraph[downindex*n+upindex] = no_dependency;
 	phy->mingraph[downindex*n+downindex] = no_dependency;
       }
@@ -472,7 +473,7 @@ static void add_up_down_attributes(STATE *s) {
 	if (downindex != upindex) {
 	  free_edgeset(aug_graph->graph[upindex*n+upindex],aug_graph);
 	  add_edge_to_graph(&array[upindex],&array[downindex],
-			    &cond,fiber_dependency,aug_graph);
+			    &cond,current_dependency,aug_graph);
 	  free_edgeset(aug_graph->graph[downindex*n+upindex],aug_graph);
 	  free_edgeset(aug_graph->graph[downindex*n+downindex],aug_graph);
 	  aug_graph->graph[upindex*n+upindex] =
@@ -569,10 +570,10 @@ static void add_up_down_attributes(STATE *s) {
 		    aug_graph->graph[k*n+l] = NULL;
 		    if (!lcycle) {
 		      add_edge_to_graph(&array[downindex],&array[l],
-					&cond,fiber_dependency,aug_graph);
+					&cond,current_dependency,aug_graph);
 		    } else if (!kcycle) {
 		      add_edge_to_graph(&array[k],&array[upindex],
-					&cond,fiber_dependency,aug_graph);
+					&cond,current_dependency,aug_graph);
 		    }
 		  }
 		}
@@ -589,10 +590,10 @@ static void add_up_down_attributes(STATE *s) {
 	      if (attr != NULL) {
 		if (ATTR_DECL_IS_SYN(attr)) {
 		  add_edge_to_graph(&array[k],&array[upindex],&cond,
-				    fiber_dependency,aug_graph);
+				    current_dependency,aug_graph);
 		} else {
 		  add_edge_to_graph(&array[downindex],&array[k],&cond,
-				    fiber_dependency,aug_graph);
+				    current_dependency,aug_graph);
 		}
 	      }
 	    }
@@ -600,7 +601,7 @@ static void add_up_down_attributes(STATE *s) {
 	  if (downindex != upindex) {
 	    free_edgeset(aug_graph->graph[upindex*n+upindex],aug_graph);
 	    add_edge_to_graph(&array[upindex],&array[downindex],
-			      &cond,fiber_dependency,aug_graph);
+			      &cond,current_dependency,aug_graph);
 	    free_edgeset(aug_graph->graph[downindex*n+upindex],aug_graph);
 	    free_edgeset(aug_graph->graph[downindex*n+downindex],aug_graph);
 	    aug_graph->graph[upindex*n+upindex] =
@@ -615,7 +616,9 @@ static void add_up_down_attributes(STATE *s) {
 }
 
 
-void break_fiber_cycles(Declaration module,STATE *s) {
+void break_fiber_cycles(Declaration module,STATE *s, DEPENDENCY d) {
+  current_dependency = d;
+
   void *mark = SALLOC(0);
   init_indices(s);
   make_cycles(s);

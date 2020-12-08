@@ -1343,7 +1343,7 @@ Declaration uitem_field(Expression e)
 void print_oset(OSET oset){
 	OSET p= oset;
 	while (p != NULL) {
-		printf("    %s\n", decl_name(p->o));
+		printf("    %s:%d\n", decl_name(p->o), tnode_line_number(p->o));
 		p = p->rest;
 	}
 }
@@ -1351,11 +1351,11 @@ void print_oset(OSET oset){
 void print_uset(USET uset){
 	USET p= uset;
 	while (p != NULL) {
-		printf("    (%d(0x%p),%s%s)\n", 
+		printf("    (%d(0x%p),%s%s:%d)\n", 
 		       tnode_line_number(p->u),
 		       p->u,
 		       EXPR_IS_LHS(p->u) ? "dot " : "",
-		       decl_name(uitem_field(p->u)));
+		       decl_name(uitem_field(p->u)), tnode_line_number(p->u));
 		p = p->rest;
 	}
 }
@@ -1798,11 +1798,11 @@ void *print_all_ou(void *statep, void *node) {
         return statep;
     }
     if (Declaration_info(decl)->oset != NULL) {
-      printf("OSET of node: %s\n", decl_name(decl));
+      printf("OSET of node: %s:%d\n", decl_name(decl), tnode_line_number(decl));
       print_oset(Declaration_info(decl)->oset);
     }
     if (Declaration_info(decl)->uset != NULL) {
-      printf("USET of node: %s\n", decl_name(decl));
+      printf("USET of node: %s:%d\n", decl_name(decl), tnode_line_number(decl));
       print_uset(Declaration_info(decl)->uset);
     }
     break; 
@@ -1891,6 +1891,13 @@ int id_expr_node(Expression expr) {
 	   tnode_line_number(expr),
 	   expr,
 	   index);
+    switch (Expression_KEY(expr))
+    {
+    case KEYfuncall:
+      if (attr_ref_p(expr)) printf("a: %s\n", decl_name(attr_ref_p(expr)));
+      if (field_ref_p(expr)) printf("f: %s\n", decl_name(field_ref_p(expr)));
+      break;
+    }
   }
   Expression_info(expr)->index = index;
   return index;
@@ -2533,7 +2540,8 @@ NODESET link_expr_rhs(Expression e, NODESET ns){
 	} // for end
 	
 	{ 
-	  OSET oset = doOU(e, EMPTY_USET);
+	  USET eu = get_uset(e);
+	  OSET oset = doOU(e, eu);
 	  return oset_to_nodeset(oset);
 	}
 	
@@ -2563,8 +2571,9 @@ NODESET link_expr_rhs(Expression e, NODESET ns){
 	      Expression object = field_ref_object(e);
 	      link_expr_rhs(object, set_of_node(get_node_expr(e)+1));	// Qe(-)
 	      {
-		OSET oset = doOU(e, EMPTY_USET);
 	    if (fiber_debug & ADD_FSA_EDGE) printf("ending to add edges for field ref of %s\n",decl_name(fdecl));
+		USET eu = get_uset(e);
+		OSET oset = doOU(e, eu);
 		return oset_to_nodeset(oset);
 	      }
 	    }
@@ -2662,7 +2671,8 @@ NODESET link_expr_lhs(Expression e, NODESET ns) {
 	      Expression object = field_ref_object(e);
 	      link_expr_lhs(object, set_of_node(get_node_expr(e)+1) );	// Qe(-)
 	      {
-		USET uset = doUO(e, EMPTY_OSET);
+		USET eu = get_uset(e);
+		USET uset = doUO(e, eu);
 		// printf("DEBUG: after doUO in link_expr.\n");
 		return uset_to_nodeset(uset);
 	      }

@@ -7,8 +7,8 @@ SCALACFLAGS= ${SCALAFLAGS}
 APS2SCALA = ${APSTOP}/bin/aps2scala
 APS2SCALAFLAGS = -p ..:${APSTOP}/base -G
 
-SCALAGEN = simple.scala classic-binding.scala tiny.scala \
-	test-coll.scala test-use-coll.scala test-cycle.scala use-global.scala 
+SCALAGEN = simple.scala classic-binding.scala tiny.scala tiny-circular.scala \
+	test-coll.scala test-use-coll.scala test-cycle.scala use-global.scala tiny-circular-simple.scala
 
 .PHONY: all clean
 
@@ -17,6 +17,7 @@ all : simple_implicit.class classic_binding_implicit.class Classic.class
 all : test_coll_implicit.class TestCollDriver.class
 all : test_cycle_implicit.class TestCycleDriver.class
 all : test_use_coll_implicit.class TestUseCollDriver.class
+all : test_coll_implicit.class tiny-circular-simple.class TinyCircularDriver.class
 
 .PHONY: run
 
@@ -57,6 +58,9 @@ TestCycleDriver.class : test_cycle_implicit.class test-cycle-driver.scala
 
 TinyParser.class : tiny-parser.handcode.scala tiny_implicit.class
 	${SCALAC} ${SCALACFLAGS} tiny-parser.handcode.scala
+
+TinyCircularDriver.class: tiny-circular-simple.scala tiny-circular-driver.scala
+	${SCALAC} ${SCALACFLAGS}  tiny-circular-driver.scala
 
 use_global_implicit.class : use-global.scala tiny_implicit.class
 	${SCALAC} ${SCALACFLAGS} use-global.scala
