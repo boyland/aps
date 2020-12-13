@@ -371,7 +371,7 @@ static char* clean_string_const_token(char* p) {
   p[strlen(p)-1] = 0;
   return p;
 }
-int bad = 0;
+
 static void* validate_canonicals(void* ignore, void*node) {
   int BUFFER_SIZE = 1000;
   Symbol symb_test_canonical_type = intern_symbol("test_canonical_type");
@@ -422,7 +422,6 @@ static void* validate_canonicals(void* ignore, void*node) {
           // print_canonical_signature_set(infer_canonical_signatures(canonical_type(type)), stdout);
           // printf("\n");
           // infer_canonical_signatures(canonical_type(type));
-          bad++;
         }
       }
       else if (symb_test_canonical_type == pragma_call_name(decl)) {
@@ -484,14 +483,9 @@ static void* validate_canonicals(void* ignore, void*node) {
           canonical_type_base_type(canonical_type(type));
         }
       }
-      break;
     }
-    default:
-      break;
     }
   }
-  default:
-    break;
   }
   return node;
 }
@@ -555,7 +549,6 @@ void type_Program(Program p)
   initialize_canonical_signature(module_TYPE, module_PHYLUM);
 
   traverse_Program(validate_canonicals,p,p);
-  printf("bad: %d\n", bad);
 }
 
 Type infer_expr_type(Expression e)
