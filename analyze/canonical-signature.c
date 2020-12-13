@@ -551,6 +551,7 @@ static CanonicalSignatureSet *from_type(Type t)
 
     return union_canonical_signature_set(from_ctype(csig), single_canonical_signature_set(csig));
   }
+  case KEYprivate_type:
   case KEYno_type:
     // Either TYPE[] or PHYLUM[]
     // type_is_phylum(t) ? type_PHYLUM : module_PHYLUM
