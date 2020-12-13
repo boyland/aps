@@ -878,8 +878,6 @@ void dump_TypeDecl_Traits(Declaration tdecl, Type ti, string n, ostream &oss)
   string actual_type = "T_" + actual_str;
   string actual_value = "t_" + actual_str;
 
-  cout << "actual is: " << actual_str << endl;
-
   // Add all module services
   body = block_body(some_class_decl_contents(mdecl));
   service_decl = first_Declaration(body);
@@ -896,10 +894,6 @@ void dump_TypeDecl_Traits(Declaration tdecl, Type ti, string n, ostream &oss)
   for (i = 0; i < csig_set->size; i++)
   {
     CanonicalSignature *csig = csig_set->members[i];
-
-    printf("=>");
-    print_canonical_signature(csig, stdout);
-    printf("\n");
 
     if (!def_is_public(some_class_decl_def(csig->source_class))) {
       continue;
@@ -925,7 +919,7 @@ void dump_TypeDecl_Traits(Declaration tdecl, Type ti, string n, ostream &oss)
 
     for (j = 0; j < csig->num_actuals; j++)
     {
-      oss << ",";
+      oss << ", ";
 
       CanonicalType *cactual = csig->actuals[j];
       buffer.clear();
