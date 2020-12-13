@@ -868,13 +868,17 @@ void dump_TypeDecl_Traits(Declaration tdecl, Type ti, string n, ostream &oss)
   Declarations body;
   Declaration service_decl;
 
-  string actual = "null";
+  string actual_str = "null";
   string prefix = "override";
 
   CanonicalType* actual_canonical_type = canonical_type_base_type(new_canonical_type_use(tdecl));
   ostringstream buffer;
   dump_CanonicalType(actual_canonical_type, buffer);
-  actual = buffer.str();
+  actual_str = buffer.str();
+  string actual_type = "T_" + actual_str;
+  string actual_value = "t_" + actual_str;
+
+  cout << "actual is: " << actual_str << endl;
 
   // Add all module services
   body = block_body(some_class_decl_contents(mdecl));
@@ -892,6 +896,10 @@ void dump_TypeDecl_Traits(Declaration tdecl, Type ti, string n, ostream &oss)
   for (i = 0; i < csig_set->size; i++)
   {
     CanonicalSignature *csig = csig_set->members[i];
+
+    printf("=>");
+    print_canonical_signature(csig, stdout);
+    printf("\n");
 
     if (!def_is_public(some_class_decl_def(csig->source_class))) {
       continue;
@@ -913,7 +921,7 @@ void dump_TypeDecl_Traits(Declaration tdecl, Type ti, string n, ostream &oss)
     oss << (i > 0 ? "\n" : "") << indent(nesting_level) << "with C_" << decl_name(csig->source_class) << "[";
 
     // dump result type
-    oss << "T_" << actual;
+    oss << actual_type;
 
     for (j = 0; j < csig->num_actuals; j++)
     {
@@ -921,8 +929,9 @@ void dump_TypeDecl_Traits(Declaration tdecl, Type ti, string n, ostream &oss)
 
       CanonicalType *cactual = csig->actuals[j];
       buffer.clear();
+      buffer.str("");
       dump_CanonicalType(cactual, buffer);
-      oss << buffer.str();
+      oss << "T_" << buffer.str();
     }
 
     oss << "]";
@@ -930,7 +939,6 @@ void dump_TypeDecl_Traits(Declaration tdecl, Type ti, string n, ostream &oss)
 
   oss << " {\n";
   nesting_level++;
-  string from = "t_" + actual;
 
   vector<Declaration>::iterator it;
   for (it = sv.begin(); it != sv.end(); it++)
@@ -945,7 +953,7 @@ void dump_TypeDecl_Traits(Declaration tdecl, Type ti, string n, ostream &oss)
     case KEYpattern_decl:
     case KEYconstructor_decl:
       oss << indent(nesting_level) << prefix << " " << "val p_" << n
-          << " = " << from << ".p_" << n << ";\n";
+          << " = " << actual_value << ".p_" << n << ";\n";
       if (Declaration_KEY(d) == KEYpattern_decl)
         break;
       /* fall through */
@@ -954,15 +962,15 @@ void dump_TypeDecl_Traits(Declaration tdecl, Type ti, string n, ostream &oss)
     case KEYfunction_decl:
     case KEYattribute_decl:
       oss << indent(nesting_level) << prefix << " " << "val v_" << n
-          << " = " << from << ".v_" << n << ";\n";
+          << " = " << actual_value << ".v_" << n << ";\n";
       break;
     case KEYtype_decl:
     case KEYphylum_decl:
     case KEYtype_renaming:
       oss << indent(nesting_level) << "type T_" << n
-          << " = " << from << ".T_" << n << ";\n";
+          << " = " << actual_value << ".T_" << n << ";\n";
       oss << indent(nesting_level) << "val t_" << n
-          << " = " << from << ".t_" << n << ";\n";
+          << " = " << actual_value << ".t_" << n << ";\n";
       break;
     }
   }
