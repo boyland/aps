@@ -371,8 +371,8 @@ begin
 
   pragma test_canonical_signature(type QI2, "{TYPE[],GEN[T]}");
   pragma test_canonical_signature(type QJ2, "{TYPE[],GEN[Integer]}");
-  pragma test_canonical_signature(type QK2, "{TYPE[],GEN[Q$K2]}");
-  pragma test_canonical_signature(type QL2, "{TYPE[],GEN[Q$L2]}");
+  pragma test_canonical_signature(type QK2, "{TYPE[],GEN[Q$C]}");
+  pragma test_canonical_signature(type QL2, "{TYPE[],GEN[Q]}");
 
   -------------------------------------------------------
 
@@ -440,7 +440,7 @@ begin
 
   pragma test_canonical_signature(type RM2, "{BASIC[],EXT[T]}");
   pragma test_canonical_signature(type RN2, "{BASIC[],PRINTABLE[],ORDERED[],NUMERIC[],TYPE[],INTEGER[],EXT[Integer]}");
-  pragma test_canonical_signature(type RO2, "{BASIC[],TYPE[],EXT[R$O2$C]}");
+  pragma test_canonical_signature(type RO2, "{BASIC[],TYPE[],EXT[R$C]}");
   pragma test_canonical_signature(type RP2, "{BASIC[],EXT[T]}");
 
   -------------------------------------------------------
@@ -722,8 +722,8 @@ pragma test_canonical_base_type(type G0L2, "G0$L2");
 
 pragma test_canonical_signature(type G0I2, "{TYPE[],GEN[String]}");
 pragma test_canonical_signature(type G0J2, "{TYPE[],GEN[Integer]}");
-pragma test_canonical_signature(type G0K2, "{TYPE[],GEN[G0$K2$C]}");
-pragma test_canonical_signature(type G0L2, "{TYPE[],GEN[G0$L2]}");
+pragma test_canonical_signature(type G0K2, "{TYPE[],GEN[G0$C]}");
+pragma test_canonical_signature(type G0L2, "{TYPE[],GEN[G0]}");
 
 -------------------------------------------------------
 
@@ -791,7 +791,7 @@ pragma test_canonical_base_type(type E0P2, "String");
 
 pragma test_canonical_signature(type E0M2, "{BASIC[],TYPE[],LIST[Character],EXT[String],STRING[]}");
 pragma test_canonical_signature(type E0N2, "{BASIC[],PRINTABLE[],ORDERED[],NUMERIC[],TYPE[],INTEGER[],EXT[Integer]}");
-pragma test_canonical_signature(type E0O2, "{BASIC[],TYPE[],EXT[E0$O2$C]}");
+pragma test_canonical_signature(type E0O2, "{BASIC[],TYPE[],EXT[E0$C]}");
 pragma test_canonical_signature(type E0P2, "{BASIC[],TYPE[],LIST[Character],EXT[String],STRING[]}");
 
 -------------------------------------------------------
@@ -814,7 +814,7 @@ pragma test_canonical_base_type(type G0P2P2, "G0");
 
 pragma test_canonical_signature(type G0M2M2, "{BASIC[],TYPE[],LIST[Character],EXT[String],STRING[]}");
 pragma test_canonical_signature(type G0N2N2, "{BASIC[],PRINTABLE[],ORDERED[],NUMERIC[],TYPE[],INTEGER[],EXT[Integer]}");
-pragma test_canonical_signature(type G0O2O2, "{BASIC[],TYPE[],EXT[G0$O2$O2$C]}");
+pragma test_canonical_signature(type G0O2O2, "{BASIC[],TYPE[],EXT[G0$O2$C]}");
 pragma test_canonical_signature(type G0P2P2, "{BASIC[],TYPE[],GEN[String],EXT[G0]}");
 
 -------------------------------------------------------
@@ -837,7 +837,7 @@ pragma test_canonical_base_type(type E0P2P2, "String");
 
 pragma test_canonical_signature(type E0M2M2, "{BASIC[],TYPE[],LIST[Character],EXT[String],STRING[]}");
 pragma test_canonical_signature(type E0N2N2, "{BASIC[],PRINTABLE[],ORDERED[],NUMERIC[],TYPE[],INTEGER[],EXT[Integer]}");
-pragma test_canonical_signature(type E0O2O2, "{BASIC[],TYPE[],EXT[E0$O2$O2$C]}");
+pragma test_canonical_signature(type E0O2O2, "{BASIC[],TYPE[],EXT[E0$O2$C]}");
 pragma test_canonical_signature(type E0P2P2, "{BASIC[],TYPE[],LIST[Character],EXT[String],STRING[]}");
 
 -------------------------------------------------------
@@ -860,8 +860,8 @@ pragma test_canonical_base_type(type G0L2L2, "G0$L2$L2");
 
 pragma test_canonical_signature(type G0I2I2, "{TYPE[],GEN[String]}");
 pragma test_canonical_signature(type G0J2J2, "{TYPE[],GEN[Integer]}");
-pragma test_canonical_signature(type G0K2K2, "{TYPE[],GEN[G0$K2$K2$C]}");
-pragma test_canonical_signature(type G0L2L2, "{TYPE[],GEN[G0$L2$L2]}");
+pragma test_canonical_signature(type G0K2K2, "{TYPE[],GEN[G0$K2$C]}");
+pragma test_canonical_signature(type G0L2L2, "{TYPE[],GEN[G0$L2]}");
 
 -------------------------------------------------------
 
@@ -883,8 +883,8 @@ pragma test_canonical_base_type(type E0L2L2, "E0$L2$L2");
 
 pragma test_canonical_signature(type E0I2I2, "{TYPE[],GEN[String]}");
 pragma test_canonical_signature(type E0J2J2, "{TYPE[],GEN[Integer]}");
-pragma test_canonical_signature(type E0K2K2, "{TYPE[],GEN[E0$K2$K2$C]}");
-pragma test_canonical_signature(type E0L2L2, "{TYPE[],GEN[E0$L2$L2]}");
+pragma test_canonical_signature(type E0K2K2, "{TYPE[],GEN[E0$K2$C]}");
+pragma test_canonical_signature(type E0L2L2, "{TYPE[],GEN[E0$L2]}");
 
 -------------------------------------------------------
 
