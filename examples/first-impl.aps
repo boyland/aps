@@ -43,9 +43,12 @@ module FIRST_IMPL[T :: var FIRST[]] extends T begin
   end;
 
   match ?self:Stmt=stmt(?nt:Symbol, ?items: Items) begin
-    s_obj : S := s_constructor();
-    s_obj.s_first :> items.items_first;
-    declarationTable :> DeclarationTable$table_entry(nt, { s_obj });
+      circular collection temp : SymbolLattice := items.items_first;
+
+      s_obj : S := s_constructor();
+      s_obj.s_first :> temp;
+
+      declarationTable :> DeclarationTable$table_entry(nt, { s_obj });
   end;
 
   match ?self:Program=program(?stmts: Stmts) begin
