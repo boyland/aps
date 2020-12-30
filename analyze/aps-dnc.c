@@ -1062,8 +1062,28 @@ Declaration attr_ref_node_decl(Expression e)
 {
   Expression node = attr_ref_object(e);
   switch (Expression_KEY(node)) {
-  default: fatal_error("%d: can't handle this attribute instance",
+  case KEYfuncall:
+  {
+    Expression ff = funcall_f(e);
+    switch (Expression_KEY(ff))
+    {
+    case KEYvalue_use:
+      {
+        Declaration use_decl = USE_DECL(value_use_use(ff));
+        switch (Declaration_KEY(use_decl))
+        {
+        case KEYfunction_decl:
+          return use_decl;
+        }
+      }
+      break;
+    }
+  }
+  default: {
+    int t = Expression_KEY(node);
+    fatal_error("%d: can't handle this attribute instance",
 		       tnode_line_number(node));
+  }
   case KEYvalue_use:
     return USE_DECL(value_use_use(node));
   }
@@ -2577,7 +2597,13 @@ void print_instance(INSTANCE *i, FILE *stream) {
     fputs("(nil)",stream);
   } else if (ABSTRACT_APS_tnode_phylum(i->fibered_attr.attr) == KEYMatch) {
     fprintf(stream,"<match@%d>",tnode_line_number(i->fibered_attr.attr));
-  } else switch(Declaration_KEY(i->fibered_attr.attr)) {
+  }
+  
+  else if (ABSTRACT_APS_tnode_phylum(i->fibered_attr.attr) == KEY_ABSTRACT_APS_None) {
+
+  }
+  else {
+    switch(Declaration_KEY(i->fibered_attr.attr)) {
   case KEYcollect_assign: {
     Expression lhs = collect_assign_lhs(i->node);
     Declaration field = field_ref_p(lhs);
@@ -2591,7 +2617,7 @@ void print_instance(INSTANCE *i, FILE *stream) {
     break;
   default:
     fputs(symbol_name(def_name(declaration_def(i->fibered_attr.attr))),stream);
-  }
+  } }
   if (i->fibered_attr.fiber != NULL) {
     fputc('$',stream);
     print_fiber(i->fibered_attr.fiber,stream);
@@ -2773,11 +2799,11 @@ void print_phy_graph(PHY_GRAPH *phy_graph, FILE *stream) {
     fputs(" -> ",stream);
     for (j=0; j < n; ++j) {
       DEPENDENCY kind= phy_graph->mingraph[i*n+j];
+      if (kind != no_dependency) fputs("\n\t", stream);
       if (kind == no_dependency) continue;
       if (kind == fiber_dependency) fputc('(',stream);
       print_instance(&phy_graph->instances.array[j],stream);
       if (kind == fiber_dependency) fputc(')',stream);
-      fputc(' ',stream);
     }
     fputc('\n',stream);
   }
@@ -2808,11 +2834,14 @@ void print_cycles(STATE *s, FILE *stream) {
     for (j=0; j < n; ++j) {
       switch (phy_graph->mingraph[j*n+j]) {
       case no_dependency: break;
+      case indirect_circular_dependency:
+      {
+        printf("Here!\n");
+      }
       case indirect_control_fiber_dependency:
       case control_fiber_dependency:
       case indirect_fiber_dependency:
       case fiber_dependency:
-      case indirect_circular_dependency:
 	fprintf(stream,"fiber ");
 	/* fall through */
       default:
