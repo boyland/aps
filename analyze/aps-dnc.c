@@ -1079,11 +1079,10 @@ Declaration attr_ref_node_decl(Expression e)
       break;
     }
   }
-  default: {
-    int t = Expression_KEY(node);
+  default:
     fatal_error("%d: can't handle this attribute instance",
-		       tnode_line_number(node));
-  }
+          tnode_line_number(node));
+    return NULL;
   case KEYvalue_use:
     return USE_DECL(value_use_use(node));
   }

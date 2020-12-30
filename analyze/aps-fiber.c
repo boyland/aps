@@ -284,18 +284,19 @@ Declaration attr_ref_p(Expression expr) {
   case KEYfuncall:
     { Expression func = funcall_f(expr);
       switch (Expression_KEY(func)) {
-      case KEYvalue_use:
+    case KEYvalue_use:
 	{ Declaration attr = USE_DECL(value_use_use(func));
 	  if (attr == NULL) aps_error(func,"unbound function");
 	  else if (DECL_IS_LOCAL(attr) && !FIELD_DECL_P(attr)) {
 	    switch (Declaration_KEY(attr)) {
-	    case KEYattribute_decl:
-	      return attr;
-	    }
-	  }
-	}
+        case KEYattribute_decl:
+        case KEYfunction_decl:
+          return attr;
+        }
       }
     }
+    }
+  }
   }
   return NULL;
 }
