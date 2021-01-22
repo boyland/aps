@@ -16,6 +16,7 @@
 #include "aps-oag.h"
 #include "aps-analyze.h"
 #include "aps-debug.h"
+#include "prime.h"
 
 extern char *aps_yyfilename;
 extern void aps_error(const void *tnode, const char *fmt, ...);
