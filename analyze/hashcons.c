@@ -27,10 +27,9 @@ void hc_initialize(HASH_CONS_TABLE hc, const int capacity)
  */
 static int hc_candidate_index(HASH_CONS_TABLE hc, void *item)
 {
-  int attempt = 0;
   int hash = hc->hashf(item);
   int index = hash % hc->capacity;
-  int step_size = 0;
+  int step_size = hash % (hc->capacity - 2) + 1;
 
   while (true)
   {
@@ -39,10 +38,6 @@ static int hc_candidate_index(HASH_CONS_TABLE hc, void *item)
       return index;
     }
 
-    if (attempt++ == 0)
-    {
-      step_size = hash % (hc->capacity - 2) + 1;
-    }
     index = (index + step_size) % hc->capacity;
   }
 }
@@ -163,15 +158,18 @@ int hash_string(char *str)
 }
 
 /**
- * Combine two hash values into one
+ * Combine two hash values into one positive hash value
  * @param hash1
  * @param hash2
  * @return combined hash 
  */
 int hash_mix(int h1, int h2)
 {
+  if (h1 < 0) h1 = -h1;
+  if (h2 < 0) h2 = -h2;
+
   int hash = 17;
   hash = hash * 31 + h1;
   hash = hash * 31 + h2;
-  return hash < 0 ? -hash : hash;
+  return hash;
 }

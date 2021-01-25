@@ -3,7 +3,7 @@
 #include "stdlib.h"
 #include "string.h"
 
-#define INITIAL_TABLE_SIZE 9973
+#define INITIAL_TABLE_SIZE 4973
 #define DOUBLE_SIZE(x) ((x << 1) + 1)
 
 typedef struct
@@ -65,16 +65,10 @@ static void sieve_of_eratosthenes(int n)
  */
 int next_twin_prime(int p)
 {
-  // If array is not initialized
-  if (primes.array == NULL)
-  {
-    sieve_of_eratosthenes(INITIAL_TABLE_SIZE);
-  }
-
   // If array size is not enough then resize the array
   if (p >= primes.size)
   {
-    int new_size = DOUBLE_SIZE(primes.size);
+    int new_size = DOUBLE_SIZE(primes.size || INITIAL_TABLE_SIZE);
 
     // Resized array is also not enough
     if (new_size <= p)
