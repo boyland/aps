@@ -29,7 +29,7 @@ static int hc_candidate_index(HASH_CONS_TABLE hc, void *item)
 {
   int hash = hc->hashf(item);
   int index = hash % hc->capacity;
-  int step_size = (hash % (hc->capacity - 2) + 1) & 0xfffffff;
+  int step_size = (hash & 0xfffffff) % (hc->capacity - 2) + 1;
 
   while (true)
   {
