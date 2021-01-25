@@ -27,9 +27,7 @@ void hc_initialize(HASH_CONS_TABLE hc, const int capacity)
  */
 static int hc_candidate_index(HASH_CONS_TABLE hc, void *item)
 {
-  int hash = hc->hashf(item);
-  if (hash < 0) hash = -hash;
-
+  int hash = hc->hashf(item) & 0xfffffff;
   int index = hash % hc->capacity;
   int step_size = hash % (hc->capacity - 2) + 1;
 
@@ -141,7 +139,7 @@ void *hash_cons_get(void *item, size_t temp_size, HASH_CONS_TABLE hc)
 }
 
 /**
- * Hash string
+ * Hash string and returns a positive hash value
  * Source: http://www.cse.yorku.ca/~oz/hash.html
  * @param string
  * @return intger hash value
@@ -156,7 +154,7 @@ int hash_string(char *str)
     hash = ((hash << 5) + hash) + c;
   }
 
-  return hash;
+  return hash & 0xfffffff;
 }
 
 /**
@@ -167,11 +165,8 @@ int hash_string(char *str)
  */
 int hash_mix(int h1, int h2)
 {
-  if (h1 < 0) h1 = -h1;
-  if (h2 < 0) h2 = -h2;
-
   int hash = 17;
   hash = hash * 31 + h1;
   hash = hash * 31 + h2;
-  return hash;
+  return hash & 0xfffffff;
 }
