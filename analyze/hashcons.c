@@ -28,6 +28,8 @@ void hc_initialize(HASH_CONS_TABLE hc, const int capacity)
 static int hc_candidate_index(HASH_CONS_TABLE hc, void *item)
 {
   int hash = hc->hashf(item);
+  if (hash < 0) hash = -hash;
+
   int index = hash % hc->capacity;
   int step_size = hash % (hc->capacity - 2) + 1;
 
