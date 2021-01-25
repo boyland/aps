@@ -68,7 +68,7 @@ int next_twin_prime(int p)
   // If array size is not enough then resize the array
   if (p >= primes.size)
   {
-    int new_size = DOUBLE_SIZE(primes.size || INITIAL_TABLE_SIZE);
+    int new_size = DOUBLE_SIZE(primes.size + INITIAL_SIZE);
 
     // Resized array is also not enough
     if (new_size <= p)
