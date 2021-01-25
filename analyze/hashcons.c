@@ -1,9 +1,9 @@
 #include "hashcons.h"
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 #include "prime.h"
 
-#define MAX_INT 0xfffffff
 #define HC_INITIAL_BASE_SIZE 61
 #define MAX_DENSITY 0.5
 #define DOUBLE_SIZE(x) ((x << 1) + 1)
@@ -28,7 +28,7 @@ void hc_initialize(HASH_CONS_TABLE hc, const int capacity)
  */
 static int hc_candidate_index(HASH_CONS_TABLE hc, void *item)
 {
-  int hash = hc->hashf(item) & MAX_INT;
+  int hash = hc->hashf(item) & INT_MAX;
   int index = hash % hc->capacity;
   int step_size = hash % (hc->capacity - 2) + 1;
 
