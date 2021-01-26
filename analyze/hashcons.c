@@ -125,7 +125,6 @@ void *hash_cons_get(void *item, size_t temp_size, HASH_CONS_TABLE hc)
 
   void *result = malloc(temp_size);
   memcpy(result, item, temp_size);
-
   hc_insert_at(hc, result, candidate_index);
 
   if (hc->size > hc->capacity * MAX_DENSITY)
