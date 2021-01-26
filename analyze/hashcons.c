@@ -122,21 +122,19 @@ void *hash_cons_get(void *item, size_t temp_size, HASH_CONS_TABLE hc)
   {
     return hc->table[candidate_index];
   }
-  else
+
+  void *result = malloc(temp_size);
+  memcpy(result, item, temp_size);
+
+  hc_insert_at(hc, result, candidate_index);
+
+  if (hc->size > hc->capacity * MAX_DENSITY)
   {
-    void *result = malloc(temp_size);
-    memcpy(result, item, temp_size);
-
-    hc_insert_at(hc, result, candidate_index);
-
-    if (hc->size > hc->capacity * MAX_DENSITY)
-    {
-      const int new_capacity = next_twin_prime(DOUBLE_SIZE(hc->capacity));
-      hc_resize(hc, new_capacity);
-    }
-
-    return result;
+    const int new_capacity = next_twin_prime(DOUBLE_SIZE(hc->capacity));
+    hc_resize(hc, new_capacity);
   }
+
+  return result;
 }
 
 /**
