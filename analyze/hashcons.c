@@ -116,12 +116,6 @@ void *hash_cons_get(void *item, size_t temp_size, HASH_CONS_TABLE hc)
     hc_initialize(hc, HC_INITIAL_BASE_SIZE);
   }
 
-  if (hc->size > hc->capacity * MAX_DENSITY)
-  {
-    const int new_capacity = next_twin_prime(DOUBLE_SIZE(hc->capacity));
-    hc_resize(hc, new_capacity);
-  }
-
   int candidate_index = hc_search(hc, item);
 
   if (hc->table[candidate_index] != NULL)
@@ -134,6 +128,12 @@ void *hash_cons_get(void *item, size_t temp_size, HASH_CONS_TABLE hc)
     memcpy(result, item, temp_size);
 
     hc_insert_at(hc, result, candidate_index);
+
+    if (hc->size > hc->capacity * MAX_DENSITY)
+    {
+      const int new_capacity = next_twin_prime(DOUBLE_SIZE(hc->capacity));
+      hc_resize(hc, new_capacity);
+    }
 
     return result;
   }
