@@ -20,6 +20,15 @@ Type function_type_return_type(Type ft)
   return value_decl_type(first_Declaration(function_type_return_values(ft)));
 }
 
+Type constructor_return_type(Declaration decl) {
+  Type function_type = constructor_decl_type(decl);
+  Declaration rd = first_Declaration(function_type_return_values(function_type));
+  Type rt = value_decl_type(rd);
+  return rt;
+}
+
+Declaration current_module = NULL;
+
 static void* do_typechecking(void* ignore, void*node) {
   // find places where Expression, Pattern or Default is used
   switch (ABSTRACT_APS_tnode_phylum(node)) {
@@ -44,6 +53,9 @@ static void* do_typechecking(void* ignore, void*node) {
     {
       Declaration decl = (Declaration)node;
       switch (Declaration_KEY(decl)) {
+        case KEYmodule_decl:
+          current_module = (Declaration) node;
+          break;
         case KEYconstructor_decl:
         {
           Declarations formals = function_type_formals(constructor_decl_type(decl));
@@ -63,6 +75,35 @@ static void* do_typechecking(void* ignore, void*node) {
                     aps_error(decl, "Duplicate constructor formal name: \"%s\" at indices: %i, %i in \"%s\" constructor", formal_name, i, j, decl_name(decl));
                   }
               }
+          }
+
+          Type rt = constructor_return_type(decl);
+          switch (Type_KEY(rt))
+          {
+            case KEYremote_type:
+              aps_error(decl, "Constructor for remote type is forbidden (constructor %s(...): remote %s)", decl_name(decl), symbol_name(use_name(type_use_use(remote_type_nodetype(rt)))));
+              break;
+            case KEYtype_use:
+              {
+                TypeEnvironment type_env = Use_info(type_use_use(rt))->use_type_env;
+                while (type_env != NULL) {
+                  switch (Declaration_KEY(type_env->source))
+                  {
+                    case KEYmodule_decl:
+                      if (type_env->source != current_module) {
+                            aps_error(decl, "Adding a constructor \"%s\" in extending module is forbidden", decl_name(decl));
+                      }
+                      break;
+                    default:
+                      break;
+                  }
+
+                  type_env = type_env->outer;
+                }
+                break;
+              }
+            default:
+              break;
           }
           break;
         }

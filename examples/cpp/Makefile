@@ -1,6 +1,6 @@
 APSTOP= ../..
 CPP = g++
-CPPFLAGS = -ftemplate-depth-31 -I ${APSTOP}/base/cpp
+CPPFLAGS = -ftemplate-depth=63 -I ${APSTOP}/base/cpp
 APSCPP = ${APSTOP}/bin/apscpp
 APSCPPFLAGS = -p ..:${APSTOP}/base -G
 BASECPP = ${APSTOP}/lib/basecpp.a
@@ -34,6 +34,10 @@ simple-binding3.h simple-binding3.cpp : ../simple-binding3.aps
 simple-driver.o : simple.h simple-binding3.h
 simple-driver : simple-driver.o simple-binding3.o simple.o
 	${CPP} ${CPPFLAGS} simple-driver.o simple-binding3.o simple.o ${BASECPP} -o $@
+
+test-coll-driver.o : tiny.h test-coll.h
+test-coll-driver: test-coll-driver.o tiny.o test-coll.o
+	${CPP} ${CPPFLAGS} test-coll-driver.o tiny.o test-coll.o ${BASECPP} -o $@
 
 APSMODS = test.aps tiny.aps test-coll.aps test-cicular.aps \
 	  simple.aps \
