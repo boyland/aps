@@ -688,17 +688,6 @@ static Declaration get_module(Declaration decl)
   return NULL;
 }
 
-static bool are_in_the_same_module(Declaration decl1, Declaration decl2)
-{
-  Declaration mdecl1 = get_module(decl1);
-  if (mdecl1 != NULL)
-  {
-    return is_inside_module(mdecl1, decl2);
-  }
-
-  return false;
-}
-
 /**
  * Join of two canonical type use
  * @param outer canonical type use
