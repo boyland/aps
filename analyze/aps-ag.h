@@ -16,6 +16,10 @@
 #include "aps-oag.h"
 #include "aps-analyze.h"
 #include "aps-debug.h"
+#include "prime.h"
+#include "hashcons.h"
+#include "canonical-type.h"
+#include "canonical-signature.h"
 
 extern char *aps_yyfilename;
 extern void aps_error(const void *tnode, const char *fmt, ...);
