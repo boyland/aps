@@ -582,7 +582,7 @@ static void add_up_down_attributes(STATE *s) {
 	  /* fix up dependencies for cycle attributes */
 	  for (k=0; k < n; ++k) {
 	    if (parent_index[k+constructor_index] == cyc->internal_info &&
-		k != downindex && k != downindex &&
+		k != downindex && k != upindex &&
 		array[k].node != NULL &&
 		DECL_IS_RHS(array[k].node)) {
 	      Declaration attr = array[k].fibered_attr.attr;
