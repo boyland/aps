@@ -1,8 +1,9 @@
 #include "hashcons.h"
 
-#include "stdbool.h"
-#include "stdio.h"
-#include "stdlib.h"
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 void assert_true(const char *message, bool b)
 {
@@ -60,13 +61,13 @@ typedef struct dummy {
   char text[];
 } *DUMMY;
 
-int hash(void *untyped)
+int hashcons_dummy_hash(void *untyped)
 {
   DUMMY item = (DUMMY) untyped;
   return hash_mix(item->key, hash_string(item->text));
 }
 
-bool equal(void *untyped_a, void *untyped_b)
+bool hashcons_dummy_equals(void *untyped_a, void *untyped_b)
 {
   if (untyped_a == NULL || untyped_b == NULL)
   {
@@ -79,20 +80,16 @@ bool equal(void *untyped_a, void *untyped_b)
   return item_a->key == item_b->key && !strcmp(item_a->text, item_b->text);
 }
 
-DUMMY create_dummy(int key, const char* text)
-{
-  DUMMY dummy = alloca(sizeof(dummy));
-  dummy->key = key;
-  strcpy(dummy->text, text);
-  return dummy;
-}
+static struct hash_cons_table dummy_table = { &hashcons_dummy_hash, &hashcons_dummy_equals, 0, 0 };
 
 DUMMY new_hash_cons_dummy(int key, const char* text)
 {
   DUMMY dummy = alloca(sizeof(dummy));
   dummy->key = key;
   strcpy(dummy->text, text);
-  return dummy;
+  size_t struct_size = sizeof(key) + sizeof(text) / sizeof(char);
+
+  return hash_cons_get(dummy, struct_size, &dummy_table);
 }
 
 void test_dummy_table_consistency()
@@ -101,7 +98,7 @@ void test_dummy_table_consistency()
   {
     char buffer[256];
     sprintf(buffer, "dummy for %d", i);
-    // assert_true(buffer, *new_hash_cons_dummy(i, buffer) == i);
+    assert_true(buffer, new_hash_cons_dummy(i, buffer) == new_hash_cons_dummy(i, buffer));
   }
 }
 
@@ -111,6 +108,5 @@ void test_dummy_table_consistency()
 void test_hash_cons()
 {
   test_integer_table_consistency();
-
   test_dummy_table_consistency();
 }
