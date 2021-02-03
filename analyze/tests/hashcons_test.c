@@ -4,6 +4,22 @@
 #include "stdio.h"
 #include "stdlib.h"
 
+void assert_true(const char *message, bool b)
+{
+  if (!b)
+  {
+    fprintf(stderr, "Assertion failed: %s\n", message);
+    exit(1);
+  }
+}
+
+/*
+ * Basic Consistency Test
+ * 
+ * Making sure everything is getting correctly stored in the hashcons
+ * table by validating the values that are retrieved are correct
+ */
+
 int hashcons_integer_hash(void *p)
 {
   return *((int *)p);
@@ -23,27 +39,78 @@ int *new_hash_cons_integer(int n)
   return hash_cons_get(&n, sizeof(int), &integer_table);
 }
 
-void assert_true(const char *message, bool b)
+void test_integer_table_consistency()
 {
-  if (!b)
-  {
-    fprintf(stderr, "Assertion failed: %s\n", message);
-    exit(1);
-  }
-}
-
-void test_integer_table()
-{
-  int *i3 = new_hash_cons_integer(3);
-  assert_true("initial i3", *i3 == 3);
-  int *i8 = new_hash_cons_integer(8);
-  assert_true("initial i8", *i8 == 8);
-  assert_true("later i3", *i3 == 3);
-
   for (int i = 0; i < 100; ++i)
   {
     char buffer[256];
     sprintf(buffer, "integer for %d", i);
     assert_true(buffer, *new_hash_cons_integer(i) == i);
   }
+}
+
+/*
+ * Struct Consistency Test
+ * 
+ * Making sure everything is getting correctly stored in the hashcons
+ * table by validating the values that are retrieved are correct
+ */
+typedef struct dummy {
+  int key;
+  char text[];
+} *DUMMY;
+
+int hash(void *untyped)
+{
+  DUMMY item = (DUMMY) untyped;
+  return hash_mix(item->key, hash_string(item->text));
+}
+
+bool equal(void *untyped_a, void *untyped_b)
+{
+  if (untyped_a == NULL || untyped_b == NULL)
+  {
+    return false;
+  }
+
+  DUMMY item_a = (DUMMY) untyped_a;
+  DUMMY item_b = (DUMMY) untyped_b;
+
+  return item_a->key == item_b->key && !strcmp(item_a->text, item_b->text);
+}
+
+DUMMY create_dummy(int key, const char* text)
+{
+  DUMMY dummy = alloca(sizeof(dummy));
+  dummy->key = key;
+  strcpy(dummy->text, text);
+  return dummy;
+}
+
+DUMMY new_hash_cons_dummy(int key, const char* text)
+{
+  DUMMY dummy = alloca(sizeof(dummy));
+  dummy->key = key;
+  strcpy(dummy->text, text);
+  return dummy;
+}
+
+void test_dummy_table_consistency()
+{
+  for (int i = 0; i < 100; ++i)
+  {
+    char buffer[256];
+    sprintf(buffer, "dummy for %d", i);
+    // assert_true(buffer, *new_hash_cons_dummy(i, buffer) == i);
+  }
+}
+
+/**
+ * Run tests in a sequence 
+ */
+void test_hash_cons()
+{
+  test_integer_table_consistency();
+
+  test_dummy_table_consistency();
 }

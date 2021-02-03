@@ -1,9 +1,9 @@
 #include <stdio.h>
-#include "hashcons_test.c"
+#include "hashcons_test.h"
 
 int main()
 {
-  test_integer_table();
+  test_hash_cons();
 
   printf("Hello world!\n");
 }
