@@ -42,21 +42,24 @@ int *new_hash_cons_integer(int n)
 
 void test_integer_table_consistency()
 {
-  char buffer[256];
   printf("Started <test_integer_table_consistency>\n");
+
+  char buffer[256];
   int i, j;
   for (i = 0, j = 0; i < TOTAL_COUNT; ++i, j = (j + 1) % PRIME_MODULO)
   {
     sprintf(buffer, "integer for %d", i);
     assert_true(buffer, *new_hash_cons_integer(j) == j);
   }
+
   printf("Finished <test_integer_table_consistency>\n");
 }
 
 void test_integer_set_empty_consistency()
 {
-  HASH_CONS_SET set = get_hash_cons_empty_set();
   printf("Started <test_integer_set_empty_consistency>\n");
+
+  HASH_CONS_SET set = get_hash_cons_empty_set();
 
   assert_true("empty set should have size of 0", set->num_elements == 0);
   assert_true("empty set should be unique", set == get_hash_cons_empty_set());
@@ -66,9 +69,11 @@ void test_integer_set_empty_consistency()
 
 void test_integer_set_add_consistency()
 {
+  printf("Started <test_integer_set_add_consistency>\n");
+
   char buffer[256];
   HASH_CONS_SET set = get_hash_cons_empty_set();
-  printf("Started <test_integer_set_add_consistency>\n");
+
   int i, j;
   for (i = 0, j = 0; i < TOTAL_COUNT; ++i, j = (j + 1) % PRIME_MODULO)
   {
@@ -80,15 +85,18 @@ void test_integer_set_add_consistency()
     sprintf(buffer, "size contain the element %d at correct index", j);
     assert_true(buffer, (int)set->elements[j] == j);
   }
+
   printf("Finished <test_integer_set_add_consistency>\n");  
 }
 
 void test_integer_set_union_consistency()
 {
+  printf("Started <test_integer_set_union_consistency>\n");
+
   char buffer[256];
   HASH_CONS_SET set1 = get_hash_cons_empty_set();
   HASH_CONS_SET set2 = get_hash_cons_empty_set();
-  printf("Started <test_integer_set_union_consistency>\n");
+
   int i;
   for (i = 0; i < (PRIME_MODULO >> 1); i++)
   {
@@ -116,10 +124,11 @@ void test_integer_set_union_consistency()
 
 void test_integer_set_new_consistency()
 {
+  printf("Started <test_integer_set_new_consistency>\n");
+
   char buffer[256];
   HASH_CONS_SET set1 = get_hash_cons_empty_set();
   HASH_CONS_SET set2 = get_hash_cons_empty_set();
-  printf("Started <test_integer_set_new_consistency>\n");
   
   size_t struct_size = sizeof(struct hash_cons_set) + PRIME_MODULO * sizeof(void *); 
   HASH_CONS_SET set = (HASH_CONS_SET)alloca(struct_size);
@@ -185,14 +194,16 @@ DUMMY new_hash_cons_dummy(int key, char text[])
 
 void test_dummy_table_consistency()
 {
-  char buffer[256];
   printf("Started <test_dummy_table_consistency>\n");
+ 
+  char buffer[256];
   int i, j;
   for (i = 0, j = 0; i < TOTAL_COUNT; ++i, j = (j + 1) % PRIME_MODULO)
   {
     sprintf(buffer, "dummy for %d", i);
     assert_true(buffer, new_hash_cons_dummy(j, buffer) == new_hash_cons_dummy(j, buffer));
   }
+
   printf("Finished <test_dummy_table_consistency>\n");
 }
 
