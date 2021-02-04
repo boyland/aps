@@ -146,7 +146,7 @@ static int hashcons_set_hash(void *untyped)
 {
   HASH_CONS_SET set = (HASH_CONS_SET)untyped;
 
-  int i, hash = 0;
+  int i, hash = 17;
   for (i = 0; i < set->num_elements; i++) hash |= ((int)set->elements[i]);
 
   return hash;
