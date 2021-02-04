@@ -154,8 +154,8 @@ static int hashcons_set_hash(void *untyped)
 
 /**
  * Equality test for hashcons set
- * @param untyped1 untyped CanonicalType
- * @param untyped2 untyped CanonicalType
+ * @param untyped1 untyped hashcons set
+ * @param untyped2 untyped hashcons set
  * @return boolean indicating the result of equality
  */
 static bool hashcons_set_equal(void *untyped1, void *untyped2)
