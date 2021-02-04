@@ -11,7 +11,7 @@ prime.o: ../prime.h ../prime.c
 hashcons.o: prime.o ../hashcons.h ../hashcons.c
 	$(CC) -c $(CFLAGS) prime.o ../hashcons.c -o hashcons.o
 
-hashcons_test.o: hashcons.o hashcons_test.c
+hashcons_test.o: hashcons.o hashcons_test.h hashcons_test.c
 	$(CC) -c $(CFLAGS) hashcons_test.c
 
 driver.o: hashcons_test.o driver.c
