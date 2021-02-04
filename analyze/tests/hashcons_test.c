@@ -55,7 +55,6 @@ void test_integer_table_consistency()
 
 void test_integer_set_empty_consistency()
 {
-  char buffer[256];
   HASH_CONS_SET set = get_hash_cons_empty_set();
   printf("Started <test_integer_set_empty_consistency>\n");
 
