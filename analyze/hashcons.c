@@ -180,76 +180,6 @@ static bool hashcons_set_equal(void *untyped1, void *untyped2)
 static struct hash_cons_table hashcons_set_table = { hashcons_set_hash, hashcons_set_equal };
 
 /**
- * Merges two sub-array in-place
- * - First sub-array is arr[l..m]
- * - Second sub-array is arr[m+1..r]
- * @param arr array to be sorted
- * @param start start index
- * @param mid midpoint index
- * @param end ending index
- */ 
-static void merge(int arr[], int start, int mid, int end)
-{
-  int start1 = start;
-  int start2 = mid + 1;
-
-  // If the direct merge is already sorted
-  if (arr[mid] <= arr[start2])
-  {
-      return;
-  }
-
-  // Two pointers to maintain start of both arrays to merge
-  while (start1 <= mid && start2 <= end)
-  {
-    // If element 1 is in right place
-    if (arr[start] <= arr[start2]) 
-    {
-      start1++;
-    }
-    else
-    {
-      int value = arr[start2];
-      int index = start2;
-
-      // Shift all the elements between element 1 element 2, right by 1.
-      while (index != start1) 
-      {
-        arr[index] = arr[index-1];
-        index--;
-      }
-      arr[start1] = value;
-
-      // Update all the pointers
-      start1++;
-      mid++;
-      start2++;
-    }
-  }
-}
-     
-/**
- * @param arr sub-array of arr to be sorted
- * @param l is for left index
- * @param r is right index of the 
- */
-static void merge_sort(int arr[], int l, int r)
-{
-  if (l < r)
-  {
-    // Same as (l + r) / 2, but avoids overflow for large l and r
-    int m = l + (r - l) >> 1;
-
-    // Sort first and second halves
-    merge_sort(arr, l, m);
-    merge_sort(arr, m + 1, r);
-
-    // Merge together two sorted sub arrays
-    merge(arr, l, m, r);
-  }
-}
-
-/**
  * Take a temporary set and hash cons it, returning the set that results
  * NOTE: The elements array will be sorted by address to ensure a canonical representation.
  * @param set hashcons set
@@ -259,16 +189,40 @@ HASH_CONS_SET new_hash_cons_set(HASH_CONS_SET set)
 {
   size_t struct_size = sizeof(struct hash_cons_set) + set->num_elements * sizeof(void *);
   HASH_CONS_SET sorted_set = (HASH_CONS_SET)alloca(struct_size);
+  sorted_set->num_elements = 0;
 
-  sorted_set->num_elements = set->num_elements;
-
-  int i;
+  int i, j, k;
+  bool inserted;
   for (i = 0; i < set->num_elements; i++)
   {
-    sorted_set->elements[i] = set->elements[i];
-  }
+    inserted = false;
+    for (j = 0; j < sorted_set->num_elements && !inserted; j++)
+    {
+      if (set->elements[i] == sorted_set->elements[j])
+      {
+        inserted = true;  // duplicate not allowed in a set
+      }
+      else if (set->elements[i] < sorted_set->elements[j])
+      {
+        k = sorted_set->num_elements;
+        while (k > j)
+        {
+          sorted_set->elements[k] = sorted_set->elements[k - 1];
+          k--;
+        }
+        sorted_set->elements[j] = set->elements[i];
 
-  merge_sort(sorted_set->elements, 0, sorted_set->num_elements);
+        inserted = true;
+        sorted_set->num_elements++;
+      }
+    }
+
+    if (!inserted)
+    {
+      sorted_set->elements[sorted_set->num_elements++] = set->elements[i];
+      inserted = true;
+    }
+  }
 
   void *memory = hash_cons_get(sorted_set, struct_size, &hashcons_set_table);
   return (HASH_CONS_SET)memory;
@@ -291,27 +245,13 @@ HASH_CONS_SET get_hash_cons_empty_set()
  */
 HASH_CONS_SET add_hash_cons_set(void *item, HASH_CONS_SET set)
 {
-  int updated_count = set->num_elements + 1;
-  size_t struct_size = sizeof(struct hash_cons_set) + updated_count * sizeof(void *);
-  HASH_CONS_SET sorted_set = (HASH_CONS_SET)alloca(struct_size);
+  size_t struct_size = sizeof(struct hash_cons_set) + 1 * sizeof(void *);
+  HASH_CONS_SET single_element_set = (HASH_CONS_SET)alloca(struct_size);
 
-  sorted_set->num_elements = updated_count;
+  single_element_set->num_elements = 1;
+  single_element_set->elements[0] = item;
 
-  // O(n): adding an item to sorted array efficiently
-  bool item_added = false;
-  int i;
-  for (i = 0; i < set->num_elements; i++)
-  {
-    sorted_set->elements[i] = set->elements[item_added ? i - 1 : item_added];
-    if (!item_added)
-    {
-      sorted_set->elements[++i] = item;
-      item_added = true;
-    }
-  }
-
-  void *memory = hash_cons_get(sorted_set, struct_size, &hashcons_set_table);
-  return (HASH_CONS_SET)memory;
+  return union_hash_const_set(single_element_set, set);
 }
 
 /**
@@ -371,7 +311,7 @@ int hash_string(char *str)
   int hash = 5381;
   int c;
 
-  while (c = *str++)
+  while ((c = *str++))
   {
     hash = ((hash << 5) + hash) + c;
   }

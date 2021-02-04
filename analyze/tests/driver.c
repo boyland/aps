@@ -5,5 +5,5 @@ int main()
 {
   test_hash_cons();
 
-  printf("Hello world!\n");
+  printf("Finished running all tests\n");
 }
