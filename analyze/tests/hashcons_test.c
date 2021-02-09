@@ -17,10 +17,6 @@ void assert_true(const char *message, bool b)
   }
 }
 
-/*
- * Basic Consistency Test
- */
-
 int hashcons_integer_hash(void *p)
 {
   return *((int *)p);
@@ -40,6 +36,9 @@ int *new_hash_cons_integer(int n)
   return hash_cons_get(&n, sizeof(int), &integer_table);
 }
 
+/**
+ * Validating consistency of hashcons by storing and retriving integers
+ */
 void test_integer_table_consistency()
 {
   printf("Started <test_integer_table_consistency>\n");
@@ -55,6 +54,9 @@ void test_integer_table_consistency()
   printf("Finished <test_integer_table_consistency>\n");
 }
 
+/**
+ * Validating empty hashcons set is unique and has a size of zero
+ */
 void test_integer_set_empty_consistency()
 {
   printf("Started <test_integer_set_empty_consistency>\n");
@@ -67,6 +69,9 @@ void test_integer_set_empty_consistency()
   printf("Finished <test_integer_set_empty_consistency>\n");  
 }
 
+/**
+ * Validating add_hash_cons_set, making sure size is getting incremented and values are unique
+ */
 void test_integer_set_add_consistency()
 {
   printf("Started <test_integer_set_add_consistency>\n");
@@ -89,21 +94,25 @@ void test_integer_set_add_consistency()
   printf("Finished <test_integer_set_add_consistency>\n");  
 }
 
+/**
+ * Validating union_hash_const_set, making sure size is correct and values are sorted without any duplicates
+ */
 void test_integer_set_union_consistency()
 {
   printf("Started <test_integer_set_union_consistency>\n");
 
+  int size = 1000;
   char buffer[256];
   HASH_CONS_SET set1 = get_hash_cons_empty_set();
   HASH_CONS_SET set2 = get_hash_cons_empty_set();
 
   int i;
-  for (i = 0; i < (PRIME_MODULO >> 1); i++)
+  for (i = 0; i < (size >> 1); i++)
   {
     set1 = add_hash_cons_set((void *)i, set1);
   }
 
-  for (i = PRIME_MODULO >> 1; i < PRIME_MODULO; i++)
+  for (i = 0; i < size; i++)
   {
     set2 = add_hash_cons_set((void *)i, set2);
   }
@@ -122,28 +131,32 @@ void test_integer_set_union_consistency()
   printf("Finished <test_integer_set_union_consistency>\n");  
 }
 
+/**
+ * Validating new_hash_cons_set, making sure size is correct and values are sorted without any duplicates
+ */
 void test_integer_set_new_consistency()
 {
   printf("Started <test_integer_set_new_consistency>\n");
 
+  int size = 1000;
   char buffer[256];
   HASH_CONS_SET set1 = get_hash_cons_empty_set();
   HASH_CONS_SET set2 = get_hash_cons_empty_set();
   
   size_t struct_size = sizeof(struct hash_cons_set) + PRIME_MODULO * sizeof(void *); 
   HASH_CONS_SET set = (HASH_CONS_SET)alloca(struct_size);
-  set->num_elements = PRIME_MODULO;
+  set->num_elements = size;
 
   int i;
-  for (i = 0; i < PRIME_MODULO; i++)
+  for (i = 0; i < size; i++)
   {
-    set->elements[i] = (void *)PRIME_MODULO - i - 1;
+    set->elements[i] = (void *)size - i - 1;
   }
 
   HASH_CONS_SET sorted_set = new_hash_cons_set(set);
   assert_true("size should be the same as before", sorted_set->num_elements == set->num_elements);
 
-  for (i = 0; i < PRIME_MODULO; i++)
+  for (i = 0; i < size; i++)
   {
     sprintf(buffer, "elements should be in sorted order %d != %d", (int)sorted_set->elements[i], i);
     assert_true(buffer, (int)sorted_set->elements[i] == i);
@@ -151,10 +164,6 @@ void test_integer_set_new_consistency()
 
   printf("Finished <test_integer_set_new_consistency>\n");  
 }
-
-/*
- * Struct Consistency Test
- */
 
 typedef struct dummy {
   int key;
@@ -192,6 +201,9 @@ DUMMY new_hash_cons_dummy(int key, char text[])
   return hash_cons_get(dummy, struct_size, &dummy_table);
 }
 
+/**
+ * Validating hashcons works with a struct
+ */
 void test_dummy_table_consistency()
 {
   printf("Started <test_dummy_table_consistency>\n");

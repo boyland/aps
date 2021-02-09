@@ -6,7 +6,7 @@
 
 #define HC_INITIAL_BASE_SIZE 61
 #define MAX_DENSITY 0.5
-#define DOUBLE_SIZE(x) ((x << 1) + 1)
+#define DOUBLE_SIZE(x) (((x) << 1) + 1)
 
 /**
  * Initializes a table
@@ -191,36 +191,21 @@ HASH_CONS_SET new_hash_cons_set(HASH_CONS_SET set)
   HASH_CONS_SET sorted_set = (HASH_CONS_SET)alloca(struct_size);
   sorted_set->num_elements = 0;
 
-  int i, j, k;
-  bool inserted;
+  int i, j;
   for (i = 0; i < set->num_elements; i++)
   {
-    inserted = false;
-    for (j = 0; j < sorted_set->num_elements && !inserted; j++)
-    {
-      if (set->elements[i] == sorted_set->elements[j])
-      {
-        inserted = true;  // duplicate not allowed in a set
-      }
-      else if (set->elements[i] < sorted_set->elements[j])
-      {
-        k = sorted_set->num_elements;
-        while (k > j)
-        {
-          sorted_set->elements[k] = sorted_set->elements[k - 1];
-          k--;
-        }
-        sorted_set->elements[j] = set->elements[i];
+    int key = (int) set->elements[i]; 
+    int j = i - 1; 
 
-        inserted = true;
-        sorted_set->num_elements++;
-      }
+    while (j >= 0 && sorted_set->elements[j] > key) { 
+      sorted_set->elements[j + 1] = sorted_set->elements[j]; 
+      j = j - 1; 
     }
 
-    if (!inserted)
-    {
-      sorted_set->elements[sorted_set->num_elements++] = set->elements[i];
-      inserted = true;
+    // Disallow duplicates
+    if (sorted_set->elements[j + 1] != key) {
+      sorted_set->elements[j + 1] = key;
+      sorted_set->num_elements++;
     }
   }
 
@@ -247,7 +232,6 @@ HASH_CONS_SET add_hash_cons_set(void *item, HASH_CONS_SET set)
 {
   size_t struct_size = sizeof(struct hash_cons_set) + 1 * sizeof(void *);
   HASH_CONS_SET single_element_set = (HASH_CONS_SET)alloca(struct_size);
-
   single_element_set->num_elements = 1;
   single_element_set->elements[0] = item;
 
@@ -265,7 +249,6 @@ HASH_CONS_SET union_hash_const_set(HASH_CONS_SET set_a, HASH_CONS_SET set_b)
   int updated_count = set_a->num_elements + set_b->num_elements;
   size_t struct_size = sizeof(struct hash_cons_set) + updated_count * sizeof(void *);
   HASH_CONS_SET sorted_set = (HASH_CONS_SET)alloca(struct_size);
-
   sorted_set->num_elements = updated_count;
 
   int i = 0, j = 0, k = 0;

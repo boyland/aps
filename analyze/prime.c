@@ -4,7 +4,7 @@
 #include "string.h"
 
 #define INITIAL_TABLE_SIZE 4973
-#define DOUBLE_SIZE(x) ((x << 1) + 1)
+#define DOUBLE_SIZE(x) (((x) << 1) + 1)
 
 typedef struct
 {
@@ -68,7 +68,7 @@ int next_twin_prime(int p)
   // If array size is not enough then resize the array
   if (p >= primes.size)
   {
-    int new_size = DOUBLE_SIZE((primes.size + INITIAL_TABLE_SIZE));
+    int new_size = DOUBLE_SIZE(primes.size + INITIAL_TABLE_SIZE);
 
     // Resized array is also not enough
     if (new_size <= p)
