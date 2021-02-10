@@ -1,9 +1,9 @@
 CC=gcc 
-CFLAGS=-I ..
+CFLAGS=-g -I ..
 
-all: output test clean
-output: prime.o hashcons.o hashcons_test.o driver.o
-	$(CC) $(CFLAGS) $^ -o output
+all: build test clean
+build: prime.o hashcons.o hashcons_test.o driver.o
+	$(CC) $(CFLAGS) $^ -o test.out
 
 prime.o: ../prime.h ../prime.c
 	$(CC) -c $(CFLAGS) ../prime.c -o prime.o
@@ -17,8 +17,8 @@ hashcons_test.o: hashcons.o hashcons_test.h hashcons_test.c
 driver.o: hashcons_test.o driver.c
 	$(CC) -c $(CFLAGS) driver.c -o driver.o
 
-test: output
-	@./output
+test: build
+	@./test.out
 
 clean:
-	@rm -rf *.o output
+	@rm -rf *.o *.out

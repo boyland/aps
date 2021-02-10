@@ -132,7 +132,7 @@ void test_integer_set_union_consistency()
 }
 
 /**
- * Validating new_hash_cons_set, making sure size is correct and values are sorted without any duplicates
+ * Validating new_hash_cons_set, making sure size is correct and values are sorted
  */
 void test_integer_set_new_consistency()
 {
@@ -145,20 +145,16 @@ void test_integer_set_new_consistency()
   
   size_t struct_size = sizeof(struct hash_cons_set) + 2 * size * sizeof(void *); 
   HASH_CONS_SET set = (HASH_CONS_SET)alloca(struct_size);
+  set->num_elements = size;
 
   int i;
   for (i = 0; i < size; i++)
   {
-    set->elements[set->num_elements++] = (void *)size - i - 1;
-  }
-
-  for (; i < size; i++)
-  {
-    set->elements[set->num_elements++] = (void *)size - i - 1;
+    set->elements[i] = (void *)size - i - 1;
   }
 
   HASH_CONS_SET sorted_set = new_hash_cons_set(set);
-  assert_true("size should be the same as before", sorted_set->num_elements == set->num_elements);
+  assert_true("size should be correct", sorted_set->num_elements == size);
 
   for (i = 0; i < size; i++)
   {
