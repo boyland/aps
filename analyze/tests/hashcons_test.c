@@ -120,7 +120,7 @@ void test_integer_set_union_consistency()
   HASH_CONS_SET result_set = union_hash_const_set(set1, set2);
 
   sprintf(buffer, "size contain the element %d at correct index", i);
-  assert_true(buffer, result_set->num_elements = PRIME_MODULO);
+  assert_true(buffer, result_set->num_elements == size);
 
   for (i = 0; i < PRIME_MODULO; i++)
   {
@@ -143,14 +143,18 @@ void test_integer_set_new_consistency()
   HASH_CONS_SET set1 = get_hash_cons_empty_set();
   HASH_CONS_SET set2 = get_hash_cons_empty_set();
   
-  size_t struct_size = sizeof(struct hash_cons_set) + PRIME_MODULO * sizeof(void *); 
+  size_t struct_size = sizeof(struct hash_cons_set) + 2 * size * sizeof(void *); 
   HASH_CONS_SET set = (HASH_CONS_SET)alloca(struct_size);
-  set->num_elements = size;
 
   int i;
   for (i = 0; i < size; i++)
   {
-    set->elements[i] = (void *)size - i - 1;
+    set->elements[set->num_elements++] = (void *)size - i - 1;
+  }
+
+  for (; i < size; i++)
+  {
+    set->elements[set->num_elements++] = (void *)size - i - 1;
   }
 
   HASH_CONS_SET sorted_set = new_hash_cons_set(set);
