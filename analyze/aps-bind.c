@@ -78,6 +78,26 @@ static void set_instance_index(Declarations ds)
   }
 }
 
+static void *sig_bind(void* scope, void* untyped) {
+  switch (ABSTRACT_APS_tnode_phylum(untyped))
+  {
+    case KEYSignature:
+    {
+      Signature sig = (Signature)untyped;
+      switch (Signature_KEY(sig))
+      {
+        case KEYsig_inst:
+        {
+          Use use = class_use_use(sig_inst_class(sig));
+          Declaration parent_mdecl = USE_DECL(use);          
+          traverse_Block(get_public_bindings, scope, some_class_decl_contents(parent_mdecl));  
+        }
+      }
+    }
+  }
+
+  return scope;
+}
 
 static void pop_type_contour()
 {
@@ -243,6 +263,9 @@ static SCOPE inst_services(TypeEnvironment use_type_env,
 			   TypeActuals tacts,
 			   SCOPE services)
 {
+
+  traverse_Signature(sig_bind, &services, some_class_decl_parent(class_decl));
+
   TypeEnvironment saved = current_type_env;
   Declaration tf;
   /* Signature psig = some_class_decl_parent(class_decl); */
