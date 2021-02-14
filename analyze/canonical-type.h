@@ -81,6 +81,13 @@ int canonical_type_compare(CanonicalType *ctype1, CanonicalType *ctype2);
 Declaration canonical_type_decl(CanonicalType *canonical_type);
 
 /**
+ * Given an untyped CanonicalType, it returns a its hash value
+ * @arg untyped CanonicalType
+ * @return hash value
+ */
+int canonical_type_hash(void *arg);
+
+/**
  * Given a canonical type, prints it to the file output
  * @param untyped untyped canonical type
  * @return f FILE output
