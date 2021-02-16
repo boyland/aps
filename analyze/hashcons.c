@@ -248,7 +248,8 @@ HASH_CONS_SET add_hash_cons_set(void *item, HASH_CONS_SET set)
 HASH_CONS_SET union_hash_const_set(HASH_CONS_SET set_a, HASH_CONS_SET set_b)
 {
   int updated_count = set_a->num_elements + set_b->num_elements;
-  size_t struct_size = sizeof(struct hash_cons_set) + updated_count * sizeof(void *);
+  size_t item_size = sizeof(void *);
+  size_t struct_size = sizeof(struct hash_cons_set) + updated_count * item_size;
   HASH_CONS_SET sorted_set = (HASH_CONS_SET)alloca(struct_size);
   sorted_set->num_elements = updated_count;
 
@@ -259,7 +260,7 @@ HASH_CONS_SET union_hash_const_set(HASH_CONS_SET set_a, HASH_CONS_SET set_b)
     {
       sorted_set->elements[k] = set_a->elements[i];
       sorted_set->num_elements--;
-      struct_size -= sizeof(void *);
+      struct_size -= item_size;
       i++;
       j++;
     }
