@@ -217,7 +217,10 @@ HASH_CONS_SET new_hash_cons_set(HASH_CONS_SET set)
  */
 HASH_CONS_SET get_hash_cons_empty_set()
 {
-  return new_hash_cons_set(&((struct hash_cons_set) { 0 }));
+  struct hash_cons_set empty_set = (struct hash_cons_set) { 0 };
+
+  void *memory = hash_cons_get(&empty_set, sizeof(empty_set), &hashcons_set_table);
+  return (HASH_CONS_SET)memory;
 }
 
 /**
@@ -256,6 +259,7 @@ HASH_CONS_SET union_hash_const_set(HASH_CONS_SET set_a, HASH_CONS_SET set_b)
     {
       sorted_set->elements[k] = set_a->elements[i];
       sorted_set->num_elements--;
+      struct_size -= sizeof(void *);
       i++;
       j++;
     }
