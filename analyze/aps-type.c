@@ -395,10 +395,10 @@ static void* validate_canonicals(void* ignore, void*node) {
         Expression result_expr = Expression_info(type_expr)->next_expr;
 
         Type type = type_value_T(type_expr);
-        String expected = string_const_token(result_expr);
+        String expected_string = string_const_token(result_expr);
 
-        char buffer1[BUFFER_SIZE];
-        FILE* f = fmemopen(buffer1, sizeof(buffer1), "w");
+        char actual_to_string[BUFFER_SIZE];
+        FILE* f = fmemopen(actual_to_string, sizeof(actual_to_string), "w");
         if (symb_test_canonical_signature == pragma_value) {
           print_canonical_signature_set(infer_canonical_signatures(canonical_type(type)), f);
         } else if (symb_test_canonical_type == pragma_value) {
@@ -408,18 +408,13 @@ static void* validate_canonicals(void* ignore, void*node) {
         }
         fclose(f);
 
-        char buffer2[BUFFER_SIZE];
-        sprintf(buffer2, "%s", expected);
+        char expected[BUFFER_SIZE];
+        sprintf(expected, "%s", expected_string);
 
-        char buffer3[BUFFER_SIZE];
-        FILE* f2 = fmemopen(buffer3, sizeof(buffer3), "w");
-        print_Type(type, f2);
-        fclose(f2);
-
-        char* expected_cleaned = clean_string_const_token(&buffer2);
+        char* expected_cleaned = clean_string_const_token(&expected);
         
-        if (strcmp(buffer1, expected_cleaned) != 0) {
-          aps_error(type,"Failed: %s:%d  expected `%s` but got `%s`", buffer3, tnode_line_number(type), expected_cleaned, buffer1);
+        if (strcmp(actual_to_string, expected_cleaned) != 0) {
+          aps_error(type,"Failed: %d  expected `%s` but got `%s`", tnode_line_number(type), expected_cleaned, actual_to_string);
         }
       }
     }
