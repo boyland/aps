@@ -127,11 +127,11 @@ bool canonical_type_equal(void *a, void *b)
  */
 void print_canonical_type(void *untyped, FILE *f)
 {
-  if (f == 0)
+  if (f == NULL)
   {
     f = stdout;
   }
-  if (untyped == 0)
+  if (untyped == NULL)
   {
     fprintf(f, "<null>");
     return;
