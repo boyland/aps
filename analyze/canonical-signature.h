@@ -12,20 +12,14 @@ struct CanonicalSignature_type
 
 typedef struct CanonicalSignature_type CanonicalSignature;
 
-struct CanonicalSignatureSet_type
-{
-  int size;
-  CanonicalSignature *members[]; /* MUST be sorted because otherwise it won't be unique */
-};
-
-typedef struct CanonicalSignatureSet_type CanonicalSignatureSet;
+typedef HASH_CONS_SET CanonicalSignatureSet;
 
 /**
  * Should accumulate the signatures in a restrictive way not additive mannger
  * @param ctype canonical type
  * @return canonical signature set
  */
-CanonicalSignatureSet *infer_canonical_signatures(CanonicalType *ctype);
+CanonicalSignatureSet infer_canonical_signatures(CanonicalType *ctype);
 
 /**
  * Initializes the necessary stuff needed to find the canonical signatures

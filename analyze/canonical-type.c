@@ -25,7 +25,7 @@ int canonical_type_hash(void *arg)
     return 0;
   }
 
-  struct canonicalTypeBase *canonical_type = (struct CanonicalType *)arg;
+  CanonicalType *canonical_type = (CanonicalType *)arg;
 
   switch (canonical_type->key)
   {
@@ -70,8 +70,8 @@ bool canonical_type_equal(void *a, void *b)
     return false;
   }
 
-  struct canonicalTypeBase *canonical_type_a = (struct CanonicalType *)a;
-  struct canonicalTypeBase *canonical_type_b = (struct CanonicalType *)b;
+  CanonicalType *canonical_type_a = (CanonicalType *)a;
+  CanonicalType *canonical_type_b = (CanonicalType *)b;
 
   if (canonical_type_a->key != canonical_type_b->key)
   {
@@ -137,7 +137,7 @@ void print_canonical_type(void *untyped, FILE *f)
     return;
   }
 
-  struct canonicalTypeBase *canonical_type = (struct CanonicalType *)untyped;
+  CanonicalType *canonical_type = (CanonicalType *)untyped;
 
   switch (canonical_type->key)
   {
@@ -603,19 +603,19 @@ CanonicalType *canonical_type_base_type(CanonicalType *ctype)
   }
   case KEY_CANONICAL_FUNC:
   {
-    struct Canonical_function_type *canonical_type_function = (struct Canonical_function_type *)shallow_clone_canonical_function_types(ctype);
+    struct Canonical_function_type *canonical_type_function = (struct Canonical_function_type *)ctype;
+    struct Canonical_function_type *result = shallow_clone_canonical_function_types(canonical_type_function);
 
     size_t my_size = sizeof(struct Canonical_function_type) + canonical_type_function->num_formals * (sizeof(CanonicalType *));
 
-    canonical_type_function->return_type = canonical_type_base_type(canonical_type_function->return_type);
+    result->return_type = canonical_type_base_type(result->return_type);
     int i;
-    for (i = 0; i < canonical_type_function->num_formals; i++)
+    for (i = 0; i < result->num_formals; i++)
     {
-      canonical_type_function->param_types[i] = canonical_type_base_type(canonical_type_function->param_types[i]);
+      result->param_types[i] = canonical_type_base_type(result->param_types[i]);
     }
 
-    void *memory = hash_cons_get(canonical_type_function, my_size, &canonical_type_table);
-
+    void *memory = hash_cons_get(result, my_size, &canonical_type_table);
     return (CanonicalType *)memory;
   }
   default:
@@ -626,26 +626,26 @@ CanonicalType *canonical_type_base_type(CanonicalType *ctype)
 /**
  * Combine canonical use with qual safely and recursively
  * Note that structure of two canonical types dictates this
- * @param ctypeLeft
- * @param ctypeRight
+ * @param ctype_left
+ * @param ctype_right
  * @return combined canonical types
  */
-static CanonicalType *canonical_type_left_refactor(struct Canonical_use_type *ctypeLeft, struct Canonical_qual_type *ctypeRight)
+static CanonicalType *canonical_type_left_refactor(struct Canonical_use_type *ctype_left, struct Canonical_qual_type *ctype_right)
 {
-  switch (ctypeRight->source->key)
+  switch (ctype_right->source->key)
   {
   case KEY_CANONICAL_USE:
   {
-    struct Canonical_use_type *right_use = (struct Canonical_use_type *)ctypeRight->source;
-    return new_canonical_type_qual(new_canonical_type_qual(ctypeLeft, right_use->decl), ctypeRight->decl);
+    struct Canonical_use_type *right_use = (struct Canonical_use_type *)ctype_right->source;
+    return new_canonical_type_qual(new_canonical_type_qual(ctype_left, right_use->decl), ctype_right->decl);
   }
   case KEY_CANONICAL_QUAL:
   {
-    struct Canonical_qual_type *right_qual = (struct Canonical_qual_type *)ctypeRight;
-    return new_canonical_type_qual(canonical_type_left_refactor(ctypeLeft, ctypeRight->source), ctypeRight->decl);
+    struct Canonical_qual_type *right_qual = (struct Canonical_qual_type *)ctype_right;
+    return new_canonical_type_qual(canonical_type_left_refactor(ctype_left, ctype_right->source), ctype_right->decl);
   }
   default:
-    aps_error(ctypeRight, "Not sure how to do a canonical_type_left_refactor");
+    aps_error(ctype_right, "Not sure how to do a canonical_type_left_refactor");
     return NULL;
   }
 }
@@ -843,14 +843,14 @@ static CanonicalType *canonical_type_qual_use_join(struct Canonical_qual_type *c
       return new_canonical_type_qual(ctype_outer, decl);
     default:
       aps_error(tdecl_type, "Unexpected type %d in resolve_canonical_base_type()", (int)Type_KEY(tdecl_type));
-      return decl;
+      return NULL;
     }
   }
   case KEYsome_type_formal:
     return canonical_type_join(ctype_outer->source, canonical_type(get_actual_given_formal(tdecl, mdecl, decl)), is_base_type);
   default:
     aps_error(decl, "Unexpected decl %d in resolve_canonical_base_type()", (int)Declaration_KEY(decl));
-    return decl;
+    return NULL;
   }
 }
 
@@ -937,14 +937,14 @@ static CanonicalType *canonical_type_qual_qual_join(struct Canonical_qual_type *
       return canonical_type_left_refactor(ctype_outer, ctype_inner);
     default:
       aps_error(tdecl_type, "Unexpected type %d in resolve_canonical_base_type()", (int)Type_KEY(tdecl_type));
-      return decl;
+      return NULL;
     }
   }
   case KEYsome_type_formal:
     return canonical_type_join(ctype_outer->source, canonical_type(get_actual_given_formal(tdecl, mdecl, decl)), is_base_type);
   default:
     aps_error(decl, "Unexpected decl %d in resolve_canonical_base_type()", (int)Declaration_KEY(decl));
-    return decl;
+    return NULL;
   }
 }
 
