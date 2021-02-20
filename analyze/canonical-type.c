@@ -159,7 +159,7 @@ void print_canonical_type(void *untyped, FILE *f)
   }
   case KEY_CANONICAL_FUNC:
   {
-    int started = false;
+    bool started = false;
     struct Canonical_function_type *canonical_func_type = (struct Canonical_function_type *)canonical_type;
 
     fputc('(', f);

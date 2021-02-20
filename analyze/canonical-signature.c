@@ -10,6 +10,7 @@ static CanonicalSignatureSet from_sig(Signature sig);
 static CanonicalSignatureSet from_type(Type t);
 static CanonicalSignatureSet from_declaration(Declaration decl);
 static CanonicalSignatureSet substitute_canonical_signature_set_actuals(CanonicalType* source, CanonicalSignatureSet sig_set);
+static int canonical_signature_compare(CanonicalSignature *sig1, CanonicalSignature *sig2);
 
 static Declaration module_TYPE;
 static Declaration module_PHYLUM;
@@ -37,7 +38,7 @@ void print_canonical_signature(void *untyped, FILE *f)
   fprintf(f, "%s", decl_name(canonical_signature->source_class));
   fputc('[', f);
 
-  int started = false;
+  bool started = false;
   int i;
   for (i = 0; i < canonical_signature->num_actuals; i++)
   {
@@ -72,23 +73,45 @@ void print_canonical_signature_set(void *untyped, FILE *f)
     return;
   }
 
-  CanonicalSignatureSet canonical_signature_set = (CanonicalSignatureSet)untyped;
+  CanonicalSignatureSet set = (CanonicalSignatureSet)untyped;
 
   fprintf(f, "{");
 
-  int started = false;
-  int i;
-  for (i = 0; i < canonical_signature_set->num_elements; i++)
+  if (set->num_elements > 0)
   {
-    if (started)
+    size_t struct_size = sizeof(struct hash_cons_set) + set->num_elements * sizeof(void *);
+    HASH_CONS_SET sorted_set = (HASH_CONS_SET)alloca(struct_size);
+    sorted_set->num_elements = 0;
+
+    int i, j;
+    for (i = 0; i < set->num_elements; i++)
     {
-      fprintf(f, ",");
+      CanonicalSignature * item = (CanonicalSignature *)set->elements[i];
+      int j = i - 1;
+
+      while (j >= 0 && canonical_signature_compare((CanonicalSignature *)sorted_set->elements[j], item) > 0)
+      { 
+        sorted_set->elements[j + 1] = sorted_set->elements[j]; 
+        j--; 
+      }
+
+      sorted_set->elements[j + 1] = item;
+      sorted_set->num_elements++;
     }
-    else
+
+    int started = false;
+    for (i = 0; i < sorted_set->num_elements; i++)
     {
-      started = true;
+      if (started)
+      {
+        fprintf(f, ",");
+      }
+      else
+      {
+        started = true;
+      }
+      print_canonical_signature(sorted_set->elements[i], f);
     }
-    print_canonical_signature(canonical_signature_set->elements[i], f);
   }
 
   fprintf(f, "}");
