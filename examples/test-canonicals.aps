@@ -39,7 +39,7 @@ begin
 
   -------------------------------------------------------
 
-  -- simple (non-polymiorphic)
+  -- simple (non-polymorphic)
   type A := T;        
   type B := Integer;
   type C;             
@@ -108,7 +108,7 @@ begin
 
   -------------------------------------------------------
 
-  -- polymiorphic (generating)
+  -- polymorphic (generating)
   type I := GEN[A];
   type J := GEN[B];
   type K := GEN[C];
@@ -131,7 +131,7 @@ begin
 
   -------------------------------------------------------
 
-  -- polymiorphic (generating) 1 level type use
+  -- polymorphic (generating) 1 level type use
   type I1 := GEN[E];
   type J1 := GEN[F];
   type K1 := GEN[G];
@@ -154,7 +154,7 @@ begin
 
   -------------------------------------------------------
 
-  -- polymiorphic (generating) 2 level type use
+  -- polymorphic (generating) 2 level type use
   type I2 := GEN[E2];
   type J2 := GEN[F2];
   type K2 := GEN[G2];
@@ -177,7 +177,7 @@ begin
 
   -------------------------------------------------------
 
-  -- polymiorphic (non-generating)
+  -- polymorphic (non-generating)
   type M := EXT[A];
   type N := EXT[B];
   type O := EXT[C];
@@ -200,7 +200,7 @@ begin
 
   -------------------------------------------------------
 
-  -- polymiorphic (non-generating) 1 level type use
+  -- polymorphic (non-generating) 1 level type use
   type M1 := EXT[E];
   type N1 := EXT[F];
   type O1 := EXT[G];
@@ -223,7 +223,7 @@ begin
   
   -------------------------------------------------------
 
-  -- polymiorphic (non-generating) 2 level type use
+  -- polymorphic (non-generating) 2 level type use
   type M2 := EXT[E2];
   type N2 := EXT[F2];
   type O2 := EXT[G2];
@@ -353,7 +353,7 @@ begin
 
   -------------------------------------------------------
 
-  -- type inst Q $ polymiorphic (generating) 2 level
+  -- type inst Q $ polymorphic (generating) 2 level
   type QI2 := Q$I2;
   type QJ2 := Q$J2;
   type QK2 := Q$K2;
@@ -376,7 +376,7 @@ begin
 
   -------------------------------------------------------
 
-  -- type inst R $ polymiorphic (generating) 2 level
+  -- type inst R $ polymorphic (generating) 2 level
   type RI2 := R$I2;
   type RJ2 := R$J2;
   type RK2 := R$K2;
@@ -399,7 +399,7 @@ begin
 
   -------------------------------------------------------
 
-  -- type inst Q $ polymiorphic (non-generating) 2 level
+  -- type inst Q $ polymorphic (non-generating) 2 level
   type QM2 := Q$M2;
   type QN2 := Q$N2;
   type QO2 := Q$O2;
@@ -422,7 +422,7 @@ begin
 
   -------------------------------------------------------
 
-  -- type inst R $ polymiorphic (non-generating) 2 level
+  -- type inst R $ polymorphic (non-generating) 2 level
   type RM2 := R$M2;
   type RN2 := R$N2;
   type RO2 := R$O2;
@@ -486,7 +486,7 @@ end;
 
 module EXT[T :: BASIC[]] extends T
 begin
-  -- simple (non-polymiorphic)
+  -- simple (non-polymorphic)
   type A := T;
   type B := Integer;
   type C;
@@ -504,37 +504,37 @@ begin
   type G2 := G;
   type H2 := H;
 
-  -- polymiorphic (generating)
+  -- polymorphic (generating)
   type I := GEN[A];
   type J := GEN[B];
   type K := GEN[C];
   type L := GEN[D];
 
-  -- polymiorphic (generating) 1 level type use
+  -- polymorphic (generating) 1 level type use
   type I1 := GEN[E];
   type J1 := GEN[F];
   type K1 := GEN[G];
   type L1 := GEN[H];
 
-  -- polymiorphic (generating) 2 level type use
+  -- polymorphic (generating) 2 level type use
   type I2 := GEN[E2];
   type J2 := GEN[F2];
   type K2 := GEN[G2];
   type L2 := GEN[H2];
 
-  -- polymiorphic (non-generating)
+  -- polymorphic (non-generating)
   type M := EXT[A];
   type N := EXT[B];
   type O := EXT[C];
   type P := EXT[D];
 
-  -- polymiorphic (non-generating) 1 level type use
+  -- polymorphic (non-generating) 1 level type use
   type M1 := EXT[E];
   type N1 := EXT[F];
   type O1 := EXT[G];
   type P1 := EXT[H];
 
-  -- polymiorphic (non-generating) 2 level type use
+  -- polymorphic (non-generating) 2 level type use
   type M2 := EXT[E2];
   type N2 := EXT[F2];
   type O2 := EXT[G2];
@@ -704,7 +704,7 @@ pragma test_canonical_signature(type E0H2, "{BASIC[],TYPE[],LIST[Character],EXT[
 
 -------------------------------------------------------
 
--- G0 $ polymiorphic (generating) 2 level type use
+-- G0 $ polymorphic (generating) 2 level type use
 type G0I2 := G0$I2;
 type G0J2 := G0$J2;
 type G0K2 := G0$K2;
@@ -727,7 +727,7 @@ pragma test_canonical_signature(type G0L2, "{TYPE[],GEN[G0]}");
 
 -------------------------------------------------------
 
--- E0 $ polymiorphic (generating) 2 level type use
+-- E0 $ polymorphic (generating) 2 level type use
 type E0I2 := E0$I2;
 type E0J2 := E0$J2;
 type E0K2 := E0$K2;
@@ -750,7 +750,7 @@ pragma test_canonical_signature(type E0L2, "{TYPE[],GEN[String]}");
 
 -------------------------------------------------------
 
--- G0 $ polymiorphic (non-generating) 2 level type use
+-- G0 $ polymorphic (non-generating) 2 level type use
 type G0M2 := G0$M2;
 type G0N2 := G0$N2;
 type G0O2 := G0$O2;
@@ -773,7 +773,7 @@ pragma test_canonical_signature(type G0P2, "{BASIC[],TYPE[],GEN[String],EXT[G0]}
 
 -------------------------------------------------------
 
--- E0 $ polymiorphic (non-generating) 2 level type use
+-- E0 $ polymorphic (non-generating) 2 level type use
 type E0M2 := E0$M2;
 type E0N2 := E0$N2;
 type E0O2 := E0$O2;
@@ -796,7 +796,7 @@ pragma test_canonical_signature(type E0P2, "{BASIC[],TYPE[],LIST[Character],EXT[
 
 -------------------------------------------------------
 
--- G0 $ polymiorphic (non-generating) 2 level type use $ polymiorphic (non-generating) 2 level type use
+-- G0 $ polymorphic (non-generating) 2 level type use $ polymorphic (non-generating) 2 level type use
 type G0M2M2 := G0$M2$M2;
 type G0N2N2 := G0$N2$N2;
 type G0O2O2 := G0$O2$O2;
@@ -819,7 +819,7 @@ pragma test_canonical_signature(type G0P2P2, "{BASIC[],TYPE[],GEN[String],EXT[G0
 
 -------------------------------------------------------
 
--- E0 $ polymiorphic (non-generating) 2 level type use $ polymiorphic (non-generating) 2 level type use
+-- E0 $ polymorphic (non-generating) 2 level type use $ polymorphic (non-generating) 2 level type use
 type E0M2M2 := E0$M2$M2;
 type E0N2N2 := E0$N2$N2;
 type E0O2O2 := E0$O2$O2;
@@ -842,7 +842,7 @@ pragma test_canonical_signature(type E0P2P2, "{BASIC[],TYPE[],LIST[Character],EX
 
 -------------------------------------------------------
 
--- G0 $ polymiorphic (generating) 2 level type use $ polymiorphic (generating) 2 level type use
+-- G0 $ polymorphic (generating) 2 level type use $ polymorphic (generating) 2 level type use
 type G0I2I2 := G0$I2$I2;
 type G0J2J2 := G0$J2$J2;
 type G0K2K2 := G0$K2$K2;
@@ -865,7 +865,7 @@ pragma test_canonical_signature(type G0L2L2, "{TYPE[],GEN[G0$L2]}");
 
 -------------------------------------------------------
 
--- E0 $ polymiorphic (generating) 2 level type use $ polymiorphic (generating) 2 level type use
+-- E0 $ polymorphic (generating) 2 level type use $ polymorphic (generating) 2 level type use
 type E0I2I2 := E0$I2$I2;
 type E0J2J2 := E0$J2$J2;
 type E0K2K2 := E0$K2$K2;
