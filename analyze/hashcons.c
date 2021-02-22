@@ -6,7 +6,7 @@
 
 #define HC_INITIAL_BASE_SIZE 61
 #define MAX_DENSITY 0.5
-#define DOUBLE_SIZE(x) ((x << 1) + 1)
+#define DOUBLE_SIZE(x) (((x) << 1) + 1)
 
 /**
  * Initializes a table
@@ -138,6 +138,155 @@ void *hash_cons_get(void *item, size_t temp_size, HASH_CONS_TABLE hc)
 }
 
 /**
+ * Hashes hashcons set
+ * @param untyped InferredSignature
+ * @return hash integer value
+ */
+static int hashcons_set_hash(void *untyped)
+{
+  HASH_CONS_SET set = (HASH_CONS_SET)untyped;
+
+  int i, hash = 17;
+  for (i = 0; i < set->num_elements; i++) hash |= ((int)set->elements[i]);
+
+  return hash;
+}
+
+/**
+ * Equality test for hashcons set
+ * @param untyped1 untyped hashcons set
+ * @param untyped2 untyped hashcons set
+ * @return boolean indicating the result of equality
+ */
+static bool hashcons_set_equal(void *untyped1, void *untyped2)
+{
+  HASH_CONS_SET set_a = (HASH_CONS_SET)untyped1;
+  HASH_CONS_SET set_b = (HASH_CONS_SET)untyped2;
+
+  if (set_a->num_elements != set_b->num_elements) return false;
+
+  int i, hash = 0;
+  for (i = 0; i < set_a->num_elements; i++)
+  {
+    if (set_a->elements[i] != set_b->elements[i]) return false;
+  }
+
+  return true;
+}
+
+/**
+ * Used to hold hashconsed sets
+ */
+static struct hash_cons_table hashcons_set_table = { hashcons_set_hash, hashcons_set_equal };
+
+/**
+ * Take a temporary set and hash cons it, returning the set that results
+ * NOTE: The elements array will be sorted by address to ensure a canonical representation.
+ * @param set hashcons set
+ * @return new hashcons set that includes the item
+ */
+HASH_CONS_SET new_hash_cons_set(HASH_CONS_SET set)
+{
+  size_t struct_size = sizeof(struct hash_cons_set) + set->num_elements * sizeof(void *);
+  HASH_CONS_SET sorted_set = (HASH_CONS_SET)alloca(struct_size);
+  sorted_set->num_elements = 0;
+
+  int i, j;
+  for (i = 0; i < set->num_elements; i++)
+  {
+    int key = (int) set->elements[i]; 
+    int j = i - 1;
+
+    while (j >= 0 && (int)sorted_set->elements[j] > key)
+    { 
+      sorted_set->elements[j + 1] = sorted_set->elements[j]; 
+      j--; 
+    }
+
+    sorted_set->elements[j + 1] = key;
+    sorted_set->num_elements++;
+  }
+
+  void *memory = hash_cons_get(sorted_set, struct_size, &hashcons_set_table);
+  return (HASH_CONS_SET)memory;
+}
+
+/**
+ * Return the empty set
+ * @return hashconsed empty set
+ */
+HASH_CONS_SET get_hash_cons_empty_set()
+{
+  struct hash_cons_set empty_set = (struct hash_cons_set) { 0 };
+
+  void *memory = hash_cons_get(&empty_set, sizeof(empty_set), &hashcons_set_table);
+  return (HASH_CONS_SET)memory;
+}
+
+/**
+ * Adds an element to the hashcons set, returning the set that results
+ * @param item item to be added to the set
+ * @param set hashcons set
+ * @return new hashcons set that includes the item
+ */
+HASH_CONS_SET add_hash_cons_set(void *item, HASH_CONS_SET set)
+{
+  size_t struct_size = sizeof(struct hash_cons_set) + 1 * sizeof(void *);
+  HASH_CONS_SET single_element_set = (HASH_CONS_SET)alloca(struct_size);
+  single_element_set->num_elements = 1;
+  single_element_set->elements[0] = item;
+
+  return union_hash_const_set(single_element_set, set);
+}
+
+/**
+ * Unions two hashcons set, returning the set that results
+ * @param set_a hashcons set A
+ * @param set_b hashcons set B
+ * @return new hashcons set that includes the item
+ */
+HASH_CONS_SET union_hash_const_set(HASH_CONS_SET set_a, HASH_CONS_SET set_b)
+{
+  int updated_count = set_a->num_elements + set_b->num_elements;
+  size_t item_size = sizeof(void *);
+  size_t struct_size = sizeof(struct hash_cons_set) + updated_count * item_size;
+  HASH_CONS_SET sorted_set = (HASH_CONS_SET)alloca(struct_size);
+  sorted_set->num_elements = updated_count;
+
+  int i = 0, j = 0, k = 0;
+  while (i < set_a->num_elements && j < set_b->num_elements)
+  {
+    if (set_a->elements[i] == set_b->elements[j])
+    {
+      sorted_set->elements[k] = set_a->elements[i];
+      sorted_set->num_elements--;
+      struct_size -= item_size;
+      i++;
+      j++;
+    }
+    else if (set_a->elements[i] < set_b->elements[j])
+    {
+      sorted_set->elements[k] = set_a->elements[i];
+      i++;
+    }
+    else
+    {
+      sorted_set->elements[k] = set_b->elements[j];
+      j++;
+    }
+
+    k++;
+  }
+
+  while (i < set_a->num_elements) sorted_set->elements[k++] = set_a->elements[i++];
+
+  while (j < set_b->num_elements) sorted_set->elements[k++] = set_b->elements[j++];
+
+  void *memory = hash_cons_get(sorted_set, struct_size, &hashcons_set_table);
+  return (HASH_CONS_SET)memory;
+}
+
+/**
  * Hash string and returns a hash value
  * Source: http://www.cse.yorku.ca/~oz/hash.html
  * @param string
@@ -148,7 +297,7 @@ int hash_string(char *str)
   int hash = 5381;
   int c;
 
-  while (c = *str++)
+  while ((c = *str++))
   {
     hash = ((hash << 5) + hash) + c;
   }

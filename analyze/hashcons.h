@@ -15,6 +15,42 @@ typedef struct hash_cons_table {
   void **table;
 } * HASH_CONS_TABLE;
 
+typedef struct hash_cons_set {
+  int num_elements;
+  void *elements[];
+} * HASH_CONS_SET;
+
+/**
+ * Return the empty set
+ * @return hashconsed empty set
+ */
+HASH_CONS_SET get_hash_cons_empty_set();
+
+/**
+ * Take a temporary set and hash cons it, returning the set that results
+ * NOTE: The elements array will be sorted
+ * by address to ensure a canonical representation.
+ * @param set hashcons set
+ * @return new hashcons set that includes the item
+ */
+HASH_CONS_SET new_hash_cons_set(HASH_CONS_SET set);
+
+/**
+ * Adds an element to the hashcons set, returning the set that results
+ * @param item item to be added to the set
+ * @param set hashcons set
+ * @return new hashcons set that includes the item
+ */
+HASH_CONS_SET add_hash_cons_set(void *item, HASH_CONS_SET set);
+
+/**
+ * Unions two hashcons set, returning the set that results
+ * @param set_a hashcons set A
+ * @param set_b hashcons set B
+ * @return new hashcons set that includes the item
+ */
+HASH_CONS_SET union_hash_const_set(HASH_CONS_SET set_a, HASH_CONS_SET set_b);
+
 /**
  * Get item if there is one otherwise create one
  * @param temp_item it is a temporary or perhaps stack allocated creation of item
@@ -34,7 +70,7 @@ int hash_string(char *str);
  * Combine two hash values into one
  * @param hash1
  * @param hash2
- * @return combined hash 
+ * @return combined hash
  */
 int hash_mix(int h1, int h2);
 
