@@ -204,7 +204,7 @@ HASH_CONS_SET new_hash_cons_set(HASH_CONS_SET set)
       j--; 
     }
 
-    sorted_set->elements[j + 1] = item;
+    sorted_set->elements[j + 1] = key;
     sorted_set->num_elements++;
   }
 
