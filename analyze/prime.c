@@ -4,7 +4,7 @@
 #include "string.h"
 
 #define INITIAL_TABLE_SIZE 4973
-#define DOUBLE_SIZE(x) ((x << 1) + 1)
+#define DOUBLE_SIZE(x) (((x) << 1) + 1)
 
 typedef struct
 {
