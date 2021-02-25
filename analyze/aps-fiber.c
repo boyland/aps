@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "jbb.h"
+#include "aps-lex.h"
 #include "jbb-alloc.h"
 #include "aps-ag.h"
 
@@ -57,6 +58,10 @@ WORKLIST wl= NULL;
 int BACKWARD_ = 1;
 int FORWARD_ = 2;
 int DFA_node_number = 1;		// there is always 1 init node. (final states)
+
+// forward declaration
+void print_nodeset(NODESET ns);
+int get_node_decl(Declaration decl);
 
 /////////////  DATA definition end ////////////////////////////////
 
@@ -640,6 +645,7 @@ Declaration formal_in_case_p(Declaration formal) {
     switch (Declaration_KEY((Declaration)parent)) {
     default:
       fatal_error("%d: not a case",tnode_line_number(parent));
+      return NULL; /* Keep CC happy */
       break;
     case KEYcase_stmt:
       return (Declaration)parent;
@@ -947,7 +953,7 @@ void print_shared_info_fibersets(STATE *state) {
   }
 }
 
-void *finalize_fibersets_for_decl(Declaration decl) {
+void finalize_fibersets_for_decl(Declaration decl) {
   switch (Declaration_KEY(decl)) {
   case KEYdeclaration:
     {
@@ -1502,58 +1508,60 @@ USET doUO(Expression e, OSET oset) {
     RETURN EMPTY_USET;
     break;
 
- 	case KEYvalue_use:	
-		{	Declaration sdecl = USE_DECL(value_use_use(e));
-		// Several cases
-		// * 1> a use of a local "shared" global variable
-		// *    perhaps a global collection
-		// * 2> a use of a local (attribute)
-	//		 
-//		printf("DEBUG: in KEYvalue.\n");
-		if (!DECL_IS_LOCAL(sdecl)) {
-//			printf("DEBUG: not local.\n");
-		  RETURN EMPTY_USET;
-		} else if (DECL_IS_SHARED(sdecl)) {
-//			printf("DEBUG: shared.\n");
-		  USET p = (USET)malloc(sizeof(struct uset));
-		  p->u = e;
-		  p->rest = NULL;
-		  add_to_uset(responsible_node_shared_info(e, mystate),p);
-		  add_to_oset(sdecl,oset);
-		  RETURN get_uset(sdecl);
-		} else if (!DECL_IS_SYNTAX(sdecl)) {
-//			printf("DEBUG: not syntax.\n");
-		  add_to_oset(sdecl,oset);
-		  RETURN get_uset(sdecl);
-	  } else {
-		  aps_error(e,"assigning a syntax decl");
-		}
-		break;
-		} // case KEYvalue_use
-		case KEYfuncall:
-		// * Several cases
-		// * 1> X.a (attr_ref)
-		// * 2> w.f (field_ref)
-		// 
-		{	Declaration fdecl;
-
-		// attr ref: X.a 
-		if ((fdecl = attr_ref_p(e)) != NULL) {
-		  add_to_oset(fdecl,oset);
-		  RETURN get_uset(fdecl);
-		} else if ((fdecl = field_ref_p(e))!= NULL) {
-		// field ref: w.f
-		  Expression object = field_ref_object(e);
-
-		  USET newuset = (USET)malloc(sizeof(struct uset));
-		  OSET o_w; 
-		  newuset->rest = NULL;
-		  newuset->u = e;
-		  o_w = doOU(object, newuset);
-			RETURN EMPTY_USET;
-		}
-		}  // case funcall
-	} // switch
+  case KEYvalue_use:	
+    {	Declaration sdecl = USE_DECL(value_use_use(e));
+      // Several cases
+      // * 1> a use of a local "shared" global variable
+      // *    perhaps a global collection
+      // * 2> a use of a local (attribute)
+      //		 
+      //		printf("DEBUG: in KEYvalue.\n");
+      if (!DECL_IS_LOCAL(sdecl)) {
+	//			printf("DEBUG: not local.\n");
+	RETURN EMPTY_USET;
+      } else if (DECL_IS_SHARED(sdecl)) {
+	//			printf("DEBUG: shared.\n");
+	USET p = (USET)malloc(sizeof(struct uset));
+	p->u = e;
+	p->rest = NULL;
+	add_to_uset(responsible_node_shared_info(e, mystate),p);
+	add_to_oset(sdecl,oset);
+	RETURN get_uset(sdecl);
+      } else if (!DECL_IS_SYNTAX(sdecl)) {
+	//			printf("DEBUG: not syntax.\n");
+	add_to_oset(sdecl,oset);
+	RETURN get_uset(sdecl);
+      } else {
+	aps_error(e,"assigning a syntax decl");
+      }
+      break;
+    } // case KEYvalue_use
+  case KEYfuncall:
+    // * Several cases
+    // * 1> X.a (attr_ref)
+    // * 2> w.f (field_ref)
+    // 
+    {	Declaration fdecl;
+      
+      // attr ref: X.a 
+      if ((fdecl = attr_ref_p(e)) != NULL) {
+	add_to_oset(fdecl,oset);
+	RETURN get_uset(fdecl);
+      } else if ((fdecl = field_ref_p(e))!= NULL) {
+	// field ref: w.f
+	Expression object = field_ref_object(e);
+	
+	USET newuset = (USET)malloc(sizeof(struct uset));
+	OSET o_w; 
+	newuset->rest = NULL;
+	newuset->u = e;
+	o_w = doOU(object, newuset);
+	RETURN EMPTY_USET;
+      }
+    }  // case funcall
+  } // switch
+  fatal_error("doUO was about to return undefined.\n");
+  return 0;
 }
 
 // doUOp: calculate Uset of pattern given an OSet.

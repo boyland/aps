@@ -7,8 +7,10 @@
 #include <string.h>
 #include <sys/param.h>
 #include "jbb.h"
+#include "aps-lex.h"
 #include "aps-tree.h"
 #include "aps-read.h"
+#include "aps.tab.h"
 
 #define MAX_PROGRAMS 100
 
@@ -76,6 +78,7 @@ static int initialize() {
     }
     initialized=TRUE;
   }
+  return initialized;
 }
 
 Program find_Program(String name) {

@@ -58,6 +58,7 @@ enum instance_direction instance_direction(INSTANCE *i) {
     return instance_local;
   } else {
     fatal_error("%d: unknown attributed node",tnode_line_number(i->node));
+    return dir; /* keep CC happy */
   }
 }
 
@@ -452,6 +453,7 @@ static Expression if_rule_test(void* if_rule) {
     return Match_info((Match)if_rule)->match_test;
   default:
     fatal_error("%d: unknown if_rule",tnode_line_number(if_rule));
+    return 0; /* keep CC happy */
   }
 }
 
@@ -463,6 +465,7 @@ static CONDITION* if_rule_cond(void *if_rule) {
     return &Match_info((Match)if_rule)->match_cond;
   default:
     fatal_error("%d: unknown if_rule",tnode_line_number(if_rule));
+    return 0; /* keep CC happy */
   }
 }
 

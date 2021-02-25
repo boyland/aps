@@ -28,6 +28,7 @@ void *rassoc(void *value, ALIST alist) {
     if (alist->value == value) return alist->key;
     alist=alist->next;
   }
+  return NULL;
 }
 
 BOOL setassoc(void *key, void *value, ALIST alist) {

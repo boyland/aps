@@ -57,6 +57,7 @@ extern int member_fiberset(FIBER,FIBERSET);
 
 struct analysis_state;
 
+extern void add_fibers_to_state(struct analysis_state *s);
 extern void fiber_module(Declaration module, struct analysis_state *s);
 
 extern void print_fiber(FIBER,FILE *);

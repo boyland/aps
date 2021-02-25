@@ -6,3 +6,5 @@ typedef struct condition {
 
 enum CONDcompare { CONDeq, CONDgt, CONDlt, CONDcomp, CONDnone };
 extern enum CONDcompare cond_compare(CONDITION *, CONDITION *);
+
+extern void print_condition(CONDITION *cond, FILE *stream);

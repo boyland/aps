@@ -1,5 +1,8 @@
 #ifndef APS_LEX_H
 #define APS_LEX_H
+#include <stdio.h>
+#include "jbb-symbol.h"
+#include "jbb-string.h"
 
 /* define yy things used in both aps.y and aps.lex */
 
@@ -25,8 +28,9 @@ extern int yylex();
 extern int yydebug;
 #define YY_USER_ACTION if (yydebug) {printf("Lexed: \"%s\"\n",yytext);}
 
-extern void set_infix(Symbol sym, int kind);
-extern void set_code_name(Symbol sym, String s);
-extern String get_code_name(Symbol sym);
+extern void init_lexer(FILE *f);
+extern void set_infix(SYMBOL sym, int kind);
+extern void set_code_name(SYMBOL sym, STRING s);
+extern STRING get_code_name(SYMBOL sym);
 
 #endif
