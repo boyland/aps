@@ -194,8 +194,7 @@ HASH_CONS_SET new_hash_cons_set(HASH_CONS_SET set)
   int i, j;
   for (i = 0; i < set->num_elements; i++)
   {
-    void* item = set->elements[i];
-    int key = (int) item; 
+    int key = (int) set->elements[i]; 
     int j = i - 1;
 
     while (j >= 0 && (int)sorted_set->elements[j] > key)
