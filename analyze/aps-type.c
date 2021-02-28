@@ -365,7 +365,7 @@ static void init_types() {
   error_type = Boolean_Type;
 }
 
-static char* clean_string_const_token(char* p) {
+static char* trim_string_const_token(char* p) {
   p++;
   p[strlen(p)-1] = 0;
   return p;
@@ -411,7 +411,9 @@ static void* validate_canonicals(void* ignore, void*node) {
         char expected[BUFFER_SIZE];
         sprintf(expected, "%s", expected_string);
 
-        char* expected_cleaned = clean_string_const_token(&expected);
+        // Remove double quotes from the begining and the end of string
+        // This is needed because APS parser does not trim double quotes from KEYstring_const
+        char* expected_cleaned = trim_string_const_token(&expected);
         
         if (strcmp(actual_to_string, expected_cleaned) != 0) {
           aps_error(type,"Failed: %d  expected `%s` but got `%s`", tnode_line_number(type), expected_cleaned, actual_to_string);
