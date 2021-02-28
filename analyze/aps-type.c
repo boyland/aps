@@ -411,7 +411,7 @@ static void* validate_canonicals(void* ignore, void*node) {
         char expected[BUFFER_SIZE];
         sprintf(expected, "%s", expected_string);
 
-        // Remove double quotes from the begining and the end of string
+        // Remove double quotes from the beginning and the end of string
         // This is needed because APS parser does not trim double quotes from KEYstring_const
         char* expected_cleaned = trim_string_const_token(&expected);
         
