@@ -1,7 +1,7 @@
 .PHONY: all install clean
 
 SCALA= aps-impl.scala basic.handcode.scala table.handcode.scala
-SVERSION=2.12
+SVERSION=2.13
 
 # We can't make 2.9 anymore because it doesn't understand Java 8
 
@@ -30,6 +30,12 @@ aps-library-2.11.jar : ${SCALA}
 aps-library-2.12.jar : ${SCALA}
 	@rm -f *.class
 	/afs/cs.uwm.edu/package/scala/scala-2.12.8/common/bin/scalac -deprecation ${SCALA}
+	jar cvf $@ *.class
+
+aps-library-2.13.jar : ${SCALA}
+	@rm -f *.class
+	# TODO: Fix the path to scalac 2.13
+	scalac -deprecation ${SCALA}
 	jar cvf $@ *.class
 
 .PHONY: test-multiset.run
