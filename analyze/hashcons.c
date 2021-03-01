@@ -165,7 +165,7 @@ static bool hashcons_set_equal(void *untyped1, void *untyped2)
 
   if (set_a->num_elements != set_b->num_elements) return false;
 
-  int i, hash = 0;
+  int i;
   for (i = 0; i < set_a->num_elements; i++)
   {
     if (set_a->elements[i] != set_b->elements[i]) return false;
@@ -203,7 +203,7 @@ HASH_CONS_SET new_hash_cons_set(HASH_CONS_SET set)
       j--; 
     }
 
-    sorted_set->elements[j + 1] = key;
+    sorted_set->elements[j + 1] = set->elements[i];
     sorted_set->num_elements++;
   }
 
