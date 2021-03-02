@@ -416,7 +416,12 @@ static void* validate_canonicals(void* ignore, void*node) {
         char* expected_cleaned = trim_string_const_token(expected);
         
         if (strcmp(actual_to_string, expected_cleaned) != 0) {
-          aps_error(type,"Failed: %d  expected `%s` but got `%s`", tnode_line_number(type), expected_cleaned, actual_to_string);
+          char type_to_str[BUFFER_SIZE];
+          f = fmemopen(type_to_str, sizeof(type_to_str), "w");
+          print_Type(type, f);
+          fclose(f);
+
+          aps_error(type,"Failed: `%s`:%d expected `%s` but got `%s`", type_to_str, tnode_line_number(type), expected_cleaned, actual_to_string);
         }
       }
     }
