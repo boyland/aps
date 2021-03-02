@@ -409,11 +409,11 @@ static void* validate_canonicals(void* ignore, void*node) {
         fclose(f);
 
         char expected[BUFFER_SIZE];
-        sprintf(expected, "%s", expected_string);
+        sprintf(expected, "%s", (char *)expected_string);
 
         // Remove double quotes from the beginning and the end of string
         // This is needed because APS parser does not trim double quotes from KEYstring_const
-        char* expected_cleaned = trim_string_const_token(&expected);
+        char* expected_cleaned = trim_string_const_token(expected);
         
         if (strcmp(actual_to_string, expected_cleaned) != 0) {
           aps_error(type,"Failed: %d  expected `%s` but got `%s`", tnode_line_number(type), expected_cleaned, actual_to_string);
@@ -429,7 +429,7 @@ static void* validate_canonicals(void* ignore, void*node) {
 static Declaration module_TYPE;
 static Declaration module_PHYLUM;
 
-static void set_root_phylum(void *ignore, void *node)
+static void* set_root_phylum(void *ignore, void *node)
 {
   switch (ABSTRACT_APS_tnode_phylum(node))
   {
