@@ -635,12 +635,12 @@ static CanonicalType *canonical_type_left_refactor(CanonicalType *ctype_left, Ca
   switch (ctype_right->key)
   {
   case KEY_CANONICAL_USE:
-  {    
+  {
     struct Canonical_use_type *ctype_right_use = (struct Canonical_use_type *)ctype_right;
     return new_canonical_type_qual(ctype_left, ctype_right_use->decl);
   }
   case KEY_CANONICAL_QUAL:
-  {    
+  {
     struct Canonical_qual_type *ctype_right_qual = (struct Canonical_qual_type *)ctype_right;
     return new_canonical_type_qual(canonical_type_left_refactor(ctype_left, ctype_right_qual->source), ctype_right_qual->decl);
   }
