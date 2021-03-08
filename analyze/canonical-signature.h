@@ -29,10 +29,17 @@ CanonicalSignatureSet infer_canonical_signatures(CanonicalType *ctype);
 void initialize_canonical_signature(Declaration module_PHYLUM, Declaration type_PHYLUM);
 
 /**
- * Given a canonical type, prints it to the file output
+ * Given a canonical signature, prints it to the file output
  * @param untyped untyped canonical type
  * @return f FILE output
  */
 void print_canonical_signature(void *untyped, FILE *f);
+
+/**
+ * Given a canonical signature set, prints it to the file output
+ * @param untyped untyped canonical type
+ * @return f FILE output
+ */
+void print_canonical_signature_set(void *untyped, FILE *f);
 
 #endif
