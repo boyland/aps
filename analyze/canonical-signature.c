@@ -4,8 +4,6 @@
 #include "aps-ag.h"
 #include "jbb-alloc.h"
 
-int hash_source_class(Declaration cl);
-
 static CanonicalSignatureSet from_sig(Signature sig);
 static CanonicalSignatureSet from_type(Type t);
 static CanonicalSignatureSet from_declaration(Declaration decl);
@@ -123,9 +121,9 @@ void print_canonical_signature_set(void *untyped, FILE *f)
  * @param types
  * @return combined hash 
  */
-int hash_canonical_types(int count, CanonicalType **types)
+long hash_canonical_types(int count, CanonicalType **types)
 {
-  int h = 7;
+  long h = 17;
   int i;
   for (i = 0; i < count; i++)
   {
@@ -140,9 +138,9 @@ int hash_canonical_types(int count, CanonicalType **types)
  * @param cl Declaration
  * @return hash integer value
  */
-int hash_source_class(Declaration cl)
+long hash_source_class(Declaration cl)
 {
-  return (int)cl;
+  return (long)cl;
 }
 
 /**
@@ -150,7 +148,7 @@ int hash_source_class(Declaration cl)
  * @param untyped InferredSignature
  * @return hash integer value
  */
-int canonical_signature_hash(void *untyped)
+long canonical_signature_hash(void *untyped)
 {
   CanonicalSignature *inferred_sig = (CanonicalSignature *)untyped;
 

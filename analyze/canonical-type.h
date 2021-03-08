@@ -85,7 +85,7 @@ Declaration canonical_type_decl(CanonicalType *canonical_type);
  * @arg untyped CanonicalType
  * @return hash value
  */
-int canonical_type_hash(void *arg);
+long canonical_type_hash(void *arg);
 
 /**
  * Given a canonical type, prints it to the file output

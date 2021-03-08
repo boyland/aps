@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-typedef int (*Hash_Cons_Hash)(void *);
+typedef long (*Hash_Cons_Hash)(void *);
 typedef bool (*Hash_Cons_Equal)(void *, void *);
 
 typedef struct hash_cons_table {
@@ -64,7 +64,7 @@ void *hash_cons_get(void *temp_item, size_t temp_size, HASH_CONS_TABLE table);
  * @param string
  * @return intger hash value
  */
-int hash_string(char *str);
+long hash_string(char *str);
 
 /**
  * Combine two hash values into one
@@ -72,6 +72,6 @@ int hash_string(char *str);
  * @param hash2
  * @return combined hash
  */
-int hash_mix(int h1, int h2);
+long hash_mix(long h1, long h2);
 
 #endif

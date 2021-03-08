@@ -28,7 +28,7 @@ void hc_initialize(HASH_CONS_TABLE hc, const int capacity)
  */
 static int hc_candidate_index(HASH_CONS_TABLE hc, void *item)
 {
-  int hash = hc->hashf(item) & INT_MAX;
+  long hash = hc->hashf(item) & LONG_MAX;
   int index = hash % hc->capacity;
   int step_size = hash % (hc->capacity - 2) + 1;
 
@@ -142,12 +142,13 @@ void *hash_cons_get(void *item, size_t temp_size, HASH_CONS_TABLE hc)
  * @param untyped InferredSignature
  * @return hash integer value
  */
-static int hashcons_set_hash(void *untyped)
+static long hashcons_set_hash(void *untyped)
 {
   HASH_CONS_SET set = (HASH_CONS_SET)untyped;
 
-  int i, hash = 17;
-  for (i = 0; i < set->num_elements; i++) hash |= ((int)set->elements[i]);
+  int i;
+  long hash = 17;
+  for (i = 0; i < set->num_elements; i++) hash |= ((long)set->elements[i]);
 
   return hash;
 }
@@ -165,7 +166,7 @@ static bool hashcons_set_equal(void *untyped1, void *untyped2)
 
   if (set_a->num_elements != set_b->num_elements) return false;
 
-  int i, hash = 0;
+  int i;
   for (i = 0; i < set_a->num_elements; i++)
   {
     if (set_a->elements[i] != set_b->elements[i]) return false;
@@ -194,16 +195,16 @@ HASH_CONS_SET new_hash_cons_set(HASH_CONS_SET set)
   int i, j;
   for (i = 0; i < set->num_elements; i++)
   {
-    int key = (int) set->elements[i]; 
+    long key = (long) set->elements[i]; 
     int j = i - 1;
 
-    while (j >= 0 && (int)sorted_set->elements[j] > key)
+    while (j >= 0 && (long)sorted_set->elements[j] > key)
     { 
       sorted_set->elements[j + 1] = sorted_set->elements[j]; 
       j--; 
     }
 
-    sorted_set->elements[j + 1] = key;
+    sorted_set->elements[j + 1] = set->elements[i];
     sorted_set->num_elements++;
   }
 
@@ -292,10 +293,10 @@ HASH_CONS_SET union_hash_const_set(HASH_CONS_SET set_a, HASH_CONS_SET set_b)
  * @param string
  * @return intger hash value
  */
-int hash_string(char *str)
+long hash_string(char *str)
 {
-  int hash = 5381;
-  int c;
+  long hash = 5381;
+  long c;
 
   while ((c = *str++))
   {
@@ -311,9 +312,9 @@ int hash_string(char *str)
  * @param hash2
  * @return combined hash 
  */
-int hash_mix(int h1, int h2)
+long hash_mix(long h1, long h2)
 {
-  int hash = 17;
+  long hash = 17;
   hash = hash * 31 + h1;
   hash = hash * 31 + h2;
   return hash;
