@@ -365,6 +365,103 @@ static void init_types() {
   error_type = Boolean_Type;
 }
 
+static char* trim_string_const_token(char* p) {
+  p++;
+  p[strlen(p)-1] = 0;
+  return p;
+}
+
+static void* validate_canonicals(void* ignore, void*node) {
+  int BUFFER_SIZE = 1000;
+  Symbol symb_test_canonical_type = intern_symbol("test_canonical_type");
+  Symbol symb_test_canonical_base_type = intern_symbol("test_canonical_base_type");
+  Symbol symb_test_canonical_signature = intern_symbol("test_canonical_signature");
+
+  switch (ABSTRACT_APS_tnode_phylum(node))
+  {
+  case KEYDeclaration:
+  {
+    Declaration decl = (Declaration) node;
+    switch (Declaration_KEY(decl))
+    {
+    case KEYpragma_call:
+    {
+      Symbol pragma_value = pragma_call_name(decl);
+      if (symb_test_canonical_signature == pragma_value ||
+          symb_test_canonical_type == pragma_value ||
+          symb_test_canonical_base_type == pragma_value) {
+        Expressions exprs = pragma_call_parameters(decl);
+        Expression type_expr = first_Expression(exprs);
+        Expression result_expr = Expression_info(type_expr)->next_expr;
+
+        Type type = type_value_T(type_expr);
+        String expected_string = string_const_token(result_expr);
+
+        char actual_to_string[BUFFER_SIZE];
+        FILE* f = fmemopen(actual_to_string, sizeof(actual_to_string), "w");
+        if (symb_test_canonical_signature == pragma_value) {
+          print_canonical_signature_set(infer_canonical_signatures(canonical_type(type)), f);
+        } else if (symb_test_canonical_type == pragma_value) {
+          print_canonical_type(canonical_type(type), f);
+        } else if (symb_test_canonical_base_type == pragma_value) {
+          print_canonical_type(canonical_type_base_type(canonical_type(type)), f);
+        }
+        fclose(f);
+
+        char expected[BUFFER_SIZE];
+        sprintf(expected, "%s", (char *)expected_string);
+
+        // Remove double quotes from the beginning and the end of string
+        // This is needed because APS parser does not trim double quotes from KEYstring_const
+        char* expected_cleaned = trim_string_const_token(expected);
+        
+        if (strcmp(actual_to_string, expected_cleaned) != 0) {
+          char type_to_str[BUFFER_SIZE];
+          f = fmemopen(type_to_str, sizeof(type_to_str), "w");
+          print_Type(type, f);
+          fclose(f);
+
+          aps_error(type,"Failed: `%s`:%d expected `%s` but got `%s`", type_to_str, tnode_line_number(type), expected_cleaned, actual_to_string);
+        }
+      }
+    }
+    }
+  }
+  }
+  return node;
+}
+
+static Declaration module_TYPE;
+static Declaration module_PHYLUM;
+
+static void* set_root_phylum(void *ignore, void *node)
+{
+  switch (ABSTRACT_APS_tnode_phylum(node))
+  {
+  case KEYDeclaration:
+  {
+    Declaration d = (Declaration)node;
+    switch (Declaration_KEY(d))
+    {
+    case KEYmodule_decl:
+    {
+      if (module_TYPE == 0 && streq(decl_name(d), "TYPE"))
+      {
+        module_TYPE = d;
+      }
+      else if (module_PHYLUM == 0 && streq(decl_name(d), "PHYLUM"))
+      {
+        module_PHYLUM = d;
+      }
+
+      return NULL;
+    }
+    }
+  }
+  }
+
+  return node;
+}
 
 void type_Program(Program p)
 {
@@ -388,6 +485,11 @@ void type_Program(Program p)
   if (type_debug) printf("Type checking code in \"%s.aps\"\n",aps_yyfilename);
   traverse_Program(do_typechecking,p,p);
   aps_yyfilename = saved_filename;
+
+  traverse_Program(set_root_phylum, p, p);
+  initialize_canonical_signature(module_TYPE, module_PHYLUM);
+
+  traverse_Program(validate_canonicals,p,p);
 }
 
 Type infer_expr_type(Expression e)
