@@ -523,7 +523,7 @@ trait C_COLLECTION[T_Result, T_ElemType] extends C_READ_ONLY_COLLECTION[T_Result
   val v_append : (T_Result,T_Result) => T_Result;
   val v_single : (T_ElemType) => T_Result;
   val v_none : () => T_Result;
-  val v__op_AC : (T_ElemType*) => T_Result;
+  val v__op_AC : (Seq[T_ElemType]) => T_Result;
 }
 
 class M__basic_14[T_ElemType,T_T](t_ElemType:Any,t_T:C_READ_ONLY_COLLECTION[T_T,T_ElemType]) {
@@ -533,7 +533,7 @@ class M__basic_14[T_ElemType,T_T](t_ElemType:Any,t_T:C_READ_ONLY_COLLECTION[T_T,
 };
 
 class M__basic_15[T_ElemType,T_T](t_ElemType:Any,t_T:C_COLLECTION[T_T,T_ElemType]) {
-  val v__op_AC : (T_ElemType*) => T_T = t_T.v__op_AC;
+  val v__op_AC : (Seq[T_ElemType]) => T_T = t_T.v__op_AC;
 };
 
 trait C_READ_ONLY_ORDERED_COLLECTION[T_Result, T_ElemType] extends C_READ_ONLY_COLLECTION[T_Result,T_ElemType] {
@@ -720,7 +720,7 @@ with C_BAG[List[T_ElemType],T_ElemType]
   def f_assert(v__88 : T_Result) : Unit = {};
   
   val v__op_AC = f__op_AC _;
-  def f__op_AC(v_l : T_ElemType*):T_Result = v_l.toList;
+  def f__op_AC(v_l : Seq[T_ElemType]):T_Result = v_l.toList;
   
   val p__op_AC = new PatternSeqFunction[T_Result,T_ElemType](u__op_AC);
   def u__op_AC(x:Any) : Option[(T_Result,Seq[T_ElemType])] = x match {
@@ -845,7 +845,7 @@ with C_SET[Set[T_ElemType],T_ElemType]
   override def f_assert(v__88 : T_Result) : Unit = {};
   
   val v__op_AC = f__op_AC _;
-  def f__op_AC(v_l : T_ElemType*):T_Result = ListSet(v_l:_*);
+  def f__op_AC(v_l : Seq[T_ElemType]):T_Result = ListSet(v_l:_*);
   
   val p__op_AC = new PatternSeqFunction[T_Result,T_ElemType](u__op_AC);
   def u__op_AC(x:Any) : Option[(T_Result,Seq[T_ElemType])] = x match {
@@ -915,7 +915,7 @@ trait C_MULTISET[T_Result, T_ElemType] extends C_TYPE[T_Result]with C_BAG[T_Resu
   val v_equal : (T_Result,T_Result) => T_Boolean;
   val v_less : (T_Result,T_Result) => T_Boolean;
   val v_less_equal : (T_Result,T_Result) => T_Boolean;
-  val v__op_AC : (T_ElemType*) => T_Result;
+  val v__op_AC : (Seq[T_ElemType]) => T_Result;
   val p__op_AC : PatternSeqFunction[T_Result,T_ElemType];
   val v_member : (T_ElemType,T_Result) => T_Boolean;
   val v_count : (T_ElemType,T_Result) => T_Integer;
@@ -1032,7 +1032,7 @@ class M_ORDERED_SET[T_ElemType](t_ElemType:C_ORDERED[T_ElemType] extends Module(
     val v_less_equal = f_less_equal _;
     def f_less_equal(v__130 : T_Result, v__131 : T_Result):T_Boolean;
     val v__op_AC = f__op_AC _;
-    def f__op_AC(v__132 : T_ElemType*):T_Result;
+    def f__op_AC(v__132 : Seq[T_ElemType]):T_Result;
     val v_union = f_union _;
     def f_union(v__133 : T_Result, v__134 : T_Result):T_Result;
     val v_intersect = f_intersect _;
@@ -1072,7 +1072,7 @@ trait C_ORDERED_MULTISET[T_Result, T_ElemType] extends C_ORDERED_COLLECTION[T_Re
   val v_equal : (T_Result,T_Result) => T_Boolean;
   val v_less : (T_Result,T_Result) => T_Boolean;
   val v_less_equal : (T_Result,T_Result) => T_Boolean;
-  val v__op_AC : (T_ElemType*) => T_Result;
+  val v__op_AC : (Seq[T_ElemType]) => T_Result;
   val v_union : (T_Result,T_Result) => T_Result;
   val v_intersect : (T_Result,T_Result) => T_Result;
   val v_difference : (T_Result,T_Result) => T_Result;
@@ -1105,7 +1105,7 @@ class M_ORDERED_MULTISET[T_ElemType](t_ElemType:C_ORDERED[T_ElemType] extends Mo
     val v_less_equal = f_less_equal _;
     def f_less_equal(v__143 : T_Result, v__144 : T_Result):T_Boolean;
     val v__op_AC = f__op_AC _;
-    def f__op_AC(v__145 : T_ElemType*):T_Result;
+    def f__op_AC(v__145 : Seq[T_ElemType]):T_Result;
     val v_union = f_union _;
     def f_union(v__146 : T_Result, v__147 : T_Result):T_Result;
     val v_intersect = f_intersect _;
