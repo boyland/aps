@@ -861,8 +861,6 @@ void dump_TypeDecl_Traits(Declaration tdecl, Type ti, string n, ostream &oss)
   int nesting_level = 2;
   oss << indent(nesting_level) << "/* dumping traits */" << "\n";
 
-  TypeActuals tas = type_inst_type_actuals(ti);
- 
   vector<Declaration> sv;
   ServiceRecord sr;
 
