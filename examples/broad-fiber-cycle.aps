@@ -1,0 +1,75 @@
+with "tiny";
+module BROAD_FIBER_CYCLE[T :: var TINY[]] extends T begin
+  phylum Context;
+  constructor context(depth : Integer) : Context;
+
+  type ContextPtr := remote Context;
+  attribute Context.ptr1 : ContextPtr;
+  attribute Context.ptr2 : ContextPtr;
+  
+  attribute Wood.scope1 : ContextPtr;
+  attribute Wood.scope2 : ContextPtr;
+  attribute Wood.half : ContextPtr;
+  attribute Wood.syn : Integer;
+  
+  attribute Root.answer : Integer;
+
+  pragma synthesized (syn, answer, half);
+  pragma inherited (scope1, scope2);
+  
+  match ?this=root(?w) begin
+    this.answer := w.syn;
+    c : Context := context(0);
+    c.ptr1 := nil;
+    c.ptr2 := nil;
+    w.scope1 := c;
+    w.scope2 := w.half;
+  end;
+  
+  match ?this=branch(?w1,?w2) begin
+    this.syn := w1.syn + w2.syn;
+    c1 : Context := context(scope_depth(this.scope1)+1);
+    c2 : Context := context(scope_depth(this.scope2)+1);
+    c1.ptr1 := this.scope1;
+    c1.ptr2 := w2.half;
+    c2.ptr1 := w1.half;
+    c2.ptr2 := this.scope2;
+    w1.scope1 := c1;
+    w2.scope1 := c1;
+    w1.scope2 := c2;
+    w2.scope2 := c2;
+    this.half := w2.half;
+  end;
+  
+  match ?this=leaf(?n) begin
+    this.half := this.scope1;
+    this.syn := scope_depth(index_scope(this.scope2,n));
+  end;
+
+  function index_scope(sc : ContextPtr; i : Integer) : ContextPtr begin
+    if sc = nil or i = 0 then
+      result := sc;
+    else
+      case sc begin
+	match context(?) begin
+	  j : Integer := i / 2;
+	  if i = 2 * j then
+	    result := index_scope(sc.ptr1,j);
+	  else
+	    result := index_scope(sc.ptr2,j);
+	  endif;
+	end;
+      end;
+    endif;
+  end;
+  
+  function scope_depth(sc : ContextPtr) : Integer begin
+    case sc begin
+      match ?c=context(?n) begin
+	result := n;
+      end;
+    else
+      result := 0;
+    end;
+  end;
+end;

@@ -1,0 +1,60 @@
+with "tiny";
+module BELOW_SINGLE_FIBER_CYCLE[T :: var TINY[]] extends T begin
+  phylum Context;
+  constructor context(depth : Integer) : Context;
+
+  type ContextPtr := remote Context;
+  attribute Context.ptr : ContextPtr;
+  
+  attribute Wood.scope : ContextPtr;
+  attribute Wood.half : ContextPtr;
+  attribute Wood.syn : Integer;
+  
+  attribute Root.answer : Integer;
+
+  pragma synthesized (syn, answer, half);
+  pragma inherited (scope);
+  
+  match ?this=root(?w) begin
+    this.answer := w.syn;
+    c : Context := context(0);
+    c.ptr := w.half;
+    w.scope := c;
+  end;
+  
+  match ?this=branch(?w1,?w2) begin
+    this.syn := w1.syn + w2.syn;
+    c : Context := context(scope_depth(this.scope)+1);
+    c.ptr := this.scope;
+    w1.scope := c;
+    w2.scope := w1.half;
+    this.half := w2.half;
+  end;
+  
+  match ?this=leaf(?n) begin
+    this.half := this.scope;
+    this.syn := scope_depth(index_scope(this.scope,n));
+  end;
+
+  function index_scope(sc : ContextPtr; i : Integer) : ContextPtr begin
+    if sc = nil or i = 0 then
+      result := sc;
+    else
+      case sc begin
+	match context(?) begin
+	  result := index_scope(sc.ptr,i-1);
+	end;
+      end;
+    endif;
+  end;
+  
+  function scope_depth(sc : ContextPtr) : Integer begin
+    case sc begin
+      match ?c=context(?n) begin
+	result := n;
+      end;
+    else
+      result := 0;
+    end;
+  end;
+end;
