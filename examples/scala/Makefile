@@ -8,7 +8,8 @@ APS2SCALA = ${APSTOP}/bin/aps2scala
 APS2SCALAFLAGS = -p ..:${APSTOP}/base -G
 
 SCALAGEN = simple.scala classic-binding.scala tiny.scala \
-	test-coll.scala test-use-coll.scala test-cycle.scala use-global.scala 
+	test-coll.scala test-use-coll.scala test-cycle.scala use-global.scala \
+	grammar.scala first.scala follow.scala
 
 .PHONY: all clean
 
@@ -17,6 +18,7 @@ all : simple_implicit.class classic_binding_implicit.class Classic.class
 all : test_coll_implicit.class TestCollDriver.class
 all : test_cycle_implicit.class TestCycleDriver.class
 all : test_use_coll_implicit.class TestUseCollDriver.class
+all : grammar_implicit.class GrammarDriver.class
 
 .PHONY: run
 
@@ -54,6 +56,12 @@ test_cycle_implicit.class : test-cycle.scala
 
 TestCycleDriver.class : test_cycle_implicit.class test-cycle-driver.scala
 	${SCALAC} ${SCALACFLAGS}  test-cycle-driver.scala
+
+grammar_implicit.class : grammar.scala first.scala follow.scala
+	${SCALAC} ${SCALACFLAGS} $^
+
+GrammarDriver.class : grammar_implicit.class grammar.scala 
+	${SCALAC} ${SCALACFLAGS} grammar-driver.scala
 
 TinyParser.class : tiny-parser.handcode.scala tiny_implicit.class
 	${SCALAC} ${SCALACFLAGS} tiny-parser.handcode.scala

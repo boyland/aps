@@ -9,3 +9,18 @@ begin
   function select(table : Result; key : KeyType) : Result := table;
   -- function arbitrary(table : Result) : ValueType;
 end;
+
+module TABLE_LATTICE[KeyType :: ORDERED[]; ValueType :: COMBINABLE[], LATTICE[]]
+  :: TABLE[KeyType, ValueType], LATTICE[] extends TABLE[KeyType, ValueType]
+begin
+  bottom = Result$initial;
+  function compare(t1, t2 : Result) : Boolean;
+  function compare_equal(t1, t2 : Result) : Boolean;
+  function join(t1, t2 : Result) : Result;
+  function meet(t1, t2 : Result) : Result;
+
+  function select(table: Result; key: KeyType): Result := Result$select(table, key);
+
+  pattern table_entry = Result$table_entry;
+  function table_entry(key: KeyType; value: ValueType): Result := Result$table_entry(key, value);
+end;
