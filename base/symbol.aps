@@ -1,0 +1,25 @@
+-- SYMBOL.APS
+-- Stubs for a symbol table package
+-- John Boyland
+
+private module SYMBOL[] :: BASIC[], PRINTABLE[], ORDERED[] begin
+  function assert(_:Result);
+  function equal(_,_:Result) : Boolean;
+  function create(_:String) : Result;
+  function name(_:Result) : String;
+  function less(_,_:Result) : Boolean;
+  function less_equal(_,_:Result) : Boolean;
+  string = name;
+  null : Result;
+end;
+
+type Symbol := SYMBOL[];
+
+make_symbol = Symbol$create;
+symbol_name = Symbol$name;
+symbol_equal = Symbol$equal;
+
+null_symbol : Symbol := Symbol$null;
+
+-- classified as a function for convenience
+function gensym() : Symbol;

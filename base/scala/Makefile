@@ -1,6 +1,6 @@
 .PHONY: all install clean
 
-SCALA= aps-impl.scala basic.handcode.scala table.handcode.scala
+SCALA= aps-impl.scala basic.handcode.scala table.handcode.scala symbol.scala symbol.handcode.scala
 SVERSION=2.12
 LIB=../../lib
 
