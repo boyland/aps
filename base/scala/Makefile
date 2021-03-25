@@ -2,13 +2,14 @@
 
 SCALA= aps-impl.scala basic.handcode.scala table.handcode.scala
 SVERSION=2.12
+LIB=../../lib
 
 # We can't make 2.9 anymore because it doesn't understand Java 8
 
 all : aps-library-2.10.jar aps-library-2.11.jar aps-library-2.12.jar
 
 install : 
-	cp aps-library*.jar ../../lib
+	mkdir -p ${LIB} && cp aps-library*.jar ${LIB}
 
 aps-library-2.9.jar : ${SCALA}
 	@rm -f *.class
