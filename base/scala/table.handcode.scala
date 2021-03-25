@@ -99,7 +99,7 @@ class M_TABLE_LATTICE[T_KeyType, T_ValueType] (
     var result :Table = v_empty_table
     for ((k,v) <- v_t2) {
       if (v_t1.isDefinedAt(k)) {
-        result = result.updated(k, t_ValueType.v_combine(v_t1(k), v)).asInstanceOf[Table]
+        result = result.updated(k, _t_ValueType.v_meet(v_t1(k), v)).asInstanceOf[Table]
       }
     };
     result
