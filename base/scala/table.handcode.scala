@@ -6,6 +6,7 @@ import basic_implicit._;
 object table_implicit {
   val table_loaded = true;
   type T_TABLE[K,V] = scala.collection.immutable.TreeMap[K,V];
+  type T_TABLE_LATTICE[K, V] = T_TABLE[K, V]; 
 }
 import table_implicit._;
 
@@ -80,3 +81,34 @@ with C_TABLE[TreeMap[T_KeyType,T_ValueType],T_KeyType,T_ValueType]
   }
 }
 
+trait C_TABLE_LATTICE[TResult, T_KeyType, T_ValueType]
+  extends C_TABLE[TResult, T_KeyType, T_ValueType]
+  with C_LATTICE[TResult]
+
+class M_TABLE_LATTICE[T_KeyType, T_ValueType] (
+    val _name : String,
+    val _t_KeyType : C_TYPE[T_KeyType] with C_ORDERED[T_KeyType],
+    val _t_ValueType : C_TYPE[T_ValueType] with C_COMBINABLE[T_ValueType] with C_LATTICE[T_ValueType])
+  extends M_TABLE[T_KeyType, T_ValueType](_name, _t_KeyType, _t_ValueType)
+  with C_TABLE_LATTICE[T_TABLE[T_KeyType,T_ValueType],T_KeyType,T_ValueType] {
+
+  override val v_join = v_combine
+  override val v_meet = f_meet
+
+  def f_meet(v_t1 :T_Result, v_t2 :T_Result) :T_Result = {
+    var result :Table = v_empty_table
+    for ((k,v) <- v_t2) {
+      if (v_t1.isDefinedAt(k)) {
+        result = result.updated(k, t_ValueType.v_combine(v_t1(k), v)).asInstanceOf[Table]
+      }
+    };
+    result
+  };
+
+  override def v_bottom = v_empty_table
+
+  // v1 != v2 && v1 <= v2 --> v1 < v2
+  override val v_compare = (x, y) => v_compare_equal(x, y) && !v_equal(x, y)
+
+  override val v_compare_equal = (x, y) => (x.keySet subsetOf y.keySet) && (x.keySet & y.keySet).forall(key => _t_ValueType.v_compare_equal(x(key), y(key)))
+}

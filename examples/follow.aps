@@ -1,0 +1,86 @@
+with "symbol";
+with "table";
+with "grammar";
+
+module FOLLOW[T :: var GRAMMAR[]] extends T begin
+
+  type Symbols := SET[Symbol];
+  type SymbolLattice := UNION_LATTICE[Symbol, Symbols];
+
+  type DeclarationTable := TABLE_LATTICE[Symbol, SymbolLattice];
+  var circular collection predictTable : DeclarationTable;
+  var circular collection followTable : DeclarationTable;
+
+  circular attribute Item.item_predict : SymbolLattice;
+  circular attribute Item.item_follow : SymbolLattice;
+  pragma synthesized(item_predict);
+  pragma inherited (item_follow);
+
+  circular attribute Items.items_follow : SymbolLattice := { };
+  circular attribute Items.items_predict : SymbolLattice := { };
+  pragma synthesized(items_predict);
+  pragma inherited (items_follow);
+
+  circular attribute Grammar.grammar_follow : DeclarationTable;
+  pragma synthesized(grammar_follow);
+
+  epsilon : Symbol := make_symbol("epsilon");
+
+  match ?self:Item=terminal(?s:Symbol) begin
+    self.item_predict := { s };
+  end;
+
+  match ?self:Item=nonterminal(?s:Symbol) begin
+    followTable :> DeclarationTable$table_entry(s, self.item_follow);
+
+    case DeclarationTable$select(predictTable, s) begin
+      match DeclarationTable$table_entry(?,?item_predict_objs) begin
+        self.item_predict := item_predict_objs;
+      end;
+    end;
+  end;
+
+  match ?self:Production=prod(?nt:Symbol, ?items: Items) begin
+    case DeclarationTable$select(followTable, nt) begin
+      match DeclarationTable$table_entry(?,?item_follow_objs) begin
+        items.items_follow := item_follow_objs;
+      end;
+    end;
+
+    predictTable :> DeclarationTable$table_entry(nt, items.items_predict);
+  end;
+
+  match ?self:Grammar=grammar(?prods: Productions) begin
+    self.grammar_follow := followTable;
+  end;
+
+  match ?self : Items = Items$none() begin
+    self.items_predict := self.items_follow;
+  end;
+
+  match ?self : Items = Items$single(?item : Item) begin
+    self.items_predict := item.item_predict;
+
+    item.item_follow := self.items_follow;
+  end;
+
+  match ?self : Items = Items$append(?items1,?items2 : Items) begin
+    items1.items_follow := items2.items_predict;
+
+    items2.items_follow := self.items_follow;
+
+    self.items_predict := items1.items_predict;
+  end;
+
+  match ?self : Productions = Productions$none() begin
+
+  end;
+
+  match ?self : Productions = Productions$single(?stmt : Production) begin
+
+  end;
+
+  match ?self : Productions = Productions$append(?stmts1,?stmts2 : Productions) begin
+
+  end;
+end;
