@@ -10,7 +10,7 @@ module FIRST[T :: var GRAMMAR[]] extends T begin
   type DeclarationTable := TABLE_LATTICE[Symbol, SymbolLattice];
   var circular collection firstTable : DeclarationTable;
 
-  circular attribute Item.item_first : SymbolLattice;
+  circular attribute Item.item_first : SymbolLattice := { };
   pragma synthesized(item_first);
 
   circular attribute Items.items_first : SymbolLattice;

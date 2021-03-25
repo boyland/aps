@@ -11,7 +11,7 @@ module FOLLOW[T :: var GRAMMAR[]] extends T begin
   var circular collection predictTable : DeclarationTable;
   var circular collection followTable : DeclarationTable;
 
-  circular attribute Item.item_predict : SymbolLattice;
+  circular attribute Item.item_predict : SymbolLattice := { };
   circular attribute Item.item_follow : SymbolLattice;
   pragma synthesized(item_predict);
   pragma inherited (item_follow);
