@@ -5,6 +5,8 @@ extern "C" {
 }
 #include "dump-scala.h"
 #include "implement.h"
+#include "dyn-impl.h"
+#include <sstream>      // std::ostringstream
 
 #define LOCAL_VALUE_FLAG (1<<28)
 
@@ -669,18 +671,29 @@ public:
       Super::note_top_level_match(tlm,oss);
     }
 
+    void dump_compute(string cfname, ostream& oss) {
+      oss << indent() << "override def compute : ValueType = "
+	  << cfname << "(anchor);\n";
+    }
+    
     void note_local_attribute(Declaration ld, ostream& oss) {
       Super::note_local_attribute(ld,oss);
       Declaration_info(ld)->decl_flags |= LOCAL_ATTRIBUTE_FLAG;
+      int i = LOCAL_UNIQUE_PREFIX(ld);
+      dump_compute(string("c")+i+"_"+decl_name(ld),oss);
     }
     
     void note_attribute_decl(Declaration ad, ostream& oss) {
       Declaration_info(ad)->decl_flags |= ATTRIBUTE_DECL_FLAG;
       Super::note_attribute_decl(ad,oss);
+      dump_compute(string("c_")+decl_name(ad),oss);
     }
     
     void note_var_value_decl(Declaration vd, ostream& oss) {
       Super::note_var_value_decl(vd,oss);
+      oss << indent() << "override def compute : ValueType = "
+	  << "c_" << decl_name(vd) << "();\n";
+      Declaration_info(vd)->decl_flags |= VAR_VALUE_DECL_FLAG;
     }
 
     void implement(ostream& oss) {
@@ -690,6 +703,10 @@ public:
       Declarations ds = block_body(module_decl_contents(module_decl));
       
       dump_visit_functions(s,oss);
+
+      implement_local_attributes(local_attributes,oss);
+      implement_attributes(attribute_decls,top_level_matches,oss);
+      implement_var_value_decls(var_value_decls,top_level_matches,oss);
 
       // Implement finish routine:
       oss << indent() << "override def finish() : Unit = {\n";
@@ -752,7 +769,8 @@ public:
     } else if (flags & LOCAL_VALUE_FLAG) {
       os << "v" << LOCAL_UNIQUE_PREFIX(vd) << "_" << decl_name(vd);
     } else {
-      aps_error(vd,"internal_error: What is special about this?");
+      os << "v_" << decl_name(vd);
+      aps_error(vd,"internal_error: What is special about this? %s", decl_name(vd));
     }
   }
 };

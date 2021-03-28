@@ -6,7 +6,7 @@ APS2SCALALIBS = ../lib/aps-lib.o ../lib/aps-ag.a
 aps2scala : ${APS2SCALAOBJS} ${APS2SCALALIBS}
 	${CPP} ${CPPFLAGS} ${APS2SCALAOBJS} ${APS2SCALALIBS} -o aps2scala
 
-${APS2SCALAOBJS} : implement.h dump-scala.h
+${APS2SCALAOBJS} : implement.h dyn-impl.h dump-scala.h
 
 %.cc : RCS/%.cc,v
 	co $<
