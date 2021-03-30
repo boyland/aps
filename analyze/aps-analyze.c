@@ -27,25 +27,34 @@ static void *analyze_thing(void *ignore, void *node)
     {
       s = compute_dnc(decl);
       d = analysis_state_cycle(s);
-      if (!(d & DEPENDENCY_MAYBE_SIMPLE) || !(d & DEPENDENCY_NOT_JUST_FIBER))
+      if (!d)
+      {
+        // Do nothing; no cycle to remove
+      }
+      else if (!(d & DEPENDENCY_MAYBE_SIMPLE) || !(d & DEPENDENCY_NOT_JUST_FIBER))
       {
         printf("Fiber cycle detected; cycle being removed\n");
         break_fiber_cycles(decl, s);
+        d = 0;  // clear dependency
       }
       else
       {
-        aps_error(decl, "Unable to handle dependency (%d)", d);
+        aps_error(decl, "Unable to handle dependency (%d); Attribute grammar is not DNC", d);
+        return NULL;  // Avoid running OAG if grammar is not DNC
       }
 
       compute_oag(decl, s);
       d = analysis_state_cycle(s);
-      if (d & SOME_DEPENDENCY)  // any dependency after computing OAG
+      if (d)
       {
-        aps_error(decl, "Cycle detected (%d); Attribute grammar is not DNC", d);
-      }
-      if (cycle_debug & PRINT_CYCLE)
-      {
-        print_cycles(s, stdout);
+        if (SOME_DEPENDENCY)  // any dependency after computing OAG
+        {
+          aps_error(decl, "Cycle detected (%d); Attribute grammar is not OAG", d);
+        }
+        if (cycle_debug & PRINT_CYCLE)
+        {
+          print_cycles(s, stdout);
+        }
       }
       Declaration_info(decl)->analysis_state = s;
     }

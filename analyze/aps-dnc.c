@@ -2822,9 +2822,7 @@ void print_cycles(STATE *s, FILE *stream) {
     int n = phy_graph->instances.length;
     for (j=0; j < n; ++j) {
       d = phy_graph->mingraph[j*n+j];
-      switch (d) {
-      case no_dependency: break;
-      default:
+      if (d)
       {
         if (!(d & DEPENDENCY_NOT_JUST_FIBER)) fprintf(stream,"fiber ");
 	fprintf(stream,"summary cycle involving %s.",
@@ -2833,7 +2831,6 @@ void print_cycles(STATE *s, FILE *stream) {
 	fprintf(stream,"\n");
 	break;
       }
-      }
     }
   }
   for (i=0; i < s->match_rules.length; ++i) {
@@ -2841,9 +2838,7 @@ void print_cycles(STATE *s, FILE *stream) {
     int n = aug_graph->instances.length;
     for (j=0; j < n; ++j) {
       d = edgeset_kind(aug_graph->graph[j*n+j]);
-      switch (d) {
-      case no_dependency: break;
-      default:
+      if (d)
       {
         if (!(d & DEPENDENCY_NOT_JUST_FIBER)) fprintf(stream,"fiber ");
 	fprintf(stream,"local cycle (%d) for %s involving", (edgeset_kind(aug_graph->graph[j*n+j])),
@@ -2851,7 +2846,6 @@ void print_cycles(STATE *s, FILE *stream) {
 	print_instance(&aug_graph->instances.array[j],stdout);
 	fprintf(stream,"\n");
 	break;
-      }
       }
     }
   }
