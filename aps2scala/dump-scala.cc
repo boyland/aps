@@ -261,6 +261,7 @@ void dump_debug_end(ostream& os)
 
 // Output Scala pattern for APS pattern
 
+int formal_count = 0;
 static void dump_pattern_call(Pattern p, Pattern result, const char* resultS, ostream& os)
 {
   Pattern pf = pattern_call_func(p);
@@ -281,9 +282,11 @@ static void dump_pattern_call(Pattern p, Pattern result, const char* resultS, os
   } else {
     os << resultS;
   }
+  formal_count = 0;
   for (Pattern pa = first_PatternActual(pactuals); pa ; pa = PAT_NEXT(pa)) {
     os << ",";
     dump_Pattern(pa,os);
+    formal_count++;
   }
   os << ")";
 }
@@ -350,7 +353,7 @@ void dump_Pattern(Pattern p, ostream& os)
     {
       Declaration f = pattern_var_formal(p);
       string n = symbol_name(def_name(formal_def(f)));
-      if (n == "_") os << "_";
+      if (n == "_") os << "v_" << to_string(formal_count);
       else {
 	os << "v_" << n;
 	// Generating a type causes Scala to warn about erasure
