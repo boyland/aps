@@ -5,6 +5,7 @@ extern "C" {
 }
 #include "dump-scala.h"
 #include "implement.h"
+#include <sstream>      // std::ostringstream
 
 #define LOCAL_VALUE_FLAG (1<<28)
 
@@ -155,7 +156,7 @@ static bool implement_visit_function(AUG_GRAPH* aug_graph,
 	if (is_mod)
 	  os << "root";
 	else
-	  os << "v_" << decl_name(in->node);
+	  os << "v_" << ("_" == string(decl_name(in->node)) ? "0": decl_name(in->node));
 	os << ");\n";
 	if (is_mod) {
 	  --nesting_level;
