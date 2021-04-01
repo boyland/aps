@@ -17,38 +17,43 @@ Several phases:
 static void *analyze_thing(void *ignore, void *node)
 {
   STATE *s;
-  if (ABSTRACT_APS_tnode_phylum(node) == KEYDeclaration) {
+  DEPENDENCY d;
+  if (ABSTRACT_APS_tnode_phylum(node) == KEYDeclaration)
+  {
     Declaration decl = (Declaration)node;
-    switch (Declaration_KEY(decl)) {
+    switch (Declaration_KEY(decl))
+    {
     case KEYmodule_decl:
+    {
       s = compute_dnc(decl);
-      switch (analysis_state_cycle(s)) {
-      default:
-	aps_error(decl,"Cycle detected; Attribute grammar is not DNC");
-	break;
-      case indirect_control_fiber_dependency:
-      case control_fiber_dependency:
-      case indirect_fiber_dependency:
-      case fiber_dependency:
-	printf("Fiber cycle detected; cycle being removed\n");
-	break_fiber_cycles(decl,s);
-	/* fall through */
-      case no_dependency:
-	compute_oag(decl,s);
-	switch (analysis_state_cycle(s)) {
-	case no_dependency:
-	  break;
-	default:
-	  aps_error(decl,"Cycle detected; Attribute grammar is not OAG");
-	  break;
-	}
-	break;
+      if (!(d = analysis_state_cycle(s)))
+      {
+        // Do nothing; no cycle to remove
       }
-      if (cycle_debug & PRINT_CYCLE) {
-	print_cycles(s,stdout);
+      else if (!(d & DEPENDENCY_MAYBE_SIMPLE) || !(d & DEPENDENCY_NOT_JUST_FIBER))
+      {
+        printf("Fiber cycle detected; cycle being removed\n");
+        break_fiber_cycles(decl, s);
+        d = 0;  // clear dependency
+      }
+      else
+      {
+        aps_error(decl, "Unable to handle dependency (%d); Attribute grammar is not DNC", d);
+      }
+
+      if (!d) compute_oag(decl, s); // calculate OAG if grammar is DNC
+
+      if (d || (d = analysis_state_cycle(s)))
+      {
+        if (cycle_debug & PRINT_CYCLE)
+        {
+          print_cycles(s, stdout);
+        }
+
+        aps_error(decl, "Cycle detected (%d); Attribute grammar is not OAG", d);
       }
       Declaration_info(decl)->analysis_state = s;
-      break;
+    }
     }
     return NULL;
   }
