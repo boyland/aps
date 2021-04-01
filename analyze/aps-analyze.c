@@ -24,7 +24,6 @@ static void *analyze_thing(void *ignore, void *node)
     switch (Declaration_KEY(decl))
     {
     case KEYmodule_decl:
-    {
       s = compute_dnc(decl);
       if (!(d = analysis_state_cycle(s)))
       {
@@ -41,9 +40,12 @@ static void *analyze_thing(void *ignore, void *node)
         aps_error(decl, "Unable to handle dependency (%d); Attribute grammar is not DNC", d);
       }
 
-      if (!d) compute_oag(decl, s); // calculate OAG if grammar is DNC
-
-      if (d || (d = analysis_state_cycle(s)))
+      if (!d) {
+	compute_oag(decl, s); // calculate OAG if grammar is DNC
+	d = analysis_state_cycle(s); // check again for type-3 errors
+      }
+      
+      if (d)
       {
         if (cycle_debug & PRINT_CYCLE)
         {
@@ -53,7 +55,7 @@ static void *analyze_thing(void *ignore, void *node)
         aps_error(decl, "Cycle detected (%d); Attribute grammar is not OAG", d);
       }
       Declaration_info(decl)->analysis_state = s;
-    }
+      break;
     }
     return NULL;
   }
