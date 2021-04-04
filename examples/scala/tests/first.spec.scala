@@ -11,7 +11,7 @@ object FirstSpec extends Spec {
     map +:= ("X", List("Z", "z"))
   
     // Act
-    val first = new M_FIRST("First", toGrammar(map))
+    val first = new M_FIRST("First", buildGrammar(map))
     first.finish()
 
     val firstTable = (for ((key, value) <- first.v_firstTable) yield (key.name, value.map(x => x.name).toSet)).toMap

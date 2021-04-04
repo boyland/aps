@@ -11,7 +11,7 @@ object FollowSpec extends Spec {
     map +:= ("X", List("Z", "z"))
   
     // Act
-    val first = new M_FOLLOW("Follow", toGrammar(map))
+    val first = new M_FOLLOW("Follow", buildGrammar(map))
     first.finish()
 
     val followTable = (for ((key, value) <- first.v_followTable) yield (key.name, value.map(x => x.name).toSet)).toMap
