@@ -1,3 +1,5 @@
 *.scala
 !*-driver.scala
 !*.handcode.scala
+!*.spec.scala
+!*.util.scala
