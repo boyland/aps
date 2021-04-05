@@ -6,30 +6,30 @@ APSLIB=${ROOT_PATH}/lib/aps-library-${SCALAV}.jar
 SCALA_FLAGS=.:${APSLIB}
 APS2SCALA=${ROOT_PATH}/bin/aps2scala
 
-.PHONY:
+.PHONY: all
 all: $(addsuffix Spec.run, $(SPECS))
+
+.PHONY: clean
+clean:
+	rm -f *.class grammar.scala first.scala follow.scala
 
 %.class: %.scala
 	scalac -cp ${SCALA_FLAGS} $<
 
-%.generate:
+%.scala:
 	${APS2SCALA} -DCOT -p ${EXAMPLES_PATH}:${ROOT_PATH}/base $*
 
-%.aps: %.generate %.class
-	echo "Building aps"
+%.aps: %.class
+	echo "Needed so Makefile does not break"
 
 %.run: %.class
-	@scala -cp ${SCALA_FLAGS} $<
+	scala -cp ${SCALA_FLAGS} $(basename $<)
 
-FirstSpec.compile: Spec.class GrammarUtil.compile first.aps FirstSpec.class 
-	echo "Building FirstSpec.scala"
+GrammarUtil.class: GrammarUtil.scala grammar.aps
+	scalac -cp ${SCALA_FLAGS} $<
 
-FollowSpec.compile: Spec.class GrammarUtil.compile follow.aps FollowSpec.class
-	echo "Building FollowSpec.scala"
+FirstSpec.class: FirstSpec.scala Spec.class GrammarUtil.class first.aps
+	scalac -cp ${SCALA_FLAGS} $<
 
-GrammarUtil.compile: grammar.aps grammar.class GrammarUtil.class
-	echo "Building GrammarUtil.scala"
-
-.PHONY:
-clean:
-	rm -f *.class grammar.scala first.scala follow.scala
+FollowSpec.class: FollowSpec.scala Spec.class GrammarUtil.class follow.aps
+ 	scalac -cp ${SCALA_FLAGS} $<
