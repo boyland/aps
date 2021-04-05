@@ -1,30 +1,35 @@
-SPECS=first.spec.scala follow.spec.scala
-TREES=grammar.scala
-UTILS=grammar.util.scala
+SPECS=First Follow
 EXAMPLES_PATH=../..
 ROOT_PATH=../${EXAMPLES_PATH}
 SCALAV=2.12
 APSLIB=${ROOT_PATH}/lib/aps-library-${SCALAV}.jar
+SCALA_FLAGS=.:${APSLIB}
 APS2SCALA=${ROOT_PATH}/bin/aps2scala
 
-%.build:
-	@scalac -cp ${APSLIB} Spec.scala ${UTILS} ${TREES} $* $(basename $(basename $*)).scala
+.PHONY:
+all: $(addsuffix Spec.run, $(SPECS))
+
+%.class: %.scala
+	scalac -cp ${SCALA_FLAGS} $<
 
 %.generate:
-	@${APS2SCALA} -DCOT -p ${EXAMPLES_PATH}:${ROOT_PATH}/base $(basename $(basename $*))
+	${APS2SCALA} -DCOT -p ${EXAMPLES_PATH}:${ROOT_PATH}/base $*
 
-all: $(addsuffix .generate, $(TREES)) $(addsuffix .run, $(SPECS)) 
+%.aps: %.generate %.class
+	echo "Building aps"
 
-first.spec.scala.run: first.spec.scala.run2 
-	# FirstSpec is the name of class
-	@scala -cp .:${APSLIB} FirstSpec
+%.run: %.class
+	@scala -cp ${SCALA_FLAGS} $<
 
-follow.spec.scala.run: follow.spec.scala.run2 
-	# FollowSpec is the name of class
-	@scala -cp .:${APSLIB} FollowSpec
+FirstSpec.compile: Spec.class GrammarUtil.compile first.aps FirstSpec.class 
+	echo "Building FirstSpec.scala"
 
-%.run2: %.generate %.build
-	@echo "Run2"
+FollowSpec.compile: Spec.class GrammarUtil.compile follow.aps FollowSpec.class
+	echo "Building FollowSpec.scala"
 
+GrammarUtil.compile: grammar.aps grammar.class GrammarUtil.class
+	echo "Building GrammarUtil.scala"
+
+.PHONY:
 clean:
 	rm -f *.class grammar.scala first.scala follow.scala
