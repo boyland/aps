@@ -105,13 +105,10 @@ Expression* make_instance_assignment(AUG_GRAPH* aug_graph,
     }
   }
 
-  if (debug)
+  std::map<INSTANCE*, std::string>::iterator it;
+  for (it = default_assignments.begin(); it != default_assignments.end(); it++)
   {
-    std::map<INSTANCE*, std::string>::iterator it;
-    for (it = default_assignments.begin(); it != default_assignments.end(); it++)
-    {
-      cout << "Default assignment arm without follow-up assignment: " << (*it).second << endl;
-    }
+    cout << "Default assignment arm without follow-up assignment: " << (*it).second << endl;
   }
 
   default_assignments.clear();
