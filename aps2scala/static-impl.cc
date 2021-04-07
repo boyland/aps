@@ -66,7 +66,7 @@ Expression* make_instance_assignment(AUG_GRAPH* aug_graph,
 	switch (Declaration_KEY(ad)) {
 	case KEYattribute_decl:
 	  array[i] = default_init(attribute_decl_default(ad));
-    if (array[i])
+    if (debug && array[i])
     {
       std::stringstream oss;
       dump_Expression(array[i], oss);
@@ -75,7 +75,7 @@ Expression* make_instance_assignment(AUG_GRAPH* aug_graph,
 	  break;
 	case KEYvalue_decl:
 	  array[i] = default_init(value_decl_default(ad));
-    if (array[i])
+    if (debug && array[i])
     {
       std::stringstream oss;
       dump_Expression(array[i], oss);
@@ -96,10 +96,13 @@ Expression* make_instance_assignment(AUG_GRAPH* aug_graph,
       if (INSTANCE* in = Expression_info(assign_rhs(d))->value_for) {
 	if (in->index >= n) fatal_error("bad index for instance");
 	array[in->index] = assign_rhs(d);
-  std::map<INSTANCE*, std::string>::iterator default_assignment_arm = default_assignments.find(in);
-  if (default_assignment_arm != default_assignments.end())
+  if (debug)
   {
-    default_assignments.erase(default_assignment_arm);
+    std::map<INSTANCE*, std::string>::iterator default_assignment_arm = default_assignments.find(in);
+    if (default_assignment_arm != default_assignments.end())
+    {
+      default_assignments.erase(default_assignment_arm);
+    }
   }
       }
       break;
@@ -108,10 +111,13 @@ Expression* make_instance_assignment(AUG_GRAPH* aug_graph,
     }
   }
 
-  std::map<INSTANCE*, std::string>::iterator it;
-  for (it = default_assignments.begin(); it != default_assignments.end(); it++)
+  if (debug)
   {
-    cout << "Default assignment arm without follow-up assignment: " << (*it).second << endl;
+    std::map<INSTANCE*, std::string>::iterator it;
+    for (it = default_assignments.begin(); it != default_assignments.end(); it++)
+    {
+      cout << "Default assignment arm without follow-up assignment: " << (*it).second << endl;
+    }
   }
 
   default_assignments.clear();
