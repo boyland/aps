@@ -75,12 +75,6 @@ Expression* make_instance_assignment(AUG_GRAPH* aug_graph,
 	  break;
 	case KEYvalue_decl:
 	  array[i] = default_init(value_decl_default(ad));
-    if (debug && array[i])
-    {
-      std::stringstream oss;
-      dump_Expression(array[i], oss);
-      default_assignments[in] = oss.str();
-    }
 	  break;
 	default:
 	  break;
