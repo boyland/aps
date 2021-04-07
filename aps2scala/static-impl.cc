@@ -6,6 +6,8 @@ extern "C" {
 #include "dump-scala.h"
 #include "implement.h"
 #include <sstream>      // std::ostringstream
+#include <map>
+#include <algorithm>
 
 #define LOCAL_VALUE_FLAG (1<<28)
 
@@ -48,7 +50,7 @@ Expression* make_instance_assignment(AUG_GRAPH* aug_graph,
 {
   int n = aug_graph->instances.length;
   Expression* array = new Expression[n];
-
+  std::map<INSTANCE*, std::string> default_assignments;
   if (from) {
     for (int i=0; i < n; ++i) {
       array[i] = from[i];
@@ -64,6 +66,12 @@ Expression* make_instance_assignment(AUG_GRAPH* aug_graph,
 	switch (Declaration_KEY(ad)) {
 	case KEYattribute_decl:
 	  array[i] = default_init(attribute_decl_default(ad));
+    if (debug && array[i])
+    {
+      std::stringstream oss;
+      dump_Expression(array[i], oss);
+      default_assignments[in] = oss.str();
+    }
 	  break;
 	case KEYvalue_decl:
 	  array[i] = default_init(value_decl_default(ad));
@@ -82,12 +90,28 @@ Expression* make_instance_assignment(AUG_GRAPH* aug_graph,
       if (INSTANCE* in = Expression_info(assign_rhs(d))->value_for) {
 	if (in->index >= n) fatal_error("bad index for instance");
 	array[in->index] = assign_rhs(d);
+  if (debug)
+  {
+    std::map<INSTANCE*, std::string>::iterator default_assignment_arm = default_assignments.find(in);
+    if (default_assignment_arm != default_assignments.end())
+    {
+      default_assignments.erase(default_assignment_arm);
+    }
+  }
       }
       break;
     default:
       break;
     }
   }
+
+  std::map<INSTANCE*, std::string>::iterator it;
+  for (it = default_assignments.begin(); it != default_assignments.end(); it++)
+  {
+    cout << "Default assignment arm without follow-up assignment: " << (*it).second << endl;
+  }
+
+  default_assignments.clear();
 
   return array;
 }
