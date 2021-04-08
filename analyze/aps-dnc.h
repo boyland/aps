@@ -92,6 +92,7 @@ typedef struct analysis_state {
   AUG_GRAPH global_dependencies;
   VECTOR(FIBER) fibers;
   CYCLES cycles;
+  DEPENDENCY initial_dependency;  // dependency before breaking fiber cycles
 } STATE;
 
 extern PHY_GRAPH* summary_graph_for(STATE *, Declaration);

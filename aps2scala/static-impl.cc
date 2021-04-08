@@ -686,7 +686,7 @@ public:
 
     void implement(ostream& oss) {
       STATE *s = (STATE*)Declaration_info(module_decl)->analysis_state;
-
+  
 
       Declarations ds = block_body(module_decl_contents(module_decl));
       
@@ -695,7 +695,21 @@ public:
       // Implement finish routine:
       oss << indent() << "override def finish() : Unit = {\n";
       ++nesting_level;
-      oss << indent() << "visit();\n";
+
+      if (activate_static_circular)
+      {
+        oss << endl;
+        oss << indent(nesting_level) << "do {" << endl;
+        oss << indent(nesting_level + 1) << "changed = false;" << endl;
+        oss << indent(nesting_level + 1) << "visit();" << endl;
+        oss << indent(nesting_level) << "} while (changed);" << endl;
+        oss << endl;
+      }
+      else
+      {
+        oss << indent() << "visit();\n";
+      }
+
       // types actually should be scheduled...
       for (Declaration d = first_Declaration(ds); d; d = DECL_NEXT(d)) {
 	const char* kind = NULL;

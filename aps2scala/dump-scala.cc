@@ -27,6 +27,7 @@ using std::string;
 
 extern int aps_yylineno;
 int nesting_level = 0;
+bool activate_static_circular = false;
 
 ostream& operator<<(ostream&o,Symbol s)
 {
@@ -92,6 +93,21 @@ static string program_id(string name)
     else if (*it == '-' || *it == '_' || *it == '.') result += '_';
   }
   return result;
+}
+
+void dump_staticCircularTrait(std::ostream& oss)
+{
+  oss << endl;
+  oss << indent(nesting_level) << "var changed = false;" << endl;
+  oss << indent(nesting_level) << "trait StaticCircularEvaluation[V_P, V_T] extends CircularEvaluation[V_P, V_T] {" << endl;
+  oss << indent(nesting_level + 1) << "override def set(newValue : ValueType) : Unit = {" << endl;
+  oss << indent(nesting_level + 2) << "val prevValue = value;" << endl;
+  oss << indent(nesting_level + 2) << "super.set(newValue);" << endl;
+  oss << indent(nesting_level + 2) << "changed |= prevValue != value;" << endl;
+  oss << indent(nesting_level + 1) << "}" << endl;
+  oss << indent(nesting_level + 1) << "checkForLateUpdate = false;" << endl; // Needed to prevent TooLateError
+  oss << indent(nesting_level) << "}" << endl;
+  oss << endl;
 }
 
 void dump_scala_Declaration_header(Declaration, std::ostream&);
@@ -677,6 +693,7 @@ void dump_some_attribute(Declaration d, string i,
       << "\"" << name << "\")"
       << (is_cir ? " with CircularEvaluation" + tmps.str() : "") 
       << (is_col ? " with CollectionEvaluation" + tmps.str() : "")
+      << (activate_static_circular && is_cir ? " with StaticCircularEvaluation" + tmps.str() : "")
       << " {\n";
   ++nesting_level;
 
@@ -1563,6 +1580,11 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
       oss << "]\n";
       oss << indent() << "{\n";
       ++nesting_level;
+
+      STATE *s = (STATE*)Declaration_info(decl)->analysis_state;
+      DEPENDENCY dep = s->initial_dependency;
+      activate_static_circular = !(dep & DEPENDENCY_MAYBE_SIMPLE);
+      dump_staticCircularTrait(oss);
 
       if (result_typeval != "") {
 	oss << indent() << "type T_" << rname << " = "

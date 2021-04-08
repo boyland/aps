@@ -28,9 +28,11 @@ static void *analyze_thing(void *ignore, void *node)
       if (!(d = analysis_state_cycle(s)))
       {
         // Do nothing; no cycle to remove
+        s->initial_dependency = 0;
       }
       else if (!(d & DEPENDENCY_MAYBE_SIMPLE) || !(d & DEPENDENCY_NOT_JUST_FIBER))
       {
+        s->initial_dependency = d;
         printf("Fiber cycle detected; cycle being removed\n");
         break_fiber_cycles(decl, s);
         d = 0;  // clear dependency
