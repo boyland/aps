@@ -12,14 +12,10 @@ class Spec extends App {
 
   {
     println(f"Running test file: ${getClass.getSimpleName}")
-
-    getClass
-      .getMethods
-      .filter(_.getName.startsWith("test"))
-      .foreach(m => {
-        println(f" > Running ${m.getName}")
-        m.invoke(this)
-        println(f" > Finished ${m.getName}")
-      })
+    for (method <- getClass.getMethods if method.getName.startsWith("test")) {
+      println(f"> Running ${method.getName}")
+      method.invoke(this)
+      println(f"> Finished ${method.getName}")
+    }
   }
 }
