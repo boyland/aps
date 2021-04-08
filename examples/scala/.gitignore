@@ -1,5 +1,4 @@
 *.scala
 !*-driver.scala
 !*.handcode.scala
-!*Spec.scala
-!*Util.scala
+!tests/
