@@ -1,4 +1,4 @@
-SPECS=First Follow
+SPECS=FirstSpec FollowSpec
 EXAMPLES_PATH=../..
 ROOT_PATH=../${EXAMPLES_PATH}
 SCALAV=2.12
@@ -7,7 +7,7 @@ SCALA_FLAGS=.:${APSLIB}
 APS2SCALA=${ROOT_PATH}/bin/aps2scala
 
 .PHONY: all
-all: $(addsuffix Spec.run, $(SPECS))
+all: $(addsuffix .run, $(SPECS))
 
 .PHONY: clean
 clean:
@@ -19,17 +19,14 @@ clean:
 %.scala:
 	${APS2SCALA} -DCOT -p ${EXAMPLES_PATH}:${ROOT_PATH}/base $*
 
-%.aps: %.class
-	echo "Needed so Makefile does not break"
-
 %.run: %.class
 	scala -cp ${SCALA_FLAGS} $(basename $<)
 
-GrammarUtil.class: GrammarUtil.scala grammar.aps
-	scalac -cp ${SCALA_FLAGS} $<
+GrammarUtil.class: grammar.class
+	scalac -cp ${SCALA_FLAGS} GrammarUtil.scala
 
-FirstSpec.class: FirstSpec.scala Spec.class GrammarUtil.class first.aps
-	scalac -cp ${SCALA_FLAGS} $<
+FirstSpec.class: Spec.class GrammarUtil.class first.class
+	scalac -cp ${SCALA_FLAGS} FirstSpec.scala
 
-FollowSpec.class: FollowSpec.scala Spec.class GrammarUtil.class follow.aps
- 	scalac -cp ${SCALA_FLAGS} $<
+FollowSpec.class: Spec.class GrammarUtil.class follow.class
+	scalac -cp ${SCALA_FLAGS} FollowSpec.scala
