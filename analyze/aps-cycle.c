@@ -338,7 +338,6 @@ static void remove_edgeset(int index1, int index2, int n, INSTANCE *array, AUG_G
     print_instance(attr2, stdout);
     printf("\n");
   }
-  
   free_edgeset(aug_graph->graph[index1 * n + index2], aug_graph);
   aug_graph->graph[index1 * n + index2] = NULL;
 }
