@@ -316,7 +316,7 @@ static void make_cycles(STATE *s) {
 /*** Break cycles and redo dependency graphs ***/
 
 bool instance_is_up(INSTANCE *i) {
-  return (fibered_attr_direction(&i->fibered_attr)) == instance_outward;
+  return (fibered_attr_direction(&i->fibered_attr)) == instance_outward || i->inside_conditional;
 }
 
 /**
@@ -338,6 +338,14 @@ static void remove_edgeset(int index1, int index2, int n, INSTANCE *array, AUG_G
     print_instance(attr2, stdout);
     printf("\n");
   }
+
+  EDGESET es = aug_graph->graph[index1 * n + index2];
+  if (es != NULL && !(es->kind & DEPENDENCY_MAYBE_CARRYING) && (es->kind & DEPENDENCY_MAYBE_DIRECT))
+  {
+    printf("Skiped removing an edge\n");
+    // return;
+  }
+  
   free_edgeset(aug_graph->graph[index1 * n + index2], aug_graph);
   aug_graph->graph[index1 * n + index2] = NULL;
 }
