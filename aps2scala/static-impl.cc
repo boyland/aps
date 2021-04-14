@@ -138,11 +138,12 @@ static bool implement_visit_function(AUG_GRAPH* aug_graph,
       ++current;
     }
 
+  bool is_mod = false;
     // check for phase change of child:
     // we allow inherited attributes of next phase to go by:
     if (ch < nch && ph != child_phase[ch] && ph != -child_phase[ch]-1) {
       if (current == phase) {
-	bool is_mod = Declaration_KEY(in->node) == KEYmodule_decl;
+	is_mod = Declaration_KEY(in->node) == KEYmodule_decl;
 
 	if (is_mod) {
 	  os << indent() << "for (root <- roots) {\n";
@@ -168,6 +169,16 @@ static bool implement_visit_function(AUG_GRAPH* aug_graph,
 					   instance_assignment,
 					   nch,children,child_phase,os);
       --child_phase[ch];
+
+      // There is more visit calls needed in this phase
+      // Dump them first before leaving this phase altogether
+      if (cont && phase == current && !is_mod) 
+      {
+        os << indent() << "visit_" << PHY_GRAPH_NUM(npg)
+           << "_" << ph + 1 << "(";
+        os << "v_" << ("_" == string(decl_name(in->node)) ? "0" : decl_name(in->node));
+        os << ");\n";
+      }
       return cont;
     }
 
@@ -686,7 +697,7 @@ public:
 
     void implement(ostream& oss) {
       STATE *s = (STATE*)Declaration_info(module_decl)->analysis_state;
-
+  
 
       Declarations ds = block_body(module_decl_contents(module_decl));
       
