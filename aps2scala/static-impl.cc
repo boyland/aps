@@ -697,7 +697,7 @@ public:
 
     void implement(ostream& oss) {
       STATE *s = (STATE*)Declaration_info(module_decl)->analysis_state;
-  
+
 
       Declarations ds = block_body(module_decl_contents(module_decl));
       
