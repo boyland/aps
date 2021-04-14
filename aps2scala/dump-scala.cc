@@ -1582,9 +1582,12 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
       ++nesting_level;
 
       STATE *s = (STATE*)Declaration_info(decl)->analysis_state;
-      DEPENDENCY dep = s->initial_dependency;
-      activate_static_circular = !(dep & DEPENDENCY_MAYBE_SIMPLE);
-      dump_staticCircularTrait(oss);
+      if (s != NULL)
+      {
+        DEPENDENCY dep = s->initial_dependency;
+        activate_static_circular = !(dep & DEPENDENCY_MAYBE_SIMPLE);
+        dump_staticCircularTrait(oss);
+      }
 
       if (result_typeval != "") {
 	oss << indent() << "type T_" << rname << " = "
