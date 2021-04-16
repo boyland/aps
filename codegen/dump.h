@@ -1,4 +1,4 @@
-#ifndef DUMP_CPP_H
+#ifndef DUMP_H
 #include <iostream>
 #include <string>
 
@@ -6,10 +6,10 @@ using std::ostream;
 using std::string;
 
 // don't generate any code for this declaration:
-void omit_declaration(char *name);
+void omit_declaration(const char *name);
 
 // The result type is as given:
-void impl_module(char *name, char *type);
+void impl_module(const char *name, const char *type);
 
 extern bool incremental;
 extern bool static_schedule;
@@ -19,25 +19,6 @@ extern int debug;
 class Implementation;
 
 extern Implementation *impl;
-
-void dump_cpp_Program(Program,ostream&,ostream&);
-void dump_cpp_Units(Units,ostream&,ostream&);
-void dump_cpp_Unit(Unit,ostream&,ostream&);
-
-// If non-zero, this variable means that we
-// should do everything in oss.hs, not oss.cpps
-extern int inline_definitions;
-
-struct output_streams {
-  Declaration context;
-  ostream &hs, &cpps, &is;
-  string prefix;
-  output_streams(Declaration _c, ostream &_hs, ostream &_cpps, ostream &_is,
-		 string _p)
-    : context(_c), hs(_hs), cpps(_cpps), is(_is), prefix(_p) {}
-};
-
-void dump_cpp_Declaration(Declaration,const output_streams&);
 
 static const int indent_multiple = 2;
 extern int nesting_level;
@@ -49,8 +30,34 @@ class InDefinition {
   ~InDefinition() { nesting_level = saved_nesting; }
 };
 
-#define INDEFINITION InDefinition xx(inline_definitions ? nesting_level : 0)
+#ifdef APS2SCALA
+/*
+ * The Scala generation does everything in one file.
+ */
+#define GEN_OUTPUT ostream
+#define INDEFINITION InDefinition xx(nesting_level)
 
+#else /* APS2SCALA */
+/*
+ * The C++  generation has separate header and implementation files.
+ */
+struct output_streams {
+  Declaration context;
+  ostream &hs, &cpps, &is;
+  string prefix;
+  output_streams(Declaration _c, ostream &_hs, ostream &_cpps, ostream &_is,
+                 string _p)
+    : context(_c), hs(_hs), cpps(_cpps), is(_is), prefix(_p) {}
+};
+#define GEN_OUTPUT output_streams
+
+extern int inline_definitions;
+#define INDEFINITION InDefinition xx(inline_definitions ? nesting_level : 0)
+#endif /* APS2SCALA */
+
+void dump_Declaration(Declaration,GEN_OUTPUT&);
+
+void dump_Signature(Signature,string,ostream&);
 void dump_Type_prefixed(Type,ostream&);
 void dump_Type(Type,ostream&);
 void dump_Type_value(Type,ostream&);
@@ -61,13 +68,17 @@ void dump_Use(Use,const char *prefix,ostream&);
 void dump_TypeEnvironment(TypeEnvironment,ostream&);
 void dump_vd_Default(Declaration,ostream&);
 
-void dump_function_prototype(string,Type ft, output_streams& oss);
+void dump_function_prototype(string,Type ft, GEN_OUTPUT& oss);
+void dump_debug_end(ostream& os);
 
+#ifndef APC2SCALA
 // these two must always be called in pairs: the first
 // leaves information around for the second:
 void dump_Pattern_cond(Pattern p, string node, ostream&);
 void dump_Pattern_bindings(Pattern p, ostream&);
 string matcher_bindings(string node, Match m);
+#endif
+void dump_Pattern(Pattern p, ostream&); // only defined for Scala
 
 // override <<
 ostream& operator<<(ostream&o,Symbol s);
@@ -82,6 +93,12 @@ inline ostream& operator<<(ostream&o,Expression e)
 inline ostream& operator<<(ostream&o,Type t)
 {
   dump_Type(t,o);
+  return o;
+}
+
+inline ostream& operator<<(ostream&o, Pattern p)
+{
+  dump_Pattern(p,o);
   return o;
 }
 
@@ -114,6 +131,10 @@ inline ostream& operator<<(ostream&os, INSTANCE*i) {
   return os;
 }
 
+extern string operator+(string, int);
+
+#ifndef APS2SCALA
+// special C++ generation code
 // sending to oss copies to cpps, ...
 template <class Any>
 inline const output_streams& operator<<(const output_streams& oss, Any x) {
@@ -172,7 +193,6 @@ inline const output_streams& operator<< <header_end>
   if (!inline_definitions) oss.hs << ";\n";
   return oss;
 }
-
-extern string operator+(string, int);
+#endif /* APS2SCALA */
 
 #endif

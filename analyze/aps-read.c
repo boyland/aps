@@ -19,6 +19,7 @@ static Program programs[MAX_PROGRAMS];
 
 extern FILE *aps_yyin;
 extern char *aps_yyfilename;
+extern int aps_yyparse();
 Program the_tree = NULL;
 int aps_parse_error = 0;
 
