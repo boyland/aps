@@ -388,7 +388,7 @@ string local_attribute_context_bindings(Declaration d)
 }
 
 void implement_local_attributes(vector<Declaration>& local_attributes,
-				const output_streams& oss)
+				output_streams& oss)
 {
   ostream& hs = oss.hs;
   ostream& cpps = oss.cpps;
@@ -433,7 +433,7 @@ void implement_local_attributes(vector<Declaration>& local_attributes,
 
 void implement_attributes(const vector<Declaration>& attrs,
 			  const vector<Declaration>& tlms,
-			  const output_streams& oss)
+			  output_streams& oss)
 {
   ostream& hs = oss.hs;
   ostream& cpps = oss.cpps;
@@ -500,7 +500,7 @@ void implement_attributes(const vector<Declaration>& attrs,
 
 void implement_var_value_decls(const vector<Declaration>& vvds,
 			       const vector<Declaration>& tlms,
-			       const output_streams& oss)
+			       output_streams& oss)
 {
   ostream& hs = oss.hs;
   ostream& cpps = oss.cpps;
@@ -569,11 +569,11 @@ public:
   public:
     ModuleInfo(Declaration mdecl) : Implementation::ModuleInfo(mdecl) {}
 
-    void note_top_level_match(Declaration tlm, const output_streams& oss) {
+    void note_top_level_match(Declaration tlm, output_streams& oss) {
       Super::note_top_level_match(tlm,oss);
     }
 
-    void dump_compute(string cfname, const output_streams& oss) {
+    void dump_compute(string cfname, output_streams& oss) {
       ostream& bs = inline_definitions ? oss.hs : oss.cpps;
 
       oss << header_return_type<string>("value_type") << " "
@@ -588,19 +588,19 @@ public:
       bs << indent() << "}\n";
     }
     
-    void note_local_attribute(Declaration ld, const output_streams& oss) {
+    void note_local_attribute(Declaration ld, output_streams& oss) {
       Super::note_local_attribute(ld,oss);
       Declaration_info(ld)->decl_flags |= LOCAL_ATTRIBUTE_FLAG;
       int i = LOCAL_UNIQUE_PREFIX(ld);
       dump_compute(string("c")+i+"_"+decl_name(ld),oss);
     }
     
-    void note_attribute_decl(Declaration ad, const output_streams& oss) {
+    void note_attribute_decl(Declaration ad, output_streams& oss) {
       Super::note_attribute_decl(ad,oss);
       dump_compute(string("c_")+decl_name(ad),oss);
     }
     
-    void note_var_value_decl(Declaration vd, const output_streams& oss) {
+    void note_var_value_decl(Declaration vd, output_streams& oss) {
       Super::note_var_value_decl(vd,oss);
       Declaration_info(vd)->decl_flags |= VAR_VALUE_DECL_FLAG;
       char *name = decl_name(vd);
@@ -608,7 +608,7 @@ public:
       oss.is << ",\n    s_" << name << "(UNEVALUATED)";
     }
 
-    void implement(const output_streams& oss) {
+    void implement(output_streams& oss) {
       implement_local_attributes(local_attributes,oss);
       implement_attributes(attribute_decls,top_level_matches,oss);
       implement_var_value_decls(var_value_decls,top_level_matches,oss);

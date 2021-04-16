@@ -2,7 +2,7 @@ extern "C" {
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
-#include "/usr/include/string.h"
+#include <string.h>
 #include <strings.h>
 #include "aps-ag.h"
 }
@@ -17,7 +17,7 @@ extern "C" {
 
 int callset_AI(Declaration module, STATE *s) { return 0; }
 
-static char* argv0 = "apscpp";
+static const char* argv0 = "apscpp";
 void usage() {
   fprintf(stderr,"%s: usage: %s [-SVG] [-D...] <file.aps>\n",argv0,argv0);
   fprintf(stderr,"             compile APS to C++\n");
