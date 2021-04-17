@@ -142,7 +142,7 @@ Declaration constructor_decl_base_type_decl(Declaration decl)
   return tdecl;
 }
 
-void dump_formal(Declaration formal,char *prefix,ostream&s)
+void dump_formal(Declaration formal,const char *prefix,ostream&s)
 {
   dump_Typed_decl(infer_formal_type(formal),formal,prefix,s);
   if (KEYseq_formal == Declaration_KEY(formal)) s << ",...";
@@ -1911,7 +1911,7 @@ void dump_Type(Type t, ostream& o)
   }
 }
 
-void dump_Typed_decl(Type t, Declaration decl, char*prefix,ostream& o)
+void dump_Typed_decl(Type t, Declaration decl, const char*prefix,ostream& o)
 {
   Symbol sym = def_name(declaration_def(decl));
   switch (Type_KEY(t)) {
@@ -2211,7 +2211,7 @@ void dump_TypeEnvironment(TypeEnvironment te, ostream&os)
   os << "::";
 }
 
-void dump_Use(Use u, char *prefix, ostream& os)
+void dump_Use(Use u, const char *prefix, ostream& os)
 {
   Symbol sym;
   switch (Use_KEY(u)) {

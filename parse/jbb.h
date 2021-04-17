@@ -57,7 +57,8 @@ extern char *strcpy(), *strcat();
 #endif
 #ifndef assert
 #ifndef _crash
-#define _crash() (*(int *)0 = -1)
+#include <stdlib.h>
+#define _crash() (abort(),0)
 #endif
 #ifndef _assert
 #define _assert(ex) \
