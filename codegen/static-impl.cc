@@ -880,16 +880,16 @@ public:
 
       if (activate_static_circular)
       {
-        oss << endl;
-        oss << indent(nesting_level) << "do {" << endl;
-        oss << indent(nesting_level + 1) << "changed = false;" << endl;
-        oss << indent(nesting_level + 1) << "visit();" << endl;
-        oss << indent(nesting_level) << "} while (changed);" << endl;
-        oss << endl;
+        os << endl;
+        os << indent(nesting_level) << "do {" << endl;
+        os << indent(nesting_level + 1) << "changed = false;" << endl;
+        os << indent(nesting_level + 1) << "visit();" << endl;
+        os << indent(nesting_level) << "} while (changed);" << endl;
+        os << endl;
       }
       else
       {
-        oss << indent() << "visit();\n";
+        os << indent() << "visit();\n";
       }
 
       // types actually should be scheduled...

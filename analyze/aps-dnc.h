@@ -92,7 +92,7 @@ typedef struct analysis_state {
   AUG_GRAPH global_dependencies;
   VECTOR(FIBER) fibers;
   CYCLES cycles;
-  bool loop_required; // flag to indicate loop around visits is required
+  BOOL loop_required; // flag to indicate loop around visits is required
 } STATE;
 
 extern PHY_GRAPH* summary_graph_for(STATE *, Declaration);
