@@ -163,7 +163,7 @@ static bool implement_visit_function(AUG_GRAPH* aug_graph,
 	}
 	if (ph < 0) {
 	  aps_warning(in->node,"used inherited attributes of children");
-    ph = -ph;
+	  ph = -ph;
 	}
 	os << indent() << "visit_" << PHY_GRAPH_NUM(npg)
 	   << "_" << ph << "(";	
