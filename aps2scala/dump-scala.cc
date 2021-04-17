@@ -1584,8 +1584,7 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
       STATE *s = (STATE*)Declaration_info(decl)->analysis_state;
       if (s != NULL)
       {
-        DEPENDENCY dep = s->initial_dependency;
-        activate_static_circular = !(dep & DEPENDENCY_MAYBE_SIMPLE);
+        activate_static_circular = s->loop_required;
         dump_staticCircularTrait(oss);
       }
 
