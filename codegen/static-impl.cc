@@ -17,21 +17,6 @@ using namespace std;
 #define DEREF "->"
 #endif
 
-/** Return phase (synthesized) or -phase (inherited)
- * for fibered attribute, given the phylum's summary dependence graph.
- */
-int attribute_schedule(PHY_GRAPH *phy_graph, const FIBERED_ATTRIBUTE& key)
-{
-  int n = phy_graph->instances.length;
-  for (int i=0; i < n; ++i) {
-    const FIBERED_ATTRIBUTE& fa = phy_graph->instances.array[i].fibered_attr;
-    if (fa.attr == key.attr && fa.fiber == key.fiber)
-      return phy_graph->summary_schedule[i];
-  }
-  fatal_error("Could not find summary schedule for instance");
-  return 0;
-}
-
 Expression default_init(Default def)
 {
   switch (Default_KEY(def)) {
@@ -130,7 +115,11 @@ static bool implement_visit_function(AUG_GRAPH* aug_graph,
     
     PHY_GRAPH* npg = node_is_syntax ?
       Declaration_info(in->node)->node_phy_graph : 0;
-    int ph = node_is_syntax ? attribute_schedule(npg,in->fibered_attr) : -1;
+    int ph = node_is_syntax ? attribute_schedule(npg,&(in->fibered_attr)) : 0;
+    print_instance(in,stdout);
+    if (ch == nch) printf("  ch = <none>");
+    else printf("  ch = %d",ch);
+    printf(", ph = %d\n",ph);
 
     // check for phase change of parent:
     if (node_is_lhs && ph != current && ph != -current) {
@@ -163,6 +152,7 @@ static bool implement_visit_function(AUG_GRAPH* aug_graph,
 	}
 	if (ph < 0) {
 	  aps_warning(in->node,"used inherited attributes of children");
+	  fatal_error("stopping");
 	  ph = -ph;
 	}
 	os << indent() << "visit_" << PHY_GRAPH_NUM(npg)
@@ -494,6 +484,8 @@ void dump_visit_functions(PHY_GRAPH *phy_graph,
     os << "\n";
 #endif /* APS2SCALA */
 
+    printf("Implementing visit function for %s, phase %d\n",
+	   decl_name(aug_graph->syntax_decl), phase);
     bool cont =
       implement_visit_function(aug_graph,phase,0,total_order,
 			       instance_assignment,

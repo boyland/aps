@@ -303,6 +303,22 @@ CTO_NODE* schedule_rest(AUG_GRAPH *aug_graph,
   return cto_node;
 }
 
+/** Return phase (synthesized) or -phase (inherited)
+ * for fibered attribute, given the phylum's summary dependence graph.
+ * TODO: make public and export and remove from static-impl.cc
+ */
+int attribute_schedule(PHY_GRAPH *phy_graph, FIBERED_ATTRIBUTE* key)
+{
+  int n = phy_graph->instances.length;
+  for (int i=0; i < n; ++i) {
+    FIBERED_ATTRIBUTE* fa = &(phy_graph->instances.array[i].fibered_attr);
+    if (fa->attr == key->attr && fa->fiber == key->fiber)
+      return phy_graph->summary_schedule[i];
+  }
+  fatal_error("Could not find summary schedule for instance");
+  return 0;
+}
+
 void schedule_augmented_dependency_graph(AUG_GRAPH *aug_graph) {
   int n = aug_graph->instances.length;
   int i;
@@ -315,6 +331,28 @@ void schedule_augmented_dependency_graph(AUG_GRAPH *aug_graph) {
   if (oag_debug & PROD_ORDER) {
     printf("Scheduling conditional total order for %s\n",
 	   aug_graph_name(aug_graph));
+  }
+  if (oag_debug & DEBUG_ORDER) {
+    for (int i=0; i <= n; ++i) {
+      INSTANCE *in = &(aug_graph->instances.array[i]);
+      print_instance(in,stdout);
+      printf(": ");
+      Declaration ad = in->fibered_attr.attr;
+      Declaration chdecl;
+    
+      int j = 0, ch = -1;
+      for (chdecl = aug_graph->first_rhs_decl; chdecl != 0; chdecl=DECL_NEXT(chdecl)) {
+	if (in->node == chdecl) ch = j;
+	++j;
+      }
+      if (in->node == aug_graph->lhs_decl || ch >= 0) {
+	PHY_GRAPH *npg = Declaration_info(in->node)->node_phy_graph;
+	int ph = attribute_schedule(npg,&(in->fibered_attr));
+	printf("<%d,%d>\n",ph,ch);
+      } else {
+	printf("local\n");
+      }
+    }
   }
 
   /* we use the schedule array as temp storage */
