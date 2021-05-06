@@ -377,7 +377,7 @@ static bool instances_are_in_same_group(AUG_GRAPH *aug_graph, CHILD_PHASE* insta
  * @param instance_groups array of <ph,ch>
  * @param i instance index to test
  */
-static bool instance_ready_to_go(AUG_GRAPH *aug_graph, CONDITION cond, CHILD_PHASE* instance_groups, const int i)
+static bool instance_ready_to_go(AUG_GRAPH *aug_graph, CONDITION cond, CHILD_PHASE* instance_groups, int *possible_schedule, const int i)
 {
   int j;
   EDGESET edges;
@@ -386,7 +386,7 @@ static bool instance_ready_to_go(AUG_GRAPH *aug_graph, CONDITION cond, CHILD_PHA
   for (j = 0; j < n; j++)
   {
     // Already scheduled then ignore
-    if (aug_graph->schedule[j] != 0) continue;
+    if (possible_schedule[j] != 0) continue;
 
     int index = j * n + i;  // j (source) >--> i (sink) edge
 
@@ -397,7 +397,7 @@ static bool instance_ready_to_go(AUG_GRAPH *aug_graph, CONDITION cond, CHILD_PHA
       if (MERGED_CONDITION_IS_IMPOSSIBLE(cond, edges->cond)) continue;
 
       // Can't continue with scheduling if a dependency with a "possible" condition has not been scheduled yet
-      printf("This edgeset was not ready: ");
+      printf("This edgeset was not ready because of: ");
       print_edgeset(edges, stdout);
 
       return false;
@@ -416,16 +416,26 @@ static bool instance_ready_to_go(AUG_GRAPH *aug_graph, CONDITION cond, CHILD_PHA
  */
 static bool group_ready_to_go(AUG_GRAPH *aug_graph, CONDITION cond, CHILD_PHASE* instance_groups, const int i)
 {
+  printf("Checking readyness of: ");
+  print_instance(&aug_graph->instances.array[i], stdout);
+  printf("\n");
+
   int n = aug_graph->instances.length;
   int j;
+
+  int* possible_schedule = (int *)alloca(sizeof(int) * n);  // create a temporary schedule
+  memcpy(possible_schedule, aug_graph->schedule, n);        // copy over the previous schedule
+
+  possible_schedule[i] = 1; // if this instance is schedules, can we complete the rest in this group? will find out ...
+
   for (j = 0; j < n; j++)
   {
     // Instance in the same group but cannot be considered
     if (instances_are_in_same_group(aug_graph, instance_groups, i, j))
     {
-      if (aug_graph->schedule[j] != 0) continue;
+      if (aug_graph->schedule[j] != 0) continue;  // already scheduled
 
-      if (!instance_ready_to_go(aug_graph, cond, instance_groups, j))
+      if (!instance_ready_to_go(aug_graph, cond, instance_groups, possible_schedule, j))
       {
         return false;
       }
@@ -486,50 +496,59 @@ static CTO_NODE* schedule_visits_group(AUG_GRAPH *aug_graph, CTO_NODE* prev, CON
   /* Outer condition is impossible, its a dead-end branch */
   if (CONDITION_IS_IMPOSSIBLE(cond)) return NULL;
 
-  // If we find ourselves scheduling a <-ph,ch>, we need to (after putting in all the
-  // instances in that group), we need to schedule the visit of the child (add a CTO
-  // node with a null instance but with <ph,ch) and then ALSO schedule immediately
-  // all the syn attributes of that child’s phase. (<+ph,ch> group, if any).
-  if (parent_group->ph < 0 && parent_group->ch > -1)
+  // Group is finished
+  if (!is_there_more_to_schedule_in_group(aug_graph, instance_groups, group))
   {
-    // Group is finished
-    if (!is_there_more_to_schedule_in_group(aug_graph, instance_groups, parent_group))
+    // If we find ourselves scheduling a <-ph,ch>, we need to (after putting in all the
+    // instances in that group), we need to schedule the visit of the child (add a CTO
+    // node with a null instance but with <ph,ch) and then ALSO schedule immediately
+    // all the syn attributes of that child’s phase. (<+ph,ch> group, if any).
+    if (group->ph < 0 && group->ch > -1)
     {
       // Visit marker
       CTO_NODE *cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
       cto_node->cto_prev = prev;
       cto_node->cto_instance = NULL;
-      cto_node->child_phase.ph = -parent_group->ph;
-      cto_node->child_phase.ch = parent_group->ch;
+      cto_node->child_phase.ph = -group->ph;
+      cto_node->child_phase.ch = group->ch;
       cto_node->cto_next = schedule_visits_group(aug_graph, cto_node, cond, instance_groups, remaining - 1, &(cto_node->child_phase));
 
       return cto_node;
     }
-  }
 
-  // If we find ourselves scheduling a <+ph,-1>, this means that after we put all these ones in the schedule
-  // (which we should do as a group NOW), this visit phase is over. And we should mark it with a <ph,-1> marker in the CTO.
-  if (parent_group->ph >= 0 && parent_group->ch == -1)
-  {
-    // Group is finished
-    if (!is_there_more_to_schedule_in_group(aug_graph, instance_groups, parent_group))
+    // If we find ourselves scheduling a <+ph,-1>, this means that after we put all these ones in the schedule
+    // (which we should do as a group NOW), this visit phase is over. And we should mark it with a <ph,-1> marker in the CTO.
+    if (group->ph >= 0 && group->ch == -1)
     {
       // Visit marker
       CTO_NODE *cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
       cto_node->cto_prev = prev;
       cto_node->cto_instance = NULL;
-      cto_node->child_phase.ph = parent_group->ph;
-      cto_node->child_phase.ch = parent_group->ch;
+      cto_node->child_phase.ph = -(group->ph + 1);
+      cto_node->child_phase.ch = group->ch;
       cto_node->cto_next = schedule_visits(aug_graph, prev, cond, instance_groups, remaining /* no change */);
 
       return cto_node;
     }
+
+    // As a special case, when we are about to start scheduling for the first phase (ph = 1), *or* we just ended a phase,
+    // we should immediately schedule all the inherited attributes of the parent for this new phase (ph = 1 + the old ph).
+    if (group->ph == 1)
+    {
+      CHILD_PHASE *parent_inherited_group = (CHILD_PHASE *)alloca(sizeof(CHILD_PHASE));
+      parent_inherited_group->ph = -(parent_inherited_group->ph + 1);
+      parent_inherited_group->ch = parent_inherited_group->ch;
+      return schedule_visits_group(aug_graph, prev, cond, instance_groups, remaining /* no change */, parent_inherited_group);
+    }
+
+    return schedule_visits(aug_graph, prev, cond, instance_groups, remaining /* no change */);
   }
+
 
   for (i = 0; i < n; i++)
   {
     INSTANCE *instance = &aug_graph->instances.array[i];
-    CHILD_PHASE *group_key = &instance_groups[i];
+    CHILD_PHASE *instance_group = &instance_groups[i];
 
     // Already scheduled then ignore
     if (aug_graph->schedule[i] != 0) continue;
@@ -537,29 +556,17 @@ static CTO_NODE* schedule_visits_group(AUG_GRAPH *aug_graph, CTO_NODE* prev, CON
     sane_remaining++;
 
     // Check if everything is in the same group, don't check for dependencies
-    if (group_key->ph == parent_group->ph && group_key->ch == parent_group->ch)
+    // Locals will never end-up in this function
+    if (instance_group->ph == group->ph && instance_group->ch == group->ch)
     {
       cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
       cto_node->cto_prev = prev;
       cto_node->cto_instance = instance;
-      cto_node->child_phase = *group_key;
+      cto_node->child_phase = *group;
 
       aug_graph->schedule[i] = 1; // instance has been scheduled (and will not be considered for scheduling in the recursive call)
 
-      if (if_rule_p(instance->fibered_attr.attr))
-      {
-        int cmask = 1 << (if_rule_index(instance->fibered_attr.attr));
-        cond.negative |= cmask;
-        cto_node->cto_if_false = schedule_visits_group(aug_graph, cto_node, cond, instance_groups, remaining-1, parent_group);
-        cond.negative &= ~cmask;
-        cond.positive |= cmask;
-        cto_node->cto_if_true = schedule_visits_group(aug_graph, cto_node, cond, instance_groups, remaining-1, parent_group);
-        cond.positive &= ~cmask;
-      }
-      else
-      {
-        cto_node->cto_next = schedule_visits_group(aug_graph, cto_node, cond, instance_groups, remaining-1, parent_group);
-      }
+      cto_node->cto_next = schedule_visits_group(aug_graph, cto_node, cond, instance_groups, remaining-1, group);
 
       aug_graph->schedule[i] = 0; // Release it
 
@@ -603,7 +610,7 @@ static CTO_NODE* schedule_visits(AUG_GRAPH *aug_graph, CTO_NODE* prev, CONDITION
   for (i = 0; i < n; i++)
   {
     INSTANCE *instance = &aug_graph->instances.array[i];
-    CHILD_PHASE *group_key = &instance_groups[i];
+    CHILD_PHASE *group = &instance_groups[i];
 
     // Already scheduled then ignore
     if (aug_graph->schedule[i] != 0) continue;
@@ -616,12 +623,12 @@ static CTO_NODE* schedule_visits(AUG_GRAPH *aug_graph, CTO_NODE* prev, CONDITION
       cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
       cto_node->cto_prev = prev;
       cto_node->cto_instance = instance;
-      cto_node->child_phase = *group_key;
+      cto_node->child_phase = *group;
 
       aug_graph->schedule[i] = 1; // instance has been scheduled (and will not be considered for scheduling in the recursive call)
 
       // If it is local then continue scheduling
-      if (!group_key->ph && !group_key->ch)
+      if (!group->ph && !group->ch)
       {
         if (if_rule_p(instance->fibered_attr.attr))
         {
@@ -648,32 +655,42 @@ static CTO_NODE* schedule_visits(AUG_GRAPH *aug_graph, CTO_NODE* prev, CONDITION
         // If we find ourselves scheduling a <+ph,ch>, this means that somehow, we didn’t have any <-ph,ch>
         // for that same ph and ch -- apparently the phase has no inherited attributes! 0 and so we need
         // to *first* put in the child visit node, and *then* the syn attributes from this group.
-        if (group_key->ph >= 0 && group_key->ch > -1)
+        if (group->ph >= 0 && group->ch > -1)
         {
           // Visit marker
           CTO_NODE *cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
           cto_node->cto_prev = prev;
           cto_node->cto_instance = NULL;
-          cto_node->child_phase.ph = group_key->ph + 1;
-          cto_node->child_phase.ch = group_key->ch;
-          cto_node->cto_next = schedule_visits_group(aug_graph, prev, cond, instance_groups, remaining /* no change */, group_key);
+          cto_node->child_phase.ph = group->ph + 1;
+          cto_node->child_phase.ch = group->ch;
+          cto_node->cto_next = schedule_visits_group(aug_graph, prev, cond, instance_groups, remaining /* no change */, group);
+        }
+
+        // As a special case, when we are about to start scheduling for the first phase (ph = 1), *or* we just ended a phase,
+        // we should immediately schedule all the inherited attributes of the parent for this new phase (ph = 1 + the old ph).
+        if (group->ph == 1)
+        {
+          CHILD_PHASE *parent_inherited_group = (CHILD_PHASE *)alloca(sizeof(CHILD_PHASE));
+          parent_inherited_group->ph = -(parent_inherited_group->ph + 1);
+          parent_inherited_group->ch = parent_inherited_group->ch;
+          return schedule_visits_group(aug_graph, prev, cond, instance_groups, remaining /* no change */, parent_inherited_group);
         }
 
         // If we find ourselves schedule a parent inherited attribute (that wasn’t handled in the case case),
         // this means that the previous visit ended without any synthesized attributes, so we need to stick in the visit end
         // (Visit(child = -1, ph = +(one less then the -ph we are on now).
-        if (group_key->ph < 0 && group_key->ch == -1)
+        if (group->ph < 0 && group->ch == -1)
         {
           // Visit marker
           CTO_NODE *cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
           cto_node->cto_prev = prev;
           cto_node->cto_instance = NULL;
-          cto_node->child_phase.ph = group_key->ph - 1;
+          cto_node->child_phase.ph = group->ph - 1;
           cto_node->child_phase.ch = -1;
-          cto_node->cto_next = schedule_visits_group(aug_graph, prev, cond, instance_groups, remaining /* no change */, group_key);
+          cto_node->cto_next = schedule_visits_group(aug_graph, prev, cond, instance_groups, remaining /* no change */, group);
         }
 
-        return schedule_visits_group(aug_graph, prev, cond, instance_groups, remaining, group_key);
+        return schedule_visits_group(aug_graph, prev, cond, instance_groups, remaining, group);
       }
     }
   }
