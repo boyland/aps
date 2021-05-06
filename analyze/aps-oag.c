@@ -375,20 +375,24 @@ static bool instances_are_in_same_group(AUG_GRAPH *aug_graph, CHILD_PHASE* insta
  * @param aug_graph Augmented dependency graph
  * @param cond current condition
  * @param instance_groups array of <ph,ch>
- * @param i instance index to test
+ * @param i group index
+ * @param j instance index to test
  */
-static bool instance_ready_to_go(AUG_GRAPH *aug_graph, CONDITION cond, CHILD_PHASE* instance_groups, int *possible_schedule, const int i)
+static bool instance_ready_to_go(AUG_GRAPH *aug_graph, CONDITION cond, CHILD_PHASE* instance_groups, const int i, const int j)
 {
-  int j;
+  int k;
   EDGESET edges;
   int n = aug_graph->instances.length;
   
-  for (j = 0; j < n; j++)
+  for (k = 0; k < n; k++)
   {
     // Already scheduled then ignore
-    if (possible_schedule[j] != 0) continue;
+    if (aug_graph->schedule[k] != 0) continue;
 
-    int index = j * n + i;  // j (source) >--> i (sink) edge
+    // If from the same group then ignore
+    if (instances_are_in_same_group(aug_graph, instance_groups, i, k)) continue;
+
+    int index = k * n + j;  // k (source) >--> j (sink) edge
 
     /* Look at all dependencies from j to i */
     for (edges = aug_graph->graph[index]; edges != NULL; edges=edges->rest)
@@ -423,11 +427,6 @@ static bool group_ready_to_go(AUG_GRAPH *aug_graph, CONDITION cond, CHILD_PHASE*
   int n = aug_graph->instances.length;
   int j;
 
-  int* possible_schedule = (int *)alloca(sizeof(int) * n);  // create a temporary schedule
-  memcpy(possible_schedule, aug_graph->schedule, n);        // copy over the previous schedule
-
-  possible_schedule[i] = 1; // if this instance is schedules, can we complete the rest in this group? will find out ...
-
   for (j = 0; j < n; j++)
   {
     // Instance in the same group but cannot be considered
@@ -435,7 +434,7 @@ static bool group_ready_to_go(AUG_GRAPH *aug_graph, CONDITION cond, CHILD_PHASE*
     {
       if (aug_graph->schedule[j] != 0) continue;  // already scheduled
 
-      if (!instance_ready_to_go(aug_graph, cond, instance_groups, possible_schedule, j))
+      if (!instance_ready_to_go(aug_graph, cond, instance_groups, i, j))
       {
         return false;
       }
