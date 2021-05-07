@@ -400,9 +400,13 @@ static bool instance_ready_to_go(AUG_GRAPH *aug_graph, CONDITION cond, CHILD_PHA
       /* If the merge condition is impossible, ignore this edge */
       if (MERGED_CONDITION_IS_IMPOSSIBLE(cond, edges->cond)) continue;
 
-      // Can't continue with scheduling if a dependency with a "possible" condition has not been scheduled yet
-      printf("This edgeset was not ready because of: ");
-      print_edgeset(edges, stdout);
+      if (oag_debug & DEBUG_ORDER)
+      {
+        // Can't continue with scheduling if a dependency with a "possible" condition has not been scheduled yet
+        printf("This edgeset was not ready to be scheduled because of:\n");
+        print_edgeset(edges, stdout);
+        printf("\n");
+      }
 
       return false;
     }
@@ -420,9 +424,12 @@ static bool instance_ready_to_go(AUG_GRAPH *aug_graph, CONDITION cond, CHILD_PHA
  */
 static bool group_ready_to_go(AUG_GRAPH *aug_graph, CONDITION cond, CHILD_PHASE* instance_groups, const int i)
 {
-  printf("Checking readyness of: ");
-  print_instance(&aug_graph->instances.array[i], stdout);
-  printf("\n");
+  if (oag_debug & DEBUG_ORDER)
+  {
+    printf("Checking group readyness of: ");
+    print_instance(&aug_graph->instances.array[i], stdout);
+    printf("\n");
+  }
 
   int n = aug_graph->instances.length;
   int j;
@@ -599,6 +606,8 @@ static CTO_NODE* schedule_visits(AUG_GRAPH *aug_graph, CTO_NODE* prev, CONDITION
   int n = aug_graph->instances.length;
   int sane_remaining = 0;
   CTO_NODE* cto_node = NULL;
+
+  bool just_started = remaining == n;
   
   /* If nothing more to do, we are done. */
   if (remaining == 0) return NULL;
@@ -619,16 +628,16 @@ static CTO_NODE* schedule_visits(AUG_GRAPH *aug_graph, CTO_NODE* prev, CONDITION
     // If edgeset condition is not impossible then go ahead with scheduling
     if (group_ready_to_go(aug_graph, cond, instance_groups, i))
     {
-      cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
-      cto_node->cto_prev = prev;
-      cto_node->cto_instance = instance;
-      cto_node->child_phase = *group;
-
-      aug_graph->schedule[i] = 1; // instance has been scheduled (and will not be considered for scheduling in the recursive call)
-
       // If it is local then continue scheduling
       if (!group->ph && !group->ch)
       {
+        cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
+        cto_node->cto_prev = prev;
+        cto_node->cto_instance = instance;
+        cto_node->child_phase = *group;
+
+        aug_graph->schedule[i] = 1; // instance has been scheduled (and will not be considered for scheduling in the recursive call)
+
         if (if_rule_p(instance->fibered_attr.attr))
         {
           int cmask = 1 << (if_rule_index(instance->fibered_attr.attr));
@@ -670,15 +679,15 @@ static CTO_NODE* schedule_visits(AUG_GRAPH *aug_graph, CTO_NODE* prev, CONDITION
         if (group->ph == 1)
         {
           CHILD_PHASE *parent_inherited_group = (CHILD_PHASE *)alloca(sizeof(CHILD_PHASE));
-          parent_inherited_group->ph = -(parent_inherited_group->ph + 1);
-          parent_inherited_group->ch = parent_inherited_group->ch;
+          parent_inherited_group->ph = -(group->ph + 1);
+          parent_inherited_group->ch = group->ch;
           return schedule_visits_group(aug_graph, prev, cond, instance_groups, remaining /* no change */, parent_inherited_group);
         }
 
-        // If we find ourselves schedule a parent inherited attribute (that wasn’t handled in the case case),
+        // If we find ourselves schedule a parent inherited attribute (that wasn’t handled in the case),
         // this means that the previous visit ended without any synthesized attributes, so we need to stick in the visit end
         // (Visit(child = -1, ph = +(one less then the -ph we are on now).
-        if (group->ph < 0 && group->ch == -1)
+        if (group->ph < 0 && group->ch == -1 && !just_started)
         {
           // Visit marker
           CTO_NODE *cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
