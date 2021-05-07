@@ -501,6 +501,35 @@ static CTO_NODE* schedule_visits_group(AUG_GRAPH *aug_graph, CTO_NODE* prev, CON
   /* Outer condition is impossible, its a dead-end branch */
   if (CONDITION_IS_IMPOSSIBLE(cond)) return NULL;
 
+  for (i = 0; i < n; i++)
+  {
+    INSTANCE *instance = &aug_graph->instances.array[i];
+    CHILD_PHASE *instance_group = &instance_groups[i];
+
+    // Already scheduled then ignore
+    if (aug_graph->schedule[i] != 0) continue;
+
+    sane_remaining++;
+
+    // Check if everything is in the same group, don't check for dependencies
+    // Locals will never end-up in this function
+    if (instance_group->ph == group->ph && instance_group->ch == group->ch)
+    {
+      cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
+      cto_node->cto_prev = prev;
+      cto_node->cto_instance = instance;
+      cto_node->child_phase = *group;
+
+      aug_graph->schedule[i] = 1; // instance has been scheduled (and will not be considered for scheduling in the recursive call)
+
+      cto_node->cto_next = schedule_visits_group(aug_graph, cto_node, cond, instance_groups, remaining-1, group);
+
+      aug_graph->schedule[i] = 0; // Release it
+
+      return cto_node;
+    }
+  }
+
   // Group is finished
   if (!is_there_more_to_schedule_in_group(aug_graph, instance_groups, group))
   {
@@ -545,36 +574,6 @@ static CTO_NODE* schedule_visits_group(AUG_GRAPH *aug_graph, CTO_NODE* prev, CON
     }
 
     return schedule_visits(aug_graph, prev, cond, instance_groups, remaining /* no change */);
-  }
-
-
-  for (i = 0; i < n; i++)
-  {
-    INSTANCE *instance = &aug_graph->instances.array[i];
-    CHILD_PHASE *instance_group = &instance_groups[i];
-
-    // Already scheduled then ignore
-    if (aug_graph->schedule[i] != 0) continue;
-
-    sane_remaining++;
-
-    // Check if everything is in the same group, don't check for dependencies
-    // Locals will never end-up in this function
-    if (instance_group->ph == group->ph && instance_group->ch == group->ch)
-    {
-      cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
-      cto_node->cto_prev = prev;
-      cto_node->cto_instance = instance;
-      cto_node->child_phase = *group;
-
-      aug_graph->schedule[i] = 1; // instance has been scheduled (and will not be considered for scheduling in the recursive call)
-
-      cto_node->cto_next = schedule_visits_group(aug_graph, cto_node, cond, instance_groups, remaining-1, group);
-
-      aug_graph->schedule[i] = 0; // Release it
-
-      return cto_node;
-    }
   }
 
   // TODO: add more debugging information
@@ -799,9 +798,10 @@ void schedule_augmented_dependency_graph(AUG_GRAPH *aug_graph) {
 
   cond.positive = 0;
   cond.negative = 0;
-  aug_graph->total_order = schedule_visits(aug_graph, NULL, cond, instance_groups, n);
+  CHILD_PHASE next_group = { -1, -1 };
+  aug_graph->total_order = schedule_visits_group(aug_graph, NULL, cond, instance_groups, n, &next_group);
 
-  if (oag_debug & DEBUG_ORDER)
+  // if (oag_debug & DEBUG_ORDER)
   {
     printf("\nSchedule\n");
     print_total_order(aug_graph->total_order, stdout);
