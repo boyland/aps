@@ -672,6 +672,7 @@ static CTO_NODE* schedule_visits(AUG_GRAPH *aug_graph, CTO_NODE* prev, CONDITION
           cto_node->child_phase.ph = group->ph + 1;
           cto_node->child_phase.ch = group->ch;
           cto_node->cto_next = schedule_visits_group(aug_graph, prev, cond, instance_groups, remaining /* no change */, group);
+          return cto_node;
         }
 
         // TODO: this causes infinite recusuion
@@ -699,6 +700,7 @@ static CTO_NODE* schedule_visits(AUG_GRAPH *aug_graph, CTO_NODE* prev, CONDITION
           cto_node->child_phase.ph = group->ph - 1;
           cto_node->child_phase.ch = -1;
           cto_node->cto_next = schedule_visits_group(aug_graph, prev, cond, instance_groups, remaining /* no change */, group);
+          return cto_node;
         }
 
         return schedule_visits_group(aug_graph, prev, cond, instance_groups, remaining, group);
