@@ -522,9 +522,17 @@ static CTO_NODE* schedule_visits_group(AUG_GRAPH *aug_graph, CTO_NODE* prev, CON
       return cto_node;
     }
 
+    // As a special case, when we are about to start scheduling for the first phase (ph = 1), *or* we just ended a phase,
+    // we should immediately schedule all the inherited attributes of the parent for this new phase (ph = 1 + the old ph).
+    if (group->ph == 1 && group->ch > -1)
+    {
+      CHILD_PHASE parent_inherited_group = { -(group->ph + 1) /* ph */, group->ch /* ch */};
+      return schedule_visits_group(aug_graph, prev, cond, instance_groups, remaining /* no change */, &parent_inherited_group);
+    }
+
     // If we find ourselves scheduling a <+ph,-1>, this means that after we put all these ones in the schedule
     // (which we should do as a group NOW), this visit phase is over. And we should mark it with a <ph,-1> marker in the CTO.
-    if (group->ph >= 0 && group->ch == -1)
+    if (group->ph > 0 && group->ch == -1)
     {
       // Visit marker
       CTO_NODE *cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
@@ -535,16 +543,6 @@ static CTO_NODE* schedule_visits_group(AUG_GRAPH *aug_graph, CTO_NODE* prev, CON
       cto_node->cto_next = schedule_visits(aug_graph, prev, cond, instance_groups, remaining /* no change */);
 
       return cto_node;
-    }
-
-    // As a special case, when we are about to start scheduling for the first phase (ph = 1), *or* we just ended a phase,
-    // we should immediately schedule all the inherited attributes of the parent for this new phase (ph = 1 + the old ph).
-    if (group->ph == 1)
-    {
-      CHILD_PHASE *parent_inherited_group = (CHILD_PHASE *)alloca(sizeof(CHILD_PHASE));
-      parent_inherited_group->ph = -(parent_inherited_group->ph + 1);
-      parent_inherited_group->ch = parent_inherited_group->ch;
-      return schedule_visits_group(aug_graph, prev, cond, instance_groups, remaining /* no change */, parent_inherited_group);
     }
 
     return schedule_visits(aug_graph, prev, cond, instance_groups, remaining /* no change */);
@@ -675,17 +673,12 @@ static CTO_NODE* schedule_visits(AUG_GRAPH *aug_graph, CTO_NODE* prev, CONDITION
           return cto_node;
         }
 
-        // TODO: this causes infinite recusuion
-        // schedule_visits_group() -> group is empty -> schedule_visits() -> if (group->ph == 1) -> schedule_visits_group() -> group is empty -> schedule_visits() ->if (group->ph == 1)
-        //
         // As a special case, when we are about to start scheduling for the first phase (ph = 1), *or* we just ended a phase,
         // we should immediately schedule all the inherited attributes of the parent for this new phase (ph = 1 + the old ph).
-        if (group->ph == 1)
+        if ((group->ph == 1 && group->ch > -1) && just_started)
         {
-          CHILD_PHASE *parent_inherited_group = (CHILD_PHASE *)alloca(sizeof(CHILD_PHASE));
-          parent_inherited_group->ph = -(group->ph + 1);
-          parent_inherited_group->ch = group->ch;
-          return schedule_visits_group(aug_graph, prev, cond, instance_groups, remaining /* no change */, parent_inherited_group);
+          CHILD_PHASE parent_inherited_group = { -(group->ph + 1) /* ph */, group->ch /* ch */ };
+          return schedule_visits_group(aug_graph, prev, cond, instance_groups, remaining /* no change */, &parent_inherited_group);
         }
 
         // If we find ourselves schedule a parent inherited attribute (that wasn’t handled in the case),
