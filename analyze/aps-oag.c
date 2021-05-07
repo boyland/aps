@@ -318,31 +318,30 @@ static void print_indent(int count, FILE *stream)
 }
 
 // TODO: temporarily
-static void print_total_order_rec(CTO_NODE *cto, CHILD_PHASE *instance_groups, int indent, FILE *stream)
+static void print_total_order_rec(CTO_NODE *cto, int indent, FILE *stream)
 {
   if (stream == 0) stream = stdout;
   if (cto == NULL || cto->cto_instance == NULL) return;
 
-  CHILD_PHASE *group_key = &instance_groups[cto->cto_instance->index];
   print_indent(indent, stream);
   print_instance(cto->cto_instance, stream);
-  printf(" <%d,%d>", group_key->ph, group_key->ch);
+  printf(" <%d,%d>", cto->child_phase.ph, cto->child_phase.ch);
   printf("\n");
   indent++;
 
   if (cto->cto_if_true != NULL)
   {
-    print_total_order_rec(cto->cto_if_true, instance_groups, indent, stdout);
+    print_total_order_rec(cto->cto_if_true, indent, stdout);
     printf("\n");
   }
 
-  print_total_order_rec(cto->cto_next, instance_groups, indent, stdout);
+  print_total_order_rec(cto->cto_next, indent, stdout);
 }
 
 // TODO: temporarily
-static void print_total_order(CTO_NODE *cto, CHILD_PHASE *instance_groups, FILE *stream)
+static void print_total_order(CTO_NODE *cto, FILE *stream)
 {
-  print_total_order_rec(cto, instance_groups, 0, stream);
+  print_total_order_rec(cto, 0, stream);
 }
 
 /**
@@ -586,6 +585,7 @@ static CTO_NODE* schedule_visits_group(AUG_GRAPH *aug_graph, CTO_NODE* prev, CON
   }
 
   fatal_error("Cannot make conditional total order!");
+  print_total_order(prev, stdout);
 
   return NULL;
 }
@@ -675,7 +675,7 @@ static CTO_NODE* schedule_visits(AUG_GRAPH *aug_graph, CTO_NODE* prev, CONDITION
 
         // As a special case, when we are about to start scheduling for the first phase (ph = 1), *or* we just ended a phase,
         // we should immediately schedule all the inherited attributes of the parent for this new phase (ph = 1 + the old ph).
-        if ((group->ph == 1 && group->ch > -1) && just_started)
+        if ((group->ph == 1 && group->ch > -1) || just_started)
         {
           CHILD_PHASE parent_inherited_group = { -(group->ph + 1) /* ph */, group->ch /* ch */ };
           return schedule_visits_group(aug_graph, prev, cond, instance_groups, remaining /* no change */, &parent_inherited_group);
@@ -709,6 +709,7 @@ static CTO_NODE* schedule_visits(AUG_GRAPH *aug_graph, CTO_NODE* prev, CONDITION
   }
 
   fatal_error("Cannot make conditional total order!");
+  print_total_order(prev, stdout);
 
   return NULL;
 }
@@ -803,7 +804,7 @@ void schedule_augmented_dependency_graph(AUG_GRAPH *aug_graph) {
   if (oag_debug & DEBUG_ORDER)
   {
     printf("\nSchedule\n");
-    print_total_order(aug_graph->total_order, instance_groups, stdout);
+    print_total_order(aug_graph->total_order, stdout);
   }
 
   printf("\n");
