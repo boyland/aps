@@ -552,7 +552,7 @@ static CTO_NODE* schedule_visits_group(AUG_GRAPH *aug_graph, CTO_NODE* prev, CON
 
     // As a special case, when we are about to start scheduling for the first phase (ph = 1), *or* we just ended a phase,
     // we should immediately schedule all the inherited attributes of the parent for this new phase (ph = 1 + the old ph).
-    if (group->ph == 1 && group->ch > -1)
+    if (group->ph > 0 && group->ch > -1)
     {
       CHILD_PHASE parent_inherited_group = { -(group->ph + 1) /* ph */, group->ch /* ch */};
       return schedule_visits_group(aug_graph, prev, cond, instance_groups, remaining /* no change */, &parent_inherited_group);
@@ -674,7 +674,7 @@ static CTO_NODE* schedule_visits(AUG_GRAPH *aug_graph, CTO_NODE* prev, CONDITION
 
         // As a special case, when we are about to start scheduling for the first phase (ph = 1), *or* we just ended a phase,
         // we should immediately schedule all the inherited attributes of the parent for this new phase (ph = 1 + the old ph).
-        if ((group->ph == 1 && group->ch > -1))
+        if (group->ph > 0 && group->ch > -1)
         {
           CHILD_PHASE parent_inherited_group = { -(group->ph + 1) /* ph */, group->ch /* ch */ };
           return schedule_visits_group(aug_graph, prev, cond, instance_groups, remaining /* no change */, &parent_inherited_group);
@@ -799,6 +799,8 @@ void schedule_augmented_dependency_graph(AUG_GRAPH *aug_graph) {
   cond.positive = 0;
   cond.negative = 0;
   CHILD_PHASE next_group = { -1, -1 };
+
+  // It is safe to assume inherited attribute of parents have no dependencies and should be scheduled right away
   aug_graph->total_order = schedule_visits_group(aug_graph, NULL, cond, instance_groups, n, &next_group);
 
   // if (oag_debug & DEBUG_ORDER)
