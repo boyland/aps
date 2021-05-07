@@ -324,7 +324,14 @@ static void print_total_order_rec(CTO_NODE *cto, int indent, FILE *stream)
   if (cto == NULL || cto->cto_instance == NULL) return;
 
   print_indent(indent, stream);
-  print_instance(cto->cto_instance, stream);
+  if (cto->cto_instance == NULL)
+  {
+    printf("visit marker");
+  }
+  else
+  {
+    print_instance(cto->cto_instance, stream);
+  }
   printf(" <%d,%d>", cto->child_phase.ph, cto->child_phase.ch);
   printf("\n");
   indent++;
