@@ -674,6 +674,9 @@ static CTO_NODE* schedule_visits(AUG_GRAPH *aug_graph, CTO_NODE* prev, CONDITION
           cto_node->cto_next = schedule_visits_group(aug_graph, prev, cond, instance_groups, remaining /* no change */, group);
         }
 
+        // TODO: this causes infinite recusuion
+        // schedule_visits_group() -> group is empty -> schedule_visits() -> if (group->ph == 1) -> schedule_visits_group() -> group is empty -> schedule_visits() ->if (group->ph == 1)
+        //
         // As a special case, when we are about to start scheduling for the first phase (ph = 1), *or* we just ended a phase,
         // we should immediately schedule all the inherited attributes of the parent for this new phase (ph = 1 + the old ph).
         if (group->ph == 1)
