@@ -584,7 +584,7 @@ static CTO_NODE* schedule_visits_group(AUG_GRAPH *aug_graph, CTO_NODE* prev, CON
       CTO_NODE *cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
       cto_node->cto_prev = prev;
       cto_node->cto_instance = NULL;
-      cto_node->child_phase.ph = -(-group->ph - 1);
+      cto_node->child_phase.ph = -(group->ph + 1);
       cto_node->child_phase.ch = -1;
       cto_node->cto_next = schedule_visits(aug_graph, cto_node, cond, instance_groups, remaining /* no change */);
       return cto_node;
@@ -691,7 +691,7 @@ static CTO_NODE* schedule_visits(AUG_GRAPH *aug_graph, CTO_NODE* prev, CONDITION
 
         // As a special case, when we are about to start scheduling for the first phase (ph = 1), *or* we just ended a phase,
         // we should immediately schedule all the inherited attributes of the parent for this new phase (ph = 1 + the old ph).
-        if (group->ph == 0 && group->ch > -1)
+        if (group->ph == 1 && group->ch > -1)
         {
           CHILD_PHASE parent_inherited_group = { -(group->ph + 1) /* ph */, group->ch /* ch */ };
           return schedule_visits_group(aug_graph, prev, cond, instance_groups, remaining /* no change */, &parent_inherited_group);
@@ -706,7 +706,7 @@ static CTO_NODE* schedule_visits(AUG_GRAPH *aug_graph, CTO_NODE* prev, CONDITION
           CTO_NODE *cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
           cto_node->cto_prev = prev;
           cto_node->cto_instance = NULL;
-          cto_node->child_phase.ph = -(-group->ph - 1);
+          cto_node->child_phase.ph = -(group->ph + 1);
           cto_node->child_phase.ch = -1;
           cto_node->cto_next = schedule_visits_group(aug_graph, cto_node, cond, instance_groups, remaining /* no change */, group);
           return cto_node;
