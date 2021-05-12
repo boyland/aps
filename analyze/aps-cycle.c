@@ -319,6 +319,70 @@ bool instance_is_up(INSTANCE *i) {
   return (fibered_attr_direction(&i->fibered_attr)) == instance_outward;
 }
 
+static bool instance_is_local(INSTANCE *instance)
+{
+  if (instance->node ==  NULL) return true;
+
+  void* node = instance->node;
+  // Some instance->node use Expression instead of Declaration
+  if (ABSTRACT_APS_tnode_phylum(node) == KEYDeclaration)
+  {
+    // printf("key: %d\n", Declaration_KEY((Declaration)node));
+    switch (Declaration_KEY((Declaration)node))
+    {
+    case KEYpragma_call:  // black_dot(...).result is local and the node is a proxy of function_decl
+    case KEYsome_function_decl:
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Given an INSTANCE it returns its group based on whether its using DOWN_UP or UP_DOWN
+ * -1 (outward if UP_DOWN else inward)
+ *  0 (local)
+ *  1 (inward if DOWN_UP else outward) 
+ * @param instance
+ * @param direction true if UP_DOWN and false is DOWN_UP
+ * @return {-1, 0, 1}
+ */
+static int instance_group(INSTANCE *instance, bool direction)
+{
+  // local (indepent of being UP_DOWN or DOWN_UP)
+  if (instance_is_local(instance))
+  {
+    return 0;
+  }
+  // UP_DOWN
+  else if (direction)
+  {
+    // outward
+    if (instance_is_up(instance))
+    {
+      return -1;
+    }
+    else
+    {
+      return 1;
+    }
+  }
+  // DOWN_UP
+  else
+  {
+    // outward
+    if (instance_is_up(instance))
+    {
+      return 1;
+    }
+    else
+    {
+      return -1;
+    }
+  }
+}
+
+
 /**
  * Removes edgeset between two instances at the indices.
  * @param index1 source index
@@ -406,6 +470,9 @@ static void edgeset_combine_dependencies(EDGESET es, DEPENDENCY* acc_dependency,
  *
  *  If the instance is in the cycle and an DOWN attr:
  *    Remove all dependencies from this attribute to any other instance in the same cycle
+ * 
+ * Note that grouping of instances into -1, 0, 1 will help us to quickly decided whether an edge
+ * should be kept (<) or removed (>=)
  * @param s analysis STATE
  * @param direction true: UP_DOWN and false DOWN_UP
  */
@@ -587,7 +654,7 @@ static void add_up_down_attributes(STATE *s, bool direction)
             for (l = 0; l < n; l++)
             {
               // If edge is not to self and it is in the cycle
-              if (parent_index[l + constructor_index] == cyc->internal_info)
+              if (parent_index[l + constructor_index] == cyc->internal_info && instance_group(&array[k], direction) < instance_group(&array[l], direction))
               {
                 // printf("k -> l Adding Not In cycle -> In Cycle: ");
                 add_up_down_edge(k, l, n, array, acc_dependency, &acc_cond, aug_graph);
@@ -616,7 +683,7 @@ static void add_up_down_attributes(STATE *s, bool direction)
             for (l = 0; l < n; l++)
             {
               // If edge is not to self and it is in the cycle
-              if (parent_index[l + constructor_index] == cyc->internal_info)
+              if (parent_index[l + constructor_index] == cyc->internal_info && instance_group(&array[l], direction) < instance_group(&array[k], direction))
               {
                 // printf("l -> k Adding In Cycle -> Not In Cycle: ");
                 add_up_down_edge(l, k, n, array, acc_dependency, &acc_cond, aug_graph);
@@ -651,12 +718,12 @@ static void add_up_down_attributes(STATE *s, bool direction)
               if (parent_index[l + constructor_index] == cyc->internal_info)
               {
                 // Make sure it is a DOWN attribute
-                if (acc_dependency && UP_DOWN_DIRECTION(!instance_is_up(&array[l]), direction))
+                if (acc_dependency && UP_DOWN_DIRECTION(!instance_is_up(&array[l]), direction) && instance_group(&array[k], direction) < instance_group(&array[l], direction))
                 {
                   // printf("k -> l Adding In cycle -> In Cycle: ");
                   add_up_down_edge(k, l, n, array, acc_dependency, &acc_cond, aug_graph);
                 }
-                else
+                else if (instance_group(&array[k], direction) >= instance_group(&array[l], direction))
                 {
                   // printf("k -> l Removing In cycle -> In Cycle: ");
                   remove_edgeset(k, l, n, array, aug_graph);
@@ -671,7 +738,7 @@ static void add_up_down_attributes(STATE *s, bool direction)
             for (l = 0; l < n; l++)
             {
               // Make sure it is in the cycle
-              if (parent_index[l + constructor_index] == cyc->internal_info)
+              if (parent_index[l + constructor_index] == cyc->internal_info && instance_group(&array[k], direction) >= instance_group(&array[l], direction))
               {
                 // Remove edges between instance and all others in the same cycle
                 // printf("k -> l Removing Down In cycle -> In Cycle: ");
