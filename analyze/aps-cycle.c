@@ -324,10 +324,9 @@ static bool instance_is_local(INSTANCE *instance)
   if (instance->node ==  NULL) return true;
 
   void* node = instance->node;
-  // Some instance->node use Expression instead of Declaration
+  // Some instance->node are Expression instead of Declaration
   if (ABSTRACT_APS_tnode_phylum(node) == KEYDeclaration)
   {
-    // printf("key: %d\n", Declaration_KEY((Declaration)node));
     switch (Declaration_KEY((Declaration)node))
     {
     case KEYpragma_call:  // black_dot(...).result is local and the node is a proxy of function_decl
