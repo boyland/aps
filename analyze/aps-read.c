@@ -7,8 +7,10 @@
 #include <string.h>
 #include <sys/param.h>
 #include "jbb.h"
+#include "aps-lex.h"
 #include "aps-tree.h"
 #include "aps-read.h"
+#include "aps.tab.h"
 
 #define MAX_PROGRAMS 100
 
@@ -17,6 +19,7 @@ static Program programs[MAX_PROGRAMS];
 
 extern FILE *aps_yyin;
 extern char *aps_yyfilename;
+extern int aps_yyparse();
 Program the_tree = NULL;
 int aps_parse_error = 0;
 
@@ -76,6 +79,7 @@ static int initialize() {
     }
     initialized=TRUE;
   }
+  return initialized;
 }
 
 Program find_Program(String name) {

@@ -55,7 +55,7 @@ static int get_set(int index) {
   }
 }
 
-static int merge_sets(int index1, int index2) {
+static void merge_sets(int index1, int index2) {
   if (parent_index[index1] == -1) /* non normally cyclic */
     parent_index[index1] = get_set(index2);
   else
@@ -313,314 +313,387 @@ static void make_cycles(STATE *s) {
 }
 
 
-/*** Add new instances and redo dependency graphs ***/
+/*** Break cycles and redo dependency graphs ***/
 
-SYMBOL make_up_down_name(const char *n, int num,BOOL up) {
-  char name[80];
-  sprintf(name,"%s[%s]-%d",up?"UP":"DOWN",n,num);
-  /* printf("Creating symbol %s\n",name); */
-  return intern_symbol(name);
+bool instance_is_up(INSTANCE *i) {
+  return (fibered_attr_direction(&i->fibered_attr)) == instance_outward;
 }
 
-static char danger[1000];
-
-static const char *phylum_to_string(Declaration d)
+/**
+ * Removes edgeset between two instances at the indices.
+ * @param index1 source index
+ * @param index2 sink index
+ * @param n width of matrix
+ * @param array instance array
+ * @param aug_graph augmented dependency graph
+ */
+static void remove_edgeset(int index1, int index2, int n, INSTANCE *array, AUG_GRAPH *aug_graph)
 {
-  switch (Declaration_KEY(d)) {
-  default:
-    return decl_name(d);
-  case KEYpragma_call:
-    sprintf(danger,"%s:%d",symbol_name(pragma_call_name(d)),
-	    tnode_line_number(d));
-    return danger;
-  case KEYif_stmt:
-    sprintf(danger,"if:%d",tnode_line_number(d));
-    return danger;
+  INSTANCE *attr1 = (&array[index1]);
+  INSTANCE *attr2 = (&array[index2]);
+  if (cycle_debug & DEBUG_UP_DOWN) {
+    printf("  Removing up/down: ");
+    print_instance(attr1, stdout);
+    printf(" -> ");
+    print_instance(attr2, stdout);
+    printf("\n");
+  }
+  free_edgeset(aug_graph->graph[index1 * n + index2], aug_graph);
+  aug_graph->graph[index1 * n + index2] = NULL;
+}
+
+/**
+ * Add edge between two instances to reflect the up/down construction.
+ * @param index1 source index
+ * @param index2 sink index
+ * @param n width of matrix
+ * @param array instance array
+ * @param dep dependency to join
+ * @param cond condition to join
+ * @param aug_graph augmented dependency graph
+ */
+static void add_up_down_edge(int index1, int index2, int n, INSTANCE *array, DEPENDENCY dep, CONDITION *cond, AUG_GRAPH *aug_graph)
+{
+  INSTANCE *attr1 = &array[index1];
+  INSTANCE *attr2 = &array[index2];
+
+  if (cycle_debug & DEBUG_UP_DOWN)
+  {     
+    printf("  Adding up/down: ");
+    print_instance(attr1, stdout);
+    printf(" -> ");
+    print_instance(attr2, stdout);
+    printf("\n");
+  }
+  add_edge_to_graph(attr1, attr2, cond, dep, aug_graph);
+}
+
+/**
+ * Combines dependencies for edgeset
+ * @param es
+ * @param acc_dependency
+ * @param acc_cond
+ */
+static void edgeset_combine_dependencies(EDGESET es, DEPENDENCY* acc_dependency, CONDITION* acc_cond)
+{
+  for (; es != NULL; es = es->rest)
+  {
+    *acc_dependency |= es->kind;
+    acc_cond->positive |= es->cond.positive;
+    acc_cond->negative |= es->cond.negative;
   }
 }
 
-static void add_up_down_attributes(STATE *s) {
-  int i,j,k,l;
-  CONDITION cond;
-  cond.positive=0;
-  cond.negative=0;
-  for (i=0; i < s->cycles.length; ++i) {
+#define UP_DOWN_DIRECTION(v, direction) (direction ? v : !v)
+
+/**
+ * In phylum graph (and in aug graph)
+ * For every instance i:
+ *  If the instance is NOT in the cycle:
+ *    "OR" the condition/kind for the dependency from i to any instance of the cycle.
+ *    If result is not False, 0
+ *      Create a dependency from i to *every* instance in the cycle with this condition and kind
+ *    
+ *    "OR" the condition/kind for any instance of the cycle to i
+ *    If result is not False, 0
+ *      Create a dependency from *every* instance in the cycle to i with this condition and kind
+ * 
+ *  If the instance is in the cycle and an UP attr:
+ *    "OR" the condition/kind for the dependency from i to any instance of the cycle
+ *    If the result is not False, 0
+ *      Create a dependency from i to all the DOWN instances in the cycle
+ *    Remove all dependencies from this attribute to any other UP instance in the same cycle
+ *
+ *  If the instance is in the cycle and an DOWN attr:
+ *    Remove all dependencies from this attribute to any other instance in the same cycle
+ * @param s analysis STATE
+ * @param direction true: UP_DOWN and false DOWN_UP
+ */
+static void add_up_down_attributes(STATE *s, bool direction)
+{
+  int i, j, k, l, m;
+  DEPENDENCY acc_dependency;
+  CONDITION acc_cond;
+
+  // Forall cycles in the graph
+  for (i = 0; i < s->cycles.length; i++)
+  {
     CYCLE *cyc = &s->cycles.array[i];
-    for (j=0; j < s->phyla.length; ++j) {
-      int found = 0;
+    if (cycle_debug & DEBUG_UP_DOWN) printf("Breaking Cycle #%d\n",i);
+
+    // Forall phylum in the phylum_graph
+    for (j = 0; j < s->phyla.length; j++)
+    {
       PHY_GRAPH *phy = &s->phy_graphs[j];
       int n = phy->instances.length;
       int phylum_index = phylum_instance_start[j];
       INSTANCE *array = phy->instances.array;
-      int upindex, downindex;
-      Declaration upattr =
-	attribute_decl(def(make_up_down_name(phylum_to_string(s->phyla.array[j]),
-					     i,TRUE),
-			   FALSE,FALSE),
-		       no_type(), /* sloppy */
-		       direction(FALSE,FALSE,FALSE),no_default());
-      Declaration downattr =
-	attribute_decl(def(make_up_down_name(phylum_to_string(s->phyla.array[j]),
-					     i,FALSE),
-			   FALSE,FALSE),
-		       no_type(), /* sloppy */
-		       direction(FALSE,FALSE,FALSE),no_default());
-      Declaration_info(upattr)->decl_flags =
-	ATTR_DECL_SYN_FLAG|DECL_LOCAL_FLAG|SHARED_DECL_FLAG|UP_DOWN_FLAG;
-      Declaration_info(downattr)->decl_flags =
-	ATTR_DECL_INH_FLAG|DECL_LOCAL_FLAG|SHARED_DECL_FLAG|UP_DOWN_FLAG;
-      for (k=0; k < n; ++k) {
-	if (parent_index[k+phylum_index] == cyc->internal_info) {
-	  switch (++found) {
-	  case 1:
-	    array[k].fibered_attr.attr = upattr;
-	    Declaration_info(upattr)->instance_index = upindex = k;
-	    break;
-	  case 2:
-	    array[k].fibered_attr.attr = downattr;
-	    Declaration_info(downattr)->instance_index = downindex = k;
-	    break;
-	  default:
-	    array[k].fibered_attr.attr = NULL;
-	    break;
-	  }
-	  array[k].fibered_attr.fiber = NULL;
-	}
+
+      for (k = 0; k < n; k++)
+      {
+        INSTANCE *instance = &array[k];
+
+        // If instance is not in the cycle
+        if (parent_index[k + phylum_index] != cyc->internal_info)
+        {
+          acc_dependency = no_dependency;
+
+          // Forall instances in the cycle
+          for (l = 0; l < n; l++)
+          {
+            // If dependency is not to self and is in cycle
+            if (parent_index[l + phylum_index] == cyc->internal_info)
+            {
+              acc_dependency |= phy->mingraph[k * n + l];
+            }
+          }
+
+          // If any dependency
+          if (acc_dependency)
+          {
+            // Forall instances in the cycle
+            for (l = 0; l < n; l++)
+            {
+              // If edge is not to self and it is in the cycle
+              if (parent_index[l + phylum_index] == cyc->internal_info)
+              {
+                phy->mingraph[k * n + l] = acc_dependency;
+              }
+            }
+          }
+
+          acc_dependency = no_dependency;
+
+          // Forall instances in the cycle
+          for (l = 0; l < n; l++)
+          {
+            // If dependency is not to self and is in cycle
+            if (parent_index[l + phylum_index] == cyc->internal_info)
+            {
+              acc_dependency |= phy->mingraph[l * n + k];
+            }
+          }
+
+          // If any dependency
+          if (acc_dependency)
+          {
+            // Forall instances in the cycle
+            for (l = 0; l < n; l++)
+            {
+              // If edge is not to self and it is in the cycle
+              if (parent_index[l + phylum_index] == cyc->internal_info)
+              {
+                phy->mingraph[l * n + k] = acc_dependency;
+              }
+            }
+          }
+        }
+        // Instance is in the cycle
+        else
+        {
+          // UP attribute
+          if (direction && UP_DOWN_DIRECTION(instance_is_up(instance), direction))
+          {
+            acc_dependency = no_dependency;
+
+            // Forall instances in the cycle
+            for (l = 0; l < n; l++)
+            {
+              // If dependency is not to self and is in cycle
+              if (parent_index[l + phylum_index] == cyc->internal_info)
+              {
+                acc_dependency |= phy->mingraph[k * n + l];
+              }
+            }
+
+            // Forall instances in the cycle
+            for (l = 0; l < n; l++)
+            {
+              // Make sure it is in the cycle
+              if (parent_index[l + phylum_index] == cyc->internal_info)
+              {
+                // Make sure it is a DOWN attribute
+                if (acc_dependency && UP_DOWN_DIRECTION(!instance_is_up(&array[l]), direction))
+                {
+                  phy->mingraph[k * n + l] = acc_dependency;
+                }
+                else
+                {
+                  phy->mingraph[k * n + l] = no_dependency;
+                }
+              }
+            }
+          }
+          // DOWN attribute
+          else
+          {
+            // Forall instances in the cycle
+            for (l = 0; l < n; l++)
+            {
+              // Make sure it is in the cycle
+              if (parent_index[l + phylum_index] == cyc->internal_info)
+              {
+                // Remove edges between instance and all others in the same cycle
+                phy->mingraph[k * n + l] = no_dependency;
+              }
+            }
+          }
+        }
       }
-      if (found > 0) {
-	if (found < 2) fatal_error("Not enough attributes to make cycle");
-	/* redo dependencies */
-	for (k=0; k < n; ++k) {
-	  BOOL kcycle = parent_index[k+phylum_index] == cyc->internal_info;
-	  if (k != downindex) {
-	    for (l=0; l < n; ++l) {
-	      BOOL lcycle = parent_index[l+phylum_index] == cyc->internal_info;
-	      if (l != upindex &&
-		  phy->mingraph[k*n+l] != no_dependency) {
-		if (kcycle || lcycle) {
-		  phy->mingraph[k*n+l] = no_dependency;
-		  if (!lcycle) {
-		    phy->mingraph[downindex*n+l] = fiber_dependency;
-		  } else if (!kcycle) {
-		    phy->mingraph[k*n+upindex] = fiber_dependency;
-		  }
-		}
-	      }
-	    }
-	  }
-	}
-	phy->mingraph[upindex*n+upindex] = no_dependency;
-	phy->mingraph[upindex*n+downindex] = fiber_dependency; /* set! */
-	phy->mingraph[downindex*n+upindex] = no_dependency;
-	phy->mingraph[downindex*n+downindex] = no_dependency;
-      }
-    } /* for phyla */
-    for (j = 0; j <= s->match_rules.length; ++j) {
+    }
+
+    // Forall edges in the augmented dependency graph
+    for (j = 0; j <= s->match_rules.length; j++)
+    {
       AUG_GRAPH *aug_graph =
-	(j == s->match_rules.length) ?
-	  &s->global_dependencies :
-	    &s->aug_graphs[j];
+          (j == s->match_rules.length) ? &s->global_dependencies : &s->aug_graphs[j];
       int n = aug_graph->instances.length;
       int constructor_index = constructor_instance_start[j];
       INSTANCE *array = aug_graph->instances.array;
-      int cycle_type = 0;
-      int upindex = -1, downindex = -1;
-      int start = 0;
-      int found = 0;
-      Declaration lastnode = NULL;
-      Declaration updecl, downdecl;
-      for (k=0; k < n; ++k) {
-	if (parent_index[k+constructor_index] == cyc->internal_info) {
-	  ++found;
-	  if (array[k].node == NULL)
-	    cycle_type |= CYC_LOCAL;
-	  else if (DECL_IS_LHS(array[k].node))
-	    cycle_type |= CYC_ABOVE;
-	  else if (DECL_IS_RHS(array[k].node))
-	    cycle_type |= CYC_BELOW;
-	  else
-	    fatal_error("Cannot classify node: %s",phylum_to_string(array[k].node));
+      for (k = 0; k < n; k++)
+      {
+        INSTANCE *instance = &array[k];
+
+	if (cycle_debug & DEBUG_UP_DOWN) {
+	  printf("> aug node #%d (",k);
+	  print_instance(&array[k],stdout);
+	  printf(") %s\n",
+		 parent_index[k + constructor_index] == cyc->internal_info ?
+		 (instance_is_up(instance) ? "UP" : "DOWN") :
+		 "not in cycle");
 	}
-      }
-      if (cycle_type == CYC_BELOW) {
-	/* special case if all cycles are below:
-	 * a different cycle for every node.
-	 */
-	if (found != 2)
-	  fatal_error("Cannot handle cycle below case in general yet!");
-	found = 0;
-	for (k=0; k < n; ++k) {
-	  if (array[k].node != lastnode) {
-	    start = k;
-	    lastnode = array[k].node;
-	  }	  
-	  if (parent_index[k+constructor_index] == cyc->internal_info) {
-	    PHY_GRAPH *phy_graph =
-	      Declaration_info(array[k].node)->node_phy_graph;
-	    array[k].fibered_attr.attr =
-	      phy_graph->instances.array[k-start].fibered_attr.attr;
-	    switch (++found) {
-	    case 1: upindex = k; break;
-	    case 2: downindex = k; break;
-	    default: break;
-	    }
-	    array[k].fibered_attr.fiber = NULL;
-	  }
-	}
-	if (found != 2)
-	  fatal_error("Counted twice gets different numbers!");
-	if (downindex != upindex) {
-	  free_edgeset(aug_graph->graph[upindex*n+upindex],aug_graph);
-	  add_edge_to_graph(&array[upindex],&array[downindex],
-			    &cond,fiber_dependency,aug_graph);
-	  free_edgeset(aug_graph->graph[downindex*n+upindex],aug_graph);
-	  free_edgeset(aug_graph->graph[downindex*n+downindex],aug_graph);
-	  aug_graph->graph[upindex*n+upindex] =
-	    aug_graph->graph[downindex*n+upindex] =
-	      aug_graph->graph[downindex*n+downindex] =
-		NULL;
-	}
-      } else if (cycle_type != 0) {
-	found = 0;
-	if (cycle_type == CYC_BELOW)
-	  fatal_error("Below only: no locals to attach to!");
-	if (!(cycle_type & CYC_ABOVE)) {
-	  updecl =
-	    value_decl(def(make_up_down_name(aug_graph_name(aug_graph),
-					     i,TRUE),
-			   FALSE,FALSE),
-		       no_type(), /* sloppy */
-		       direction(FALSE,FALSE,FALSE),no_default());
-	  downdecl =
-	    value_decl(def(make_up_down_name(aug_graph_name(aug_graph),
-					     i,FALSE),
-			   FALSE,FALSE),
-		       no_type(), /* sloppy */
-		       direction(FALSE,FALSE,FALSE),no_default());
-	  Declaration_info(updecl)->decl_flags = DECL_LOCAL_FLAG;
-	  Declaration_info(downdecl)->decl_flags = DECL_LOCAL_FLAG;
-	}
-	for (k=0; k < n; ++k) {
-	  if (array[k].node != lastnode) {
-	    start = k;
-	    lastnode = array[k].node;
-	  }
-	  if (parent_index[k+constructor_index] == cyc->internal_info) {
-	    /* printf("in cycle: ");
-	     * print_instance(&array[k],stdout);
-	     * printf("\n");
-	     */
-	    if (array[k].node == NULL) { /* a local */
-	      switch (++found) {
-	      case 1:      
-		array[k].fibered_attr.attr = updecl;
-		Declaration_info(updecl)->instance_index = upindex = k;
-		break;
-	      case 2:
-		array[k].fibered_attr.attr = downdecl;
-		Declaration_info(downdecl)->instance_index = downindex = k;
-		break;
-	      default:
-		array[k].fibered_attr.attr = NULL;
-		break;
-	      }
-	    } else {
-	      PHY_GRAPH *phy_graph =
-		Declaration_info(array[k].node)->node_phy_graph;
-	      array[k].fibered_attr.attr =
-		phy_graph->instances.array[k-start].fibered_attr.attr;
-	      if (found < 2 && ! DECL_IS_RHS(array[k].node))
-		switch (++found) {
-		case 1: upindex = k; break;
-		case 2: downindex = k; break;
-		}
-	    }
-	    array[k].fibered_attr.fiber = NULL;
-	  }
-	}
-	if (found > 0) {
-	  if (found == 1) downindex = upindex;
-	  /*
-	  printf("up = ");
-	  print_instance(&array[upindex],stdout);
-	  printf(" down = ");
-	  print_instance(&array[downindex],stdout);
-	  printf("\n");
-	  */
-	  /* redo dependencies */
-	  for (k = 0; k < n; ++k)
-	    if (parent_index[k+constructor_index] == cyc->internal_info)
-	      for (l = 0; l < n; ++l)
-		if (parent_index[l+constructor_index] == cyc->internal_info) {
-		  free_edgeset(aug_graph->graph[k*n+l],aug_graph);
-		  aug_graph->graph[k*n+l] = NULL;
-		}
-	  for (k=0; k < n; ++k) {
-	    BOOL kcycle =
-	      parent_index[k+constructor_index] == cyc->internal_info;
-	    if (k != downindex) {
-	      for (l=0; l < n; ++l) {
-		BOOL lcycle =
-		  parent_index[l+constructor_index] == cyc->internal_info;
-		if (l != upindex &&
-		    edgeset_kind(aug_graph->graph[k*n+l]) != no_dependency) {
-		  if (kcycle || lcycle) {
-		    free_edgeset(aug_graph->graph[k*n+l],aug_graph);
-		    aug_graph->graph[k*n+l] = NULL;
-		    if (!lcycle) {
-		      add_edge_to_graph(&array[downindex],&array[l],
-					&cond,fiber_dependency,aug_graph);
-		    } else if (!kcycle) {
-		      add_edge_to_graph(&array[k],&array[upindex],
-					&cond,fiber_dependency,aug_graph);
-		    }
-		  }
-		}
-	      }
-	    }
-	  }
-	  /* fix up dependencies for cycle attributes */
-	  for (k=0; k < n; ++k) {
-	    if (parent_index[k+constructor_index] == cyc->internal_info &&
-		k != downindex && k != downindex &&
-		array[k].node != NULL &&
-		DECL_IS_RHS(array[k].node)) {
-	      Declaration attr = array[k].fibered_attr.attr;
-	      if (attr != NULL) {
-		if (ATTR_DECL_IS_SYN(attr)) {
-		  add_edge_to_graph(&array[k],&array[upindex],&cond,
-				    fiber_dependency,aug_graph);
-		} else {
-		  add_edge_to_graph(&array[downindex],&array[k],&cond,
-				    fiber_dependency,aug_graph);
-		}
-	      }
-	    }
-	  }
-	  if (downindex != upindex) {
-	    free_edgeset(aug_graph->graph[upindex*n+upindex],aug_graph);
-	    add_edge_to_graph(&array[upindex],&array[downindex],
-			      &cond,fiber_dependency,aug_graph);
-	    free_edgeset(aug_graph->graph[downindex*n+upindex],aug_graph);
-	    free_edgeset(aug_graph->graph[downindex*n+downindex],aug_graph);
-	    aug_graph->graph[upindex*n+upindex] =
-	      aug_graph->graph[downindex*n+upindex] =
-		aug_graph->graph[downindex*n+downindex] =
-		  NULL;
-	  }
-	}
+
+        // If instance is not in the cycle
+        if (parent_index[k + constructor_index] != cyc->internal_info)
+        {
+          acc_dependency = no_dependency;
+          acc_cond.positive = 0;
+          acc_cond.negative = 0;
+
+          // Forall instances in the cycle
+          for (l = 0; l < n; l++)
+          {
+            // If dependency is not to self and is in cycle
+            if (parent_index[l + constructor_index] == cyc->internal_info && aug_graph->graph[k * n + l] != NULL)
+            {
+              edgeset_combine_dependencies(aug_graph->graph[k * n + l], &acc_dependency, &acc_cond);
+            }
+          }
+
+          // If any dependency
+          if (acc_dependency)
+          {
+            // Forall instances in the cycle
+            for (l = 0; l < n; l++)
+            {
+              // If edge is not to self and it is in the cycle
+              if (parent_index[l + constructor_index] == cyc->internal_info)
+              {
+                // printf("k -> l Adding Not In cycle -> In Cycle: ");
+                add_up_down_edge(k, l, n, array, acc_dependency, &acc_cond, aug_graph);
+              }
+            }
+          }
+
+          acc_dependency = no_dependency;
+          acc_cond.positive = 0;
+          acc_cond.negative = 0;
+
+          // Forall instances in the cycle
+          for (l = 0; l < n; l++)
+          {
+            // If dependency is not to self and is in cycle
+            if (parent_index[l + constructor_index] == cyc->internal_info && aug_graph->graph[l * n + k] != NULL)
+            {
+              edgeset_combine_dependencies(aug_graph->graph[l * n + k], &acc_dependency, &acc_cond);
+            }
+          }
+
+          // If any dependency
+          if (acc_dependency)
+          {
+            // Forall instances in the cycle
+            for (l = 0; l < n; l++)
+            {
+              // If edge is not to self and it is in the cycle
+              if (parent_index[l + constructor_index] == cyc->internal_info)
+              {
+                // printf("l -> k Adding In Cycle -> Not In Cycle: ");
+                add_up_down_edge(l, k, n, array, acc_dependency, &acc_cond, aug_graph);
+              }
+            }
+          }
+        }
+        // Instance is in the cycle
+        else
+        {
+          // UP attribute
+          if (UP_DOWN_DIRECTION(instance_is_up(instance), direction))
+          {
+            acc_dependency = no_dependency;
+            acc_cond.positive = 0;
+            acc_cond.negative = 0;
+
+            // Forall instances in the cycle
+            for (l = 0; l < n; l++)
+            {
+              // If dependency is not to self and is in cycle
+              if (parent_index[l + constructor_index] == cyc->internal_info && aug_graph->graph[k * n + l] != NULL)
+              {
+                edgeset_combine_dependencies(aug_graph->graph[k * n + l], &acc_dependency, &acc_cond);
+              }
+            }
+
+            // Forall instances in the cycle
+            for (l = 0; l < n; l++)
+            {
+              // Make sure it is in the cycle
+              if (parent_index[l + constructor_index] == cyc->internal_info)
+              {
+                // Make sure it is a DOWN attribute
+                if (acc_dependency && UP_DOWN_DIRECTION(!instance_is_up(&array[l]), direction))
+                {
+                  // printf("k -> l Adding In cycle -> In Cycle: ");
+                  add_up_down_edge(k, l, n, array, acc_dependency, &acc_cond, aug_graph);
+                }
+                else
+                {
+                  // printf("k -> l Removing In cycle -> In Cycle: ");
+                  remove_edgeset(k, l, n, array, aug_graph);
+                }
+              }
+            }
+          }
+          // DOWN attribute
+          else
+          {
+            // Forall instances in the cycle
+            for (l = 0; l < n; l++)
+            {
+              // Make sure it is in the cycle
+              if (parent_index[l + constructor_index] == cyc->internal_info)
+              {
+                // Remove edges between instance and all others in the same cycle
+                // printf("k -> l Removing Down In cycle -> In Cycle: ");
+                remove_edgeset(k, l, n, array, aug_graph);
+              }
+            }
+          }
+        }
       }
     }
   }
 }
 
 
-void break_fiber_cycles(Declaration module,STATE *s) {
+void break_fiber_cycles(Declaration module,STATE *s,DEPENDENCY dep) {
   void *mark = SALLOC(0);
   init_indices(s);
   make_cycles(s);
   get_fiber_cycles(s);
-  add_up_down_attributes(s);
+
+  bool direction = !(dep & DEPENDENCY_NOT_JUST_FIBER);
+  add_up_down_attributes(s,direction);
   release(mark);
   {
     int saved_analysis_debug = analysis_debug;
@@ -644,11 +717,6 @@ void break_fiber_cycles(Declaration module,STATE *s) {
   }
 }
 
-
-/**** PRINTING ****/
-
-void print_fiber_cycles(STATE *s) {
-}
   
 
 

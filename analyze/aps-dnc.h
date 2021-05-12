@@ -19,6 +19,7 @@ typedef struct attribute_instance {
 } INSTANCE;
 
 enum instance_direction {instance_local, instance_inward, instance_outward};
+enum instance_direction fibered_attr_direction(FIBERED_ATTRIBUTE *fa);
 enum instance_direction instance_direction(INSTANCE *);
 
 typedef unsigned DEPENDENCY;
@@ -27,17 +28,15 @@ typedef unsigned DEPENDENCY;
 #define DEPENDENCY_NOT_JUST_FIBER 2
 #define DEPENDENCY_MAYBE_CARRYING 4
 #define DEPENDENCY_MAYBE_DIRECT 8
+#define DEPENDENCY_MAYBE_SIMPLE 16
 
 #define no_dependency 0
-#define fiber_dependency (SOME_DEPENDENCY|DEPENDENCY_MAYBE_CARRYING|DEPENDENCY_MAYBE_DIRECT)
 #define dependency (SOME_DEPENDENCY|DEPENDENCY_NOT_JUST_FIBER|DEPENDENCY_MAYBE_CARRYING|DEPENDENCY_MAYBE_DIRECT)
-#define control_fiber_dependency (SOME_DEPENDENCY|DEPENDENCY_MAYBE_DIRECT)
+#define max_dependency (SOME_DEPENDENCY|DEPENDENCY_NOT_JUST_FIBER|DEPENDENCY_MAYBE_CARRYING|DEPENDENCY_MAYBE_DIRECT|DEPENDENCY_MAYBE_SIMPLE)
 #define control_dependency (SOME_DEPENDENCY|DEPENDENCY_NOT_JUST_FIBER|DEPENDENCY_MAYBE_DIRECT)
-#define indirect_fiber_dependency (SOME_DEPENDENCY|DEPENDENCY_MAYBE_CARRYING)
-#define indirect_dependency (SOME_DEPENDENCY|DEPENDENCY_NOT_JUST_FIBER|DEPENDENCY_MAYBE_CARRYING)
-#define indirect_control_fiber_dependency (SOME_DEPENDENCY)
+#define fiber_dependency (SOME_DEPENDENCY|DEPENDENCY_MAYBE_CARRYING|DEPENDENCY_MAYBE_DIRECT)
+#define control_fiber_dependency (SOME_DEPENDENCY|DEPENDENCY_MAYBE_DIRECT)
 #define indirect_control_dependency (SOME_DEPENDENCY|DEPENDENCY_NOT_JUST_FIBER)
-#define max_dependency dependency
 
 #define AT_MOST(k1,k2) (((k1)&~(k2))==0)
 
@@ -109,6 +108,15 @@ extern INSTANCE *get_instance(Declaration attr, FIBER fiber,
 extern void assert_closed(AUG_GRAPH*);
 extern void dnc_close(STATE *);
 extern STATE *compute_dnc(Declaration module);
+
+/* Low level routines: use with caution */
+extern void free_edge(EDGESET old, AUG_GRAPH *aug_graph);
+extern void free_edgeset(EDGESET es, AUG_GRAPH *aug_graph);
+extern void add_edge_to_graph(INSTANCE *source,
+			      INSTANCE *sink,
+			      CONDITION *cond,
+			      DEPENDENCY kind,
+			      AUG_GRAPH *aug_graph);
 
 /* The following routines return TRUE if a change occurs. */
 extern int close_augmented_dependency_graph(AUG_GRAPH *);
