@@ -329,7 +329,9 @@ static bool instance_is_local(INSTANCE *instance)
   {
     switch (Declaration_KEY((Declaration)node))
     {
-    case KEYpragma_call:  // black_dot(...).result is local and the node is a proxy of function_decl
+    // For black_dot(...).result to be considered local, the node of INSTANCE should be a proxy of function_decl
+    // Note that proxies are done using pragma_calls in aps-dnc
+    case KEYpragma_call: 
     case KEYsome_function_decl:
       return true;
     }
