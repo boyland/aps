@@ -532,7 +532,15 @@ static CTO_NODE* schedule_visits_group(AUG_GRAPH *aug_graph, CTO_NODE* prev, CON
   CTO_NODE* cto_node = NULL;
   
   /* If nothing more to do, we are done. */
-  if (remaining == 0) return NULL;
+  if (remaining == 0)
+  {
+    cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
+    cto_node->cto_prev = prev;
+    cto_node->cto_instance = NULL;
+    cto_node->child_phase.ph = group->ph;
+    cto_node->child_phase.ch = -1;
+    return cto_node;
+  }
 
   /* Outer condition is impossible, its a dead-end branch */
   if (CONDITION_IS_IMPOSSIBLE(cond)) return NULL;
@@ -586,14 +594,14 @@ static CTO_NODE* schedule_visits_group(AUG_GRAPH *aug_graph, CTO_NODE* prev, CON
       return cto_node;
     }
 
-    // As a special case, when we are about to start scheduling for the first phase (ph = 1), *or* we just ended a phase,
-    // we should immediately schedule all the inherited attributes of the parent for this new phase (ph = 1 + the old ph).
-    if (group->ph == 1 && group->ch > -1)
-    {
-      CHILD_PHASE parent_inherited_group = { -(group->ph + 1) /* ph */, group->ch /* ch */};
-      printf("[595] <%d,%d>\n", parent_inherited_group.ph, parent_inherited_group.ch);
-      return schedule_visits_group(aug_graph, prev, cond, instance_groups, remaining /* no change */, &parent_inherited_group);
-    }
+    // // As a special case, when we are about to start scheduling for the first phase (ph = 1), *or* we just ended a phase,
+    // // we should immediately schedule all the inherited attributes of the parent for this new phase (ph = 1 + the old ph).
+    // if (group->ph == 1 && group->ch > -1)
+    // {
+    //   CHILD_PHASE parent_inherited_group = { -(group->ph + 1) /* ph */, group->ch /* ch */};
+    //   printf("[595] <%d,%d>\n", parent_inherited_group.ph, parent_inherited_group.ch);
+    //   return schedule_visits_group(aug_graph, prev, cond, instance_groups, remaining /* no change */, &parent_inherited_group);
+    // }
 
     // If we find ourselves scheduling a <+ph,-1>, this means that after we put all these ones in the schedule
     // (which we should do as a group NOW), this visit phase is over. And we should mark it with a <ph,-1> marker in the CTO.
@@ -615,18 +623,18 @@ static CTO_NODE* schedule_visits_group(AUG_GRAPH *aug_graph, CTO_NODE* prev, CON
     // If we find ourselves schedule a parent inherited attribute (that wasn’t handled in the case),
     // this means that the previous visit ended without any synthesized attributes, so we need to stick in the visit end
     // (Visit(child = -1, ph = +(one less then the -ph we are on now).
-    if (group->ph < 0 && group->ch == -1)
-    {
-      // Visit marker
-      CTO_NODE *cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
-      cto_node->cto_prev = prev;
-      cto_node->cto_instance = NULL;
-      cto_node->child_phase.ph = -group->ph + 1;
-      cto_node->child_phase.ch = -1;
-      printf("[627] <%d,%d>\n", cto_node->child_phase.ph, cto_node->child_phase.ch);
-      cto_node->cto_next = schedule_visits(aug_graph, cto_node, cond, instance_groups, remaining /* no change */);
-      return cto_node;
-    }
+    // if (group->ph < 0 && group->ch == -1)
+    // {
+    //   // Visit marker
+    //   CTO_NODE *cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
+    //   cto_node->cto_prev = prev;
+    //   cto_node->cto_instance = NULL;
+    //   cto_node->child_phase.ph = -group->ph + 1;
+    //   cto_node->child_phase.ch = -1;
+    //   printf("[627] <%d,%d>\n", cto_node->child_phase.ph, cto_node->child_phase.ch);
+    //   cto_node->cto_next = schedule_visits(aug_graph, cto_node, cond, instance_groups, remaining /* no change */);
+    //   return cto_node;
+    // }
 
     return schedule_visits(aug_graph, prev, cond, instance_groups, remaining /* no change */);
   }
@@ -662,7 +670,15 @@ static CTO_NODE* schedule_visits(AUG_GRAPH *aug_graph, CTO_NODE* prev, CONDITION
   bool just_started = remaining == n;
   
   /* If nothing more to do, we are done. */
-  if (remaining == 0) return NULL;
+  if (remaining == 0)
+  {
+    cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
+    cto_node->cto_prev = prev;
+    cto_node->cto_instance = NULL;
+    cto_node->child_phase.ph = prev->child_phase.ph;
+    cto_node->child_phase.ch = -1;
+    return cto_node;
+  }
 
   /* Outer condition is impossible, its a dead-end branch */
   if (CONDITION_IS_IMPOSSIBLE(cond)) return NULL;
@@ -737,21 +753,21 @@ static CTO_NODE* schedule_visits(AUG_GRAPH *aug_graph, CTO_NODE* prev, CONDITION
           return schedule_visits_group(aug_graph, prev, cond, instance_groups, remaining /* no change */, &parent_inherited_group);
         }
 
-        // If we find ourselves schedule a parent inherited attribute (that wasn’t handled in the case),
-        // this means that the previous visit ended without any synthesized attributes, so we need to stick in the visit end
-        // (Visit(child = -1, ph = +(one less then the -ph we are on now).
-        if (group->ph < 0 && group->ch == -1)
-        {
-          // Visit marker
-          CTO_NODE *cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
-          cto_node->cto_prev = prev;
-          cto_node->cto_instance = NULL;
-          cto_node->child_phase.ph = -group->ph + 1;
-          cto_node->child_phase.ch = -1;
-          printf("[752] <%d,%d>\n", cto_node->child_phase.ph, cto_node->child_phase.ch);
-          cto_node->cto_next = schedule_visits_group(aug_graph, cto_node, cond, instance_groups, remaining /* no change */, group);
-          return cto_node;
-        }
+        // // If we find ourselves schedule a parent inherited attribute (that wasn’t handled in the case),
+        // // this means that the previous visit ended without any synthesized attributes, so we need to stick in the visit end
+        // // (Visit(child = -1, ph = +(one less then the -ph we are on now).
+        // if (group->ph < 0 && group->ch == -1)
+        // {
+        //   // Visit marker
+        //   CTO_NODE *cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
+        //   cto_node->cto_prev = prev;
+        //   cto_node->cto_instance = NULL;
+        //   cto_node->child_phase.ph = -group->ph + 1;
+        //   cto_node->child_phase.ch = -1;
+        //   printf("[752] <%d,%d>\n", cto_node->child_phase.ph, cto_node->child_phase.ch);
+        //   cto_node->cto_next = schedule_visits_group(aug_graph, cto_node, cond, instance_groups, remaining /* no change */, group);
+        //   return cto_node;
+        // }
 
         return schedule_visits_group(aug_graph, prev, cond, instance_groups, remaining, group);
       }
