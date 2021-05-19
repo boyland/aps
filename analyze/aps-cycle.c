@@ -323,9 +323,6 @@ static bool instance_is_local(INSTANCE *instance)
 {
   if (instance->node ==  NULL)
   {
-    // printf("=>");
-    // print_instance(instance, stdout);
-    // printf("\n");
     return true;
   }
 
