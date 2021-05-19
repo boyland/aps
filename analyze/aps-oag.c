@@ -783,7 +783,7 @@ void schedule_augmented_dependency_graph(AUG_GRAPH *aug_graph) {
 
   if (oag_debug & DEBUG_ORDER)
   {
-    printf("\nInstances:\n");
+    printf("\nInstances %s:\n", decl_name(aug_graph->syntax_decl));
     for (i = 0; i < n; i++)
     {
       INSTANCE *in = &(aug_graph->instances.array[i]);
@@ -815,6 +815,7 @@ void schedule_augmented_dependency_graph(AUG_GRAPH *aug_graph) {
 
   if (oag_debug & DEBUG_ORDER)
   {
+    printf("\nSchedule %s\n", decl_name(aug_graph->syntax_decl));
     print_total_order(aug_graph->total_order, 0, stdout);
   }
 }
