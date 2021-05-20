@@ -604,18 +604,6 @@ static CTO_NODE* schedule_visits_group(AUG_GRAPH *aug_graph, CTO_NODE* prev, CON
       return cto_node;
     }
 
-    // // If this is end of the phase and we just finished <ph,?> then we need to add visit marker of <ph,-1>
-    // if (group->ph > 0 && !is_there_more_to_schedule_in_phase(aug_graph, instance_groups, group->ph))
-    // {
-    //   CTO_NODE *cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
-    //   cto_node->cto_prev = prev;
-    //   cto_node->cto_instance = NULL;
-    //   cto_node->child_phase.ph = group->ph;
-    //   cto_node->child_phase.ch = -1;
-    //   cto_node->cto_next = schedule_visits(aug_graph, cto_node, cond, instance_groups, remaining /* no change */);
-    //   return cto_node;
-    // }
-
     return schedule_visits(aug_graph, prev, cond, instance_groups, remaining /* no change */);
   }
 
