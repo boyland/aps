@@ -1,0 +1,66 @@
+with "symbol";
+with "table";
+with "grammar";
+
+module NULLABLE[T :: var GRAMMAR[]] extends T begin
+
+  type NullableTable := TABLE_LATTICE[Symbol, OrLattice];
+  var circular collection nullableTable : NullableTable;
+
+  circular attribute Item.item_nullable : OrLattice := false;
+  pragma synthesized(item_nullable);
+
+  circular attribute Items.items_nullable : OrLattice;
+  pragma synthesized(items_nullable);
+
+  circular attribute Grammar.grammar_nullable : NullableTable;
+  pragma synthesized(grammar_nullable);
+
+  epsilon : Symbol := make_symbol("epsilon");
+
+  match ?self:Item=terminal(?s:I) begin
+    self.item_nullable :> false;
+  end;
+
+  match ?self:Item=nonterminal(?s:I) begin
+    case NullableTable$select(nullableTable, s) begin
+      match NullableTable$table_entry(?,?item_nullable_boolean) begin
+        self.item_nullable :> item_nullable_boolean;
+      end;
+    end;
+  end;
+
+  match ?self:Production=prod(?nt:Symbol, ?items: Items) begin
+    circular collection temp : OrLattice := items.items_nullable;
+
+    nullableTable :> NullableTable$table_entry(nt, temp);
+  end;
+
+  match ?self:Grammar=grammar(?prods: Productions) begin
+    self.grammar_nullable := nullableTable;
+  end;
+
+  match ?self : Items = Items$none() begin
+    self.items_nullable :> true;
+  end;
+
+  match ?self : Items = Items$single(?item : Item) begin
+    self.items_nullable :> item.item_nullable;
+  end;
+
+  match ?self : Items = Items$append(?items1,?items2 : Items) begin
+    self.items_nullable :> items1.items_nullable or items2.items_nullable;
+  end;
+
+  match ?self : Productions = Productions$none() begin
+
+  end;
+
+  match ?self : Productions = Productions$single(?stmt : Production) begin
+
+  end;
+
+  match ?self : Productions = Productions$append(?stmts1,?stmts2 : Productions) begin
+
+  end;
+end;
