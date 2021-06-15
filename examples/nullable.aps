@@ -20,16 +20,16 @@ module NULLABLE[T :: var GRAMMAR[]] extends T begin
 
   match ?self:Item=terminal(?s:I) begin
     if s == epsilon then
-      self.item_nullable :> true;
+      self.item_nullable := true;
     else
-      self.item_nullable :> false;
+      self.item_nullable := false;
     endif;
   end;
 
   match ?self:Item=nonterminal(?s:I) begin
     case NullableTable$select(nullableTable, s) begin
       match NullableTable$table_entry(?,?item_nullable_boolean) begin
-        self.item_nullable :> item_nullable_boolean;
+        self.item_nullable := item_nullable_boolean;
       end;
     end;
   end;
@@ -45,15 +45,15 @@ module NULLABLE[T :: var GRAMMAR[]] extends T begin
   end;
 
   match ?self : Items = Items$none() begin
-    self.items_nullable :> true;
+    self.items_nullable := true;
   end;
 
   match ?self : Items = Items$single(?item : Item) begin
-    self.items_nullable :> item.item_nullable;
+    self.items_nullable := item.item_nullable;
   end;
 
   match ?self : Items = Items$append(?items1,?items2 : Items) begin
-    self.items_nullable :> items1.items_nullable or items2.items_nullable;
+    self.items_nullable := items1.items_nullable or items2.items_nullable;
   end;
 
   match ?self : Productions = Productions$none() begin
