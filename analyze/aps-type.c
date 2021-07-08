@@ -27,7 +27,26 @@ Type constructor_return_type(Declaration decl) {
   return rt;
 }
 
+Declaration module_from_type_environment(TypeEnvironment type_env) {
+  Declaration module = NULL;
+
+  while (type_env != NULL) {
+    switch (Declaration_KEY(type_env->source))
+    {
+      case KEYmodule_decl:
+        module = type_env->source;
+        break;
+      default:
+        break;
+    }
+    type_env = type_env->outer;
+  }
+
+  return module;
+}
+
 Declaration current_module = NULL;
+Declaration root_phylum = NULL;
 
 static void* do_typechecking(void* ignore, void*node) {
   // find places where Expression, Pattern or Default is used
@@ -52,7 +71,45 @@ static void* do_typechecking(void* ignore, void*node) {
   case KEYDeclaration:
     {
       Declaration decl = (Declaration)node;
+
+      if (DECL_IS_START_PHYLUM(decl)) {
+        if (root_phylum == NULL) {
+          root_phylum = decl;
+        } else {
+          aps_error(decl, "root_phylum cannot be set more than one time");
+        }
+      }
+
       switch (Declaration_KEY(decl)) {
+        case KEYpragma_call:
+        {
+          Symbol pragma_symb = pragma_call_name(decl);
+          if (pragma_symb == intern_symbol("root_phylum")) {
+            Expression pragma_arg = first_Expression(pragma_call_parameters(decl));
+
+            switch (Expression_KEY(pragma_arg))
+            {
+              case KEYtype_value:
+              {
+                switch (Type_KEY(type_value_T(pragma_arg)))
+                {
+                  case KEYtype_use:
+                    // TODO: TypeEnvironment is NULL, why?
+                    if (module_from_type_environment(USE_TYPE_ENV(type_use_use(type_value_t(pragma_arg)))) != current_module) {
+                      aps_error(decl, "root_phylum should be called in the same module as phylum itself");
+                    }
+                    break;
+                  default:
+                    break;
+                  }
+              }
+              default:
+                break;
+            }
+          }
+          break;
+        }
+
         case KEYmodule_decl:
           current_module = (Declaration) node;
           break;
