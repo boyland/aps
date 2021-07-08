@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include "jbb.h"
 #include "jbb-alloc.h"
 #include "aps-ag.h"
@@ -303,9 +305,431 @@ CTO_NODE* schedule_rest(AUG_GRAPH *aug_graph,
   return cto_node;
 }
 
+#define CONDITION_IS_IMPOSSIBLE(cond) (cond.positive & cond.negative)
+#define MERGED_CONDITION_IS_IMPOSSIBLE(cond1, cond2) ((cond1.positive|cond2.positive) & (cond1.negative|cond2.negative))
+
+// TODO: temporarily
+static void print_indent(int count, FILE *stream)
+{
+  while (count-- > 0)
+  {
+    fprintf(stream, " ");
+  }
+}
+
+// TODO: temporarily
+static void print_total_order(CTO_NODE *cto, int indent, FILE *stream)
+{
+  if (stream == 0) stream = stdout;
+  if (cto == NULL) return;
+
+  print_indent(indent, stream);
+  if (cto->cto_instance == NULL)
+  {
+    printf("visit marker");
+  }
+  else
+  {
+    print_instance(cto->cto_instance, stream);
+  }
+  printf(" <%d,%d>", cto->child_phase.ph, cto->child_phase.ch);
+  printf("\n");
+  indent++;
+
+  if (cto->cto_if_true != NULL)
+  {
+    print_total_order(cto->cto_if_true, indent, stdout);
+    printf("\n");
+  }
+
+  print_total_order(cto->cto_next, indent, stdout);
+}
+
+/**
+ * Returns true if two attribute instances belong to the same group
+ * @param aug_graph Augmented dependency graph
+ * @param cond current condition
+ * @param instance_groups array of <ph,ch>
+ * @param i instance index to test
+ * @return boolean indicating if two attributes are in the same group
+ */ 
+static bool instances_are_in_same_group(AUG_GRAPH *aug_graph, CHILD_PHASE* instance_groups, const int i, const int j)
+{
+  CHILD_PHASE *group_key1 = &instance_groups[i];
+  CHILD_PHASE *group_key2 = &instance_groups[j];
+
+  // locals
+  if (!group_key1->ph && !group_key2->ph)
+  {
+    return i == j;
+  }
+  // Anything else
+  else
+  {
+    return group_key1->ph == group_key2->ph && group_key1->ch == group_key2->ch;
+  }
+}
+
+/**
+ * Given a geneirc instance index it returns boolean indicating if its ready to be scheduled or not
+ * @param aug_graph Augmented dependency graph
+ * @param cond current condition
+ * @param instance_groups array of <ph,ch>
+ * @param i group index
+ * @param j instance index to test
+ */
+static bool instance_ready_to_go(AUG_GRAPH *aug_graph, CONDITION cond, CHILD_PHASE* instance_groups, const int i, const int j)
+{
+  int k;
+  EDGESET edges;
+  int n = aug_graph->instances.length;
+  
+  for (k = 0; k < n; k++)
+  {
+    // Already scheduled then ignore
+    if (aug_graph->schedule[k] != 0) continue;
+
+    // If from the same group then ignore
+    if (instances_are_in_same_group(aug_graph, instance_groups, i, k)) continue;
+
+    int index = k * n + j;  // k (source) >--> j (sink) edge
+
+    /* Look at all dependencies from j to i */
+    for (edges = aug_graph->graph[index]; edges != NULL; edges=edges->rest)
+    {
+      /* If the merge condition is impossible, ignore this edge */
+      if (MERGED_CONDITION_IS_IMPOSSIBLE(cond, edges->cond)) continue;
+
+      if (oag_debug & DEBUG_ORDER)
+      {
+        // Can't continue with scheduling if a dependency with a "possible" condition has not been scheduled yet
+        printf("This edgeset was not ready to be scheduled because of:\n");
+        print_edgeset(edges, stdout);
+        printf("\n");
+      }
+
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Given a generic instance index it returns boolean indicating if its ready to be scheduled or not
+ * @param aug_graph Augmented dependency graph
+ * @param cond current condition
+ * @param instance_groups array of <ph,ch>
+ * @param i instance index to test
+ */
+static bool group_ready_to_go(AUG_GRAPH *aug_graph, CONDITION cond, CHILD_PHASE* instance_groups, const int i)
+{
+  if (oag_debug & DEBUG_ORDER)
+  {
+    printf("Checking group readyness of: ");
+    print_instance(&aug_graph->instances.array[i], stdout);
+    printf("\n");
+  }
+
+  int n = aug_graph->instances.length;
+  CHILD_PHASE group = instance_groups[i];
+  int j;
+
+  for (j = 0; j < n; j++)
+  {
+    CHILD_PHASE current_group = instance_groups[j];
+
+    // Instance in the same group but cannot be considered
+    if (instances_are_in_same_group(aug_graph, instance_groups, i, j))
+    {
+      if (aug_graph->schedule[j] != 0) continue;  // already scheduled
+
+      if (!instance_ready_to_go(aug_graph, cond, instance_groups, i, j))
+      {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Simple function to check if there is more to schedule in the group of index
+ * @param aug_graph Augmented dependency graph
+ * @param instance_groups array of <ph,ch> indexed by INSTANCE index
+ * @param parent_group parent group key
+ * @return boolean indicating if there is more in this group that needs to be scheduled
+ */
+static bool is_there_more_to_schedule_in_group(AUG_GRAPH *aug_graph, CHILD_PHASE* instance_groups, CHILD_PHASE *parent_group)
+{
+  int n = aug_graph->instances.length;
+  int i;
+  for (i = 0; i < n; i++)
+  {
+    // Instance in the same group but cannot be considered
+    CHILD_PHASE *group_key = &instance_groups[i];
+
+    // Check if in the same group
+    if (group_key->ph == parent_group->ph && group_key->ch == parent_group->ch)
+    {
+      if (aug_graph->schedule[i] == 0) return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Simple function to check if there is more instances in a phase
+ * @param aug_graph Augmented dependency graph
+ * @param instance_groups array of <ph,ch> indexed by INSTANCE index
+ * @param ph phase number
+ * @return boolean indicating if there is more in this group that needs to be scheduled
+ */
+static bool is_there_more_to_schedule_in_phase(AUG_GRAPH *aug_graph, CHILD_PHASE* instance_groups, short ph)
+{
+  int n = aug_graph->instances.length;
+  int i;
+  for (i = 0; i < n; i++)
+  {
+    // Instance in the same group but cannot be considered
+    CHILD_PHASE *group_key = &instance_groups[i];
+
+    // Check if in the same group
+    if (group_key->ph == ph || group_key->ph == -ph)
+    {
+      if (aug_graph->schedule[i] == 0) return true;
+    }
+  }
+
+  return false;
+}
+
+// Signature of function
+static CTO_NODE* schedule_visits(AUG_GRAPH *aug_graph, CTO_NODE* prev, CONDITION cond, CHILD_PHASE* instance_groups, int remaining);
+
+/**
+ * Recursive scheduling function
+ * @param aug_graph Augmented dependency graph
+ * @param prev previous CTO node
+ * @param cond current CONDITION
+ * @param instance_groups array of <ph,ch> indexed by INSTANCE index
+ * @param remaining count of remaining instances to schedule
+ * @param parent_group parent group key
+ */
+static CTO_NODE* schedule_visits_group(AUG_GRAPH *aug_graph, CTO_NODE* prev, CONDITION cond, CHILD_PHASE* instance_groups, int remaining, CHILD_PHASE *group)
+{
+  int i;
+  int n = aug_graph->instances.length;
+  int sane_remaining = 0;
+  CTO_NODE* cto_node = NULL;
+  
+  /* If nothing more to do, we are done. */
+  if (remaining == 0)
+  {
+    cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
+    cto_node->cto_prev = prev;
+    cto_node->cto_instance = NULL;
+    cto_node->child_phase.ph = group->ph;
+    cto_node->child_phase.ch = -1;
+    return cto_node;
+  }
+
+  /* Outer condition is impossible, its a dead-end branch */
+  if (CONDITION_IS_IMPOSSIBLE(cond)) return NULL;
+
+  for (i = 0; i < n; i++)
+  {
+    INSTANCE *instance = &aug_graph->instances.array[i];
+    CHILD_PHASE *instance_group = &instance_groups[i];
+
+    // Already scheduled then ignore
+    if (aug_graph->schedule[i] != 0) continue;
+
+    sane_remaining++;
+
+    // Check if everything is in the same group, don't check for dependencies
+    // Locals will never end-up in this function
+    if (instance_group->ph == group->ph && instance_group->ch == group->ch)
+    {
+      cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
+      cto_node->cto_prev = prev;
+      cto_node->cto_instance = instance;
+      cto_node->child_phase = *group;
+
+      aug_graph->schedule[i] = 1; // instance has been scheduled (and will not be considered for scheduling in the recursive call)
+
+      cto_node->cto_next = schedule_visits_group(aug_graph, cto_node, cond, instance_groups, remaining-1, group);
+
+      aug_graph->schedule[i] = 0; // Release it
+
+      return cto_node;
+    }
+  }
+
+  // Group is finished
+  if (!is_there_more_to_schedule_in_group(aug_graph, instance_groups, group))
+  {
+    // If we find ourselves scheduling a <-ph,ch>, we need to (after putting in all the
+    // instances in that group), we need to schedule the visit of the child (add a CTO
+    // node with a null instance but with <ph,ch) and then ALSO schedule immediately
+    // all the syn attributes of that child’s phase. (<+ph,ch> group, if any).
+    if (group->ph < 0 && group->ch > -1)
+    {
+      // Visit marker
+      CTO_NODE *cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
+      cto_node->cto_prev = prev;
+      cto_node->cto_instance = NULL;
+      cto_node->child_phase.ph = -group->ph;
+      cto_node->child_phase.ch = group->ch;
+      cto_node->cto_next = schedule_visits_group(aug_graph, cto_node, cond, instance_groups, remaining, &(cto_node->child_phase));
+      return cto_node;
+    }
+
+    // If we find ourselves scheduling a <+ph,-1>, this means that after we put all these ones in the schedule
+    // (which we should do as a group NOW), this visit phase is over. And we should mark it with a <ph,-1> marker in the CTO.
+    if (group->ph > 0 && group->ch == -1)
+    {
+      // Visit marker
+      CTO_NODE *cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
+      cto_node->cto_prev = prev;
+      cto_node->cto_instance = NULL;
+      cto_node->child_phase.ph = group->ph;
+      cto_node->child_phase.ch = -1;
+      CHILD_PHASE parent_inherited_group = { group->ph, -1 };
+      CHILD_PHASE next_phase_group = { group->ph + 1 /* ph */, group->ch /* ch */ };
+      cto_node->cto_next = schedule_visits(aug_graph, cto_node, cond, instance_groups, remaining /* no change */);
+
+      return cto_node;
+    }
+
+    return schedule_visits(aug_graph, prev, cond, instance_groups, remaining /* no change */);
+  }
+
+  // TODO: add more debugging information
+  fflush(stdout);
+  if (sane_remaining != remaining)
+  {
+    fprintf(stderr,"remaining out of sync %d != %d\n", sane_remaining, remaining);
+  }
+
+  fatal_error("Cannot make conditional total order!");
+  print_total_order(prev, 0, stdout);
+
+  return NULL;
+}
+
+/**
+ * Recursive scheduling function
+ * @param aug_graph Augmented dependency graph
+ * @param prev previous CTO node
+ * @param cond current CONDITION
+ * @param instance_groups array of <ph,ch> indexed by INSTANCE index
+ * @param remaining count of remaining instances to schedule
+ */
+static CTO_NODE* schedule_visits(AUG_GRAPH *aug_graph, CTO_NODE* prev, CONDITION cond, CHILD_PHASE* instance_groups, int remaining)
+{
+  int i;
+  int n = aug_graph->instances.length;
+  int sane_remaining = 0;
+  CTO_NODE* cto_node = NULL;
+
+  bool just_started = remaining == n;
+  
+  /* If nothing more to do, we are done. */
+  if (remaining == 0)
+  {
+    cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
+    cto_node->cto_prev = prev;
+    cto_node->cto_instance = NULL;
+    cto_node->child_phase.ph = prev->child_phase.ph;
+    cto_node->child_phase.ch = -1;
+    return cto_node;
+  }
+
+  /* Outer condition is impossible, its a dead-end branch */
+  if (CONDITION_IS_IMPOSSIBLE(cond)) return NULL;
+
+  for (i = 0; i < n; i++)
+  {
+    INSTANCE *instance = &aug_graph->instances.array[i];
+    CHILD_PHASE *group = &instance_groups[i];
+
+    // Already scheduled then ignore
+    if (aug_graph->schedule[i] != 0) continue;
+
+    sane_remaining++;
+
+    // If edgeset condition is not impossible then go ahead with scheduling
+    if (group_ready_to_go(aug_graph, cond, instance_groups, i))
+    {
+      // If it is local then continue scheduling
+      if (!group->ph && !group->ch)
+      {
+        cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
+        cto_node->cto_prev = prev;
+        cto_node->cto_instance = instance;
+        cto_node->child_phase = *group;
+
+        aug_graph->schedule[i] = 1; // instance has been scheduled (and will not be considered for scheduling in the recursive call)
+
+        if (if_rule_p(instance->fibered_attr.attr))
+        {
+          int cmask = 1 << (if_rule_index(instance->fibered_attr.attr));
+          cond.negative |= cmask;
+          cto_node->cto_if_false = schedule_visits(aug_graph, cto_node, cond, instance_groups, remaining-1);
+          cond.negative &= ~cmask;
+          cond.positive |= cmask;
+          cto_node->cto_if_true = schedule_visits(aug_graph, cto_node, cond, instance_groups, remaining-1);
+          cond.positive &= ~cmask;
+        }
+        else
+        {
+          cto_node->cto_next = schedule_visits(aug_graph, cto_node, cond, instance_groups, remaining-1);
+        }
+
+        aug_graph->schedule[i] = 0; // Release it
+
+        return cto_node;
+      }
+      // Instance is not local then delegate it to group scheduler
+      else
+      {
+        // If we find ourselves schedule a parent inherited attribute (that wasn’t handled in the last case), this means
+        // that the previous visit ended without any synthesized attributes, so we need to stick in the visit end
+        // (Visit(child = -1, ph = +(one less then the -ph we are on now).
+        if (group->ph < -1 && group->ch == -1)
+        {
+          CTO_NODE *cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
+          cto_node->cto_prev = prev;
+          cto_node->cto_instance = NULL;
+          cto_node->child_phase.ph = -group->ph -1;
+          cto_node->child_phase.ch = -1;
+          cto_node->cto_next = schedule_visits_group(aug_graph, prev, cond, instance_groups, remaining, group);
+          return cto_node;
+        }
+
+        return schedule_visits_group(aug_graph, prev, cond, instance_groups, remaining, group);
+      }
+    }
+  }
+
+  // TODO: add more debugging information
+  fflush(stdout);
+  if (sane_remaining != remaining)
+  {
+    fprintf(stderr,"remaining out of sync %d != %d\n", sane_remaining, remaining);
+  }
+
+  fatal_error("Cannot make conditional total order!");
+  print_total_order(prev, 0, stdout);
+
+  return NULL;
+}
+
 /** Return phase (synthesized) or -phase (inherited)
  * for fibered attribute, given the phylum's summary dependence graph.
- * TODO: make public and export and remove from static-impl.cc
  */
 int attribute_schedule(PHY_GRAPH *phy_graph, FIBERED_ATTRIBUTE* key)
 {
@@ -321,8 +745,8 @@ int attribute_schedule(PHY_GRAPH *phy_graph, FIBERED_ATTRIBUTE* key)
 
 void schedule_augmented_dependency_graph(AUG_GRAPH *aug_graph) {
   int n = aug_graph->instances.length;
-  int i;
   CONDITION cond;
+  int i;
 
   (void)close_augmented_dependency_graph(aug_graph);
 
@@ -332,25 +756,50 @@ void schedule_augmented_dependency_graph(AUG_GRAPH *aug_graph) {
     printf("Scheduling conditional total order for %s\n",
 	   aug_graph_name(aug_graph));
   }
-  if (oag_debug & DEBUG_ORDER) {
-    for (int i=0; i <= n; ++i) {
+
+  size_t instance_groups_size = n * sizeof(CHILD_PHASE);
+  CHILD_PHASE* instance_groups = (CHILD_PHASE*) alloca(instance_groups_size);
+  memset(instance_groups, (int)0, instance_groups_size);
+
+  for (i = 0; i < n; i++)
+  {
+    INSTANCE *in = &(aug_graph->instances.array[i]);
+    Declaration ad = in->fibered_attr.attr;
+    Declaration chdecl;
+  
+    int j = 0, ch = -1;
+    for (chdecl = aug_graph->first_rhs_decl; chdecl != 0; chdecl=DECL_NEXT(chdecl))
+    {
+      if (in->node == chdecl) ch = j;
+      ++j;
+    }
+
+    if (in->node == aug_graph->lhs_decl || ch >= 0)
+    {
+      PHY_GRAPH *npg = Declaration_info(in->node)->node_phy_graph;
+      int ph = attribute_schedule(npg,&(in->fibered_attr));
+      instance_groups[i].ph = (short) ph;
+      instance_groups[i].ch = (short) ch;
+    }
+  }
+
+  if (oag_debug & DEBUG_ORDER)
+  {
+    printf("\nInstances %s:\n", decl_name(aug_graph->syntax_decl));
+    for (i = 0; i < n; i++)
+    {
       INSTANCE *in = &(aug_graph->instances.array[i]);
-      print_instance(in,stdout);
+      CHILD_PHASE group = instance_groups[i];
+      print_instance(in, stdout);
       printf(": ");
-      Declaration ad = in->fibered_attr.attr;
-      Declaration chdecl;
-    
-      int j = 0, ch = -1;
-      for (chdecl = aug_graph->first_rhs_decl; chdecl != 0; chdecl=DECL_NEXT(chdecl)) {
-	if (in->node == chdecl) ch = j;
-	++j;
+      
+      if (!group.ph && !group.ch)
+      {
+        printf("local\n");
       }
-      if (in->node == aug_graph->lhs_decl || ch >= 0) {
-	PHY_GRAPH *npg = Declaration_info(in->node)->node_phy_graph;
-	int ph = attribute_schedule(npg,&(in->fibered_attr));
-	printf("<%d,%d>\n",ph,ch);
-      } else {
-	printf("local\n");
+      else
+      {
+        printf("<%d,%d>\n", group.ph, group.ch);
       }
     }
   }
@@ -359,10 +808,18 @@ void schedule_augmented_dependency_graph(AUG_GRAPH *aug_graph) {
   for (i=0; i < n; ++i) {
     aug_graph->schedule[i] = 0; /* This means: not scheduled yet */
   }
+
   cond.positive = 0;
   cond.negative = 0;
+  CHILD_PHASE next_group = { -1, -1 };
+  // It is safe to assume inherited attribute of parents have no dependencies and should be scheduled right away
+  aug_graph->total_order = schedule_visits_group(aug_graph, NULL, cond, instance_groups, n, &next_group);
 
-  aug_graph->total_order = schedule_rest(aug_graph,0,cond,n);
+  if (oag_debug & DEBUG_ORDER)
+  {
+    printf("\nSchedule %s\n", decl_name(aug_graph->syntax_decl));
+    print_total_order(aug_graph->total_order, 0, stdout);
+  }
 }
 
 void compute_oag(Declaration module, STATE *s) {
