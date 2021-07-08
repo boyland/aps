@@ -570,6 +570,30 @@ static void assign_instance(INSTANCE *array, int index,
     print_instance(&array[index],stdout);
     printf("\n");
   }
+
+  bool inside_conditional = false;
+  void* current_node = attr;
+  while (current_node != NULL && !inside_conditional)
+  {
+    switch (ABSTRACT_APS_tnode_phylum(current_node))
+    {
+      case KEYDeclaration:
+      {
+        switch (Declaration_KEY(current_node))
+        {
+          case KEYif_stmt:
+          case KEYcase_stmt:
+            inside_conditional = true;
+            break;
+        }
+      }
+      default:
+        current_node = tnode_parent(current_node);
+        break;
+    }
+  }
+
+  array[index].inside_conditional = inside_conditional;
 }
 
 static int assign_instances(INSTANCE *array, int index,

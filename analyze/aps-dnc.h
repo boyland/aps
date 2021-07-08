@@ -16,6 +16,7 @@ typedef struct attribute_instance {
   FIBERED_ATTRIBUTE fibered_attr;
   Declaration node; /* NULL for locals */
   int index;
+  BOOL inside_conditional;
 } INSTANCE;
 
 enum instance_direction {instance_local, instance_inward, instance_outward};

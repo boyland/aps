@@ -316,7 +316,7 @@ static void make_cycles(STATE *s) {
 /*** Break cycles and redo dependency graphs ***/
 
 bool instance_is_up(INSTANCE *i) {
-  return (fibered_attr_direction(&i->fibered_attr)) == instance_outward;
+  return (fibered_attr_direction(&i->fibered_attr)) == instance_outward || i->inside_conditional;
 }
 
 /**
