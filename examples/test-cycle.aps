@@ -1,14 +1,14 @@
-module TEST_CYCLE[] begin
-  phylum Wood;
-  
-  constructor branch(x,y : Wood) : Wood;
-  constructor leaf(x : Integer) : Wood;
-  
+with "tiny";
+
+module TEST_CYCLE[T :: var TINY[]] extends T
+begin  
   type Integers := SET[Integer];
   type IntegerLattice := UNION_LATTICE[Integer,Integers];
 
   var circular collection leaves : IntegerLattice;
   circular attribute Wood.partial : IntegerLattice;
+
+  pragma synthesized(leaves,partial);
 
   match ?l=leaf(?x) begin
     l.partial := (leaves \ x) \/ {x+1} ;

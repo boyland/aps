@@ -1,6 +1,6 @@
 object TestCycleDriver extends App
 {
-    val m = new M_TEST_CYCLE("Tiny");
+    val m = new M_TINY("Tiny");
     type T_Tiny = m.T_Result;
     val t_Tiny = m.t_Result;
 
@@ -10,5 +10,8 @@ object TestCycleDriver extends App
 
     m.finish();
 
-    println("leaves is " + t_Tiny.v_leaves);
+    val m2 = new M_TEST_CYCLE("Test Cycle",m);
+    val w2 = w.asInstanceOf[m2.T_Wood];
+
+    println("leaves is " + m2.v_leaves);
 }
