@@ -15,6 +15,7 @@ extern bool incremental;
 extern bool static_schedule;
 extern int verbose;
 extern int debug;
+extern bool activate_static_circular;
 
 class Implementation;
 

@@ -870,7 +870,21 @@ public:
       os << " {\n";
 #endif /* APS2SCALA */
       ++nesting_level;
-      os << indent() << "visit();\n";
+
+      if (activate_static_circular)
+      {
+        os << endl;
+        os << indent(nesting_level) << "do {" << endl;
+        os << indent(nesting_level + 1) << "changed = false;" << endl;
+        os << indent(nesting_level + 1) << "visit();" << endl;
+        os << indent(nesting_level) << "} while (changed);" << endl;
+        os << endl;
+      }
+      else
+      {
+        os << indent() << "visit();\n";
+      }
+
       // types actually should be scheduled...
       for (Declaration d = first_Declaration(ds); d; d = DECL_NEXT(d)) {
 	const char* kind = NULL;
