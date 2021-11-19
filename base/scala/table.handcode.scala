@@ -66,7 +66,7 @@ with C_TABLE[TreeMap[T_KeyType,T_ValueType],T_KeyType,T_ValueType]
       if (result.isDefinedAt(k)) {
 	result = result.updated(k,t_ValueType.v_combine(result(k),v)).asInstanceOf[Table]
       } else {
-	result = result.insert(k,v);
+	result = result.updated(k,v);
       }
     };
     result

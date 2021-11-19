@@ -14,7 +14,7 @@ object Debug {
   
   def activate() : Unit = _active = true;
 
-  def indent() {
+  def indent() = {
     for (i <- 0 until depth)
       print(' ');
   }
