@@ -261,6 +261,7 @@ void dump_debug_end(ostream& os)
 
 // Output Scala pattern for APS pattern
 
+int formal_count = 0;
 static void dump_pattern_call(Pattern p, Pattern result, const char* resultS, ostream& os)
 {
   Pattern pf = pattern_call_func(p);
@@ -281,9 +282,11 @@ static void dump_pattern_call(Pattern p, Pattern result, const char* resultS, os
   } else {
     os << resultS;
   }
+  formal_count = 0;
   for (Pattern pa = first_PatternActual(pactuals); pa ; pa = PAT_NEXT(pa)) {
     os << ",";
     dump_Pattern(pa,os);
+    formal_count++;
   }
   os << ")";
 }
@@ -350,7 +353,7 @@ void dump_Pattern(Pattern p, ostream& os)
     {
       Declaration f = pattern_var_formal(p);
       string n = symbol_name(def_name(formal_def(f)));
-      if (n == "_") os << "_";
+      if (n == "_") os << "v_" << to_string(formal_count);
       else {
 	os << "v_" << n;
 	// Generating a type causes Scala to warn about erasure
@@ -826,6 +829,151 @@ void dump_TypeFormal_value(Declaration tf, ostream& os) {
 
 void dump_Type_Signature(Type,string,ostream&);
 
+void dump_CanonicalType(CanonicalType* ctype, ostream& oss)
+{
+  switch (ctype->key)
+  {
+  case KEY_CANONICAL_USE:
+  {
+    struct Canonical_use_type *canonical_use_type = (struct Canonical_use_type *)ctype;
+    oss << decl_name(canonical_use_type->decl);
+    break;
+  }
+  case KEY_CANONICAL_QUAL:
+  {
+    struct Canonical_qual_type *canonical_qual_type = (struct Canonical_qual_type *)ctype;
+    ostringstream buffer;
+    dump_CanonicalType(canonical_qual_type->source, oss);
+    oss << buffer.str() << "." << decl_name(canonical_qual_type->decl);
+    break;
+  }
+  case KEY_CANONICAL_FUNC:
+    aps_error(ctype, "Not sure how to convert canonical type function type to string");
+    break;
+  }
+}
+
+void dump_TypeDecl_Traits(Declaration tdecl, Type ti, string n, ostream &oss)
+{
+  Declaration mdecl = USE_DECL(module_use_use(type_inst_module(ti)));
+  if (module_decl_generating(mdecl))
+  {
+    return;
+  }
+
+  int nesting_level = 2;
+  oss << indent(nesting_level) << "/* dumping traits */" << "\n";
+
+  vector<Declaration> sv;
+  ServiceRecord sr;
+
+  Declarations body;
+  Declaration service_decl;
+
+  string actual_str = "null";
+  string prefix = "override";
+
+  CanonicalType* actual_canonical_type = canonical_type_base_type(new_canonical_type_use(tdecl));
+  ostringstream buffer;
+  dump_CanonicalType(actual_canonical_type, buffer);
+  actual_str = buffer.str();
+  string actual_type = "T_" + actual_str;
+  string actual_value = "t_" + actual_str;
+
+  // Add all module services
+  body = block_body(some_class_decl_contents(mdecl));
+  service_decl = first_Declaration(body);
+  while (service_decl != NULL)
+  {
+    sr.add(service_decl);
+    service_decl = DECL_NEXT(service_decl);
+  }
+
+  CanonicalSignatureSet csig_set = infer_canonical_signatures(canonical_type_base_type(new_canonical_type_use(tdecl)));
+
+  int i, j;
+  for (i = 0; i < csig_set->num_elements; i++)
+  {
+    CanonicalSignature *csig = (CanonicalSignature *)csig_set->elements[i];
+    if (!def_is_public(some_class_decl_def(csig->source_class)))
+    {
+      continue;
+    }
+
+    // If module is missing these inherited services then add them
+    body = block_body(some_class_decl_contents(csig->source_class));
+    service_decl = first_Declaration(body);
+    while (service_decl != NULL)
+    {
+      if (sr.missing(service_decl))
+      {
+        sv.push_back(service_decl);
+        sr.add(service_decl);
+      }
+      service_decl = DECL_NEXT(service_decl);
+    }
+
+    oss << (i > 0 ? "\n" : "") << indent(nesting_level) << "with C_" << decl_name(csig->source_class) << "[";
+
+    // dump result type
+    oss << actual_type;
+
+    for (j = 0; j < csig->num_actuals; j++)
+    {
+      oss << ", ";
+
+      CanonicalType *cactual = csig->actuals[j];
+      buffer.clear();
+      buffer.str("");
+      dump_CanonicalType(cactual, buffer);
+      oss << "T_" << buffer.str();
+    }
+
+    oss << "]";
+  }
+
+  oss << " {\n";
+  nesting_level++;
+
+  vector<Declaration>::iterator it;
+  for (it = sv.begin(); it != sv.end(); it++)
+  {
+    Declaration d = *it;
+
+    string n = decl_code_name(d);
+    switch (Declaration_KEY(d))
+    {
+    default:
+      break;
+    case KEYpattern_decl:
+    case KEYconstructor_decl:
+      oss << indent(nesting_level) << prefix << " " << "val p_" << n
+          << " = " << actual_value << ".p_" << n << ";\n";
+      if (Declaration_KEY(d) == KEYpattern_decl)
+        break;
+      /* fall through */
+    case KEYvalue_decl:
+    case KEYvalue_renaming:
+    case KEYfunction_decl:
+    case KEYattribute_decl:
+      oss << indent(nesting_level) << prefix << " " << "val v_" << n
+          << " = " << actual_value << ".v_" << n << ";\n";
+      break;
+    case KEYtype_decl:
+    case KEYphylum_decl:
+    case KEYtype_renaming:
+      oss << indent(nesting_level) << "type T_" << n
+          << " = " << actual_value << ".T_" << n << ";\n";
+      oss << indent(nesting_level) << "val t_" << n
+          << " = " << actual_value << ".t_" << n << ";\n";
+      break;
+    }
+  }
+
+  nesting_level--;
+  oss << indent(nesting_level) << "}\n";
+}
+
 void dump_some_class_decl(Declaration decl, ostream& oss)
 {
   // cout << "dump_some_class_decl(" << decl_name(decl) << ")" << endl;
@@ -1041,7 +1189,7 @@ static string type_inst_as_scala_type(Type ty)
 #endif
 }
 
-static void dump_type_inst(string n, string nameArg, Type ti, ostream& oss)
+static void dump_type_inst(string n, string nameArg, Declaration decl, Type ti, ostream& oss)
 {
   Module m = type_inst_module(ti);
   TypeActuals tas = type_inst_type_actuals(ti);
@@ -1055,7 +1203,7 @@ static void dump_type_inst(string n, string nameArg, Type ti, ostream& oss)
       {
 	ostringstream ss;
 	ss << n << ++u;
-	dump_type_inst(ss.str(),nameArg+"+\"$\"+"+ss.str(),ta,oss);
+	dump_type_inst(ss.str(),nameArg+"+\"$\"+"+ss.str(),decl, ta,oss);
 	break;
       }
     }
@@ -1108,7 +1256,10 @@ static void dump_type_inst(string n, string nameArg, Type ti, ostream& oss)
   for (Expression a = first_Actual(as); a; a = EXPR_NEXT(a)) {
     oss << "," << a;
   }
-  oss << ");\n";
+  oss << ")" << "\n";
+  indent();
+  dump_TypeDecl_Traits(decl,ti, n, oss);
+  oss  << "\n";
   oss << indent() << "type T_" << n << " = "
       << type_inst_as_scala_type(ti) << ";\n";
 }
@@ -1537,7 +1688,7 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
 	}
 	break;
       case KEYtype_inst:
-	dump_type_inst(name,qname,type,oss);
+	dump_type_inst(name,qname,decl,type,oss);
 	break;
       default:
 	oss << indent() << "type T_" << name << " = " << type << ";\n";

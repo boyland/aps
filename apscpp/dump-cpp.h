@@ -55,13 +55,13 @@ void dump_Type_prefixed(Type,ostream&);
 void dump_Type(Type,ostream&);
 void dump_Type_value(Type,ostream&);
 void dump_Type_signature(Type,ostream&);
-void dump_Typed_decl(Type,Declaration,char*prefix,ostream&);
+void dump_Typed_decl(Type,Declaration,const char*prefix,ostream&);
 void dump_Expression(Expression,ostream&);
-void dump_Use(Use,char *prefix,ostream&);
+void dump_Use(Use,const char *prefix,ostream&);
 void dump_TypeEnvironment(TypeEnvironment,ostream&);
 void dump_vd_Default(Declaration,ostream&);
 
-void dump_function_prototype(char*,Type ft, const output_streams& oss);
+void dump_function_prototype(string,Type ft, output_streams& oss);
 
 // these two must always be called in pairs: the first
 // leaves information around for the second:

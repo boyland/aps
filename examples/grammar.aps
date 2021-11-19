@@ -1,0 +1,19 @@
+with "symbol";
+with "table";
+
+module GRAMMAR[] begin
+  phylum Grammar;
+
+  phylum Item;
+  phylum Items := SEQUENCE[Item];
+
+  phylum Production;
+  phylum Productions := SEQUENCE[Production];
+
+  constructor terminal(s: Symbol) : Item;
+  constructor nonterminal(s: Symbol) : Item;
+  constructor prod(nt: Symbol; children: Items) : Production;
+  constructor grammar(prods: Productions) : Grammar;
+
+  pragma root_phylum(type Grammar);
+end;

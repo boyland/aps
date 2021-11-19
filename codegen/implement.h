@@ -1,13 +1,13 @@
 #ifndef IMPLEMENT_H
 #define IMPLEMENT_H
-// Implementing APS in C++
+// Implementing APS in Imperative OO (C++/Scala)
 // Different scheduling algorithms
 
 // This file contains an abstract class that
 // is used to schedule attribute grammars expressed
 // in APS using C++ templates.
 
-// The main code is in dump-cpp.cc,
+// The main code is in dump-LANG.cc,
 // but some parts are different depending on whether 
 // we have static or dynamic scheduling.
 
@@ -16,6 +16,13 @@
 
 using std::ostream;
 using std::vector;
+
+#ifdef APS2SCALA
+#define GEN_OUTPUT ostream
+#else /* APSCPP */
+struct output_streams;
+#define GEN_OUTPUT output_streams
+#endif
 
 #define LOCAL_UNIQUE_PREFIX(ld) Def_info(value_decl_def(ld))->unique_prefix
 
@@ -36,22 +43,18 @@ class Implementation {
     ModuleInfo(Declaration module);
     virtual ~ModuleInfo() {};
 
-    virtual void note_top_level_match(Declaration tlm,
-				      ostream& oss);
+    virtual void note_top_level_match(Declaration tlm, GEN_OUTPUT&);
 
-    virtual void note_local_attribute(Declaration la,
-				      ostream& oss);
+    virtual void note_local_attribute(Declaration la, GEN_OUTPUT&);
 
-    virtual void note_attribute_decl(Declaration ad,
-				     ostream& oss);
+    virtual void note_attribute_decl(Declaration ad, GEN_OUTPUT&);
 
     // Declaration will be declared by caller, but not initialized
     // unless this function desires to:
-    virtual void note_var_value_decl(Declaration vd,
-				     ostream& oss);
+    virtual void note_var_value_decl(Declaration vd, GEN_OUTPUT&);
 
     // implement tlm's and var value decls, and generate finish() routine.
-    virtual void implement(ostream& oss) = 0;
+    virtual void implement(GEN_OUTPUT&) = 0;
   };
 
   virtual ModuleInfo* get_module_info(Declaration module) = 0;
@@ -60,7 +63,7 @@ class Implementation {
   virtual void implement_function_body(Declaration f, ostream&) = 0;
 
   // not sure what to do here
-  // virtual void implement_procedure(Declaration p, ostream&) = 0;
+  // virtual void implement_procedure(Declaration p, GEN_OUTPUT&) = 0;
 
   // if a Declaration has an implementation mark on it,
   // this function is called to implement its use:

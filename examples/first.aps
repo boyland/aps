@@ -1,0 +1,82 @@
+with "symbol";
+with "table";
+with "grammar";
+
+module FIRST[T :: var GRAMMAR[]] extends T begin
+
+  type Symbols := SET[Symbol];
+  type SymbolLattice := UNION_LATTICE[Symbol, Symbols];
+
+  type DeclarationTable := TABLE_LATTICE[Symbol, SymbolLattice];
+  var circular collection firstTable : DeclarationTable;
+
+  circular attribute Item.item_first : SymbolLattice := { };
+  pragma synthesized(item_first);
+
+  circular attribute Items.items_first : SymbolLattice;
+  pragma synthesized(items_first);
+
+  attribute Grammar.grammar_first : DeclarationTable;
+  pragma synthesized(grammar_first);
+
+  epsilon : Symbol := make_symbol("epsilon");
+
+  match ?self:Item=terminal(?s:Symbol) begin
+    self.item_first := { s };
+  end;
+
+  match ?self:Item=nonterminal(?s:Symbol) begin
+    case DeclarationTable$select(firstTable, s) begin
+      match DeclarationTable$table_entry(?,?item_first_objs) begin
+        self.item_first :> item_first_objs;
+      end;
+    end;
+  end;
+
+  match ?self:Production=prod(?nt:Symbol, ?items: Items) begin
+    circular temp : SymbolLattice := items.items_first;
+
+    firstTable :> DeclarationTable$table_entry(nt, temp);
+  end;
+
+  match ?self:Grammar=grammar(?prods: Productions) begin
+    self.grammar_first := firstTable;
+  end;
+
+  match ?self : Items = Items$none() begin
+    self.items_first :> { epsilon };
+  end;
+
+  match ?self : Items = Items$single(?item : Item) begin
+    self.items_first :> item.item_first;
+  end;
+
+  match ?self : Items = Items$append(?items1,?items2 : Items) begin
+    self.items_first := black_dot(items1.items_first, items2.items_first);
+  end;
+
+  match ?self : Productions = Productions$none() begin
+
+  end;
+
+  match ?self : Productions = Productions$single(?stmt : Production) begin
+
+  end;
+
+  match ?self : Productions = Productions$append(?stmts1,?stmts2 : Productions) begin
+
+  end;
+
+  var function contains_epsilon(s_set: Symbols) :Boolean begin
+    result := Symbols$member(epsilon, s_set);
+  end;
+
+  var function black_dot(s1 :Symbols; s2 :Symbols) : Symbols begin
+    if contains_epsilon(s1) then
+      result := (s1 /\~ { epsilon }) \/ s2;
+    else
+      result := s1;
+    endif;
+  end;
+
+end;

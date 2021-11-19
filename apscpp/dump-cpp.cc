@@ -142,7 +142,7 @@ Declaration constructor_decl_base_type_decl(Declaration decl)
   return tdecl;
 }
 
-void dump_formal(Declaration formal,char *prefix,ostream&s)
+void dump_formal(Declaration formal,const char *prefix,ostream&s)
 {
   dump_Typed_decl(infer_formal_type(formal),formal,prefix,s);
   if (KEYseq_formal == Declaration_KEY(formal)) s << ",...";
@@ -334,8 +334,8 @@ void dump_Pattern_cond(Pattern p, string node, ostream& os)
 	  aps_error(pfuse,"Cannot handle calls to pattern functions");
 	}
       }
-      os << node << "->cons==";
-      dump_Use(pfuse,"this->c_",os); // added "this->" because of C++ compiler
+      os << node << "->cons==this->"; // added "this->" because of C++ compiler
+      dump_Use(pfuse,"c_",os);
 
       ostringstream ts;
       ts << "((";
@@ -1444,7 +1444,7 @@ void dump_cpp_Declaration(Declaration decl,const output_streams& oss)
 	break;
       }
       if (!is_result && context) {
-	is << ",\n    t_" << name << "(";
+	is << ",\n    t_" << name << "("; // previously added "this->" for templates
 	dump_Type_value(type,is);
 	is << ")";
       }
@@ -1782,7 +1782,7 @@ void dump_cpp_Declaration(Declaration decl,const output_streams& oss)
 	dump_Type_value(old,cpps);
       }
       if (context) {
-	is << ",\n    t_" << name << "(";
+	is << ",\n    t_" << name << "(this->"; // added "this->" because of templates
 	dump_Type_value(old,is);
 	is << ")";
       }
@@ -1911,7 +1911,7 @@ void dump_Type(Type t, ostream& o)
   }
 }
 
-void dump_Typed_decl(Type t, Declaration decl, char*prefix,ostream& o)
+void dump_Typed_decl(Type t, Declaration decl, const char*prefix,ostream& o)
 {
   Symbol sym = def_name(declaration_def(decl));
   switch (Type_KEY(t)) {
@@ -1952,6 +1952,7 @@ void dump_Type_value(Type t, ostream& o)
 	dump_Use(type_use_use(t),"get_",o);
 	o << "()";
       } else {
+        o << "this->"; // added because of C++ templates
 	dump_Use(type_use_use(t),"t_",o);
       }
     }
@@ -2210,7 +2211,7 @@ void dump_TypeEnvironment(TypeEnvironment te, ostream&os)
   os << "::";
 }
 
-void dump_Use(Use u, char *prefix, ostream& os)
+void dump_Use(Use u, const char *prefix, ostream& os)
 {
   Symbol sym;
   switch (Use_KEY(u)) {

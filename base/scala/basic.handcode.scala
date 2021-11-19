@@ -57,6 +57,10 @@ object basic_implicit {
   val t_AndLattice = new M_MAKE_LATTICE[T_Boolean]("AndLattice",t_Boolean,v_true,v_andc,v_revimplies,v_and,v_or);
   type T_AndLattice = T_Boolean;
 
+  type T_MAX_LATTICE[T] = T;
+  type T_MIN_LATTICE[T] = T;
+
+
   type T_BAG[T] = List[T];
   type T_LIST[T] = List[T];
   type T_SET[T] = scala.collection.immutable.Set[T];
@@ -716,7 +720,7 @@ with C_BAG[List[T_ElemType],T_ElemType]
   def f_assert(v__88 : T_Result) : Unit = {};
   
   val v__op_AC = f__op_AC _;
-  def f__op_AC(v_l : T_ElemType*):T_Result = v_l.toList;
+  def f__op_AC(v_l : Seq[T_ElemType]):T_Result = v_l.toList;
   
   val p__op_AC = new PatternSeqFunction[T_Result,T_ElemType](u__op_AC);
   def u__op_AC(x:Any) : Option[(T_Result,Seq[T_ElemType])] = x match {
@@ -841,7 +845,7 @@ with C_SET[Set[T_ElemType],T_ElemType]
   override def f_assert(v__88 : T_Result) : Unit = {};
   
   val v__op_AC = f__op_AC _;
-  def f__op_AC(v_l : T_ElemType*):T_Result = ListSet(v_l:_*);
+  def f__op_AC(v_l : Seq[T_ElemType]):T_Result = ListSet(v_l:_*);
   
   val p__op_AC = new PatternSeqFunction[T_Result,T_ElemType](u__op_AC);
   def u__op_AC(x:Any) : Option[(T_Result,Seq[T_ElemType])] = x match {
@@ -1028,7 +1032,7 @@ class M_ORDERED_SET[T_ElemType](t_ElemType:C_ORDERED[T_ElemType] extends Module(
     val v_less_equal = f_less_equal _;
     def f_less_equal(v__130 : T_Result, v__131 : T_Result):T_Boolean;
     val v__op_AC = f__op_AC _;
-    def f__op_AC(v__132 : T_ElemType*):T_Result;
+    def f__op_AC(v__132 : Seq[T_ElemType]):T_Result;
     val v_union = f_union _;
     def f_union(v__133 : T_Result, v__134 : T_Result):T_Result;
     val v_intersect = f_intersect _;
@@ -1068,7 +1072,7 @@ trait C_ORDERED_MULTISET[T_Result, T_ElemType] extends C_ORDERED_COLLECTION[T_Re
   val v_equal : (T_Result,T_Result) => T_Boolean;
   val v_less : (T_Result,T_Result) => T_Boolean;
   val v_less_equal : (T_Result,T_Result) => T_Boolean;
-  val v__op_AC : (T_ElemType*) => T_Result;
+  val v__op_AC : (Seq[T_ElemType]) => T_Result;
   val v_union : (T_Result,T_Result) => T_Result;
   val v_intersect : (T_Result,T_Result) => T_Result;
   val v_difference : (T_Result,T_Result) => T_Result;
@@ -1101,7 +1105,7 @@ class M_ORDERED_MULTISET[T_ElemType](t_ElemType:C_ORDERED[T_ElemType] extends Mo
     val v_less_equal = f_less_equal _;
     def f_less_equal(v__143 : T_Result, v__144 : T_Result):T_Boolean;
     val v__op_AC = f__op_AC _;
-    def f__op_AC(v__145 : T_ElemType*):T_Result;
+    def f__op_AC(v__145 : Seq[T_ElemType]):T_Result;
     val v_union = f_union _;
     def f_union(v__146 : T_Result, v__147 : T_Result):T_Result;
     val v_intersect = f_intersect _;

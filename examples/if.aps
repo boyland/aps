@@ -1,0 +1,8 @@
+[T] function (if)(b : Boolean; then_value,else_value : T) : T begin
+  if b then
+    result := then_value;
+  else
+    result := else_value;
+  endif;
+end;
+

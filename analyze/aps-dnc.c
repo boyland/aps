@@ -58,6 +58,7 @@ enum instance_direction instance_direction(INSTANCE *i) {
     return instance_local;
   } else {
     fatal_error("%d: unknown attributed node",tnode_line_number(i->node));
+    return dir; /* keep CC happy */
   }
 }
 
@@ -79,6 +80,8 @@ DEPENDENCY dependency_trans(DEPENDENCY k1, DEPENDENCY k2)
 	   (k2 & DEPENDENCY_NOT_JUST_FIBER)) |
 	  ((k1 & DEPENDENCY_MAYBE_CARRYING)&
 	   (k2 & DEPENDENCY_MAYBE_CARRYING)) |
+	  ((k1 & DEPENDENCY_MAYBE_SIMPLE)&
+	   (k2 & DEPENDENCY_MAYBE_SIMPLE)) | 
 	  SOME_DEPENDENCY);
 }
 
@@ -452,6 +455,7 @@ static Expression if_rule_test(void* if_rule) {
     return Match_info((Match)if_rule)->match_test;
   default:
     fatal_error("%d: unknown if_rule",tnode_line_number(if_rule));
+    return 0; /* keep CC happy */
   }
 }
 
@@ -463,6 +467,7 @@ static CONDITION* if_rule_cond(void *if_rule) {
     return &Match_info((Match)if_rule)->match_cond;
   default:
     fatal_error("%d: unknown if_rule",tnode_line_number(if_rule));
+    return 0; /* keep CC happy */
   }
 }
 
@@ -956,6 +961,19 @@ static BOOL decl_is_collection(Declaration d) {
   }
 }
 
+static BOOL decl_is_circular(Declaration d)
+{
+  if (!d) return FALSE;
+  switch (Declaration_KEY(d)) {
+  case KEYvalue_decl: 
+    return direction_is_circular(value_decl_direction(d));
+  case KEYattribute_decl: 
+    return direction_is_circular(attribute_decl_direction(d));
+  default:
+    return FALSE;
+  }
+}
+
 // return true if we are sure this vertex represents an input dependency
 static BOOL vertex_is_input(VERTEX* v) 
 {
@@ -1048,8 +1066,10 @@ Declaration attr_ref_node_decl(Expression e)
 {
   Expression node = attr_ref_object(e);
   switch (Expression_KEY(node)) {
-  default: fatal_error("%d: can't handle this attribute instance",
-		       tnode_line_number(node));
+  default:
+    fatal_error("%d: can't handle this attribute instance",
+          tnode_line_number(node));
+    return NULL;
   case KEYvalue_use:
     return USE_DECL(value_use_use(node));
   }
@@ -1094,6 +1114,8 @@ static void record_expression_dependencies(VERTEX *sink, CONDITION *cond,
   case KEYvalue_use:
     { Declaration decl=Use_info(value_use_use(e))->use_decl;
       Declaration rdecl;
+      int new_kind = kind;
+      if (!decl_is_circular(decl)) new_kind |= DEPENDENCY_MAYBE_SIMPLE;
       if (decl == NULL)
 	fatal_error("%d: unbound expression",tnode_line_number(e));
       if (DECL_IS_LOCAL(decl) &&
@@ -1107,13 +1129,13 @@ static void record_expression_dependencies(VERTEX *sink, CONDITION *cond,
 	  phylum_shared_info_attribute(phy,aug_graph->global_state);
 	source.modifier = NO_MODIFIER;
 	if (vertex_is_output(&source)) aps_warning(e,"Dependence on output value");
-	add_edges_to_graph(&source,sink,cond,kind&~DEPENDENCY_MAYBE_CARRYING,
+	add_edges_to_graph(&source,sink,cond,new_kind&~DEPENDENCY_MAYBE_CARRYING,
 			   aug_graph);
 
 	new_mod.field = decl;
 	new_mod.next = mod;
 	source.modifier = &new_mod;
-	add_edges_to_graph(&source,sink,cond,kind,aug_graph);
+	add_edges_to_graph(&source,sink,cond,new_kind,aug_graph);
       } else if (Declaration_info(decl)->decl_flags &
 		 (ATTR_DECL_INH_FLAG|ATTR_DECL_SYN_FLAG)) {
 	/* a use of parameter or result (we hope) */
@@ -1122,43 +1144,47 @@ static void record_expression_dependencies(VERTEX *sink, CONDITION *cond,
 	source.attr = decl;
 	source.modifier = mod;
 	if (vertex_is_output(&source)) aps_warning(e,"Dependence on output value");
-	add_edges_to_graph(&source,sink,cond,kind,aug_graph);
+	add_edges_to_graph(&source,sink,cond,new_kind,aug_graph);
       } else {
 	source.node = NULL;
 	source.attr = decl;
 	source.modifier = mod;
 	if (vertex_is_output(&source)) aps_warning(e,"Dependence on output value");
-	add_edges_to_graph(&source,sink,cond,kind,aug_graph);
+	add_edges_to_graph(&source,sink,cond,new_kind,aug_graph);
       }
     }
     break;
   case KEYfuncall:
     { Declaration decl;
+      int new_kind = kind;
       if ((decl = attr_ref_p(e)) != NULL) {
+  if (!decl_is_circular(decl)) new_kind |= DEPENDENCY_MAYBE_SIMPLE; else new_kind = kind;
 	source.node = attr_ref_node_decl(e);
 	source.attr = decl;
 	source.modifier = mod;
 	if (vertex_is_output(&source)) aps_warning(e,"Dependence on output value");
-	add_edges_to_graph(&source,sink,cond,kind,aug_graph);
+	add_edges_to_graph(&source,sink,cond,new_kind,aug_graph);
       } else if ((decl = field_ref_p(e)) != NULL) {
+  if (!decl_is_circular(decl)) new_kind |= DEPENDENCY_MAYBE_SIMPLE; else new_kind = kind;
 	Expression object = field_ref_object(e);
 	new_mod.field = decl;
 	new_mod.next = mod;
 	// first the dependency on the pointer itself (NOT carrying)
 	record_expression_dependencies(sink,cond,
-				       kind&~DEPENDENCY_MAYBE_CARRYING,
+				       new_kind&~DEPENDENCY_MAYBE_CARRYING,
 				       NO_MODIFIER,object,aug_graph);
 	// then the dependency on the field (possibly carrying)
-	record_expression_dependencies(sink,cond,kind,&new_mod,object,
+	record_expression_dependencies(sink,cond,new_kind,&new_mod,object,
 				       aug_graph);
       } else if ((decl = local_call_p(e)) != NULL) {
+  if (!decl_is_circular(decl)) new_kind |= DEPENDENCY_MAYBE_SIMPLE; else new_kind = kind;
 	Declaration result = some_function_decl_result(decl);
 	Expression actual = first_Actual(funcall_actuals(e));
 	/* first depend on the arguments (not carrying, no fibers) */
 	if (mod == NO_MODIFIER) {
 	  for (;actual!=NULL; actual=Expression_info(actual)->next_actual) {
 	    record_expression_dependencies(sink,cond,
-					   kind&~DEPENDENCY_MAYBE_CARRYING,
+					   new_kind&~DEPENDENCY_MAYBE_CARRYING,
 					   NO_MODIFIER,actual,aug_graph);
 	  }
 	}
@@ -1298,9 +1324,11 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
     break;
   case KEYfuncall:
     {
+      int new_kind = kind;
       Declaration field, attr, fdecl, decl;
       VERTEX sink;
       if ((field = field_ref_p(lhs)) != NULL) {
+  if (!decl_is_circular(field)) new_kind |= DEPENDENCY_MAYBE_SIMPLE; else new_kind = kind;
 	/* Assignment of a field, or a field of a field */
 	Expression object = field_ref_object(lhs);
 	MODIFIER new_mod;
@@ -1314,6 +1342,7 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
 	record_lhs_dependencies(object,cond,control_dependency,
 				&new_mod,object,aug_graph);
       } else if ((attr = attr_ref_p(lhs)) != NULL) {
+  if (!decl_is_circular(attr)) new_kind |= DEPENDENCY_MAYBE_SIMPLE; else new_kind = kind;
 	sink.node = attr_ref_node_decl(lhs);
 	sink.attr = attr;
 	sink.modifier = mod;
@@ -1321,7 +1350,8 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
 	if (vertex_is_input(&sink)) aps_error(lhs,"Assignment of input value");
 	record_expression_dependencies(&sink,cond,kind,NULL,rhs,aug_graph);
 	record_condition_dependencies(&sink,cond,aug_graph);
-      } else if ((fdecl = local_call_p(lhs)) != NULL) {      
+      } else if ((fdecl = local_call_p(lhs)) != NULL) {     
+	if (!decl_is_circular(fdecl)) new_kind |= DEPENDENCY_MAYBE_SIMPLE; else new_kind = kind;
 	Declaration result = some_function_decl_result(decl);
 	Declaration proxy = Expression_info(lhs)->funcall_proxy;
 	if (mod == NO_MODIFIER) {
@@ -1332,7 +1362,7 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
 	sink.modifier = mod;
 	set_value_for(&sink,rhs,aug_graph);
 	if (vertex_is_input(&sink)) aps_error(lhs,"Assignment of input value");
-	record_expression_dependencies(&sink,cond,kind,NULL,rhs,aug_graph);
+	record_expression_dependencies(&sink,cond,new_kind,NULL,rhs,aug_graph);
 	record_condition_dependencies(&sink,cond,aug_graph);
       } else {
 	Expression actual = first_Actual(funcall_actuals(lhs));
@@ -1449,7 +1479,13 @@ static void *get_edges(void *vaug_graph, void *node) {
 		dot_mod.next = nodot_mod.next = NO_MODIFIER;
 		sink.modifier = &nodot_mod;
 		source.modifier = &dot_mod;
-		add_edges_to_graph(&source,&sink,cond,fiber_dependency,
+		DEPENDENCY new_kind = fiber_dependency;
+		if (decl_is_circular(fdecl)) {
+		   new_kind &= ~DEPENDENCY_MAYBE_SIMPLE;
+		} else {
+		   new_kind |= DEPENDENCY_MAYBE_SIMPLE;
+		}
+		add_edges_to_graph(&source,&sink,cond,new_kind,
 				   aug_graph);
 	      }
 	    }
@@ -1976,7 +2012,7 @@ static void init_analysis_state(STATE *s, Declaration module) {
     }
     { int phyla_count = 0;
       if (edecls == NULL) {
-	aps_error(module,"no extension to module %s",
+	fatal_error("no extension to module %s",
 		  symbol_name(def_name(declaration_def(module))));
       } else {
 	Declaration edecl = first_Declaration(edecls);
@@ -2570,21 +2606,33 @@ void print_instance(INSTANCE *i, FILE *stream) {
 
 void print_edge_helper(DEPENDENCY kind, CONDITION *cond, FILE* stream) {
   if (stream == 0) stream = stdout;
-  switch (kind) {
-  default: fprintf(stream,"?%d",kind); break;
-  case no_dependency: fputc('!',stream); break;
-  case indirect_control_fiber_dependency:
-  case indirect_fiber_dependency: fputc('?',stream); /* fall through */
-  case control_fiber_dependency:
-  case fiber_dependency: fputc('(',stream); break;
-  case indirect_control_dependency:
-  case indirect_dependency: fputc('?',stream); /* fall through */
-  case control_dependency:
-  case dependency: break;
+
+  if (!(kind & SOME_DEPENDENCY))
+  {
+    fputc('!',stream);  // no-dependency
   }
+  
+  if (!(kind & DEPENDENCY_NOT_JUST_FIBER)) 
+  {
+    fputc('(',stream);  // fiber dependency
+  }
+  if (!(kind & DEPENDENCY_MAYBE_DIRECT))
+  {
+    fputc('?',stream);  // indirect dependency
+  }
+  if (kind & DEPENDENCY_MAYBE_SIMPLE)
+  {
+    fputc('s', stream); // simple dependency
+  }
+  else
+  {
+    fputc('o', stream); // circular dependency
+  }
+
   if (cond != NULL) print_condition(cond,stream);
-  if ((kind & DEPENDENCY_NOT_JUST_FIBER) == 0) {
-    fputc(')',stream);
+  if ((kind & DEPENDENCY_NOT_JUST_FIBER) == 0)
+  {
+    fputc(')',stream);  // fiber dependency
   }
 }
 
@@ -2739,11 +2787,11 @@ void print_phy_graph(PHY_GRAPH *phy_graph, FILE *stream) {
     fputs(" -> ",stream);
     for (j=0; j < n; ++j) {
       DEPENDENCY kind= phy_graph->mingraph[i*n+j];
+      if (kind != no_dependency) fputs("\n\t", stream);
       if (kind == no_dependency) continue;
       if (kind == fiber_dependency) fputc('(',stream);
       print_instance(&phy_graph->instances.array[j],stream);
       if (kind == fiber_dependency) fputc(')',stream);
-      fputc(' ',stream);
     }
     fputc('\n',stream);
   }
@@ -2765,6 +2813,7 @@ void print_analysis_state(STATE *s, FILE *stream) {
 
 void print_cycles(STATE *s, FILE *stream) {
   int i,j;
+  DEPENDENCY d;
   if (stream == 0) stream = stdout;
   /** test for cycles **/
   for (i=0; i < s->phyla.length; ++i) {
@@ -2772,15 +2821,10 @@ void print_cycles(STATE *s, FILE *stream) {
     PHY_GRAPH *phy_graph = &s->phy_graphs[i];
     int n = phy_graph->instances.length;
     for (j=0; j < n; ++j) {
-      switch (phy_graph->mingraph[j*n+j]) {
-      case no_dependency: break;
-      case indirect_control_fiber_dependency:
-      case control_fiber_dependency:
-      case indirect_fiber_dependency:
-      case fiber_dependency:
-	fprintf(stream,"fiber ");
-	/* fall through */
-      default:
+      d = phy_graph->mingraph[j*n+j];
+      if (d)
+      {
+        if (!(d & DEPENDENCY_NOT_JUST_FIBER)) fprintf(stream,"fiber ");
 	fprintf(stream,"summary cycle involving %s.",
 		symbol_name(def_name(declaration_def(phy_graph->phylum))));
 	print_instance(&phy_graph->instances.array[j],stdout);
@@ -2793,16 +2837,11 @@ void print_cycles(STATE *s, FILE *stream) {
     AUG_GRAPH *aug_graph = &s->aug_graphs[i];
     int n = aug_graph->instances.length;
     for (j=0; j < n; ++j) {
-      switch (edgeset_kind(aug_graph->graph[j*n+j])) {
-      case no_dependency: break;
-      case indirect_control_fiber_dependency:
-      case control_fiber_dependency:
-      case indirect_fiber_dependency:
-      case fiber_dependency:
-	fprintf(stream,"fiber ");
-	/* fall through */
-      default:
-	fprintf(stream,"local cycle for %s involving ",
+      d = edgeset_kind(aug_graph->graph[j*n+j]);
+      if (d)
+      {
+        if (!(d & DEPENDENCY_NOT_JUST_FIBER)) fprintf(stream,"fiber ");
+	fprintf(stream,"local cycle (%d) for %s involving", (edgeset_kind(aug_graph->graph[j*n+j])),
 		aug_graph_name(aug_graph));
 	print_instance(&aug_graph->instances.array[j],stdout);
 	fprintf(stream,"\n");

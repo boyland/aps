@@ -57,6 +57,7 @@ extern int member_fiberset(FIBER,FIBERSET);
 
 struct analysis_state;
 
+extern void add_fibers_to_state(struct analysis_state *s);
 extern void fiber_module(Declaration module, struct analysis_state *s);
 
 extern void print_fiber(FIBER,FILE *);
@@ -70,6 +71,7 @@ extern int fiber_debug;
 #define FIBER_INTRO 8
 #define FIBER_FINAL 16
 #define CALLSITE_INFO 32 
+#define ADD_FSA_EDGE 64
 
 /* useful routines */
 
