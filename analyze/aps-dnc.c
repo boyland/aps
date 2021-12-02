@@ -2841,7 +2841,7 @@ void print_cycles(STATE *s, FILE *stream) {
       if (d)
       {
         if (!(d & DEPENDENCY_NOT_JUST_FIBER)) fprintf(stream,"fiber ");
-	fprintf(stream,"local cycle (%d) for %s involving", (edgeset_kind(aug_graph->graph[j*n+j])),
+	fprintf(stream,"local cycle (%d) for %s involving ", (edgeset_kind(aug_graph->graph[j*n+j])),
 		aug_graph_name(aug_graph));
 	print_instance(&aug_graph->instances.array[j],stdout);
 	fprintf(stream,"\n");
