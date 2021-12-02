@@ -1199,7 +1199,9 @@ static void record_expression_dependencies(VERTEX *sink, CONDITION *cond,
 	  source.attr = result;
 	  source.modifier = mod;
 	  if (vertex_is_output(&source)) aps_warning(e,"Dependence on output value");
+#ifndef APS_FUNCTION_BLACKBOX
 	  add_edges_to_graph(&source,sink,cond,kind,aug_graph);
+#endif /* APS_FUNCTION_BLACKBOX */
 	}
       } else {
 	/* some random (external) function call */
