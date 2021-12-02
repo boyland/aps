@@ -18,11 +18,11 @@ module NULLABLE[T :: var GRAMMAR[]] extends T begin
 
   epsilon : Symbol := make_symbol("epsilon");
 
-  match ?self:Item=terminal(?s:I) begin
+  match ?self:Item=terminal(?s:Symbol) begin
     self.item_nullable := s == epsilon;
   end;
 
-  match ?self:Item=nonterminal(?s:I) begin
+  match ?self:Item=nonterminal(?s:Symbol) begin
     case NullableTable$select(nullableTable, s) begin
       match NullableTable$table_entry(?,?item_nullable_boolean) begin
         self.item_nullable := item_nullable_boolean;
