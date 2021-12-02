@@ -31,9 +31,7 @@ module NULLABLE[T :: var GRAMMAR[]] extends T begin
   end;
 
   match ?self:Production=prod(?nt:Symbol, ?items: Items) begin
-    circular collection temp : OrLattice := items.items_nullable;
-
-    nullableTable :> NullableTable$table_entry(nt, temp);
+    nullableTable :> NullableTable$table_entry(nt, items.items_nullable);
   end;
 
   match ?self:Grammar=grammar(?prods: Productions) begin
