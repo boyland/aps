@@ -19,7 +19,7 @@ module NULLABLE[T :: var GRAMMAR[]] extends T begin
   epsilon : Symbol := make_symbol("epsilon");
 
   match ?self:Item=terminal(?s:Symbol) begin
-    self.item_nullable := s == epsilon;
+    self.item_nullable := s = epsilon;
   end;
 
   match ?self:Item=nonterminal(?s:Symbol) begin
