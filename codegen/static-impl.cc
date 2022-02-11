@@ -133,7 +133,6 @@ static bool implement_visit_function(AUG_GRAPH* aug_graph,
       if (current == phase) return true; // phase is over
 
       bool is_mod = false;
-
       switch (Declaration_KEY(aug_graph->syntax_decl))
       {
       case KEYsome_class_decl:
