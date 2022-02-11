@@ -932,7 +932,6 @@ static CTO_NODE* schedule_visits(AUG_GRAPH *aug_graph, CTO_NODE* prev, CONDITION
 static Declaration* get_aug_graph_children(AUG_GRAPH *aug_graph)
 {
   Declaration source = aug_graph->match_rule;
-
   switch (Declaration_KEY(source))
   {
   case KEYtop_level_match:
@@ -947,7 +946,6 @@ static Declaration* get_aug_graph_children(AUG_GRAPH *aug_graph)
 
     int i = 0;
     Declaration* result = (Declaration*)HALLOC(sizeof(Declaration) * count);
-
     formal = top_level_match_first_rhs_decl(source);
     while (formal != NULL)
     {
@@ -972,7 +970,6 @@ static Declaration* get_aug_graph_children(AUG_GRAPH *aug_graph)
 
     int i = 0;
     Declaration* result = (Declaration*)HALLOC(sizeof(Declaration) * count);
-
     child = first_Declaration(block_body(some_class_decl_contents(source)));
     while (child != NULL)
     {
@@ -997,7 +994,6 @@ static Declaration* get_aug_graph_children(AUG_GRAPH *aug_graph)
 
     int i = 0;
     Declaration* result = (Declaration*)HALLOC(sizeof(Declaration) * count);
-
     formal = first_Declaration(function_type_formals(some_function_decl_type(source)));
     while (formal != NULL)
     {
