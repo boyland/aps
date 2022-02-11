@@ -170,9 +170,10 @@ static bool implement_visit_function(AUG_GRAPH* aug_graph,
     }
 
     // Instance should not be null for non-visit marker CTO nodes
+    // Visit markers have a form of either: <ph,ch> or <-ph,-1>
     if (in == NULL)
     {
-      fatal_error("total_order is malformed.");
+      fatal_error("total_order is malformed: Instance should not be null for non-visit marker CTO nodes.");
     }
 
     Declaration ad = in->fibered_attr.attr;
