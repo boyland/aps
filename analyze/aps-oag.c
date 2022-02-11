@@ -360,9 +360,18 @@ static void print_total_order(CTO_NODE *cto, int indent, FILE *stream)
  * @param prev CTO node
  * @param stream output stream
  */ 
-static void print_error_debug(CTO_NODE* prev, FILE *stream)
+static void print_error_debug(AUG_GRAPH *aug_graph, CHILD_PHASE* instance_groups, CTO_NODE* prev, FILE *stream)
 {
-  fprintf(stderr, "Schedule so far:\n");
+  fprintf(stderr, "Instances (%s):\n", decl_name(aug_graph->syntax_decl));
+
+  int i;
+  for (i = 0; i < aug_graph->instances.length; i++)
+  {
+    print_instance(&aug_graph->instances.array[i], stream);
+    fprintf(stream, "<%d, %d>\n", instance_groups[i].ph, instance_groups[i].ch);
+  }
+
+  fprintf(stream, "Schedule so far:\n");
   // For debugging purposes, traverse all the way back
   while (prev != NULL && prev->cto_prev != NULL) prev = prev->cto_prev;
 
@@ -480,6 +489,7 @@ static bool instance_ready_to_go(AUG_GRAPH *aug_graph, CHILD_PHASE* instance_gro
  * @param cond current condition
  * @param instance_groups array of <ph,ch>
  * @param i instance index to test
+ * @return boolean indicating whether group is ready to be scheduled
  */
 static bool group_ready_to_go(AUG_GRAPH *aug_graph, CHILD_PHASE* instance_groups, const CONDITION cond, const int i)
 {
@@ -544,6 +554,98 @@ static CTO_NODE* schedule_visits(AUG_GRAPH *aug_graph, CTO_NODE* prev, CONDITION
 static CTO_NODE* schedule_visits_group(AUG_GRAPH *aug_graph, CTO_NODE* prev, CONDITION cond, CHILD_PHASE* instance_groups, int remaining, CHILD_PHASE *group);
 
 /**
+ * Function that throws an error if locals are scheduled out of order
+ * @param aug_graph Augmented dependency graph
+ * @param instance_groups array of <ph,ch> indexed by INSTANCE index
+ */
+static void assert_locals_order(AUG_GRAPH *aug_graph, CHILD_PHASE* instance_groups)
+{
+  int n = aug_graph->instances.length;
+  int i, j;
+
+  for (i = 0; i < n; i++)
+  {
+    if (instance_is_local(aug_graph, instance_groups, i) && aug_graph->schedule[i])
+    {
+      for (j = 0; j < i; j++)
+      {
+        if (instance_is_local(aug_graph, instance_groups, j) && !aug_graph->schedule[j])
+        {
+          fprintf(stderr, "Scheduled local:\n\t");
+          print_instance(&aug_graph->instances.array[i], stderr);
+          fprintf(stderr, "\nBefore scheduling:\n\t");
+          print_instance(&aug_graph->instances.array[j], stderr);
+          fprintf(stderr, "\n");
+
+          fatal_error("Scheduling local attribute instances in an out of order fashion.");
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Utility function to greedy schedule as many locals as possible
+ * @param aug_graph Augmented dependency graph
+ * @param prev previous CTO node
+ * @param cond current CONDITION
+ * @param instance_groups array of <ph,ch> indexed by INSTANCE index
+ * @param remaining count of remaining instances to schedule
+ * @param group parent group key
+ * @return head of linked list
+ */
+static CTO_NODE* schedule_locals(AUG_GRAPH *aug_graph, CTO_NODE* prev, CONDITION cond, CHILD_PHASE* instance_groups, int remaining)
+{
+  int i;
+  int n = aug_graph->instances.length;
+  int sane_remaining = 0;
+  CTO_NODE* cto_node = prev;
+
+  for (i = 0; i < n; i++)
+  {
+    INSTANCE *instance = &aug_graph->instances.array[i];
+    CHILD_PHASE *instance_group = &instance_groups[i];
+
+    // Already scheduled OR instance is not local then ignore
+    if (aug_graph->schedule[i] != 0 || !instance_is_local(aug_graph, instance_groups, i))
+    {
+      continue;
+    }
+
+    sane_remaining++;
+
+    cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
+    cto_node->cto_prev = prev;
+    cto_node->cto_instance = instance;
+    cto_node->child_phase = instance_groups[i];
+
+    aug_graph->schedule[i] = 1; // instance has been scheduled (and will not be considered for scheduling in the recursive call)
+
+    if (if_rule_p(instance->fibered_attr.attr))
+    {
+      int cmask = 1 << (if_rule_index(instance->fibered_attr.attr));
+      cond.negative |= cmask;
+      cto_node->cto_if_false = schedule_locals(aug_graph, cto_node, cond, instance_groups, remaining-1);
+      cond.negative &= ~cmask;
+      cond.positive |= cmask;
+      cto_node->cto_if_true = schedule_locals(aug_graph, cto_node, cond, instance_groups, remaining-1);
+      cond.positive &= ~cmask;
+    }
+    else
+    {
+      cto_node->cto_next = schedule_locals(aug_graph, cto_node, cond, instance_groups, remaining-1);
+    }
+
+    aug_graph->schedule[i] = 0; // Release it
+
+    return cto_node;
+  }
+
+  // Fall back to normal scheduler
+  return schedule_visits(aug_graph, prev, cond, instance_groups, remaining /* no change */);
+}
+
+/**
  * Utility function to handle transitions between groups
  * @param aug_graph Augmented dependency graph
  * @param prev previous CTO node
@@ -551,6 +653,7 @@ static CTO_NODE* schedule_visits_group(AUG_GRAPH *aug_graph, CTO_NODE* prev, CON
  * @param instance_groups array of <ph,ch> indexed by INSTANCE index
  * @param remaining count of remaining instances to schedule
  * @param group parent group key
+ * @return head of linked list
  */
 static CTO_NODE* schedule_transitions(AUG_GRAPH *aug_graph, CTO_NODE* prev, CONDITION cond, CHILD_PHASE* instance_groups, int remaining, CHILD_PHASE *group)
 {
@@ -602,7 +705,8 @@ static CTO_NODE* schedule_transitions(AUG_GRAPH *aug_graph, CTO_NODE* prev, COND
     }
   }
 
-  return schedule_visits(aug_graph, prev, cond, instance_groups, remaining /* no change */);
+  // Try to schedule local if any before falling back and call schedule_visits
+  return schedule_locals(aug_graph, prev, cond, instance_groups, remaining /* no change */);
 }
 
 /**
@@ -610,6 +714,7 @@ static CTO_NODE* schedule_transitions(AUG_GRAPH *aug_graph, CTO_NODE* prev, COND
  * @param aug_graph Augmented dependency graph
  * @param prev previous CTO node
  * @param instance_groups array of <ph,ch> indexed by INSTANCE index
+ * @return head of linked list
  */
 static CTO_NODE* schedule_visit_end(AUG_GRAPH *aug_graph, CTO_NODE* prev, CHILD_PHASE* instance_groups)
 {
@@ -635,6 +740,7 @@ static CTO_NODE* schedule_visit_end(AUG_GRAPH *aug_graph, CTO_NODE* prev, CHILD_
  * @param instance_groups array of <ph,ch> indexed by INSTANCE index
  * @param remaining count of remaining instances to schedule
  * @param group parent group key
+ * @return head of linked list
  */
 static CTO_NODE* schedule_visits_group(AUG_GRAPH *aug_graph, CTO_NODE* prev, CONDITION cond, CHILD_PHASE* instance_groups, int remaining, CHILD_PHASE *group)
 {
@@ -673,6 +779,8 @@ static CTO_NODE* schedule_visits_group(AUG_GRAPH *aug_graph, CTO_NODE* prev, CON
 
       aug_graph->schedule[i] = 1; // instance has been scheduled (and will not be considered for scheduling in the recursive call)
 
+      assert_locals_order(aug_graph, instance_groups);
+
       if (if_rule_p(instance->fibered_attr.attr))
       {
         int cmask = 1 << (if_rule_index(instance->fibered_attr.attr));
@@ -706,7 +814,7 @@ static CTO_NODE* schedule_visits_group(AUG_GRAPH *aug_graph, CTO_NODE* prev, CON
     fprintf(stderr,"remaining out of sync %d != %d\n", sane_remaining, remaining);
   }
 
-  print_error_debug(prev, stderr);
+  print_error_debug(aug_graph, instance_groups, prev, stderr);
   fatal_error("Cannot make conditional total order!");
 
   return NULL;
@@ -719,6 +827,7 @@ static CTO_NODE* schedule_visits_group(AUG_GRAPH *aug_graph, CTO_NODE* prev, CON
  * @param cond current CONDITION
  * @param instance_groups array of <ph,ch> indexed by INSTANCE index
  * @param remaining count of remaining instances to schedule
+ * @return head of linked list
  */
 static CTO_NODE* schedule_visits(AUG_GRAPH *aug_graph, CTO_NODE* prev, CONDITION cond, CHILD_PHASE* instance_groups, int remaining)
 {
@@ -760,6 +869,8 @@ static CTO_NODE* schedule_visits(AUG_GRAPH *aug_graph, CTO_NODE* prev, CONDITION
         cto_node->child_phase = *group;
 
         aug_graph->schedule[i] = 1; // instance has been scheduled (and will not be considered for scheduling in the recursive call)
+
+        assert_locals_order(aug_graph, instance_groups);
 
         if (if_rule_p(instance->fibered_attr.attr))
         {
@@ -808,7 +919,7 @@ static CTO_NODE* schedule_visits(AUG_GRAPH *aug_graph, CTO_NODE* prev, CONDITION
     fprintf(stderr, "remaining out of sync %d != %d\n", sane_remaining, remaining);
   }
 
-  print_error_debug(prev, stderr);
+  print_error_debug(aug_graph, instance_groups, prev, stderr);
   fatal_error("Cannot make conditional total order!");
 
   return NULL;
