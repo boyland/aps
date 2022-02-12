@@ -24,7 +24,7 @@
 %%
 
 program : block
-{ $$ = program($1); }
+	{ $$ = program($1); }
 
 block : '{' decls stmts '}'
 	{ $$ = block($2, $3); }
