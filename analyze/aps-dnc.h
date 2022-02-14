@@ -21,6 +21,8 @@ typedef struct attribute_instance {
 enum instance_direction {instance_local, instance_inward, instance_outward};
 enum instance_direction fibered_attr_direction(FIBERED_ATTRIBUTE *fa);
 enum instance_direction instance_direction(INSTANCE *);
+extern BOOL fiber_attr_circular(FIBERED_ATTRIBUTE* fiber_attr);
+extern BOOL instance_circular(INSTANCE* in);
 
 typedef unsigned DEPENDENCY;
 

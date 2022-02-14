@@ -2850,3 +2850,35 @@ void print_cycles(STATE *s, FILE *stream) {
     }
   }
 }
+
+
+/**
+ * Utility function that determines whether fibered attribute is circular or not.
+ * if a fiber_attr is circular, which is true if the fiber is empty and the attribute
+ * (local or node attribute) is declared circular, OR (if the fiber is non-empty) if
+ * the last step in the fiber is circular.
+ * Note that a.b.c. is repsented as short = a.b, field = c 
+ * @param fiber_attr fibered attribute pointer
+ * @return boolean indicating the circularity 
+ */
+BOOL fiber_attr_circular(FIBERED_ATTRIBUTE* fiber_attr)
+{
+  // If fiber is empty
+  if (fiber_attr->fiber == base_fiber || fiber_attr->fiber == NULL)
+  {
+    return decl_is_circular(fiber_attr->attr);
+  }
+
+  FIBER fiber = fiber_attr->fiber;
+  return decl_is_circular(fiber->field);
+}
+
+/**
+ * Utility function indicating whether INSTANCE (attribute instance) is circular or not
+ * @param in attribute instance
+ * @return boolean indicating the circularity 
+ */
+BOOL instance_circular(INSTANCE* in)
+{
+  return fiber_attr_circular(&in->fibered_attr);
+}
