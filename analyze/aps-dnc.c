@@ -2851,7 +2851,6 @@ void print_cycles(STATE *s, FILE *stream) {
   }
 }
 
-
 /**
  * Utility function that determines whether fibered attribute is circular or not.
  * if a fiber_attr is circular, which is true if the fiber is empty and the attribute
