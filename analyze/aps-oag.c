@@ -16,28 +16,28 @@ int oag_debug;
  */
 static int schedule_phase(PHY_GRAPH * phy_graph, int phase, BOOL circular) {
   int done = 0;
-  int n = phy_graph -> instances.length;
+  int n = phy_graph->instances.length;
   int i, j;
 
   /* find inherited instances for the phase. */
   for (i = 0; i < n; ++i) {
-    INSTANCE * in = & phy_graph -> instances.array[i];
+    INSTANCE * in = & phy_graph->instances.array[i];
     if (instance_direction(in) == instance_inward &&
       instance_circular(in) == circular &&
-      phy_graph -> summary_schedule[i] == 0) {
+      phy_graph->summary_schedule[i] == 0) {
       for (j = 0; j < n; ++j) {
-        if (phy_graph -> summary_schedule[j] == 0 &&
-          phy_graph -> mingraph[j * n + i] != no_dependency)
+        if (phy_graph->summary_schedule[j] == 0 &&
+          phy_graph->mingraph[j * n + i] != no_dependency)
           break;
       }
       if (j == n) {
-        phy_graph -> summary_schedule[i] = -phase;
+        phy_graph->summary_schedule[i] = -phase;
         done++;
         for (j = 0; j < n; ++j) {
           /* force extra dependencies */
-          int sch = phy_graph -> summary_schedule[j];
+          int sch = phy_graph->summary_schedule[j];
           if (sch != 0 && sch != -phase)
-            phy_graph -> mingraph[j * n + i] = indirect_control_dependency;
+            phy_graph->mingraph[j * n + i] = indirect_control_dependency;
         }
         if (oag_debug & TOTAL_ORDER) {
           printf("%d- ", phase);
@@ -50,23 +50,23 @@ static int schedule_phase(PHY_GRAPH * phy_graph, int phase, BOOL circular) {
 
   /* now schedule synthesized attributes */
   for (i = 0; i < n; ++i) {
-    INSTANCE * in = & phy_graph -> instances.array[i];
+    INSTANCE * in = & phy_graph->instances.array[i];
     if (instance_direction(in) == instance_outward &&
       instance_circular(in) == circular &&
-      phy_graph -> summary_schedule[i] == 0) {
+      phy_graph->summary_schedule[i] == 0) {
       for (j = 0; j < n; ++j) {
-        if (phy_graph -> summary_schedule[j] == 0 &&
-          phy_graph -> mingraph[j * n + i] != no_dependency)
+        if (phy_graph->summary_schedule[j] == 0 &&
+          phy_graph->mingraph[j * n + i] != no_dependency)
           break;
       }
       if (j == n) {
-        phy_graph -> summary_schedule[i] = phase;
+        phy_graph->summary_schedule[i] = phase;
         done++;
         for (j = 0; j < n; ++j) {
           /* force extra dependencies */
-          int sch = phy_graph -> summary_schedule[j];
+          int sch = phy_graph->summary_schedule[j];
           if (sch != 0 && sch != phase)
-            phy_graph -> mingraph[j * n + i] = indirect_control_dependency;
+            phy_graph->mingraph[j * n + i] = indirect_control_dependency;
         }
         if (oag_debug & TOTAL_ORDER) {
           printf("%d+ ", phase);
@@ -83,17 +83,24 @@ static int schedule_phase(PHY_GRAPH * phy_graph, int phase, BOOL circular) {
 /**
  * Utility function that calculates ph (phase) for each attribute of a phylum
  */
-void schedule_summary_dependency_graph(PHY_GRAPH * phy_graph) {
-  int n = phy_graph -> instances.length;
+void schedule_summary_dependency_graph(PHY_GRAPH* phy_graph) {
+  int n = phy_graph->instances.length;
   int phase = 0;
   int done = 0;
   BOOL cont = true;
   
   int i, j;
   for (i = 0; i < n; ++i)
-    phy_graph -> summary_schedule[i] = 0;
+    phy_graph->summary_schedule[i] = 0;
 
-  int count_non_circular, count_circular;
+  size_t circular_phase_size = (n+1) * sizeof(BOOL);
+  BOOL* circular_phase = (BOOL*)HALLOC(circular_phase_size);
+  memset(circular_phase, false, circular_phase_size);
+
+  // Hold on to the flag indicating whether phase is circular or not
+  phy_graph->cyclic_flags = circular_phase;
+
+  int count_non_circular = 0, count_circular = 0;
   do {
     phase++;
 
@@ -101,6 +108,7 @@ void schedule_summary_dependency_graph(PHY_GRAPH * phy_graph) {
     count_non_circular = schedule_phase(phy_graph, phase, false);
     if (count_non_circular) {
       done += count_non_circular;
+      circular_phase[phase] = false;
       continue;
     }
 
@@ -108,6 +116,7 @@ void schedule_summary_dependency_graph(PHY_GRAPH * phy_graph) {
     count_circular = schedule_phase(phy_graph, phase, true);
     if (count_circular) {
       done += count_circular;
+      circular_phase[phase] = true;
       continue;
     }
 
@@ -116,8 +125,8 @@ void schedule_summary_dependency_graph(PHY_GRAPH * phy_graph) {
   if (done < n) {
     if (cycle_debug & PRINT_CYCLE) {
       for (i = 0; i < n; ++i) {
-        INSTANCE* in = & phy_graph -> instances.array[i];
-        int s = phy_graph -> summary_schedule[i];
+        INSTANCE* in = & phy_graph->instances.array[i];
+        int s = phy_graph->summary_schedule[i];
         print_instance( in , stdout);
         switch (instance_direction( in )) {
           case instance_local:
@@ -139,11 +148,11 @@ void schedule_summary_dependency_graph(PHY_GRAPH * phy_graph) {
         } else {
           printf(" depends on ");
           for (j = 0; j < n; ++j) {
-            if (phy_graph -> summary_schedule[j] == 0 &&
-              phy_graph -> mingraph[j * n + i] != no_dependency) {
-              INSTANCE* in2 = & phy_graph -> instances.array[j];
+            if (phy_graph->summary_schedule[j] == 0 &&
+              phy_graph->mingraph[j * n + i] != no_dependency) {
+              INSTANCE* in2 = & phy_graph->instances.array[j];
               print_instance(in2, stdout);
-              if (phy_graph -> mingraph[j * n + i] == fiber_dependency)
+              if (phy_graph->mingraph[j * n + i] == fiber_dependency)
                 printf("(?)");
               putc(' ', stdout);
             }
@@ -152,6 +161,9 @@ void schedule_summary_dependency_graph(PHY_GRAPH * phy_graph) {
         }
       }
     }
+
+    fatal_error("Cycle detected when scheduling phase %d for %s",
+		  phase,decl_name(phy_graph->phylum));
   }
 }
 

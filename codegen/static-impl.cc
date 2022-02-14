@@ -113,7 +113,14 @@ static bool implement_visit_function(AUG_GRAPH* aug_graph,
       os << indent() << "// aug_graph: " << decl_name(aug_graph->syntax_decl) << "\n";
       os << indent() << "// visit marker(" << ph << "," << ch << ")\n";
 
-      int n = PHY_GRAPH_NUM(Declaration_info(cto->child_decl)->node_phy_graph);
+      PHY_GRAPH* pg = Declaration_info(cto->child_decl)->node_phy_graph;
+      int n = PHY_GRAPH_NUM(pg);
+
+      // If current phase is not circular but visit is circular then fixed-point loop is needed
+      if (current > 0 && !pg->cyclic_flags[current] && pg->cyclic_flags[ph])
+      {
+        os << indent() << "// Fixed-point is needed here.\n";
+      }
 
       os << indent() << "visit_" << n
         << "_" << ph << "(";	
