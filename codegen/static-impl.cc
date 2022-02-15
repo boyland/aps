@@ -110,7 +110,7 @@ static void dump_fixed_point_loop_visit(Declaration decl, int n, int ph, ostream
 #ifdef APS2SCALA
   os << indent(nesting_level) << "val prevChanged" << n << ph << " = changed;\n";
   os << indent(nesting_level) << "do {\n";
-  os << indent(nesting_level + 1) << "changed = false);\n";
+  os << indent(nesting_level + 1) << "changed = false;\n";
   os << indent(nesting_level + 1) << "visit_" << n << "_" << ph << "(v_" << decl_name(decl) << ");\n";
   os << indent(nesting_level) << "} while (changed);\n";
   os << indent(nesting_level) << "changed = prevChanged" << n << ph << ";\n";
