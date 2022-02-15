@@ -98,6 +98,16 @@ Expression* make_instance_assignment(AUG_GRAPH* aug_graph,
   return array;
 }
 
+static void dump_fixed_point_loop(Declaration decl, int n, int ph, ostream& os)
+{
+#ifdef APS2SCALA
+  os << indent(nesting_level) << "do {\n";
+  os << indent(nesting_level + 1) << "changed = changed.updated(" << decl_name(decl) << ");\n";
+  os << indent(nesting_level + 1) << "visit_" << n << "_" << ph << "(" << decl_name(decl) << ");\n";
+  os << indent(nesting_level) << "} while (changed.getOrElse(" <<  decl_name(decl) << ", false));\n\n";
+#endif /* APS2SCALA */
+}
+
 // visit procedures are called:
 // visit_n_m
 // where n is the number of the phy_graph and m is the phase.
@@ -878,19 +888,7 @@ public:
 #endif /* APS2SCALA */
       ++nesting_level;
 
-      if (activate_static_circular)
-      {
-        os << endl;
-        os << indent(nesting_level) << "do {" << endl;
-        os << indent(nesting_level + 1) << "changed = false;" << endl;
-        os << indent(nesting_level + 1) << "visit();" << endl;
-        os << indent(nesting_level) << "} while (changed);" << endl;
-        os << endl;
-      }
-      else
-      {
-        os << indent() << "visit();\n";
-      }
+      os << indent() << "visit();\n";
 
       // types actually should be scheduled...
       for (Declaration d = first_Declaration(ds); d; d = DECL_NEXT(d)) {
