@@ -105,7 +105,7 @@ Expression* make_instance_assignment(AUG_GRAPH* aug_graph,
  * @param ph phase of visit
  * @param os FILE out
  */
-static void dump_fixed_point_loop(Declaration decl, int n, int ph, ostream& os)
+static void dump_fixed_point_loop_visit(Declaration decl, int n, int ph, ostream& os)
 {
 #ifdef APS2SCALA
   os << indent(nesting_level) << "val prevChanged" << n << ph << " = changed;\n";
@@ -896,9 +896,7 @@ public:
       os << " {\n";
 #endif /* APS2SCALA */
       ++nesting_level;
-
       os << indent() << "visit();\n";
-
       // types actually should be scheduled...
       for (Declaration d = first_Declaration(ds); d; d = DECL_NEXT(d)) {
 	const char* kind = NULL;
