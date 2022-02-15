@@ -599,8 +599,35 @@ static bool is_there_more_to_schedule_in_group(AUG_GRAPH *aug_graph, CHILD_PHASE
   return false;
 }
 
+/**
+ * Simple function to check if there is more to schedule in the group of index
+ * @param aug_graph Augmented dependency graph
+ * @param instance_groups array of <ph,ch> indexed by INSTANCE index
+ * @param parent_group parent group key
+ * @param min_ch min value for ch
+ * @return boolean indicating if there is more in this group that needs to be scheduled
+ */
+static BOOL is_there_more_to_schedule_in_phase(AUG_GRAPH *aug_graph, CHILD_PHASE* instance_groups, short phase, short min_ch)
+{
+  int n = aug_graph->instances.length;
+  int i;
+  for (i = 0; i < n; i++)
+  {
+    // Instance in the same group but cannot be considered
+    CHILD_PHASE *group_key = &instance_groups[i];
+
+    // Check if in the same group
+    if (abs(phase) == abs(group_key->ph) && group_key->ch >= min_ch)
+    {
+      if (aug_graph->schedule[i] == 0) return TRUE;
+    }
+  }
+
+  return FALSE;
+}
+
 // Signature of function
-static CTO_NODE* schedule_visits(AUG_GRAPH *aug_graph, CTO_NODE* prev, CONDITION cond, CHILD_PHASE* instance_groups, int remaining);
+static CTO_NODE* schedule_visits(AUG_GRAPH *aug_graph, CTO_NODE* prev, CONDITION cond, CHILD_PHASE* instance_groups, int remaining, CHILD_PHASE *group);
 static CTO_NODE* schedule_visits_group(AUG_GRAPH *aug_graph, CTO_NODE* prev, CONDITION cond, CHILD_PHASE* instance_groups, int remaining, CHILD_PHASE *group);
 
 /**
@@ -644,7 +671,7 @@ static void assert_locals_order(AUG_GRAPH *aug_graph, CHILD_PHASE* instance_grou
  * @param group parent group key
  * @return head of linked list
  */
-static CTO_NODE* schedule_locals(AUG_GRAPH *aug_graph, CTO_NODE* prev, CONDITION cond, CHILD_PHASE* instance_groups, int remaining)
+static CTO_NODE* schedule_locals(AUG_GRAPH *aug_graph, CTO_NODE* prev, CONDITION cond, CHILD_PHASE* instance_groups, int remaining, CHILD_PHASE* prev_group)
 {
   int i;
   int n = aug_graph->instances.length;
@@ -654,7 +681,7 @@ static CTO_NODE* schedule_locals(AUG_GRAPH *aug_graph, CTO_NODE* prev, CONDITION
   for (i = 0; i < n; i++)
   {
     INSTANCE *instance = &aug_graph->instances.array[i];
-    CHILD_PHASE *instance_group = &instance_groups[i];
+    CHILD_PHASE *group = &instance_groups[i];
 
     // Already scheduled OR instance is not local then ignore
     if (aug_graph->schedule[i] != 0 || !instance_is_local(aug_graph, instance_groups, i))
@@ -675,15 +702,15 @@ static CTO_NODE* schedule_locals(AUG_GRAPH *aug_graph, CTO_NODE* prev, CONDITION
     {
       int cmask = 1 << (if_rule_index(instance->fibered_attr.attr));
       cond.negative |= cmask;
-      cto_node->cto_if_false = schedule_locals(aug_graph, cto_node, cond, instance_groups, remaining-1);
+      cto_node->cto_if_false = schedule_locals(aug_graph, cto_node, cond, instance_groups, remaining-1, prev_group);
       cond.negative &= ~cmask;
       cond.positive |= cmask;
-      cto_node->cto_if_true = schedule_locals(aug_graph, cto_node, cond, instance_groups, remaining-1);
+      cto_node->cto_if_true = schedule_locals(aug_graph, cto_node, cond, instance_groups, remaining-1, prev_group);
       cond.positive &= ~cmask;
     }
     else
     {
-      cto_node->cto_next = schedule_locals(aug_graph, cto_node, cond, instance_groups, remaining-1);
+      cto_node->cto_next = schedule_locals(aug_graph, cto_node, cond, instance_groups, remaining-1, prev_group);
     }
 
     aug_graph->schedule[i] = 0; // Release it
@@ -692,7 +719,7 @@ static CTO_NODE* schedule_locals(AUG_GRAPH *aug_graph, CTO_NODE* prev, CONDITION
   }
 
   // Fall back to normal scheduler
-  return schedule_visits(aug_graph, prev, cond, instance_groups, remaining /* no change */);
+  return schedule_visits(aug_graph, prev, cond, instance_groups, remaining /* no change */, prev_group);
 }
 
 /**
@@ -734,7 +761,7 @@ static CTO_NODE* schedule_transitions(AUG_GRAPH *aug_graph, CTO_NODE* prev, COND
     cto_node->cto_instance = NULL;
     cto_node->child_phase.ph = group->ph;
     cto_node->child_phase.ch = -1;
-    cto_node->cto_next = schedule_visits(aug_graph, cto_node, cond, instance_groups, remaining /* no change */);
+    cto_node->cto_next = schedule_visits(aug_graph, cto_node, cond, instance_groups, remaining /* no change */, group);
 
     return cto_node;
   }
@@ -755,8 +782,22 @@ static CTO_NODE* schedule_transitions(AUG_GRAPH *aug_graph, CTO_NODE* prev, COND
     }
   }
 
+  // Don't leave this phase without completing everything
+  // Probe whether there is more child attribute instance in this phase ready to be scheduled
+  if (is_there_more_to_schedule_in_phase(aug_graph, instance_groups, group->ph, group->ch + 1))
+  {
+    CHILD_PHASE *child_group = (CHILD_PHASE*)HALLOC(sizeof(CHILD_PHASE));
+    child_group->ph = -abs(group->ph); // inherited attribute
+    child_group->ch = group->ch + 1;   // start from the next child
+
+    if (is_there_more_to_schedule_in_group(aug_graph, instance_groups, child_group))
+    {
+      return schedule_visits_group(aug_graph, prev, cond, instance_groups, remaining, child_group);
+    }
+  }
+
   // Try to schedule local if any before falling back and call schedule_visits
-  return schedule_locals(aug_graph, prev, cond, instance_groups, remaining /* no change */);
+  return schedule_locals(aug_graph, prev, cond, instance_groups, remaining /* no change */, group);
 }
 
 /**
@@ -766,18 +807,12 @@ static CTO_NODE* schedule_transitions(AUG_GRAPH *aug_graph, CTO_NODE* prev, COND
  * @param instance_groups array of <ph,ch> indexed by INSTANCE index
  * @return head of linked list
  */
-static CTO_NODE* schedule_visit_end(AUG_GRAPH *aug_graph, CTO_NODE* prev, CHILD_PHASE* instance_groups)
+static CTO_NODE* schedule_visit_end(AUG_GRAPH *aug_graph, CTO_NODE* prev, CHILD_PHASE* group)
 {
-  CTO_NODE* current = prev;
-  while (group_is_local(&(current->child_phase)))
-  {
-    current = current->cto_prev;
-  }
-
   CTO_NODE* cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
   cto_node->cto_prev = prev;
   cto_node->cto_instance = NULL;
-  cto_node->child_phase.ph = current->child_phase.ph;
+  cto_node->child_phase.ph = abs(group->ph);
   cto_node->child_phase.ch = -1;
   return cto_node;
 }
@@ -802,7 +837,7 @@ static CTO_NODE* schedule_visits_group(AUG_GRAPH *aug_graph, CTO_NODE* prev, CON
   /* If nothing more to do, we are done. */
   if (remaining == 0)
   {
-    return schedule_visit_end(aug_graph, prev, instance_groups);
+    return schedule_visit_end(aug_graph, prev, group);
   }
 
   /* Outer condition is impossible, its a dead-end branch */
@@ -835,10 +870,10 @@ static CTO_NODE* schedule_visits_group(AUG_GRAPH *aug_graph, CTO_NODE* prev, CON
       {
         int cmask = 1 << (if_rule_index(instance->fibered_attr.attr));
         cond.negative |= cmask;
-        cto_node->cto_if_false = schedule_visits(aug_graph, cto_node, cond, instance_groups, remaining-1);
+        cto_node->cto_if_false = schedule_visits(aug_graph, cto_node, cond, instance_groups, remaining-1, group);
         cond.negative &= ~cmask;
         cond.positive |= cmask;
-        cto_node->cto_if_true = schedule_visits(aug_graph, cto_node, cond, instance_groups, remaining-1);
+        cto_node->cto_if_true = schedule_visits(aug_graph, cto_node, cond, instance_groups, remaining-1, group);
         cond.positive &= ~cmask;
       }
       else
@@ -879,7 +914,7 @@ static CTO_NODE* schedule_visits_group(AUG_GRAPH *aug_graph, CTO_NODE* prev, CON
  * @param remaining count of remaining instances to schedule
  * @return head of linked list
  */
-static CTO_NODE* schedule_visits(AUG_GRAPH *aug_graph, CTO_NODE* prev, CONDITION cond, CHILD_PHASE* instance_groups, int remaining)
+static CTO_NODE* schedule_visits(AUG_GRAPH *aug_graph, CTO_NODE* prev, CONDITION cond, CHILD_PHASE* instance_groups, int remaining, CHILD_PHASE *prev_group)
 {
   int i;
   int n = aug_graph->instances.length;
@@ -891,7 +926,7 @@ static CTO_NODE* schedule_visits(AUG_GRAPH *aug_graph, CTO_NODE* prev, CONDITION
   /* If nothing more to do, we are done. */
   if (remaining == 0)
   {
-    return schedule_visit_end(aug_graph, prev, instance_groups);
+    return schedule_visit_end(aug_graph, prev, prev_group);
   }
 
   /* Outer condition is impossible, its a dead-end branch */
@@ -926,15 +961,15 @@ static CTO_NODE* schedule_visits(AUG_GRAPH *aug_graph, CTO_NODE* prev, CONDITION
         {
           int cmask = 1 << (if_rule_index(instance->fibered_attr.attr));
           cond.negative |= cmask;
-          cto_node->cto_if_false = schedule_visits(aug_graph, cto_node, cond, instance_groups, remaining-1);
+          cto_node->cto_if_false = schedule_visits(aug_graph, cto_node, cond, instance_groups, remaining-1, group);
           cond.negative &= ~cmask;
           cond.positive |= cmask;
-          cto_node->cto_if_true = schedule_visits(aug_graph, cto_node, cond, instance_groups, remaining-1);
+          cto_node->cto_if_true = schedule_visits(aug_graph, cto_node, cond, instance_groups, remaining-1, group);
           cond.positive &= ~cmask;
         }
         else
         {
-          cto_node->cto_next = schedule_visits(aug_graph, cto_node, cond, instance_groups, remaining-1);
+          cto_node->cto_next = schedule_visits(aug_graph, cto_node, cond, instance_groups, remaining-1, group);
         }
 
         aug_graph->schedule[i] = 0; // Release it
@@ -944,15 +979,14 @@ static CTO_NODE* schedule_visits(AUG_GRAPH *aug_graph, CTO_NODE* prev, CONDITION
       // Instance is not local then delegate it to group scheduler
       else
       {
-        // If we find ourselves schedule a parent inherited attribute (that wasn't handled in the last case), this means
-        // that the previous visit ended without any synthesized attributes, so we need to stick in the visit end
-        // (Visit (ph = +(one less then the -ph we are on now), ch = -1)
-        if (group->ph < -1 && group->ch == -1)
+        // If phase has changed since previous group then we need a end of phase visit marker
+        // This is needed when for example we have <2,-1> and we start <3,0>
+        if (abs(group->ph) > abs(prev_group->ph))
         {
           CTO_NODE *cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
           cto_node->cto_prev = prev;
           cto_node->cto_instance = NULL;
-          cto_node->child_phase.ph = -group->ph -1;
+          cto_node->child_phase.ph = abs(prev_group->ph);
           cto_node->child_phase.ch = -1;
           cto_node->cto_next = schedule_visits_group(aug_graph, prev, cond, instance_groups, remaining, group);
           return cto_node;
