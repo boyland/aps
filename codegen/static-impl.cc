@@ -120,8 +120,9 @@ static bool implement_visit_function(AUG_GRAPH* aug_graph,
       if (current > 0 && !pg->cyclic_flags[current] && pg->cyclic_flags[ph])
       {
         os << indent() << "// Fixed-point is needed here.\n";
+        dump_fixed_point_loop_visit(cto->child_decl, n, ph, os);
       }
-
+      {
       os << indent() << "visit_" << n
         << "_" << ph << "(";	
 #ifdef APS2SCALA
@@ -130,6 +131,7 @@ static bool implement_visit_function(AUG_GRAPH* aug_graph,
         os << "v_" << decl_name(cto->child_decl);
 #endif /* APS2SCALA */
       os << ");\n";
+      }
 
       continue;
     }
