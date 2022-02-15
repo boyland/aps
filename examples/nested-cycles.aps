@@ -40,7 +40,7 @@ module NESTED_CYCLES[T :: var SIMPLE[]] extends T begin
   match ?b:Block=block(?ds:Decls,?ss:Stmts) begin
     ds.decls_assigned_in := ss.stmts_assigned_out;
     -- notice simple (non-monotone) use of b.outer_names
-    ss.stmts_assigned_in := ss.stmts_assigned_out - b.outer_names;
+    ss.stmts_assigned_in := ss.stmts_assigned_out /\~ b.outer_names;
   end;
   
   match ?:Decls=no_decls() begin
