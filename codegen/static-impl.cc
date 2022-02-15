@@ -887,9 +887,7 @@ public:
       os << " {\n";
 #endif /* APS2SCALA */
       ++nesting_level;
-
       os << indent() << "visit();\n";
-
       // types actually should be scheduled...
       for (Declaration d = first_Declaration(ds); d; d = DECL_NEXT(d)) {
 	const char* kind = NULL;
