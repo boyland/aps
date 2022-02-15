@@ -607,7 +607,7 @@ static bool is_there_more_to_schedule_in_group(AUG_GRAPH *aug_graph, CHILD_PHASE
  * @param min_ch min value for ch
  * @return boolean indicating if there is more in this group that needs to be scheduled
  */
-static BOOL is_there_more_to_schedule_in_phase(AUG_GRAPH *aug_graph, CHILD_PHASE* instance_groups, short phase, short min_ch)
+static BOOL is_there_more_to_schedule_in_phase(AUG_GRAPH *aug_graph, CONDITION cond, CHILD_PHASE* instance_groups, short phase, CHILD_PHASE** ret_group)
 {
   int n = aug_graph->instances.length;
   int i;
@@ -617,9 +617,13 @@ static BOOL is_there_more_to_schedule_in_phase(AUG_GRAPH *aug_graph, CHILD_PHASE
     CHILD_PHASE *group_key = &instance_groups[i];
 
     // Check if in the same group
-    if (abs(phase) == abs(group_key->ph) && group_key->ch >= min_ch)
+    if (abs(phase) == abs(group_key->ph) && group_ready_to_go(aug_graph, instance_groups, cond, i))
     {
-      if (aug_graph->schedule[i] == 0) return TRUE;
+      if (aug_graph->schedule[i] == 0)
+      {
+        *ret_group = group_key;
+        return TRUE;
+      }
     }
   }
 
@@ -782,18 +786,12 @@ static CTO_NODE* schedule_transitions(AUG_GRAPH *aug_graph, CTO_NODE* prev, COND
     }
   }
 
+  CHILD_PHASE *child_group = NULL;
   // Don't leave this phase without completing everything
   // Probe whether there is more child attribute instance in this phase ready to be scheduled
-  if (is_there_more_to_schedule_in_phase(aug_graph, instance_groups, group->ph, group->ch + 1))
+  if (is_there_more_to_schedule_in_phase(aug_graph, cond, instance_groups, group->ph, &child_group))
   {
-    CHILD_PHASE *child_group = (CHILD_PHASE*)HALLOC(sizeof(CHILD_PHASE));
-    child_group->ph = -abs(group->ph); // inherited attribute
-    child_group->ch = group->ch + 1;   // start from the next child
-
-    if (is_there_more_to_schedule_in_group(aug_graph, instance_groups, child_group))
-    {
-      return schedule_visits_group(aug_graph, prev, cond, instance_groups, remaining, child_group);
-    }
+    return schedule_visits_group(aug_graph, prev, cond, instance_groups, remaining, child_group);
   }
 
   // Try to schedule local if any before falling back and call schedule_visits
@@ -1172,7 +1170,7 @@ void schedule_augmented_dependency_graph(AUG_GRAPH *aug_graph) {
     }
   }
 
-  // if (oag_debug & DEBUG_ORDER)
+  if (oag_debug & DEBUG_ORDER)
   {
     printf("\nInstances %s:\n", decl_name(aug_graph->syntax_decl));
     for (i = 0; i < n; i++)
