@@ -98,12 +98,12 @@ static string program_id(string name)
 void dump_staticCircularTrait(std::ostream& oss)
 {
   oss << "\n";
-  oss << indent(nesting_level) << "var changed: Map[Any, Boolean] = Map();\n";
+  oss << indent(nesting_level) << "var changed: Boolean = false;\n";
   oss << indent(nesting_level) << "trait StaticCircularEvaluation[V_P, V_T] extends CircularEvaluation[V_P, V_T] {\n";
   oss << indent(nesting_level + 1) << "override def set(newValue : ValueType) : Unit = {\n";
   oss << indent(nesting_level + 2) << "val prevValue = value;\n";
   oss << indent(nesting_level + 2) << "super.set(newValue);\n";
-  oss << indent(nesting_level + 2) << "changed = changed.updated(this, prevValue != value);\n";
+  oss << indent(nesting_level + 2) << "changed = prevValue != value;\n";
   oss << indent(nesting_level + 1) << "}\n";
   oss << indent(nesting_level + 1) << "checkForLateUpdate = false;\n"; // Needed to prevent TooLateError
   oss << indent(nesting_level) << "}\n\n";
