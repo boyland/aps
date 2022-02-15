@@ -98,7 +98,7 @@ Expression* make_instance_assignment(AUG_GRAPH* aug_graph,
   return array;
 }
 
-static void dump_fixed_point_loop(Declaration decl, int n, int ph, ostream& os)
+static void dump_fixed_point_loop_visit(Declaration decl, int n, int ph, ostream& os)
 {
 #ifdef APS2SCALA
   os << indent(nesting_level) << "do {\n";
