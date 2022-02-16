@@ -770,7 +770,7 @@ static CTO_NODE* schedule_transitions(AUG_GRAPH *aug_graph, CTO_NODE* prev, COND
     return cto_node;
   }
 
-  // If we find ourselves scheduling <-ph,-1> and there is nothing else to do in this group then work on the first child if any
+  // If we find ourselves scheduling <-ph,-1> and there is nothing else to do in this group then work on the first child <ph, 0> if any
   if (group->ph < 0 && group->ch == -1)
   {
     CHILD_PHASE *child_group = (CHILD_PHASE*)HALLOC(sizeof(CHILD_PHASE));
@@ -788,7 +788,7 @@ static CTO_NODE* schedule_transitions(AUG_GRAPH *aug_graph, CTO_NODE* prev, COND
 
   CHILD_PHASE *child_group = NULL;
   // Don't leave this phase without completing everything
-  // Probe whether there is more child attribute instance in this phase ready to be scheduled
+  // Probe whether there is more attribute instance in this phase ready to be scheduled
   if (is_there_more_to_schedule_in_phase(aug_graph, cond, instance_groups, group->ph, &child_group))
   {
     return schedule_visits_group(aug_graph, prev, cond, instance_groups, remaining, child_group);
