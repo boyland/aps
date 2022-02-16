@@ -6,3 +6,4 @@
 Simple.y
 Simple.lex
 Simple.output
+!SimpleParserBase.scala
