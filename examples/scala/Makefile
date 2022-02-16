@@ -47,7 +47,7 @@ SimpleParser.scala SimpleTokens.scala : Simple.y ${SCALABISON}
 	rm Simple.tab.c
 	${SCALA} -classpath ${SCALABISON} edu.uwm.cs.scalabison.RunGenerator Simple.y
 
-SimpleScanner.class : SimpleScanner.scala SimpleTokens.class
+SimpleScanner.class : SimpleScanner.scala SimpleTokens.class SimpleParserBase.class
 	${SCALAC} ${SCALACFLAGS} $<
 
 SimpleParser.class : SimpleParser.scala SimpleScanner.class
@@ -62,7 +62,7 @@ SimpleTokens.class : SimpleTokens.scala
 classic_binding_implicit.class : classic-binding.scala
 	${SCALAC} ${SCALACFLAGS} $<
 
-Classic.class : classic-driver.scala
+Classic.class : classic-driver.scala SimpleScanner.class SimpleParser.class
 	${SCALAC} ${SCALACFLAGS} $<
 
 Classic.class   classic_binding_implicit.class : simple_implicit.class
