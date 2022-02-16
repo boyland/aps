@@ -12,6 +12,8 @@ SCALAGEN = simple.scala classic-binding.scala tiny.scala \
 	test-coll.scala test-use-coll.scala test-cycle.scala use-global.scala \
 	grammar.scala first.scala follow.scala
 
+MISCSCALAGEN = nested-cycles.scala
+
 .PHONY: all clean
 
 all : ${SCALAGEN}
@@ -22,10 +24,14 @@ all : test_coll_implicit.class TestCollDriver.class
 all : test_cycle_implicit.class TestCycleDriver.class
 all : test_use_coll_implicit.class TestUseCollDriver.class
 all : grammar_implicit.class GrammarDriver.class
+all	: nested_cycles_implicit.class NestedCyclesDriver.class
 
 .PHONY: run
 
-run: Classic.run TestCollDriver.run TestCycleDriver.run
+run: Classic.run TestCollDriver.run TestCycleDriver.run NestedCyclesDriver.run
+
+%.static.scala : ../%.aps ${APS2SCALA}
+	${APS2SCALA} ${APS2SCALAFLAGS} -S $*
 
 %.scala : ../%.aps ${APS2SCALA}
 	${APS2SCALA} ${APS2SCALAFLAGS} $*
@@ -59,10 +65,19 @@ SimpleParserBase.class : SimpleParserBase.scala simple_implicit.class
 SimpleTokens.class : SimpleTokens.scala
 	${SCALAC} ${SCALACFLAGS} $<
 
+nested-cycles.class: nested-cycles.static.scala simple_implicit.class
+	${SCALAC} ${SCALACFLAGS} nested-cycles.scala
+
+.PHONY: nested_cycles_implicit.class
+nested_cycles_implicit.class : nested-cycles.class simple_implicit.class ;
+
+NestedCyclesDriver.class: nested_cycles_implicit.class SimpleParser.class
+	${SCALAC} ${SCALACFLAGS} nested-cycles-driver.scala
+
 classic_binding_implicit.class : classic-binding.scala
 	${SCALAC} ${SCALACFLAGS} $<
 
-Classic.class : classic-driver.scala SimpleScanner.class SimpleParser.class
+Classic.class : classic-driver.scala SimpleParser.class
 	${SCALAC} ${SCALACFLAGS} $<
 
 Classic.class   classic_binding_implicit.class : simple_implicit.class
@@ -108,5 +123,5 @@ UseGlobal.class : use-global-driver.scala
 	scala ${SCALAFLAGS} $*
 
 clean:
-	rm -f *.class ${SCALAGEN}
+	rm -f *.class ${SCALAGEN} ${MISCSCALAGEN}
 
