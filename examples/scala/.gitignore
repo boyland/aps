@@ -1,3 +1,9 @@
 *.scala
 !*-driver.scala
 !*.handcode.scala
+!*.lex.scala
+!*.y.scala
+Simple.y
+Simple.lex
+Simple.output
+!SimpleParserBase.scala
