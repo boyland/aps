@@ -1597,7 +1597,7 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
       if (s != NULL)
       {
         activate_static_circular = s->loop_required;
-        dump_staticCircularTrait(oss);
+        dump_static_circular_trait(oss);
       }
 
       if (result_typeval != "") {
