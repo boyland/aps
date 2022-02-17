@@ -113,15 +113,6 @@ static void dump_fixed_point_loop_visit(Declaration decl, int n, int ph, ostream
   os << indent(nesting_level + 1) << "changed = false;\n";
   os << indent(nesting_level + 1) << "visit_" << n << "_" << ph << "(v_" << decl_name(decl) << ");\n";
   os << indent(nesting_level) << "} while (changed);\n";
-  os << indent(nesting_level) << "override def check(newValue : ValueType) : Unit = {\n";
-  os << indent(nesting_level + 1) << "if (value != null) {\n";
-  os << indent(nesting_level + 2) << "if (!lattice.v_equal(value, newValue)) {\n";
-  os << indent(nesting_level + 3) << "if (!lattice.v_compare(value, newValue)) {\n";
-  os << indent(nesting_level + 4) << "throw new Evaluation.CyclicAttributeException("non-monotonic " + name);\n";
-  os << indent(nesting_level + 3) << "}\n";
-  os << indent(nesting_level + 2) << "}\n";
-  os << indent(nesting_level + 1) << "}\n";
-  os << indent(nesting_level) << "}\n";
   os << indent(nesting_level) << "changed = prevChanged" << n << ph << ";\n\n";
 #endif /* APS2SCALA */
 }
