@@ -17,3 +17,4 @@
 
 [ \t\r\n]+	{}
 
+<<EOF>> { return SimpleTokens.YYEOF(); }
