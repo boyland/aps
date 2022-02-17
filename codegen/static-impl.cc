@@ -122,7 +122,7 @@ static void dump_fixed_point_loop_visit(Declaration decl, int n, int ph, ostream
   os << indent(nesting_level + 2) << "}\n";
   os << indent(nesting_level + 1) << "}\n";
   os << indent(nesting_level) << "}\n";
-  os << indent(nesting_level) << "changed = prevChanged" << n << ph << ";\n";
+  os << indent(nesting_level) << "changed = prevChanged" << n << ph << ";\n\n";
 #endif /* APS2SCALA */
 }
 

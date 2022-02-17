@@ -26,7 +26,7 @@ void dump_scala_Declaration(Declaration,ostream&);
 
 static const int indent_multiple = 2;
 extern int nesting_level;
-extern bool activate_static_circular;  // This flag will generate do-while loops around root visit
+extern bool activate_static_circular;  // This flag will generate do-while loops around some visits
 string indent(int level = nesting_level);
 class InDefinition {
   int saved_nesting;
