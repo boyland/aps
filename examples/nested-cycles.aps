@@ -30,7 +30,7 @@ module NESTED_CYCLES[T :: var SIMPLE[]] extends T begin
 		   decls_assigned_in,
 		   outer_names);
 
-  type Messages := BAG[String];
+  type Messages := SET[String];
   var collection msgs : Messages;
   
   match ?p:Program=program(?b:Block) begin
