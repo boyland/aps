@@ -24,7 +24,7 @@ all : test_coll_implicit.class TestCollDriver.class
 all : test_cycle_implicit.class TestCycleDriver.class
 all : test_use_coll_implicit.class TestUseCollDriver.class
 all : grammar_implicit.class GrammarDriver.class
-all	: nested_cycles_implicit.class NestedCyclesDriver.class
+all : nested_cycles_implicit.class NestedCyclesDriver.class
 
 .PHONY: run
 
