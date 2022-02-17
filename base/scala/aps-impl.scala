@@ -482,7 +482,7 @@ trait CircularEvaluation[V_P, V_T] extends Evaluation[V_P,V_T] {
     }
   }
 
-  private def check(newValue : ValueType) : Unit = {
+  def check(newValue : ValueType) : Unit = {
     if (!lattice.v_equal(value,newValue)) {
       inCycle.helper.modified = true;
       if (!lattice.v_compare(value,newValue)) {
