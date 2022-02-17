@@ -32,5 +32,6 @@
   def ID(s : String) = SimpleTokens.ID(s);
   def INT_LITERAL(i:String) = SimpleTokens.INT_LITERAL(Integer.parseInt(i));
   def STR_LITERAL(s:String) = SimpleTokens.STR_LITERAL(s);
+  def YYEOFT = SimpleTokens.YYEOF();
   
 %}
