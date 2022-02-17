@@ -1,0 +1,103 @@
+with "simple";
+-- Example to demonsrate the need for nested cyclic looping.
+-- This example doesn't have any real intuitive meaning.
+module NESTED_CYCLES[T :: var SIMPLE[]] extends T begin
+
+  -- Sets of names:
+  type Names := SET[String];
+  type NamesLattice := UNION_LATTICE[String,Names];
+
+  var collection all_names : Names;
+
+  circular attribute Stmt.stmt_assigned_in : NamesLattice;
+  circular attribute Stmts.stmts_assigned_in : NamesLattice;
+  circular attribute Decl.decl_assigned_in : NamesLattice;
+  circular attribute Decls.decls_assigned_in : NamesLattice;
+
+  circular attribute Stmt.stmt_assigned_out : NamesLattice;
+  circular attribute Stmts.stmts_assigned_out : NamesLattice;
+
+  attribute Expr.names_used : Names;
+  attribute Block.outer_names : Names;
+
+  pragma synthesized(names_used,
+		     stmt_assigned_out,
+		     stmts_assigned_out);
+
+  pragma inherited(stmt_assigned_in,
+		   stmts_assigned_in,
+		   decl_assigned_in,
+		   decls_assigned_in,
+		   outer_names);
+
+  type Messages := BAG[String];
+  var collection msgs : Messages;
+  
+  match ?p:Program=program(?b:Block) begin
+    b.outer_names := Names${};
+  end;
+  
+  match ?b:Block=block(?ds:Decls,?ss:Stmts) begin
+    ds.decls_assigned_in := ss.stmts_assigned_out;
+    -- notice simple (non-monotone) use of b.outer_names
+    ss.stmts_assigned_in := ss.stmts_assigned_out /\~ b.outer_names;
+  end;
+  
+  match ?:Decls=no_decls() begin
+  end;
+  
+  match ?ds0:Decls=xcons_decls(?ds1:Decls,?d:Decl) begin
+    ds1.decls_assigned_in := ds0.decls_assigned_in;
+    d.decl_assigned_in := ds0.decls_assigned_in;
+  end;
+  
+  match ?d:Decl=decl(?id:String,?ty:Type) begin
+    all_names :> Names${id};
+    if id not in d.decl_assigned_in then
+      msgs :> {id ++ " was not 'assigned.'"};
+    endif;
+  end;
+
+  match ?t:Type=integer_type() begin
+  end;
+  
+  match ?t:Type=string_type() begin
+  end;
+  
+  match ?ss:Stmts=no_stmts() begin
+    ss.stmts_assigned_out := ss.stmts_assigned_in;
+  end;
+  
+  match ?ss0:Stmts=xcons_stmts(?ss1:Stmts,?s:Stmt) begin
+    ss1.stmts_assigned_in := ss0.stmts_assigned_in;
+    s.stmt_assigned_in := ss1.stmts_assigned_out;
+    ss0.stmts_assigned_out := s.stmt_assigned_out;
+  end;
+  
+  match ?s:Stmt=block_stmt(?b:Block) begin
+    s.stmt_assigned_out := s.stmt_assigned_in;
+    b.outer_names := s.stmt_assigned_in;
+  end;
+  
+  match ?s:Stmt=assign_stmt(?e1:Expr,?e2:Expr) begin
+    circular collection out : NamesLattice;
+    out :> s.stmt_assigned_in;
+    -- monotone use of s.stmt_assigned_in in this condition:
+    if e2.names_used <= s.stmt_assigned_in then
+      out :> e1.names_used;
+    endif;
+    s.stmt_assigned_out := out;
+  end;
+  
+  match ?e:Expr=intconstant(?:Integer) begin
+    e.names_used := Names${};
+  end;
+  
+  match ?e:Expr=strconstant(?:String) begin
+    e.names_used := Names${};
+  end;
+  
+  match ?e:Expr=variable(?id:String) begin
+    e.names_used := Names${id};
+  end;
+end;

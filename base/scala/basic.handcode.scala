@@ -51,10 +51,24 @@ object basic_implicit {
 
   type T_MAKE_LATTICE[L] = L;
 
-  val t_OrLattice = new M_MAKE_LATTICE[T_Boolean]("OrLattice",t_Boolean,v_false,v_cand,v_implies,v_or,v_and);
+  val t_OrLattice = new M_MAKE_LATTICE[T_Boolean]("OrLattice",t_Boolean,v_false,v_cand,v_implies,v_or,v_and)
+    with C_TYPE[Boolean]
+    with C_COMBINABLE[Boolean]
+    with C_LATTICE[Boolean] {
+        override val v_assert = t_Boolean.v_assert
+        override val v_node_equivalent = t_Boolean.v_node_equivalent
+        override val v_string = t_Boolean.v_string
+  }
   type T_OrLattice = T_Boolean;
 
-  val t_AndLattice = new M_MAKE_LATTICE[T_Boolean]("AndLattice",t_Boolean,v_true,v_andc,v_revimplies,v_and,v_or);
+  val t_AndLattice = new M_MAKE_LATTICE[T_Boolean]("AndLattice",t_Boolean,v_true,v_andc,v_revimplies,v_and,v_or)
+    with C_TYPE[Boolean]
+    with C_COMBINABLE[Boolean]
+    with C_LATTICE[Boolean] {
+       override val v_assert = t_Boolean.v_assert
+       override val v_node_equivalent = t_Boolean.v_node_equivalent
+       override val v_string = t_Boolean.v_string
+  }
   type T_AndLattice = T_Boolean;
 
   type T_MAX_LATTICE[T] = T;

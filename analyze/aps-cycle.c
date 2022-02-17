@@ -384,6 +384,8 @@ static void edgeset_combine_dependencies(EDGESET es, DEPENDENCY* acc_dependency,
   }
 }
 
+#define UP_DOWN_DIRECTION(v, direction) (direction ? v : !v)
+
 /**
  * In phylum graph (and in aug graph)
  * For every instance i:
@@ -404,8 +406,10 @@ static void edgeset_combine_dependencies(EDGESET es, DEPENDENCY* acc_dependency,
  *
  *  If the instance is in the cycle and an DOWN attr:
  *    Remove all dependencies from this attribute to any other instance in the same cycle
+ * @param s analysis STATE
+ * @param direction true: UP_DOWN and false DOWN_UP
  */
-static void add_up_down_attributes(STATE *s)
+static void add_up_down_attributes(STATE *s, bool direction)
 {
   int i, j, k, l, m;
   DEPENDENCY acc_dependency;
@@ -488,7 +492,7 @@ static void add_up_down_attributes(STATE *s)
         else
         {
           // UP attribute
-          if (instance_is_up(instance))
+          if (direction && UP_DOWN_DIRECTION(instance_is_up(instance), direction))
           {
             acc_dependency = no_dependency;
 
@@ -509,7 +513,7 @@ static void add_up_down_attributes(STATE *s)
               if (parent_index[l + phylum_index] == cyc->internal_info)
               {
                 // Make sure it is a DOWN attribute
-                if (acc_dependency && !instance_is_up(&array[l]))
+                if (acc_dependency && UP_DOWN_DIRECTION(!instance_is_up(&array[l]), direction))
                 {
                   phy->mingraph[k * n + l] = acc_dependency;
                 }
@@ -624,7 +628,7 @@ static void add_up_down_attributes(STATE *s)
         else
         {
           // UP attribute
-          if (instance_is_up(instance))
+          if (UP_DOWN_DIRECTION(instance_is_up(instance), direction))
           {
             acc_dependency = no_dependency;
             acc_cond.positive = 0;
@@ -647,7 +651,7 @@ static void add_up_down_attributes(STATE *s)
               if (parent_index[l + constructor_index] == cyc->internal_info)
               {
                 // Make sure it is a DOWN attribute
-                if (acc_dependency && !instance_is_up(&array[l]))
+                if (acc_dependency && UP_DOWN_DIRECTION(!instance_is_up(&array[l]), direction))
                 {
                   // printf("k -> l Adding In cycle -> In Cycle: ");
                   add_up_down_edge(k, l, n, array, acc_dependency, &acc_cond, aug_graph);
@@ -682,12 +686,14 @@ static void add_up_down_attributes(STATE *s)
 }
 
 
-void break_fiber_cycles(Declaration module,STATE *s) {
+void break_fiber_cycles(Declaration module,STATE *s,DEPENDENCY dep) {
   void *mark = SALLOC(0);
   init_indices(s);
   make_cycles(s);
   get_fiber_cycles(s);
-  add_up_down_attributes(s);
+
+  bool direction = !(dep & DEPENDENCY_NOT_JUST_FIBER);
+  add_up_down_attributes(s,direction);
   release(mark);
   {
     int saved_analysis_debug = analysis_debug;

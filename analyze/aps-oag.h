@@ -1,5 +1,10 @@
 extern void compute_oag(Declaration,STATE *);
 
+/** Return phase (synthesized) or -phase (inherited)
+ * for fibered attribute, given the phylum's summary dependence graph.
+ */
+extern int attribute_schedule(PHY_GRAPH *phy_graph, FIBERED_ATTRIBUTE* key);
+
 /** A conditional total order is a tree of cto nodes.
  * null means the CTO is done.
  *

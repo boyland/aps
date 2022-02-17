@@ -1,18 +1,32 @@
 /* Driver to run classic driver code */
 
 object Classic extends App {
-  val m_simple = new M_SIMPLE("Simple");
+  var simple_tree : M_SIMPLE = null;
+  if (args.length == 0) {
+    simple_tree = new M_SIMPLE("Simple");
+    val t_simple = simple_tree.t_Result;
+    val ds =
+	t_simple.v_xcons_decls(t_simple.v_no_decls(),
+			       t_simple.v_decl("x",t_simple.v_integer_type()));
+    val s =
+	t_simple.v_assign_stmt(t_simple.v_variable("x"),
+			       t_simple.v_variable("y"));
+    val ss = t_simple.v_xcons_stmts(t_simple.v_no_stmts(),s);
+    val p = t_simple.v_program(t_simple.v_block(ds,ss));
+  } else {
+    val ss = new SimpleScanner(new java.io.FileReader(args(0)));
+    val sp = new SimpleParser();
+    sp.reset(ss, args(0));
+    if (!sp.yyparse()) {
+      println("Errors found.\n");
+      System.exit(1);
+    }
+    simple_tree = sp.getTree();
+  }
+  
+  val m_simple = simple_tree;
   val m_binding = new M_NAME_RESOLUTION[m_simple.T_Result]("Binding",m_simple.t_Result);
   val t_binding = m_binding.t_Result;
-  val t_simple = t_binding; // = m_simple.t_Result; // scala type problems
-  val ds =
-    t_simple.v_xcons_decls(t_simple.v_no_decls(),
-			   t_simple.v_decl("x",t_simple.v_integer_type()));
-  val s =
-    t_simple.v_assign_stmt(t_simple.v_variable("x"),t_simple.v_variable("y"));
-  val ss = t_simple.v_xcons_stmts(t_simple.v_no_stmts(),s);
-					    
-  val p = t_simple.v_program(t_simple.v_block(ds,ss));
 
   Debug.activate();
 

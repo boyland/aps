@@ -1,5 +1,6 @@
 APSTOP= ../..
 SCALAC= scalac
+SCALA= scala
 SCALAV= 2.12
 APSLIB = ${APSTOP}/lib/aps-library-${SCALAV}.jar
 SCALAFLAGS= -cp .:${APSLIB}
@@ -15,6 +16,8 @@ SCALAGEN = simple.scala classic-binding.scala tiny.scala \
 
 all : ${SCALAGEN}
 all : simple_implicit.class classic_binding_implicit.class Classic.class
+all : SimpleScanner.class SimpleTokens.class
+all : SimpleParserBase.class SimpleParser.class
 all : test_coll_implicit.class TestCollDriver.class
 all : test_cycle_implicit.class TestCycleDriver.class
 all : test_use_coll_implicit.class TestUseCollDriver.class
@@ -29,6 +32,32 @@ run: Classic.run TestCollDriver.run TestCycleDriver.run
 
 %_implicit.class : %.scala
 	${SCALAC} ${SCALACFLAGS} $*.scala
+
+Simple.lex : ../simple.lex Simple.lex.scala
+	cat Simple.lex.scala ../simple.lex > $@
+
+SimpleScanner.scala : Simple.lex
+	java -jar ${SCALAFLEX} --scala $<
+
+Simple.y : ../simple.y Simple.y.scala
+	cat $< Simple.y.scala > $@
+
+SimpleParser.scala SimpleTokens.scala : Simple.y ${SCALABISON}
+	bison -v Simple.y
+	rm Simple.tab.c
+	${SCALA} -classpath ${SCALABISON} edu.uwm.cs.scalabison.RunGenerator Simple.y
+
+SimpleScanner.class : SimpleScanner.scala SimpleTokens.class
+	${SCALAC} ${SCALACFLAGS} $<
+
+SimpleParser.class : SimpleParser.scala SimpleScanner.class
+	${SCALAC} ${SCALACFLAGS} $<
+
+SimpleParserBase.class : SimpleParserBase.scala simple_implicit.class
+	${SCALAC} ${SCALACFLAGS} $<
+
+SimpleTokens.class : SimpleTokens.scala
+	${SCALAC} ${SCALACFLAGS} $<
 
 classic_binding_implicit.class : classic-binding.scala
 	${SCALAC} ${SCALACFLAGS} $<
