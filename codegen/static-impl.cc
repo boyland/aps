@@ -103,17 +103,18 @@ Expression* make_instance_assignment(AUG_GRAPH* aug_graph,
  * @param decl child node decl which will be used as parameter
  * @param n phylum graph index of child
  * @param ph phase of visit
+ * @param suffix preChanged variable suffix to prevent duplicate variable name error
  * @param os FILE out
  */
-static void dump_fixed_point_loop_visit(Declaration decl, int n, int ph, ostream& os)
+static void dump_fixed_point_loop_visit(Declaration decl, int n, int ph, int suffix, ostream& os)
 {
 #ifdef APS2SCALA
-  os << indent(nesting_level) << "val prevChanged" << n << ph << " = changed;\n";
+  os << indent(nesting_level) << "val prevChanged" << n << "_" << ph << "_" << suffix << " = changed;\n";
   os << indent(nesting_level) << "do {\n";
   os << indent(nesting_level + 1) << "changed = false;\n";
   os << indent(nesting_level + 1) << "visit_" << n << "_" << ph << "(v_" << decl_name(decl) << ");\n";
   os << indent(nesting_level) << "} while (changed);\n";
-  os << indent(nesting_level) << "changed = prevChanged" << n << ph << ";\n\n";
+  os << indent(nesting_level) << "changed = prevChanged" << n << "_" << ph << "_" << suffix << ";\n\n";
 #endif /* APS2SCALA */
 }
 
