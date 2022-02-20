@@ -16,6 +16,9 @@ clean:
 %.class: %.scala
 	scalac -cp ${SCALA_FLAGS} $<
 
+first.scala follow.scala:
+	${APS2SCALA} -DCOT -p ${EXAMPLES_PATH}:${ROOT_PATH}/base -S $(basename $(@F))
+
 %.scala:
 	${APS2SCALA} -DCOT -p ${EXAMPLES_PATH}:${ROOT_PATH}/base $*
 
