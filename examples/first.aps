@@ -28,7 +28,7 @@ module FIRST[T :: var GRAMMAR[]] extends T begin
   match ?self:Item=nonterminal(?s:Symbol) begin
     case DeclarationTable$select(firstTable, s) begin
       match DeclarationTable$table_entry(?,?item_first_objs) begin
-        self.item_first :> item_first_objs;
+        self.item_first := item_first_objs;
       end;
     end;
   end;
@@ -44,11 +44,11 @@ module FIRST[T :: var GRAMMAR[]] extends T begin
   end;
 
   match ?self : Items = Items$none() begin
-    self.items_first :> { epsilon };
+    self.items_first := { epsilon };
   end;
 
   match ?self : Items = Items$single(?item : Item) begin
-    self.items_first :> item.item_first;
+    self.items_first := item.item_first;
   end;
 
   match ?self : Items = Items$append(?items1,?items2 : Items) begin

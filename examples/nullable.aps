@@ -13,7 +13,7 @@ module NULLABLE[T :: var GRAMMAR[]] extends T begin
   circular attribute Items.items_nullable : OrLattice;
   pragma synthesized(items_nullable);
 
-  circular attribute Grammar.grammar_nullable : NullableTable;
+  attribute Grammar.grammar_nullable : NullableTable;
   pragma synthesized(grammar_nullable);
 
   epsilon : Symbol := make_symbol("epsilon");
