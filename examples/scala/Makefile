@@ -12,7 +12,7 @@ SCALAGEN = simple.scala classic-binding.scala tiny.scala \
 	test-coll.scala test-use-coll.scala test-cycle.scala use-global.scala \
 	grammar.scala first.scala follow.scala
 
-MISCSCALAGEN = nested-cycles.scala
+MISC_SCALAGEN = nested-cycles.scala
 
 .PHONY: all clean
 
@@ -123,5 +123,5 @@ UseGlobal.class : use-global-driver.scala
 	scala ${SCALAFLAGS} $*
 
 clean:
-	rm -f *.class ${SCALAGEN} ${MISCSCALAGEN}
+	rm -f *.class ${SCALAGEN} ${MISC_SCALAGEN}
 
