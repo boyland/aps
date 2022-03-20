@@ -87,10 +87,10 @@ class GrammarParserBase {
 
   def items_many_single(v1: Items) : ItemsMany = {
     Seq(v1)
-  }
+  };
 
   def items_many_append(v1: ItemsMany, v2: ItemsMany) : ItemsMany = {
     v1 ++ v2
-  }
+  };
 
 }
