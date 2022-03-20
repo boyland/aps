@@ -12,14 +12,16 @@ SCALAGEN = simple.scala classic-binding.scala tiny.scala \
 	test-coll.scala test-use-coll.scala test-cycle.scala use-global.scala \
 	grammar.scala first.scala follow.scala
 
-MISC_SCALAGEN = nested-cycles.scala
+MISC_SCALAGEN = nested-cycles.scala GrammarParser.scala SimpleParser.scala \
+	GrammarTokens.scala SimpleTokens.scala *.scala~ GrammarScanner.scala \
+	*.output *.lex *.y
 
 .PHONY: all clean
 
 all : ${SCALAGEN}
-all : simple_implicit.class classic_binding_implicit.class Classic.class
-all : SimpleScanner.class SimpleTokens.class
-all : SimpleParserBase.class SimpleParser.class
+all : grammar_implicit.class simple_implicit.class classic_binding_implicit.class Classic.class
+all : GrammarScanner.class GrammarTokens.class SimpleScanner.class SimpleTokens.class
+all : GrammarParserBase.class GrammarParser.class SimpleParserBase.class SimpleParser.class
 all : test_coll_implicit.class TestCollDriver.class
 all : test_cycle_implicit.class TestCycleDriver.class
 all : test_use_coll_implicit.class TestUseCollDriver.class
@@ -39,6 +41,32 @@ run: Classic.run TestCollDriver.run TestCycleDriver.run NestedCyclesDriver.run
 %_implicit.class : %.scala
 	${SCALAC} ${SCALACFLAGS} $*.scala
 
+Grammar.lex : ../grammar.lex Grammar.lex.scala
+	cat Grammar.lex.scala ../grammar.lex > $@
+
+GrammarScanner.scala : Grammar.lex
+	java -jar ${SCALAFLEX} --scala $<
+
+Grammar.y : ../grammar.y Grammar.y.scala
+	cat $< Grammar.y.scala > $@
+
+GrammarParser.scala GrammarTokens.scala : Grammar.y ${SCALABISON}
+	bison -v Grammar.y
+	rm Grammar.tab.c
+	${SCALA} -classpath ${SCALABISON} edu.uwm.cs.scalabison.RunGenerator Grammar.y
+
+GrammarScanner.class : GrammarScanner.scala GrammarTokens.class
+	${SCALAC} ${SCALACFLAGS} $<
+
+GrammarParser.class : GrammarParser.scala GrammarScanner.class GrammarParserBase.class
+	${SCALAC} ${SCALACFLAGS} $<
+
+GrammarParserBase.class : GrammarParserBase.scala grammar_implicit.class
+	${SCALAC} ${SCALACFLAGS} $<
+
+GrammarTokens.class : GrammarTokens.scala
+	${SCALAC} ${SCALACFLAGS} $<
+
 Simple.lex : ../simple.lex Simple.lex.scala
 	cat Simple.lex.scala ../simple.lex > $@
 
@@ -56,7 +84,7 @@ SimpleParser.scala SimpleTokens.scala : Simple.y ${SCALABISON}
 SimpleScanner.class : SimpleScanner.scala SimpleTokens.class
 	${SCALAC} ${SCALACFLAGS} $<
 
-SimpleParser.class : SimpleParser.scala SimpleScanner.class SimpleParserBase.class
+SimpleParser.class : SimpleParser.scala SimpleParserBase.class SimpleScanner.class
 	${SCALAC} ${SCALACFLAGS} $<
 
 SimpleParserBase.class : SimpleParserBase.scala simple_implicit.class
@@ -101,10 +129,10 @@ test_cycle_implicit.class : test-cycle.scala
 TestCycleDriver.class : test_cycle_implicit.class test-cycle-driver.scala
 	${SCALAC} ${SCALACFLAGS}  test-cycle-driver.scala
 
-grammar_implicit.class : grammar.scala first.scala follow.scala
+grammar_implicit.class : grammar.scala first.scala follow.scala nullable.scala
 	${SCALAC} ${SCALACFLAGS} $^
 
-GrammarDriver.class : grammar_implicit.class grammar.scala 
+GrammarDriver.class : grammar_implicit.class GrammarParser.class
 	${SCALAC} ${SCALACFLAGS} grammar-driver.scala
 
 TinyParser.class : tiny-parser.handcode.scala tiny_implicit.class
@@ -120,7 +148,7 @@ UseGlobal.class : use-global-driver.scala
 .PHONY: %.run
 
 %.run : %.class
-	scala ${SCALAFLAGS} $*
+	scala ${SCALAFLAGS} $* ${ARGS}
 
 clean:
 	rm -f *.class ${SCALAGEN} ${MISC_SCALAGEN}

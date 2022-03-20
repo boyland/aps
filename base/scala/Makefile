@@ -30,7 +30,7 @@ aps-library-2.11.jar : ${SCALA}
 
 aps-library-2.12.jar : ${SCALA}
 	@rm -f *.class
-	/afs/cs.uwm.edu/package/scala/scala-2.12.8/common/bin/scalac -deprecation ${SCALA}
+	scalac -deprecation ${SCALA}
 	jar cvf $@ *.class
 
 .PHONY: test-multiset.run
