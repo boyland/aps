@@ -46,10 +46,6 @@ object GrammarDriver extends App {
     p = t_grammar.v_grammar(program)
   } else {
     var ss = new GrammarScanner(new java.io.FileReader(args(0)));
-
-    while(ss.hasNext()) println(ss.next())
-
-    ss = new GrammarScanner(new java.io.FileReader(args(0)));
     val sp = new GrammarParser();
     sp.reset(ss, args(0));
     if (!sp.yyparse()) {
