@@ -423,8 +423,8 @@ static void *get_match_tests(void *vpexpr, void *node)
   default:
     return NULL;
   case KEYMatch:
-    traverse_Pattern(get_match_tests,vpexpr,matcher_pat((Match)node));
     Match_info((Match)node)->match_test = *pexpr;
+    traverse_Pattern(get_match_tests,vpexpr,matcher_pat((Match)node));
     return NULL;
   case KEYMatches:
   case KEYPatternActuals:
