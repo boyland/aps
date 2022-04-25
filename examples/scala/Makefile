@@ -12,7 +12,7 @@ SCALAGEN = simple.scala classic-binding.scala tiny.scala \
 	test-coll.scala test-use-coll.scala test-cycle.scala use-global.scala \
 	grammar.scala first.scala follow.scala
 
-MISC_SCALAGEN = nested-cycles.scala GrammarParser.scala SimpleParser.scala \
+MISCGEN = nested-cycles.scala GrammarParser.scala SimpleParser.scala \
 	GrammarTokens.scala SimpleTokens.scala *.scala~ GrammarScanner.scala \
 	*.output *.lex *.y
 
@@ -151,5 +151,5 @@ UseGlobal.class : use-global-driver.scala
 	scala ${SCALAFLAGS} $* ${ARGS}
 
 clean:
-	rm -f *.class ${SCALAGEN} ${MISC_SCALAGEN}
+	rm -f *.class ${SCALAGEN} ${MISCGEN}
 
