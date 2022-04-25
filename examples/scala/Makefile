@@ -16,7 +16,7 @@ MISCGEN = nested-cycles.scala GrammarParser.scala SimpleParser.scala \
 	GrammarTokens.scala SimpleTokens.scala *.scala~ GrammarScanner.scala \
 	*.output *.lex *.y
 
-.PHONY: all clean
+.PHONY: all clean phony_explicit
 
 all : ${SCALAGEN}
 all : grammar_implicit.class simple_implicit.class classic_binding_implicit.class Classic.class
@@ -31,6 +31,8 @@ all : nested_cycles_implicit.class NestedCyclesDriver.class
 .PHONY: run
 
 run: Classic.run TestCollDriver.run TestCycleDriver.run NestedCyclesDriver.run
+
+phony_explicit:
 
 %.static.scala : ../%.aps ${APS2SCALA}
 	${APS2SCALA} ${APS2SCALAFLAGS} -S $*
