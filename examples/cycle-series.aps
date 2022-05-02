@@ -1,5 +1,5 @@
 with "tiny";
-module BELOW_FIBER_CYCLE[T :: var TINY[]] extends T begin
+module CYCLE_SERIES[T :: var TINY[]] extends T begin
   type IntegerSet := SET[Integer];
   type IntegerSetLattice := UNION_LATTICE[Integer,IntegerSet];
 
