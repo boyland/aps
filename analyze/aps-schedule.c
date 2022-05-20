@@ -130,7 +130,7 @@ static int schedule_phase_circular(PHY_GRAPH* phy_graph, int phase) {
       temp_schedule[in->index] = 1;
     }
 
-    bool cycle_is_ready = true;
+    bool cycle_ready = true;
 
     for (j = 0; j < cyc->instances.length; j++) {
       INSTANCE* in = &cyc->instances.array[j];
@@ -139,13 +139,13 @@ static int schedule_phase_circular(PHY_GRAPH* phy_graph, int phase) {
         // come first then this cycle is not ready
         if (!temp_schedule[k] &&
             phy_graph->mingraph[k * n + in->index] != no_dependency) {
-          cycle_is_ready = false;
+          cycle_ready = false;
         }
       }
     }
 
     // If all attributes in this cycle are ready
-    if (cycle_is_ready) {
+    if (cycle_ready) {
       for (j = 0; j < cyc->instances.length; j++) {
         INSTANCE* in = &cyc->instances.array[j];
         // -phase for inherited attributes
@@ -1070,6 +1070,94 @@ static CTO_NODE* schedule_visit_end(AUG_GRAPH* aug_graph,
   return cto_node;
 }
 
+static CTO_NODE* schedule_visits_circular_group(AUG_GRAPH* aug_graph,
+                                                CYCLE* cyc,
+                                                CTO_NODE* prev,
+                                                CONDITION cond,
+                                                TOTAL_ORDER_STATE* state,
+                                                int remaining,
+                                                CHILD_PHASE* group,
+                                                int prev_i,
+                                                short parent_ph) {
+  int i, j, k;
+  int n = aug_graph->instances.length;
+
+  for (i = 0; i < cyc->instances.length; i++) {
+    INSTANCE* in = &cyc->instances.array[i];
+    CTO_NODE* cto_node;
+
+    // Already scheduled
+    if (state->schedule[in->index])
+      continue;
+
+    /*
+     * check to see if makes sense
+     * (No need to schedule something that
+     * occurs only in a different condition branch.)
+     */
+    if (MERGED_CONDITION_IS_IMPOSSIBLE(cond, instance_condition(in))) {
+      state->schedule[i] = true;
+      cto_node = schedule_visits_circular_group(aug_graph, cyc, prev, cond,
+                                                state, remaining - 1, group,
+                                                prev_i, parent_ph);
+      state->schedule[i] = false;
+      return cto_node;
+    }
+
+    // If it is local then continue scheduling
+    if (instance_is_local(aug_graph, state, i)) {
+      cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
+      cto_node->cto_prev = prev;
+      cto_node->cto_instance = in;
+      cto_node->child_phase.ch = group->ch;
+      cto_node->child_phase.ph = group->ph;
+      cto_node->visit = parent_ph;
+      state->schedule[i] =
+          true;  // instance has been scheduled (and will not be
+                 // considered for scheduling in the recursive call)
+
+      if (if_rule_p(in->fibered_attr.attr)) {
+        int cmask = 1 << (if_rule_index(in->fibered_attr.attr));
+        cond.negative |= cmask;
+        cto_node->cto_if_false = schedule_visits_circular_group(
+            aug_graph, cyc, cto_node, cond, state, remaining - 1, group, i,
+            parent_ph);
+        cond.negative &= ~cmask;
+        cond.positive |= cmask;
+        cto_node->cto_if_true = schedule_visits_circular_group(
+            aug_graph, cyc, cto_node, cond, state, remaining - 1, group, i,
+            parent_ph);
+        cond.positive &= ~cmask;
+      } else {
+        cto_node->cto_next = schedule_visits_circular_group(
+            aug_graph, cyc, cto_node, cond, state, remaining - 1, group, i,
+            parent_ph);
+      }
+
+      state->schedule[i] = false;  // Release it
+
+      return cto_node;
+    } else {
+      // Instance is not local then delegate it to group scheduler
+      return schedule_transition_start_of_group(
+          aug_graph, prev, cond, state, remaining, group, prev_i, parent_ph);
+    }
+  }
+
+  return schedule_visits(aug_graph, prev, cond, state, remaining, group, prev_i,
+                         parent_ph);
+}
+
+/**
+ * Recursive scheduling function to only schedule
+ * @param aug_graph Augmented dependency graph
+ * @param prev previous CTO node
+ * @param cond current CONDITION
+ * @param state state
+ * @param remaining count of remaining instances to schedule
+ * @param group parent group key
+ * @return head of linked list
+ */
 static CTO_NODE* schedule_visits_circular(AUG_GRAPH* aug_graph,
                                           CTO_NODE* prev,
                                           CONDITION cond,
@@ -1078,12 +1166,71 @@ static CTO_NODE* schedule_visits_circular(AUG_GRAPH* aug_graph,
                                           CHILD_PHASE* group,
                                           int prev_i,
                                           short parent_ph) {
-  int i;
+  int i, j, k;
   int n = aug_graph->instances.length;
 
-  // Mark all attributes in this 
-  for (i = 0; i < n; i++) {
+  for (i = 0; i < aug_graph->cycles.length; i++) {
+    CYCLE* cyc = &aug_graph->cycles.array[i];
+
+    // If any of instances in this cycle are scheduled then this cycle is
+    // already schedule
+    if (state->schedule[cyc->instances.array[0].index])
+      continue;
+
+    size_t temp_schedule_size = n * sizeof(bool);
+    bool* temp_schedule = (bool*)alloca(temp_schedule_size);
+    memcpy(temp_schedule, state->schedule, temp_schedule_size);
+
+    // Temporarily mark all attributes in this scheduled
+    for (j = 0; j < cyc->instances.length; j++) {
+      INSTANCE* in = &cyc->instances.array[j];
+      temp_schedule[in->index] = 1;
+    }
+
+    bool cycle_ready = true;
+
+    for (j = 0; j < cyc->instances.length; j++) {
+      INSTANCE* in = &cyc->instances.array[j];
+
+      for (k = 0; k < n; k++) {
+        if (temp_schedule[k])
+          continue;
+
+        int index = k * n + in->index;
+
+        EDGESET edges;
+
+        // Look at all dependencies from instances in the cycle to instances
+        // that are not scheduled
+        for (edges = aug_graph->graph[index]; edges != NULL;
+             edges = edges->rest) {
+          // If the merge condition is impossible, ignore this edge
+          if (MERGED_CONDITION_IS_IMPOSSIBLE(cond, edges->cond))
+            continue;
+
+          if (oag_debug & DEBUG_ORDER) {
+            // Can't continue with scheduling if a dependency with a
+            // "possible" condition has not been scheduled yet
+            printf("This edgeset was not ready to be scheduled because of:\n");
+            print_edgeset(edges, stdout);
+            printf("\n");
+          }
+
+          cycle_ready = false;
+        }
+      }
+    }
+
+    if (cycle_ready) {
+      // Delegate it to the circular group scheduler
+      return schedule_visits_circular_group(aug_graph, cyc, prev, cond, state,
+                                            remaining, group, prev_i,
+                                            parent_ph);
+    }
   }
+
+  return schedule_visits(aug_graph, prev, cond, state, remaining, group, prev_i,
+                         parent_ph);
 }
 
 /**
