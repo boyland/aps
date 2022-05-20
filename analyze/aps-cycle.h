@@ -5,6 +5,7 @@
  */
 
 extern void break_fiber_cycles(Declaration,STATE *,DEPENDENCY);
+extern DEPENDENCY get_edgeset_combine_dependencies(EDGESET es);
 extern int cycle_debug;
 
 typedef struct cycle_description {

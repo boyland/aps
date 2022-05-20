@@ -370,6 +370,22 @@ static void add_up_down_edge(int index1, int index2, int n, INSTANCE *array, DEP
 
 /**
  * Combines dependencies for edgeset
+ * @param es edgeset
+ * @return combined dependencies given an edgeset
+ */
+DEPENDENCY get_edgeset_combine_dependencies(EDGESET es)
+{
+  DEPENDENCY acc_dependency = no_dependency;
+  for (; es != NULL; es = es->rest)
+  {
+    acc_dependency |= es->kind;
+  }
+
+  return acc_dependency;
+}
+
+/**
+ * Combines dependencies for edgeset
  * @param es
  * @param acc_dependency
  * @param acc_cond
@@ -385,6 +401,8 @@ static void edgeset_combine_dependencies(EDGESET es, DEPENDENCY* acc_dependency,
 }
 
 #define UP_DOWN_DIRECTION(v, direction) (direction ? v : !v)
+
+#define IS_JUST_FIBER_DEPENDENCY(d) ((d) && !((d) & DEPENDENCY_NOT_JUST_FIBER))
 
 /**
  * In phylum graph (and in aug graph)
@@ -449,7 +467,7 @@ static void add_up_down_attributes(STATE *s, bool direction)
           }
 
           // If any dependency
-          if (acc_dependency)
+          if (IS_JUST_FIBER_DEPENDENCY(acc_dependency))
           {
             // Forall instances in the cycle
             for (l = 0; l < n; l++)
@@ -475,7 +493,7 @@ static void add_up_down_attributes(STATE *s, bool direction)
           }
 
           // If any dependency
-          if (acc_dependency)
+          if (IS_JUST_FIBER_DEPENDENCY(acc_dependency))
           {
             // Forall instances in the cycle
             for (l = 0; l < n; l++)
@@ -513,11 +531,11 @@ static void add_up_down_attributes(STATE *s, bool direction)
               if (parent_index[l + phylum_index] == cyc->internal_info)
               {
                 // Make sure it is a DOWN attribute
-                if (acc_dependency && UP_DOWN_DIRECTION(!instance_is_up(&array[l]), direction))
+                if (IS_JUST_FIBER_DEPENDENCY(acc_dependency) && UP_DOWN_DIRECTION(!instance_is_up(&array[l]), direction))
                 {
                   phy->mingraph[k * n + l] = acc_dependency;
                 }
-                else
+                else if (IS_JUST_FIBER_DEPENDENCY(phy->mingraph[k * n + l]))
                 {
                   phy->mingraph[k * n + l] = no_dependency;
                 }
@@ -533,8 +551,11 @@ static void add_up_down_attributes(STATE *s, bool direction)
               // Make sure it is in the cycle
               if (parent_index[l + phylum_index] == cyc->internal_info)
               {
-                // Remove edges between instance and all others in the same cycle
-                phy->mingraph[k * n + l] = no_dependency;
+                if (IS_JUST_FIBER_DEPENDENCY(phy->mingraph[k * n + l]))
+                {
+                  // Remove edges between instance and all others in the same cycle
+                  phy->mingraph[k * n + l] = no_dependency;
+                }
               }
             }
           }
@@ -550,6 +571,11 @@ static void add_up_down_attributes(STATE *s, bool direction)
       int n = aug_graph->instances.length;
       int constructor_index = constructor_instance_start[j];
       INSTANCE *array = aug_graph->instances.array;
+
+      if (cycle_debug & DEBUG_UP_DOWN)
+      {
+        printf("\naug decl is: %s\n", decl_name(aug_graph->syntax_decl));
+      }
       for (k = 0; k < n; k++)
       {
         INSTANCE *instance = &array[k];
@@ -581,7 +607,7 @@ static void add_up_down_attributes(STATE *s, bool direction)
           }
 
           // If any dependency
-          if (acc_dependency)
+          if (IS_JUST_FIBER_DEPENDENCY(acc_dependency))
           {
             // Forall instances in the cycle
             for (l = 0; l < n; l++)
@@ -610,7 +636,7 @@ static void add_up_down_attributes(STATE *s, bool direction)
           }
 
           // If any dependency
-          if (acc_dependency)
+          if (IS_JUST_FIBER_DEPENDENCY(acc_dependency))
           {
             // Forall instances in the cycle
             for (l = 0; l < n; l++)
@@ -651,12 +677,12 @@ static void add_up_down_attributes(STATE *s, bool direction)
               if (parent_index[l + constructor_index] == cyc->internal_info)
               {
                 // Make sure it is a DOWN attribute
-                if (acc_dependency && UP_DOWN_DIRECTION(!instance_is_up(&array[l]), direction))
+                if (IS_JUST_FIBER_DEPENDENCY(acc_dependency) && UP_DOWN_DIRECTION(!instance_is_up(&array[l]), direction))
                 {
                   // printf("k -> l Adding In cycle -> In Cycle: ");
                   add_up_down_edge(k, l, n, array, acc_dependency, &acc_cond, aug_graph);
                 }
-                else
+                else if (IS_JUST_FIBER_DEPENDENCY(get_edgeset_combine_dependencies(aug_graph->graph[k * n + l])))
                 {
                   // printf("k -> l Removing In cycle -> In Cycle: ");
                   remove_edgeset(k, l, n, array, aug_graph);
@@ -673,9 +699,12 @@ static void add_up_down_attributes(STATE *s, bool direction)
               // Make sure it is in the cycle
               if (parent_index[l + constructor_index] == cyc->internal_info)
               {
+                if (IS_JUST_FIBER_DEPENDENCY(get_edgeset_combine_dependencies(aug_graph->graph[k * n + l])))
+                {
                 // Remove edges between instance and all others in the same cycle
                 // printf("k -> l Removing Down In cycle -> In Cycle: ");
                 remove_edgeset(k, l, n, array, aug_graph);
+                }
               }
             }
           }
