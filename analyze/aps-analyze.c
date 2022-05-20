@@ -29,21 +29,15 @@ static void *analyze_thing(void *ignore, void *node)
       {
         // Do nothing; no cycle to remove
       }
-      else if (!(d & DEPENDENCY_MAYBE_SIMPLE) || !(d & DEPENDENCY_NOT_JUST_FIBER))
+      else
       {
         printf("Fiber cycle detected; cycle being removed\n");
         break_fiber_cycles(decl, s, d);
-        d = 0;  // clear dependency
-      }
-      else
-      {
-        aps_error(decl, "Unable to handle dependency (%d); Attribute grammar is not DNC", d);
       }
 
-      if (!d) {
+        d = analysis_state_cycle(s); // check again for type-3 errors
 	compute_oag(decl, s); // calculate OAG if grammar is DNC
 	d = analysis_state_cycle(s); // check again for type-3 errors
-      }
       
       if (d)
       {
