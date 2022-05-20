@@ -55,6 +55,8 @@ typedef struct edgeset {
 
 extern DEPENDENCY edgeset_kind(EDGESET);
 
+typedef VECTOR(struct cycle_description) CYCLES;
+
 typedef struct augmented_dependency_graph {
   Declaration match_rule;
   struct analysis_state *global_state;
@@ -66,6 +68,7 @@ typedef struct augmented_dependency_graph {
   struct augmented_dependency_graph *next_in_aug_worklist;
   int *schedule; /* one-d array, indexed by instance number */
   struct cto_node *total_order;
+  CYCLES cycles;
 } AUG_GRAPH;
 extern const char *aug_graph_name(AUG_GRAPH *);
 
@@ -76,10 +79,11 @@ typedef struct summary_dependency_graph {
   DEPENDENCY *mingraph; /* two-d array, indexed by instance number */
   struct summary_dependency_graph *next_in_phy_worklist;
   int *summary_schedule; /* one-d array, indexed by instance number */
+  BOOL* cyclic_flags; /* one-d array, indexed by phase number indicating whether phase is circular or not */
+  int max_phase;
+  CYCLES cycles;
 } PHY_GRAPH;
 extern const char *phy_graph_name(PHY_GRAPH *);
-  
-typedef VECTOR(struct cycle_description) CYCLES;
 
 typedef struct analysis_state {
   Declaration module;

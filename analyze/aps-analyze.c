@@ -2,6 +2,7 @@
 #include <jbb.h>
 
 #include "aps-ag.h"
+#include "aps-schedule.h"
 
 /*
 Several phases:
@@ -36,7 +37,7 @@ static void *analyze_thing(void *ignore, void *node)
       }
 
         d = analysis_state_cycle(s); // check again for type-3 errors
-	compute_oag(decl, s); // calculate OAG if grammar is DNC
+	compute_oag_v2(decl, s); // calculate OAG if grammar is DNC
 	d = analysis_state_cycle(s); // check again for type-3 errors
       
       if (d)
