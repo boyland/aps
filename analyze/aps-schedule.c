@@ -273,13 +273,17 @@ static void schedule_summary_dependency_graph(PHY_GRAPH* phy_graph) {
   memset(phy_graph->summary_schedule, 0, n * sizeof(int));
 
   int i, j;
+  size_t phase_size = (n + 1) * sizeof(BOOL);
 
-  size_t circular_phase_size = (n + 1) * sizeof(BOOL);
-  BOOL* circular_phase = (BOOL*)HALLOC(circular_phase_size);
-  memset(circular_phase, false, circular_phase_size);
+  BOOL* circular_phase = (BOOL*)HALLOC(phase_size);
+  memset(circular_phase, false, phase_size);
+
+  BOOL* empty_phase = (BOOL*)HALLOC(phase_size);
+  memset(empty_phase, false, phase_size);
 
   // Hold on to the flag indicating whether phase is circular or not
   phy_graph->cyclic_flags = circular_phase;
+  phy_graph->empty_phase = empty_phase;
 
   int count_non_circular = 0, count_circular = 0;
   int cycle_happened = false;
@@ -299,6 +303,8 @@ static void schedule_summary_dependency_graph(PHY_GRAPH* phy_graph) {
     } else if (cycle_happened) {
       // Add an empty phase between circular and non-circular
       circular_phase[phase] = false;
+      // Mark this phase as empty
+      empty_phase[phase] = true;
       phase++;
     }
 
@@ -593,11 +599,11 @@ static bool instances_in_same_group(AUG_GRAPH* aug_graph,
  * @param j instance index to test
  * @return boolean indicating whether instance is ready to be scheduled
  */
-static bool instance_ready_to_go(AUG_GRAPH* aug_graph,
-                                 TOTAL_ORDER_STATE* state,
-                                 const CONDITION cond,
-                                 const int i,
-                                 const int j) {
+static bool noncircular_instance_ready_to_go(AUG_GRAPH* aug_graph,
+                                             TOTAL_ORDER_STATE* state,
+                                             const CONDITION cond,
+                                             const int i,
+                                             const int j) {
   int k;
   EDGESET edges;
   int n = aug_graph->instances.length;
@@ -620,7 +626,7 @@ static bool instance_ready_to_go(AUG_GRAPH* aug_graph,
         continue;
 
       if (oag_debug & DEBUG_ORDER) {
-        // Can't continue with scheduling if a dependency with a
+        // Can not continue with scheduling if a dependency with a
         // "possible" condition has not been scheduled yet
         printf("This edgeset was not ready to be scheduled because of:\n");
         print_edgeset(edges, stdout);
@@ -643,10 +649,10 @@ static bool instance_ready_to_go(AUG_GRAPH* aug_graph,
  * @param i instance index to test
  * @return boolean indicating whether group is ready to be scheduled
  */
-static bool group_ready_to_go(AUG_GRAPH* aug_graph,
-                              TOTAL_ORDER_STATE* state,
-                              const CONDITION cond,
-                              const int i) {
+static bool noncircular_group_ready_to_go(AUG_GRAPH* aug_graph,
+                                          TOTAL_ORDER_STATE* state,
+                                          const CONDITION cond,
+                                          const int i) {
   if (oag_debug & DEBUG_ORDER) {
     printf("Checking group readyness of: ");
     print_instance(&aug_graph->instances.array[i], stdout);
@@ -666,7 +672,7 @@ static bool group_ready_to_go(AUG_GRAPH* aug_graph,
       if (state->schedule[j])
         continue;  // already scheduled
 
-      if (!instance_ready_to_go(aug_graph, state, cond, i, j)) {
+      if (!noncircular_instance_ready_to_go(aug_graph, state, cond, i, j)) {
         return false;
       }
     }
@@ -683,12 +689,19 @@ static bool group_ready_to_go(AUG_GRAPH* aug_graph,
  * @return boolean indicating if there is more in this group that needs to be
  * scheduled
  */
-static bool is_there_more_to_schedule_in_group(AUG_GRAPH* aug_graph,
-                                               TOTAL_ORDER_STATE* state,
-                                               CHILD_PHASE* parent_group) {
+static bool is_there_more_to_schedule_in_noncircular_group(
+    AUG_GRAPH* aug_graph,
+    TOTAL_ORDER_STATE* state,
+    CHILD_PHASE* parent_group) {
   int n = aug_graph->instances.length;
   int i;
   for (i = 0; i < n; i++) {
+    INSTANCE* in = &aug_graph->instances.array[i];
+
+    // Only consider non-circular instances
+    if (instance_in_aug_cycle(aug_graph, in) > -1)
+      continue;
+
     // Instance in the same group but cannot be considered
     CHILD_PHASE* group_key = &state->instance_groups[i];
 
@@ -952,7 +965,6 @@ static CTO_NODE* schedule_noncircular_transition_start_of_group(
     TOTAL_ORDER_STATE* state,
     int remaining,
     CHILD_PHASE* group,
-    int prev_i,
     short parent_ph) {
   CTO_NODE* cto_node;
 
@@ -968,24 +980,8 @@ static CTO_NODE* schedule_noncircular_transition_start_of_group(
     cto_node->child_decl = state->children.array[group->ch];
     cto_node->visit = parent_ph;
     cto_node->cto_next = schedule_noncircular_group(
-        aug_graph, prev, cond, state, remaining, group, prev_i, parent_ph);
+        aug_graph, prev, cond, state, remaining, group, parent_ph);
     return cto_node;
-  }
-
-  // If we are starting to schedule parent synthesized attribute then
-  // look for any other non-parent attribute to schedule if any before
-  // scheduling current group
-  if (group->ph == state->max_parent_ph && group->ch == -1) {
-    int i;
-    int n = aug_graph->instances.length;
-    for (i = 0; i < n; i++) {
-      if (!state->schedule[i] && state->instance_groups[i].ch != -1 &&
-          group_ready_to_go(aug_graph, state, cond, i)) {
-        return schedule_noncircular_group(aug_graph, prev, cond, state,
-                                          remaining, &state->instance_groups[i],
-                                          prev_i, parent_ph);
-      }
-    }
   }
 
   // If parent phase is greater than current parent attribute phase then we
@@ -999,12 +995,69 @@ static CTO_NODE* schedule_noncircular_transition_start_of_group(
     cto_node->child_phase.ch = -1;
     cto_node->visit = parent_ph;
     cto_node->cto_next = schedule_noncircular_group(
-        aug_graph, prev, cond, state, remaining, group, prev_i, parent_ph + 1);
+        aug_graph, prev, cond, state, remaining, group, parent_ph + 1);
     return cto_node;
   }
 
   return schedule_noncircular_group(aug_graph, prev, cond, state, remaining,
-                                    group, prev_i, parent_ph);
+                                    group, parent_ph);
+}
+
+/**
+ * Utility function to handle start of scheduling of groups
+ * @param aug_graph Augmented dependency graph
+ * @param cyc Cycle
+ * @param prev previous CTO node
+ * @param cond current CONDITION
+ * @param instance_groups array of <ph,ch> indexed by INSTANCE index
+ * @param remaining count of remaining instances to schedule
+ * @param group parent group key
+ * @return head of linked list
+ */
+static CTO_NODE* schedule_circular_transition_start_of_group(
+    AUG_GRAPH* aug_graph,
+    CYCLE* cyc,
+    CTO_NODE* prev,
+    CONDITION cond,
+    TOTAL_ORDER_STATE* state,
+    int remaining,
+    CHILD_PHASE* group,
+    short parent_ph) {
+  CTO_NODE* cto_node;
+
+  // If we are starting to schedule child synthesized attribute outside of
+  // group scheduler it means child synthesized attribute did not immediately
+  // followed child inherited attribute thus add a visit marker <ph,ch>
+  if (group->ph > 0 && group->ch > -1) {
+    cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
+    cto_node->cto_prev = prev;
+    cto_node->cto_instance = NULL;
+    cto_node->child_phase.ph = group->ph;
+    cto_node->child_phase.ch = group->ch;
+    cto_node->child_decl = state->children.array[group->ch];
+    cto_node->visit = parent_ph;
+    cto_node->cto_next = schedule_circular_group(
+        aug_graph, cyc, prev, cond, state, remaining, group, parent_ph);
+    return cto_node;
+  }
+
+  // If parent phase is greater than current parent attribute phase then we
+  // have reached the end of previous phase and so add a end of parent phase
+  // visit marker <ph,-1>
+  if (abs(group->ph) > parent_ph && group->ch == -1) {
+    cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
+    cto_node->cto_prev = prev;
+    cto_node->cto_instance = NULL;
+    cto_node->child_phase.ph = parent_ph;
+    cto_node->child_phase.ch = -1;
+    cto_node->visit = parent_ph;
+    cto_node->cto_next = schedule_circular_group(
+        aug_graph, cyc, prev, cond, state, remaining, group, parent_ph + 1);
+    return cto_node;
+  }
+
+  return schedule_circular_group(aug_graph, cyc, prev, cond, state, remaining,
+                                 group, parent_ph);
 }
 
 /**
@@ -1024,7 +1077,6 @@ static CTO_NODE* schedule_noncircular_transition_end_of_group(
     TOTAL_ORDER_STATE* state,
     int remaining,
     CHILD_PHASE* group,
-    int prev_i,
     short parent_ph) {
   // If we find ourselves scheduling a <-ph,ch>, we need to (after putting in
   // all the instances in that group), we need to schedule the visit of the
@@ -1040,16 +1092,38 @@ static CTO_NODE* schedule_noncircular_transition_end_of_group(
     cto_node->child_phase.ch = group->ch;
     cto_node->child_decl = state->children.array[group->ch];
     cto_node->visit = parent_ph;
-    cto_node->cto_next =
-        schedule_noncircular_group(aug_graph, cto_node, cond, state, remaining,
-                                   &cto_node->child_phase, prev_i, parent_ph);
+    cto_node->cto_next = schedule_noncircular_group(
+        aug_graph, cto_node, cond, state, remaining /* no change */,
+        &cto_node->child_phase, parent_ph);
     return cto_node;
+  }
+
+  // If we find ourselves scheduling a <+ph,ch> then we need to add visit marker
+  // for empty phase and then continue with greedy scheduler. This is because
+  // there is no instance in empty phase to guide us to add visit marker.
+  if (group->ph > 0 && group->ch != 0) {
+    PHY_GRAPH* phy =
+        Declaration_info(state->children.array[group->ch])->node_phy_graph;
+
+    if (phy->empty_phase[group->ph + 1]) {
+      // Visit marker
+      CTO_NODE* cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
+      cto_node->cto_prev = prev;
+      cto_node->cto_instance = NULL;
+      cto_node->child_phase.ph = group->ph;
+      cto_node->child_phase.ch = group->ch;
+      cto_node->child_decl = state->children.array[group->ch];
+      cto_node->visit = parent_ph;
+      cto_node->cto_next = schedule_noncircular(
+          aug_graph, cto_node, cond, state, remaining /* no change */,
+          &cto_node->child_phase, parent_ph);
+      return cto_node;
+    }
   }
 
   // Fallback to normal scheduler
   return schedule_noncircular(aug_graph, prev, cond, state,
-                              remaining /* no change */, group, prev_i,
-                              parent_ph);
+                              remaining /* no change */, group, parent_ph);
 }
 
 /**
@@ -1080,8 +1154,26 @@ static CTO_NODE* schedule_circular_group(AUG_GRAPH* aug_graph,
                                          TOTAL_ORDER_STATE* state,
                                          int remaining,
                                          CHILD_PHASE* group,
-                                         int prev_i,
-                                         short parent_ph) {
+                                         short parent_ph) {}
+
+/**
+ * Circular group scheduler
+ * @param aug_graph Augmented dependency graph
+ * @param prev previous CTO node
+ * @param cond current CONDITION
+ * @param state state
+ * @param remaining count of remaining instances to schedule
+ * @param group parent group key
+ * @return head of linked list
+ */
+static CTO_NODE* schedule_circular(AUG_GRAPH* aug_graph,
+                                   CYCLE* cyc,
+                                   CTO_NODE* prev,
+                                   CONDITION cond,
+                                   TOTAL_ORDER_STATE* state,
+                                   int remaining,
+                                   CHILD_PHASE* group,
+                                   short parent_ph) {
   int i, j, k;
   int n = aug_graph->instances.length;
 
@@ -1093,19 +1185,35 @@ static CTO_NODE* schedule_circular_group(AUG_GRAPH* aug_graph,
     if (state->schedule[in->index])
       continue;
 
-    /*
-     * check to see if makes sense
-     * (No need to schedule something that
-     * occurs only in a different condition branch.)
-     */
+    // check to see if makes sense (No need to schedule something that occurs
+    // only in a different condition branch.)
     if (MERGED_CONDITION_IS_IMPOSSIBLE(cond, instance_condition(in))) {
       state->schedule[i] = true;
-      cto_node =
-          schedule_circular_group(aug_graph, cyc, prev, cond, state,
-                                  remaining - 1, group, prev_i, parent_ph);
+      cto_node = schedule_circular(aug_graph, cyc, prev, cond, state,
+                                   remaining - 1, group, parent_ph);
       state->schedule[i] = false;
       return cto_node;
     }
+
+    // If all instances that directly depend on this are already scheduled
+    bool following_natural_order = true;
+    for (j = 0; j < cyc->instances.length; j++) {
+      INSTANCE* other = &cyc->instances.array[j];
+
+      if (state->schedule[other->index])
+        continue;
+
+      DEPENDENCY dep = get_edgeset_combine_dependencies(
+          aug_graph->graph[other->index * n + in->index]);
+
+      if (dep & DEPENDENCY_MAYBE_DIRECT) {
+        following_natural_order = false;
+      }
+    }
+
+    // We need to use the natural order when scheduling attributes in the cycle
+    if (!following_natural_order)
+      continue;
 
     // If it is local then continue scheduling
     if (instance_is_local(aug_graph, state, i)) {
@@ -1123,32 +1231,33 @@ static CTO_NODE* schedule_circular_group(AUG_GRAPH* aug_graph,
         int cmask = 1 << (if_rule_index(in->fibered_attr.attr));
         cond.negative |= cmask;
         cto_node->cto_if_false =
-            schedule_circular_group(aug_graph, cyc, cto_node, cond, state,
-                                    remaining - 1, group, i, parent_ph);
+            schedule_circular(aug_graph, cyc, cto_node, cond, state,
+                              remaining - 1, group, parent_ph);
         cond.negative &= ~cmask;
         cond.positive |= cmask;
         cto_node->cto_if_true =
-            schedule_circular_group(aug_graph, cyc, cto_node, cond, state,
-                                    remaining - 1, group, i, parent_ph);
+            schedule_circular(aug_graph, cyc, cto_node, cond, state,
+                              remaining - 1, group, parent_ph);
         cond.positive &= ~cmask;
       } else {
         cto_node->cto_next =
-            schedule_circular_group(aug_graph, cyc, cto_node, cond, state,
-                                    remaining - 1, group, i, parent_ph);
+            schedule_circular(aug_graph, cyc, cto_node, cond, state,
+                              remaining - 1, group, parent_ph);
       }
 
       state->schedule[i] = false;  // Release it
 
       return cto_node;
     } else {
-      // Instance is not local then delegate it to group scheduler
+      // Instance is not local then delegate it to circular group scheduler
       return schedule_circular_transition_start_of_group(
-          aug_graph, prev, cond, state, remaining, group, prev_i, parent_ph);
+          aug_graph, cyc, prev, cond, state, remaining, group, parent_ph);
     }
   }
 
+  // Fallback to noncircular scheduler
   return schedule_noncircular(aug_graph, prev, cond, state, remaining, group,
-                              prev_i, parent_ph);
+                              parent_ph);
 }
 
 /**
@@ -1161,14 +1270,13 @@ static CTO_NODE* schedule_circular_group(AUG_GRAPH* aug_graph,
  * @param group parent group key
  * @return head of linked list
  */
-static CTO_NODE* schedule_circular(AUG_GRAPH* aug_graph,
-                                   CTO_NODE* prev,
-                                   CONDITION cond,
-                                   TOTAL_ORDER_STATE* state,
-                                   int remaining,
-                                   CHILD_PHASE* group,
-                                   int prev_i,
-                                   short parent_ph) {
+static CTO_NODE* schedule_circular_find_cycle(AUG_GRAPH* aug_graph,
+                                              CTO_NODE* prev,
+                                              CONDITION cond,
+                                              TOTAL_ORDER_STATE* state,
+                                              int remaining,
+                                              CHILD_PHASE* group,
+                                              short parent_ph) {
   int i, j, k;
   int n = aug_graph->instances.length;
 
@@ -1224,15 +1332,24 @@ static CTO_NODE* schedule_circular(AUG_GRAPH* aug_graph,
       }
     }
 
+    // This cycle is ready to be scheduled as a group
     if (cycle_ready) {
       // Delegate it to the circular group scheduler
-      return schedule_circular_group(aug_graph, cyc, prev, cond, state,
-                                     remaining, group, prev_i, parent_ph);
+      return schedule_circular(aug_graph, cyc, prev, cond, state, remaining,
+                               group, parent_ph);
     }
   }
 
-  return schedule_noncircular(aug_graph, prev, cond, state, remaining, group,
-                              prev_i, parent_ph);
+  // We get to circular scheduler is non-circular scheduler cannot go any
+  // further if circular scheduler cannot go any further then we can not
+  // scheduler this attribute grammar
+  if (remaining > 0) {
+    fflush(stdout);
+    print_schedule_error_debug(aug_graph, state, prev, cond, stderr);
+    fatal_error("Cannot make conditional total order!");
+  }
+
+  return NULL;
 }
 
 /**
@@ -1251,7 +1368,6 @@ static CTO_NODE* schedule_noncircular_group(AUG_GRAPH* aug_graph,
                                             TOTAL_ORDER_STATE* state,
                                             int remaining,
                                             CHILD_PHASE* group,
-                                            int prev_i,
                                             short parent_ph) {
   int i;
   int n = aug_graph->instances.length;
@@ -1291,29 +1407,19 @@ static CTO_NODE* schedule_noncircular_group(AUG_GRAPH* aug_graph,
           true;  // instance has been scheduled (and will not be
                  // considered for scheduling in the recursive call)
 
-      printf("just scheduled: ");
-      print_instance(instance, stdout);
-      printf(" <%d,%d> cond: (%d,%d) inst_cond: (%d,%d)\n", group->ph,
-             group->ch, cond.positive, cond.negative,
-             instance_condition(instance).positive,
-             instance_condition(instance).negative);
-
       if (if_rule_p(instance->fibered_attr.attr)) {
         int cmask = 1 << (if_rule_index(instance->fibered_attr.attr));
         cond.negative |= cmask;
-        cto_node->cto_if_false =
-            schedule_noncircular(aug_graph, cto_node, cond, state,
-                                 remaining - 1, group, i, parent_ph);
+        cto_node->cto_if_false = schedule_noncircular(
+            aug_graph, cto_node, cond, state, remaining - 1, group, parent_ph);
         cond.negative &= ~cmask;
         cond.positive |= cmask;
-        cto_node->cto_if_true =
-            schedule_noncircular(aug_graph, cto_node, cond, state,
-                                 remaining - 1, group, i, parent_ph);
+        cto_node->cto_if_true = schedule_noncircular(
+            aug_graph, cto_node, cond, state, remaining - 1, group, parent_ph);
         cond.positive &= ~cmask;
       } else {
-        cto_node->cto_next =
-            schedule_noncircular_group(aug_graph, cto_node, cond, state,
-                                       remaining - 1, group, prev_i, parent_ph);
+        cto_node->cto_next = schedule_noncircular_group(
+            aug_graph, cto_node, cond, state, remaining - 1, group, parent_ph);
       }
 
       state->schedule[i] = false;  // Release it
@@ -1323,20 +1429,20 @@ static CTO_NODE* schedule_noncircular_group(AUG_GRAPH* aug_graph,
   }
 
   // Group is finished
-  if (!is_there_more_to_schedule_in_group(aug_graph, state, group)) {
+  if (!is_there_more_to_schedule_in_noncircular_group(aug_graph, state,
+                                                      group)) {
     return schedule_noncircular_transition_end_of_group(
-        aug_graph, cto_node, cond, state, remaining, group, prev_i, parent_ph);
+        aug_graph, cto_node, cond, state, remaining, group, parent_ph);
   }
 
+  // Try circular scheduler now
   if (remaining > 0) {
-    fflush(stdout);
-    print_schedule_error_debug(aug_graph, state, prev, cond, stderr);
-    fatal_error("Cannot make conditional total order!");
-
-    return NULL;
+    return schedule_circular_find_cycle(aug_graph, prev, cond, state, remaining,
+                                        group, parent_ph);
   }
 
-  return schedule_end(aug_graph, prev, state, parent_ph);
+  // All done with scheduling
+  return NULL;
 }
 
 /**
@@ -1354,18 +1460,17 @@ static CTO_NODE* schedule_noncircular(AUG_GRAPH* aug_graph,
                                       TOTAL_ORDER_STATE* state,
                                       int remaining,
                                       CHILD_PHASE* prev_group,
-                                      int prev_i,
                                       short parent_ph) {
   int i;
   int n = aug_graph->instances.length;
   CTO_NODE* cto_node = NULL;
 
-  /* If nothing more to do, we are done. */
+  // If nothing more to do, we are done.
   if (remaining == 0) {
     return schedule_end(aug_graph, prev, state, parent_ph);
   }
 
-  /* Outer condition is impossible, its a dead-end branch */
+  // Outer condition is impossible, its a dead-end branch
   if (CONDITION_IS_IMPOSSIBLE(cond))
     return NULL;
 
@@ -1382,17 +1487,13 @@ static CTO_NODE* schedule_noncircular(AUG_GRAPH* aug_graph,
       continue;
 
     // If edgeset condition is not impossible then go ahead with scheduling
-    if (group_ready_to_go(aug_graph, state, cond, i)) {
-      /*
-       * check to see if makes sense
-       * (No need to schedule something that
-       * occurs only in a different condition branch.)
-       */
+    if (noncircular_group_ready_to_go(aug_graph, state, cond, i)) {
+      // check to see if makes sense (no need to schedule something that occurs
+      // only in a different condition branch.)
       if (MERGED_CONDITION_IS_IMPOSSIBLE(cond, instance_condition(instance))) {
         state->schedule[i] = true;
-        cto_node =
-            schedule_noncircular(aug_graph, prev, cond, state, remaining - 1,
-                                 prev_group, prev_i, parent_ph);
+        cto_node = schedule_noncircular(aug_graph, prev, cond, state,
+                                        remaining - 1, prev_group, parent_ph);
         state->schedule[i] = false;
         return cto_node;
       }
@@ -1414,17 +1515,17 @@ static CTO_NODE* schedule_noncircular(AUG_GRAPH* aug_graph,
           cond.negative |= cmask;
           cto_node->cto_if_false =
               schedule_noncircular(aug_graph, cto_node, cond, state,
-                                   remaining - 1, prev_group, i, parent_ph);
+                                   remaining - 1, prev_group, parent_ph);
           cond.negative &= ~cmask;
           cond.positive |= cmask;
           cto_node->cto_if_true =
               schedule_noncircular(aug_graph, cto_node, cond, state,
-                                   remaining - 1, prev_group, i, parent_ph);
+                                   remaining - 1, prev_group, parent_ph);
           cond.positive &= ~cmask;
         } else {
           cto_node->cto_next =
               schedule_noncircular(aug_graph, cto_node, cond, state,
-                                   remaining - 1, prev_group, i, parent_ph);
+                                   remaining - 1, prev_group, parent_ph);
         }
 
         state->schedule[i] = false;  // Release it
@@ -1433,7 +1534,7 @@ static CTO_NODE* schedule_noncircular(AUG_GRAPH* aug_graph,
       } else {
         // Instance is not local then delegate it to group scheduler
         return schedule_noncircular_transition_start_of_group(
-            aug_graph, prev, cond, state, remaining, group, prev_i, parent_ph);
+            aug_graph, prev, cond, state, remaining, group, parent_ph);
       }
     }
   }
@@ -1486,7 +1587,7 @@ static void schedule_augmented_dependency_graph(CYCLES cycles,
 
   (void)close_augmented_dependency_graph(aug_graph);
 
-  /** Now schedule graph: we need to generate a conditional total order. */
+  // Now schedule graph: we need to generate a conditional total order.
 
   if (oag_debug & PROD_ORDER) {
     printf("Scheduling conditional total order for %s\n",
@@ -1555,17 +1656,17 @@ static void schedule_augmented_dependency_graph(CYCLES cycles,
   size_t schedule_size = n * sizeof(bool);
   bool* schedule = (bool*)alloca(schedule_size);
 
-  /* False here means nothing is scheduled yet */
+  // False here means nothing is scheduled yet
   memset(schedule, false, schedule_size);
   state->schedule = schedule;
 
-  /* Set default max phase of parent */
+  // Set default max phase of parent
   state->max_parent_ph = 1;
 
   size_t max_child_ph_size = state->children.length * sizeof(short);
   short* max_child_ph = (short*)alloca(max_child_ph_size);
 
-  /* Set default max phase of children indexed by child index */
+  // Set default max phase of children indexed by child index
   memset(max_child_ph, (int)0, max_child_ph_size);
   state->max_child_ph = max_child_ph;
 
@@ -1625,8 +1726,8 @@ static void schedule_augmented_dependency_graph(CYCLES cycles,
 
   // It is safe to assume inherited attribute of parents have no dependencies
   // and should be scheduled right away
-  aug_graph->total_order = schedule_noncircular(aug_graph, NULL, cond, state, n,
-                                                &parent_inherited_group, -1, 1);
+  aug_graph->total_order = schedule_noncircular_group(
+      aug_graph, NULL, cond, state, n, &parent_inherited_group, 1);
 
   if (aug_graph->total_order == NULL) {
     fatal_error("Failed to create total order.");
