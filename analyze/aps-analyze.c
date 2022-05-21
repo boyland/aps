@@ -37,7 +37,7 @@ static void *analyze_thing(void *ignore, void *node)
       }
 
         d = analysis_state_cycle(s); // check again for type-3 errors
-	compute_oag_v2(decl, s); // calculate OAG if grammar is DNC
+	compute_schedule(decl, s); // calculate OAG if grammar is DNC
 	d = analysis_state_cycle(s); // check again for type-3 errors
       
       // Pure fiber cycles should have been broken when reaching this step

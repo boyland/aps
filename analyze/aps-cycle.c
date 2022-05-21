@@ -155,7 +155,7 @@ static void get_fiber_cycles(STATE *s) {
 
         if (cycle_debug & PRINT_UP_DOWN)
         {
-          printf("Cycle involving phylum graph: %s\n", decl_name(phy->phylum));
+          printf("Cycle (%d) involving phylum graph: %s\n", j, decl_name(phy->phylum));
         }
 
         for (k = 0; k < phy->instances.length; ++k)
@@ -251,7 +251,7 @@ static void get_fiber_cycles(STATE *s) {
 
         if (cycle_debug & PRINT_UP_DOWN)
         {
-          printf("Cycle involving augmented dependency graph: %s\n", decl_name(aug_graph->syntax_decl));
+          printf("Cycle (%d) involving augmented dependency graph: %s\n", j, decl_name(aug_graph->syntax_decl));
         }
 
         for (k = 0; k < aug_graph->instances.length; ++k)
