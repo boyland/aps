@@ -352,13 +352,12 @@ static void make_augmented_cycles_for_node(AUG_GRAPH *aug_graph,
     }
   }
 
-  /* DO NOT merge cycles involving phylum and augmeted graph together.
+  // DO NOT merge cycles involving phylum and augmented graph together.
   for (i=start; i < max; ++i) {
     int phy_i = i-start;
     if (phy_graph->mingraph[phy_i*phy_n+phy_i] != no_dependency)
       merge_sets(constructor_index+i,phylum_index+phy_i);
   }
-  */
 }
 
 
