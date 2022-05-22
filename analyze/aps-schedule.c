@@ -587,15 +587,15 @@ static bool instances_in_same_group(AUG_GRAPH* aug_graph,
  * @param aug_graph Augmented dependency graph
  * @param cond current condition
  * @param state state
- * @param i group index
- * @param j instance index to test
+ * @param group_index group index
+ * @param attribute_index instance index to test
  * @return boolean indicating whether instance is ready to be scheduled
  */
 static bool noncircular_instance_ready_to_go(AUG_GRAPH* aug_graph,
                                              TOTAL_ORDER_STATE* state,
                                              const CONDITION cond,
                                              const int group_index,
-                                             const int j) {
+                                             const int attribute_index) {
   int k;
   EDGESET edges;
   int n = aug_graph->instances.length;
@@ -612,14 +612,16 @@ static bool noncircular_instance_ready_to_go(AUG_GRAPH* aug_graph,
       continue;
 
     // If from the same group then ignore
-    if (instances_in_same_group(aug_graph, state, group_index, k))
+    if (instances_in_same_group(aug_graph, state, group_index, in->index))
       continue;
 
-    int index = k * n + j;  // k (source) >--> j (sink) edge
+    int index =
+        k * n + attribute_index;  // k (source) >--> attribute_index (sink) edge
 
-    /* Look at all dependencies from j to i */
+    // Look at all dependencies from this attribute instance that is not
+    // scheduled to attribute_index
     for (edges = aug_graph->graph[index]; edges != NULL; edges = edges->rest) {
-      /* If the merge condition is impossible, ignore this edge */
+      // If the merge condition is impossible, ignore this edge
       if (MERGED_CONDITION_IS_IMPOSSIBLE(cond, edges->cond))
         continue;
 
@@ -648,7 +650,7 @@ static bool noncircular_instance_ready_to_go(AUG_GRAPH* aug_graph,
  * @param cond current condition
  * @param state state
  * @param group_index group index
- * @param j instance index to test
+ * @param attribute_index instance index to test
  * @return boolean indicating whether instance is ready to be scheduled
  */
 static bool circular_instance_ready_to_go(AUG_GRAPH* aug_graph,
@@ -656,7 +658,7 @@ static bool circular_instance_ready_to_go(AUG_GRAPH* aug_graph,
                                           TOTAL_ORDER_STATE* state,
                                           const CONDITION cond,
                                           const int group_index,
-                                          const int j) {
+                                          const int attribute_index) {
   int k;
   EDGESET edges;
   int n = aug_graph->instances.length;
@@ -669,14 +671,17 @@ static bool circular_instance_ready_to_go(AUG_GRAPH* aug_graph,
       continue;
 
     // If from the same group then ignore
-    if (instances_in_same_group(aug_graph, state, group_index, k))
+    if (instances_in_same_group(aug_graph, state, group_index, in->index))
       continue;
 
-    int index = in->index * n + j;  // k (source) >--> j (sink) edge
+    int index =
+        in->index * n +
+        attribute_index;  // in.index (source) >--> attribute_index (sink) edge
 
-    /* Look at all dependencies from j to i */
+    // Look at all dependencies from this attribute instance that is not
+    // scheduled to attribute_index
     for (edges = aug_graph->graph[index]; edges != NULL; edges = edges->rest) {
-      /* If the merge condition is impossible, ignore this edge */
+      // If the merge condition is impossible, ignore this edge
       if (MERGED_CONDITION_IS_IMPOSSIBLE(cond, edges->cond))
         continue;
 
@@ -703,37 +708,38 @@ static bool circular_instance_ready_to_go(AUG_GRAPH* aug_graph,
  * @param aug_graph Augmented dependency graph
  * @param cond current condition
  * @param state state
- * @param i instance index to test
+ * @param group_index group index to test
  * @return boolean indicating whether group is ready to be scheduled
  */
 static bool noncircular_group_ready_to_go(AUG_GRAPH* aug_graph,
                                           TOTAL_ORDER_STATE* state,
                                           const CONDITION cond,
-                                          const int i) {
+                                          const int group_index) {
   if (oag_debug & DEBUG_ORDER) {
     printf("Checking noncircular group readyness of: ");
-    print_instance(&aug_graph->instances.array[i], stdout);
+    print_instance(&aug_graph->instances.array[group_index], stdout);
     printf("\n");
   }
 
   int n = aug_graph->instances.length;
-  CHILD_PHASE group = state->instance_groups[i];
+  CHILD_PHASE group = state->instance_groups[group_index];
   int j, k;
 
   for (j = 0; j < n; j++) {
     INSTANCE* in = &aug_graph->instances.array[j];
-    CHILD_PHASE current_group = state->instance_groups[j];
+    CHILD_PHASE current_group = state->instance_groups[in->index];
 
     // Consider only non-circular instances
     if (instance_in_aug_cycle(aug_graph, in) > -1)
       continue;
 
     // Instance in the same group but cannot be considered
-    if (instances_in_same_group(aug_graph, state, i, j)) {
+    if (instances_in_same_group(aug_graph, state, group_index, in->index)) {
       if (state->schedule[j])
         continue;  // already scheduled
 
-      if (!noncircular_instance_ready_to_go(aug_graph, state, cond, i, j)) {
+      if (!noncircular_instance_ready_to_go(aug_graph, state, cond, group_index,
+                                            in->index)) {
         return false;
       }
     }
@@ -749,23 +755,23 @@ static bool noncircular_group_ready_to_go(AUG_GRAPH* aug_graph,
  * @param cyc cycle currently getting scheduled
  * @param cond current condition
  * @param state state
- * @param i instance index to test
+ * @param group_index group index to test
  * @return boolean indicating whether group is ready to be scheduled
  */
 static bool circular_group_ready_to_go(AUG_GRAPH* aug_graph,
                                        CYCLE* cyc,
                                        TOTAL_ORDER_STATE* state,
                                        const CONDITION cond,
-                                       const int i) {
+                                       const int group_index) {
   if (oag_debug & DEBUG_ORDER) {
     printf("Checking circular group readyness of: ");
-    print_instance(&aug_graph->instances.array[i], stdout);
+    print_instance(&aug_graph->instances.array[group_index], stdout);
     printf("\n");
   }
 
-  INSTANCE in = aug_graph->instances.array[i];
+  INSTANCE in = aug_graph->instances.array[group_index];
   int n = aug_graph->instances.length;
-  CHILD_PHASE group = state->instance_groups[i];
+  CHILD_PHASE group = state->instance_groups[group_index];
   int j, k;
 
   for (j = 0; j < cyc->instances.length; j++) {
@@ -773,12 +779,12 @@ static bool circular_group_ready_to_go(AUG_GRAPH* aug_graph,
     CHILD_PHASE current_group = state->instance_groups[in->index];
 
     // Instance in the same group but cannot be considered
-    if (instances_in_same_group(aug_graph, state, i, in->index)) {
+    if (instances_in_same_group(aug_graph, state, group_index, in->index)) {
       if (state->schedule[in->index])
         continue;  // already scheduled
 
-      if (!circular_instance_ready_to_go(aug_graph, cyc, state, cond, i,
-                                         in->index)) {
+      if (!circular_instance_ready_to_go(aug_graph, cyc, state, cond,
+                                         group_index, in->index)) {
         return false;
       }
     }
