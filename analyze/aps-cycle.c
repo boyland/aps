@@ -193,10 +193,7 @@ static void get_fiber_cycles(STATE *s) {
         }
         else
         {
-          // Free vector created for cycle instances
-          free(cycle->instances.array);
-          free(cycle);
-
+          // TODO: free vector created for cycle instances
           if (cycle_debug & PRINT_UP_DOWN)
           {
             printf("^^^ Ignore this cycle because it contained DEPENDENCY_MAYBE_SIMPLE \n");
@@ -272,9 +269,12 @@ static void get_fiber_cycles(STATE *s) {
 
         // Determine the combined dependencies between attributes in the cycle
         DEPENDENCY dep = no_dependency;
+        bool cycle_contains_parent = false;
         for (k = 0; k < cycle->instances.length; k++)
         {
           INSTANCE* source = &cycle->instances.array[k];
+          cycle_contains_parent |= source->node == aug_graph->lhs_decl;
+
           for (l = 0; l < cycle->instances.length; l++)
           {
             INSTANCE* target = &cycle->instances.array[l];
@@ -283,19 +283,16 @@ static void get_fiber_cycles(STATE *s) {
         }
 
         // Collect any cycles that are not maybe simple
-        if (!(dep & DEPENDENCY_MAYBE_SIMPLE))
+        if (!(dep & DEPENDENCY_MAYBE_SIMPLE) && !cycle_contains_parent)
         {
           num_cycles++;
         }
         else
         {
-          // Free vector created for cycle instances
-          free(cycle->instances.array);
-          free(cycle);
-
+          // TODO: free vector created for cycle instances
           if (cycle_debug & PRINT_UP_DOWN)
           {
-            printf("^^^ Ignore this cycle because it contained DEPENDENCY_MAYBE_SIMPLE \n");
+            printf("^^^ Ignore this cycle because it contained DEPENDENCY_MAYBE_SIMPLE or contained parent\n");
           }
         }
       }
@@ -597,6 +594,31 @@ static void edgeset_combine_dependencies(EDGESET es, DEPENDENCY* acc_dependency,
 
 #define IS_JUST_FIBER_DEPENDENCY(d) ((d) && ((d) & DEPENDENCY_MAYBE_SIMPLE))
 
+static bool edge_can_be_deleted(int index1, int index2, INSTANCE *array, DEPENDENCY dep)
+{
+  INSTANCE *attr1 = (&array[index1]);
+  INSTANCE *attr2 = (&array[index2]);
+
+  if (index1 != index2 &&
+      (dep & DEPENDENCY_MAYBE_DIRECT) &&
+      (dep & DEPENDENCY_NOT_JUST_FIBER) &&
+      (fibered_attr_direction(&attr1->fibered_attr)) == instance_local)
+  {
+    if (cycle_debug & DEBUG_UP_DOWN)
+    {
+      printf(" preserved critical: ");
+      print_instance(attr1, stdout);
+      printf(" -> ");
+      print_instance(attr2, stdout);
+      printf("\n");
+    }
+    return false;
+  }
+
+  // Kill the edge
+  return true;
+}
+
 /**
  * In phylum graph (and in aug graph)
  * For every instance i:
@@ -866,6 +888,7 @@ static void add_up_down_attributes(STATE *s, bool direction)
             // Forall instances in the cycle
             for (l = 0; l < n; l++)
             {
+              DEPENDENCY dep = get_edgeset_combine_dependencies(aug_graph->graph[k * n + l]);
               // Make sure it is in the cycle
               if (parent_index[l + constructor_index] == cyc->internal_info)
               {
@@ -875,7 +898,7 @@ static void add_up_down_attributes(STATE *s, bool direction)
                   // printf("k -> l Adding In cycle -> In Cycle: ");
                   add_up_down_edge(k, l, n, array, acc_dependency, &acc_cond, aug_graph);
                 }
-                else if (IS_JUST_FIBER_DEPENDENCY(get_edgeset_combine_dependencies(aug_graph->graph[k * n + l])))
+                else if (IS_JUST_FIBER_DEPENDENCY(dep) && edge_can_be_deleted(k, l, array, dep))
                 {
                   // printf("k -> l Removing In cycle -> In Cycle: ");
                   remove_edgeset(k, l, n, array, aug_graph);
@@ -892,11 +915,12 @@ static void add_up_down_attributes(STATE *s, bool direction)
               // Make sure it is in the cycle
               if (parent_index[l + constructor_index] == cyc->internal_info)
               {
-                if (IS_JUST_FIBER_DEPENDENCY(get_edgeset_combine_dependencies(aug_graph->graph[k * n + l])))
+                DEPENDENCY dep = get_edgeset_combine_dependencies(aug_graph->graph[k * n + l]);
+                if (IS_JUST_FIBER_DEPENDENCY(dep) && edge_can_be_deleted(k, l, array, dep))
                 {
-                // Remove edges between instance and all others in the same cycle
-                // printf("k -> l Removing Down In cycle -> In Cycle: ");
-                remove_edgeset(k, l, n, array, aug_graph);
+                  // Remove edges between instance and all others in the same cycle
+                  // printf("k -> l Removing Down In cycle -> In Cycle: ");
+                  remove_edgeset(k, l, n, array, aug_graph);
                 }
               }
             }
