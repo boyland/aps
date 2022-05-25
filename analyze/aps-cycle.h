@@ -11,6 +11,7 @@ extern int cycle_debug;
 typedef struct cycle_description {
   int internal_info;
   VECTOR(INSTANCE) instances;
+  DEPENDENCY acc_dep;
 } CYCLE;
 
 #define PRINT_CYCLE 1
