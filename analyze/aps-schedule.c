@@ -357,6 +357,10 @@ static void schedule_summary_dependency_graph(PHY_GRAPH* phy_graph) {
       }
       continue;
     } else if (cycle_happened) {
+      if (oag_debug & TOTAL_ORDER) {
+        printf("^^^ empty non-circular phase: %d\n", phase);
+      }
+
       // Add an empty phase between circular and non-circular
       circular_phase[phase] = false;
       // Mark this phase as empty
@@ -512,13 +516,33 @@ static void print_schedule_error_debug(AUG_GRAPH* aug_graph,
             state->schedule[i] ? "scheduled" : "not-scheduled");
   }
 
-  fprintf(stream, "\nSchedule so far:\n");
+  fprintf(stream, "\nSchedule so far for %s:\n", aug_graph_name(aug_graph));
   // For debugging purposes, traverse all the way back
   while (prev != NULL && prev->cto_prev != NULL) {
     prev = prev->cto_prev;
   }
 
   print_total_order(prev, 0, stream);
+
+  printf("Relevant dependencies from non-scheduled instances: \n");
+  for (i = 0; i < n; i++) {
+    if (state->schedule[i])
+      continue;
+
+    for (j = 0; j < n; j++) {
+      if (state->schedule[j])
+        continue;
+
+      if (i == j)
+        continue;
+
+      printf("Investigating why ");
+      print_instance(&aug_graph->instances.array[i], stdout);
+      printf(" has not been scheduled:  ");
+
+      print_edgeset(aug_graph->graph[j * n + i], stdout);
+    }
+  }
 }
 
 /**
@@ -625,17 +649,20 @@ static bool noncircular_instance_ready_to_go(AUG_GRAPH* aug_graph,
       if (MERGED_CONDITION_IS_IMPOSSIBLE(cond, edges->cond))
         continue;
 
-      if (oag_debug & DEBUG_ORDER) {
-        // Can not continue with scheduling if a dependency with a
-        // "possible" condition has not been scheduled yet
-        printf(
-            "This (noncircular) edgeset was not ready to be scheduled because "
-            "of:\n");
-        print_edgeset(edges, stdout);
-        printf("\n");
-      }
+      if (edges->kind & indirect_control_dependency) {
+        if (oag_debug & DEBUG_ORDER) {
+          // Can not continue with scheduling if a dependency with a
+          // "possible" condition has not been scheduled yet
+          printf(
+              "This (noncircular) edgeset was not ready to be scheduled "
+              "because "
+              "of:\n");
+          print_edgeset(edges, stdout);
+          printf("\n");
+        }
 
-      return false;
+        return false;
+      }
     }
   }
 
@@ -685,15 +712,19 @@ static bool circular_instance_ready_to_go(AUG_GRAPH* aug_graph,
       if (MERGED_CONDITION_IS_IMPOSSIBLE(cond, edges->cond))
         continue;
 
-      if (oag_debug & DEBUG_ORDER) {
-        // Can not continue with scheduling if a dependency with a
-        // "possible" condition has not been scheduled yet
-        printf("This edgeset was not ready to be scheduled because of:\n");
-        print_edgeset(edges, stdout);
-        printf("\n");
-      }
+      DEPENDENCY dep = edges->kind;
+      dep = dep & ~indirect_control_dependency;
+      if (dep & DEPENDENCY_MAYBE_DIRECT) {
+        if (oag_debug & DEBUG_ORDER) {
+          // Can not continue with scheduling if a dependency with a
+          // "possible" condition has not been scheduled yet
+          printf(
+              "This edgeset (%d) was not ready to be scheduled because of:\n",
+              edges->kind);
+          print_edgeset(edges, stdout);
+          printf("\n");
+        }
 
-      if (edges->kind & DEPENDENCY_MAYBE_DIRECT) {
         return false;
       }
     }
@@ -1349,8 +1380,8 @@ static CTO_NODE* schedule_circular_transition_end_of_group(
   }
 
   // Fallback to normal scheduler
-  return schedule_noncircular(aug_graph, prev, cond, state,
-                              remaining /* no change */, group, parent_ph);
+  return schedule_circular(aug_graph, cyc, prev, cond, state,
+                           remaining /* no change */, group, parent_ph);
 }
 
 /**
@@ -1475,7 +1506,17 @@ static CTO_NODE* schedule_circular_group(AUG_GRAPH* aug_graph,
         aug_graph, cyc, cto_node, cond, state, remaining, group, parent_ph);
   }
 
-  // Try circular scheduler now
+  for (i = 0; i < cyc->instances.length; i++) {
+    INSTANCE* in = &cyc->instances.array[i];
+
+    // There is still instances that in this cycle that need to be scheduled
+    if (!state->schedule[in->index]) {
+      return schedule_circular(aug_graph, cyc, prev, cond, state, remaining,
+                               group, parent_ph);
+    }
+  }
+
+  // Try non-circular scheduler now
   if (remaining > 0) {
     return schedule_noncircular(aug_graph, prev, cond, state, remaining, group,
                                 parent_ph);
@@ -2123,6 +2164,8 @@ static void schedule_augmented_dependency_graph(CYCLES cycles,
  * @param s state
  */
 void compute_schedule(Declaration module, STATE* s) {
+  state_scc(s);
+
   int j;
   for (j = 0; j < s->phyla.length; ++j) {
     schedule_summary_dependency_graph(&s->phy_graphs[j]);
