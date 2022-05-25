@@ -22,6 +22,11 @@ static int *parent_index; /* initializes to pi[i] = i */
 static int *constructor_instance_start;
 static int *phylum_instance_start;
 
+
+#define UP_DOWN_DIRECTION(v, direction) (direction ? v : !v)
+#define IS_JUST_FIBER_DEPENDENCY(d) (((d) & DEPENDENCY_MAYBE_SIMPLE))
+#define INSTANCE_EQUAL(in1, in2) ((in1->node == in2->node && fibered_attr_equal(&in1->fibered_attr, &in2->fibered_attr) && in1->index == in2->index))
+
 static void init_indices(STATE *s) {
   int num = 0;
   int i = 0;
@@ -132,25 +137,30 @@ static void get_fiber_cycles(STATE *s) {
 
     int num_cycles = 0;
     CYCLE** cycles = (CYCLE**)alloca(sizeof(CYCLE*) * phy->instances.length);
-    for (j = 0; j < constructor_instance_start[0]; ++j)
+    for (j = 0; j < s->cycles.length; j++)
     {
+      CYCLE* cyc = &s->cycles.array[j];
       int count = 0;
-      for (k = 0; k < phy->instances.length; ++k)
+      for (k = 0; k < cyc->instances.length; ++k)
       {
-        INSTANCE* in = &phy->instances.array[k];
-        if (parent_index[phylum_index + k] == j)
+        INSTANCE* in1 = &cyc->instances.array[k];
+        for (l = 0; l < phy->instances.length; l++)
         {
-          count++;
+          INSTANCE* in2 = &phy->instances.array[l];
+          if (INSTANCE_EQUAL(in1, in2))
+          {
+            count++;
+          }
         }
       }
 
       // If there is any cycle involving instances of this phylum graph
       if (count > 0)
       {
-        CYCLE* cycle = (CYCLE*)HALLOC(sizeof(CYCLE));
-        cycles[num_cycles] = cycle;
-        cycle->internal_info = j;
-        VECTORALLOC(cycle->instances, INSTANCE, count);
+        CYCLE* phylum_cycle = (CYCLE*)HALLOC(sizeof(CYCLE));
+        cycles[num_cycles++] = phylum_cycle;
+        phylum_cycle->internal_info = j;
+        VECTORALLOC(phylum_cycle->instances, INSTANCE, count);
         count = 0;
 
         if (cycle_debug & PRINT_UP_DOWN)
@@ -158,47 +168,41 @@ static void get_fiber_cycles(STATE *s) {
           printf("Cycle (%d) involving phylum graph: %s\n", j, decl_name(phy->phylum));
         }
 
-        for (k = 0; k < phy->instances.length; ++k)
+        CYCLE* generic_cycle = &s->cycles.array[j];
+        int count = 0;
+        for (k = 0; k < generic_cycle->instances.length; ++k)
         {
-          INSTANCE* in = &phy->instances.array[k];
-          if (parent_index[phylum_index + k] == j)
+          INSTANCE* in1 = &generic_cycle->instances.array[k];
+          for (l = 0; l < phy->instances.length; l++)
           {
-            cycle->instances.array[count++] = *in;
-
-            if (cycle_debug & PRINT_UP_DOWN)
+            INSTANCE* in2 = &phy->instances.array[l];
+            if (INSTANCE_EQUAL(in1, in2))
             {
-              printf("  ");
-              print_instance(in, stdout);
-              printf("\n");
+              phylum_cycle->instances.array[count++] = *in1;
+
+              if (cycle_debug & PRINT_UP_DOWN)
+              {
+                printf("  ");
+                print_instance(in1, stdout);
+                printf("\n");
+              }
             }
           }
         }
 
         // Determine the combined dependencies between attributes in the cycle
         DEPENDENCY dep = no_dependency;
-        for (k = 0; k < cycle->instances.length; k++)
+        for (k = 0; k < phylum_cycle->instances.length; k++)
         {
-          INSTANCE* source = &cycle->instances.array[k];
-          for (l = 0; l < cycle->instances.length; l++)
+          INSTANCE* source = &phylum_cycle->instances.array[k];
+          for (l = 0; l < phylum_cycle->instances.length; l++)
           {
-            INSTANCE* target = &cycle->instances.array[l];
+            INSTANCE* target = &phylum_cycle->instances.array[l];
             dep |= phy->mingraph[source->index * phy->instances.length + target->index];
           }
         }
 
-        // Collect any cycles that are not maybe simple
-        if (!(dep & DEPENDENCY_MAYBE_SIMPLE))
-        {
-          num_cycles++;
-        }
-        else
-        {
-          // TODO: free vector created for cycle instances
-          if (cycle_debug & PRINT_UP_DOWN)
-          {
-            printf("^^^ Ignore this cycle because it contained DEPENDENCY_MAYBE_SIMPLE \n");
-          }
-        }
+        phylum_cycle->acc_dep = dep;
       }
     }
 
@@ -226,24 +230,30 @@ static void get_fiber_cycles(STATE *s) {
     
     int num_cycles = 0;
     CYCLE** cycles = (CYCLE**)alloca(sizeof(CYCLE*) * aug_graph->instances.length);
-    for (j = constructor_instance_start[0]; j < num_instances; ++j)
+    for (j = 0; j < s->cycles.length; j++)
     {
+      CYCLE* cyc = &s->cycles.array[j];
       int count = 0;
-      for (k = 0; k < aug_graph->instances.length; ++k)
+      for (k = 0; k < cyc->instances.length; ++k)
       {
-        if (parent_index[constructor_index + k] == j)
+        INSTANCE* in1 = &cyc->instances.array[k];
+        for (l = 0; l < aug_graph->instances.length; l++)
         {
-          count++;
+          INSTANCE* in2 = &aug_graph->instances.array[l];
+          if (INSTANCE_EQUAL(in1, in2))
+          {
+            count++;
+          }
         }
       }
 
       // If there is any cycle involving instances of this augmented dependency graph
       if (count > 0)
       {
-        CYCLE* cycle = (CYCLE*)HALLOC(sizeof(CYCLE));
-        cycles[num_cycles] = cycle;
-        cycle->internal_info = j;
-        VECTORALLOC(cycle->instances, INSTANCE, count);
+        CYCLE* aug_graph_cycle = (CYCLE*)HALLOC(sizeof(CYCLE));
+        cycles[num_cycles++] = aug_graph_cycle;
+        aug_graph_cycle->internal_info = j;
+        VECTORALLOC(aug_graph_cycle->instances, INSTANCE, count);
         count = 0;
 
         if (cycle_debug & PRINT_UP_DOWN)
@@ -251,50 +261,41 @@ static void get_fiber_cycles(STATE *s) {
           printf("Cycle (%d) involving augmented dependency graph: %s\n", j, decl_name(aug_graph->syntax_decl));
         }
 
-        for (k = 0; k < aug_graph->instances.length; ++k)
+        CYCLE* generic_cycle = &s->cycles.array[j];
+        int count = 0;
+        for (k = 0; k < generic_cycle->instances.length; ++k)
         {
-          INSTANCE* in = &aug_graph->instances.array[k];
-          if (parent_index[constructor_index + k] == j)
+          INSTANCE* in1 = &generic_cycle->instances.array[k];
+          for (l = 0; l < aug_graph->instances.length; l++)
           {
-            cycle->instances.array[count++] = *in;
-
-            if (cycle_debug & PRINT_UP_DOWN)
+            INSTANCE* in2 = &aug_graph->instances.array[l];
+            if (INSTANCE_EQUAL(in1, in2))
             {
-              printf("  ");
-              print_instance(in, stdout);
-              printf("\n");
+              aug_graph_cycle->instances.array[count++] = *in1;
+
+              if (cycle_debug & PRINT_UP_DOWN)
+              {
+                printf("  ");
+                print_instance(in1, stdout);
+                printf("\n");
+              }
             }
           }
         }
 
         // Determine the combined dependencies between attributes in the cycle
         DEPENDENCY dep = no_dependency;
-        bool cycle_contains_parent = false;
-        for (k = 0; k < cycle->instances.length; k++)
+        for (k = 0; k < aug_graph->instances.length; k++)
         {
-          INSTANCE* source = &cycle->instances.array[k];
-          cycle_contains_parent |= source->node == aug_graph->lhs_decl;
-
-          for (l = 0; l < cycle->instances.length; l++)
+          INSTANCE* source = &aug_graph_cycle->instances.array[k];
+          for (l = 0; l < aug_graph_cycle->instances.length; l++)
           {
-            INSTANCE* target = &cycle->instances.array[l];
+            INSTANCE* target = &aug_graph_cycle->instances.array[l];
             dep |= get_edgeset_combine_dependencies(aug_graph->graph[source->index * aug_graph->instances.length + target->index]);
           }
         }
 
-        // Collect any cycles that are not maybe simple
-        if (!(dep & DEPENDENCY_MAYBE_SIMPLE) && !cycle_contains_parent)
-        {
-          num_cycles++;
-        }
-        else
-        {
-          // TODO: free vector created for cycle instances
-          if (cycle_debug & PRINT_UP_DOWN)
-          {
-            printf("^^^ Ignore this cycle because it contained DEPENDENCY_MAYBE_SIMPLE or contained parent\n");
-          }
-        }
+        aug_graph_cycle->acc_dep = dep;
       }
     }
 
@@ -314,7 +315,7 @@ static void get_fiber_cycles(STATE *s) {
   }
 }
 
-/*** determing strongly connected sets of attributes ***/
+/*** determining strongly connected sets of attributes ***/
 
 static void make_augmented_cycles_for_node(AUG_GRAPH *aug_graph,
 					   int constructor_index,
@@ -589,10 +590,6 @@ static void edgeset_combine_dependencies(EDGESET es, DEPENDENCY* acc_dependency,
   }
 }
 
-#define UP_DOWN_DIRECTION(v, direction) (direction ? v : !v)
-
-#define IS_JUST_FIBER_DEPENDENCY(d) ((d) && ((d) & DEPENDENCY_MAYBE_SIMPLE))
-
 static bool edge_can_be_deleted(int index1, int index2, INSTANCE *array, DEPENDENCY dep)
 {
   INSTANCE *attr1 = (&array[index1]);
@@ -653,6 +650,15 @@ static void add_up_down_attributes(STATE *s, bool direction)
     CYCLE *cyc = &s->cycles.array[i];
     if (cycle_debug & DEBUG_UP_DOWN) printf("Breaking Cycle #%d\n",i);
 
+    if (!(cyc->acc_dep & DEPENDENCY_MAYBE_SIMPLE))
+    {
+      if (cycle_debug & DEBUG_UP_DOWN)
+      {
+        printf("Skipped breaking Cycle #%d\n",i);
+      }
+      continue;
+    }
+
     // Forall phylum in the phylum_graph
     for (j = 0; j < s->phyla.length; j++)
     {
@@ -681,7 +687,7 @@ static void add_up_down_attributes(STATE *s, bool direction)
           }
 
           // If any dependency
-          if (IS_JUST_FIBER_DEPENDENCY(acc_dependency))
+          if (acc_dependency)
           {
             // Forall instances in the cycle
             for (l = 0; l < n; l++)
@@ -707,7 +713,7 @@ static void add_up_down_attributes(STATE *s, bool direction)
           }
 
           // If any dependency
-          if (IS_JUST_FIBER_DEPENDENCY(acc_dependency))
+          if (acc_dependency)
           {
             // Forall instances in the cycle
             for (l = 0; l < n; l++)
@@ -745,11 +751,11 @@ static void add_up_down_attributes(STATE *s, bool direction)
               if (parent_index[l + phylum_index] == cyc->internal_info)
               {
                 // Make sure it is a DOWN attribute
-                if (IS_JUST_FIBER_DEPENDENCY(acc_dependency) && UP_DOWN_DIRECTION(!instance_is_up(&array[l]), direction))
+                if (acc_dependency && UP_DOWN_DIRECTION(!instance_is_up(&array[l]), direction))
                 {
                   phy->mingraph[k * n + l] = acc_dependency;
                 }
-                else if (IS_JUST_FIBER_DEPENDENCY(phy->mingraph[k * n + l]))
+                else if (edge_can_be_deleted(k, l, array, phy->mingraph[k * n + l]))
                 {
                   phy->mingraph[k * n + l] = no_dependency;
                 }
@@ -765,7 +771,7 @@ static void add_up_down_attributes(STATE *s, bool direction)
               // Make sure it is in the cycle
               if (parent_index[l + phylum_index] == cyc->internal_info)
               {
-                if (IS_JUST_FIBER_DEPENDENCY(phy->mingraph[k * n + l]))
+                if (edge_can_be_deleted(k, l, array, phy->mingraph[k * n + l]))
                 {
                   // Remove edges between instance and all others in the same cycle
                   phy->mingraph[k * n + l] = no_dependency;
@@ -790,6 +796,7 @@ static void add_up_down_attributes(STATE *s, bool direction)
       {
         printf("\naug decl is: %s\n", decl_name(aug_graph->syntax_decl));
       }
+      
       for (k = 0; k < n; k++)
       {
         INSTANCE *instance = &array[k];
@@ -821,7 +828,7 @@ static void add_up_down_attributes(STATE *s, bool direction)
           }
 
           // If any dependency
-          if (IS_JUST_FIBER_DEPENDENCY(acc_dependency))
+          if (acc_dependency)
           {
             // Forall instances in the cycle
             for (l = 0; l < n; l++)
@@ -850,7 +857,7 @@ static void add_up_down_attributes(STATE *s, bool direction)
           }
 
           // If any dependency
-          if (IS_JUST_FIBER_DEPENDENCY(acc_dependency))
+          if (acc_dependency)
           {
             // Forall instances in the cycle
             for (l = 0; l < n; l++)
@@ -892,12 +899,12 @@ static void add_up_down_attributes(STATE *s, bool direction)
               if (parent_index[l + constructor_index] == cyc->internal_info)
               {
                 // Make sure it is a DOWN attribute
-                if (IS_JUST_FIBER_DEPENDENCY(acc_dependency) && UP_DOWN_DIRECTION(!instance_is_up(&array[l]), direction))
+                if (acc_dependency && UP_DOWN_DIRECTION(!instance_is_up(&array[l]), direction))
                 {
                   // printf("k -> l Adding In cycle -> In Cycle: ");
                   add_up_down_edge(k, l, n, array, acc_dependency, &acc_cond, aug_graph);
                 }
-                else if (IS_JUST_FIBER_DEPENDENCY(dep) && edge_can_be_deleted(k, l, array, dep))
+                else if (edge_can_be_deleted(k, l, array, dep))
                 {
                   // printf("k -> l Removing In cycle -> In Cycle: ");
                   remove_edgeset(k, l, n, array, aug_graph);
@@ -915,7 +922,7 @@ static void add_up_down_attributes(STATE *s, bool direction)
               if (parent_index[l + constructor_index] == cyc->internal_info)
               {
                 DEPENDENCY dep = get_edgeset_combine_dependencies(aug_graph->graph[k * n + l]);
-                if (IS_JUST_FIBER_DEPENDENCY(dep) && edge_can_be_deleted(k, l, array, dep))
+                if (edge_can_be_deleted(k, l, array, dep))
                 {
                   // Remove edges between instance and all others in the same cycle
                   // printf("k -> l Removing Down In cycle -> In Cycle: ");
@@ -961,7 +968,3 @@ void break_fiber_cycles(Declaration module,STATE *s,DEPENDENCY dep) {
     print_analysis_state(s,stdout);
   }
 }
-
-  
-
-
