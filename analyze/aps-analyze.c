@@ -2,7 +2,6 @@
 #include <jbb.h>
 
 #include "aps-ag.h"
-#include "aps-schedule.h"
 
 /*
 Several phases:
@@ -37,7 +36,7 @@ static void *analyze_thing(void *ignore, void *node)
       }
 
         d = analysis_state_cycle(s); // check again for type-3 errors
-	compute_schedule(decl, s); // calculate OAG if grammar is DNC
+	compute_static_schedule(decl, s); // calculate OAG if grammar is DNC
 	d = analysis_state_cycle(s); // check again for type-3 errors
       
       // Pure fiber cycles should have been broken when reaching this step
