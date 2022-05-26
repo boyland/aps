@@ -6,6 +6,6 @@
  * @param module APS module
  * @param s state
  */
-void compute_schedule(Declaration module, STATE* s);
+void compute_static_schedule(Declaration module, STATE* s);
 
 #endif
