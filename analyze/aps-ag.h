@@ -22,6 +22,7 @@
 #include "canonical-signature.h"
 #include "scc.h"
 #include "aps-scc.h"
+#include "aps-schedule.h"
 
 extern char *aps_yyfilename;
 extern void aps_error(const void *tnode, const char *fmt, ...);
