@@ -1,4 +1,5 @@
 #include "jbb-vector.h"
+#include "scc.h"
 
 typedef struct attrset {
   struct attrset *rest;
