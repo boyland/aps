@@ -22,3 +22,8 @@ typedef struct cycle_description {
 #define CYC_ABOVE 1
 #define CYC_LOCAL 2
 #define CYC_BELOW 4
+
+#define INSTANCE_EQUAL(in1, in2)                                  \
+  ((in1->node == in2->node &&                                     \
+    fibered_attr_equal(&in1->fibered_attr, &in2->fibered_attr) && \
+    in1->index == in2->index))

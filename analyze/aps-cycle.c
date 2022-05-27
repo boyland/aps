@@ -25,7 +25,6 @@ static int *phylum_instance_start;
 
 #define UP_DOWN_DIRECTION(v, direction) (direction ? v : !v)
 #define IS_JUST_FIBER_DEPENDENCY(d) (((d) & DEPENDENCY_MAYBE_SIMPLE))
-#define INSTANCE_EQUAL(in1, in2) ((in1->node == in2->node && fibered_attr_equal(&in1->fibered_attr, &in2->fibered_attr) && in1->index == in2->index))
 
 static void init_indices(STATE *s) {
   int num = 0;
@@ -136,7 +135,7 @@ static void get_fiber_cycles(STATE *s) {
     PHY_GRAPH *phy = &s->phy_graphs[i];
 
     int num_cycles = 0;
-    CYCLE** cycles = (CYCLE**)alloca(sizeof(CYCLE*) * phy->instances.length);
+    CYCLE** cycles = (CYCLE**)alloca(sizeof(CYCLE*) * s->cycles.length);
     for (j = 0; j < s->cycles.length; j++)
     {
       CYCLE* cyc = &s->cycles.array[j];
@@ -158,9 +157,12 @@ static void get_fiber_cycles(STATE *s) {
       if (count > 0)
       {
         CYCLE* phylum_cycle = (CYCLE*)HALLOC(sizeof(CYCLE));
-        cycles[num_cycles++] = phylum_cycle;
+        cycles[j] = phylum_cycle;
         phylum_cycle->internal_info = j;
         VECTORALLOC(phylum_cycle->instances, INSTANCE, count);
+
+        CYCLE* generic_cycle = &s->cycles.array[j];
+        num_cycles++;
         count = 0;
 
         if (cycle_debug & PRINT_UP_DOWN)
@@ -168,7 +170,6 @@ static void get_fiber_cycles(STATE *s) {
           printf("Cycle (%d) involving phylum graph: %s\n", j, decl_name(phy->phylum));
         }
 
-        CYCLE* generic_cycle = &s->cycles.array[j];
         int count = 0;
         for (k = 0; k < generic_cycle->instances.length; ++k)
         {
@@ -229,7 +230,7 @@ static void get_fiber_cycles(STATE *s) {
         (i == s->match_rules.length) ? &s->global_dependencies : &s->aug_graphs[i];
     
     int num_cycles = 0;
-    CYCLE** cycles = (CYCLE**)alloca(sizeof(CYCLE*) * aug_graph->instances.length);
+    CYCLE** cycles = (CYCLE**)alloca(sizeof(CYCLE*) * s->cycles.length);
     for (j = 0; j < s->cycles.length; j++)
     {
       CYCLE* cyc = &s->cycles.array[j];
@@ -251,9 +252,12 @@ static void get_fiber_cycles(STATE *s) {
       if (count > 0)
       {
         CYCLE* aug_graph_cycle = (CYCLE*)HALLOC(sizeof(CYCLE));
-        cycles[num_cycles++] = aug_graph_cycle;
+        cycles[num_cycles] = aug_graph_cycle;
         aug_graph_cycle->internal_info = j;
         VECTORALLOC(aug_graph_cycle->instances, INSTANCE, count);
+
+        CYCLE* generic_cycle = &s->cycles.array[j];
+        num_cycles++;
         count = 0;
 
         if (cycle_debug & PRINT_UP_DOWN)
@@ -261,7 +265,6 @@ static void get_fiber_cycles(STATE *s) {
           printf("Cycle (%d) involving augmented dependency graph: %s\n", j, decl_name(aug_graph->syntax_decl));
         }
 
-        CYCLE* generic_cycle = &s->cycles.array[j];
         int count = 0;
         for (k = 0; k < generic_cycle->instances.length; ++k)
         {

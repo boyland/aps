@@ -69,7 +69,7 @@ typedef struct augmented_dependency_graph {
   struct augmented_dependency_graph *next_in_aug_worklist;
   int *schedule; /* one-d array, indexed by instance number */
   struct cto_node *total_order;
-  CYCLES cycles; /* non-fiber cycles of this phylum */
+  CYCLES cycles;       /* vector of cycles of this augmented graph derived by extracting augmented graph attributes from a cycle */
   COMPONENTS components;
 } AUG_GRAPH;
 extern const char *aug_graph_name(AUG_GRAPH *);
@@ -82,9 +82,11 @@ typedef struct summary_dependency_graph {
   struct summary_dependency_graph *next_in_phy_worklist;
   int *summary_schedule; /* one-d array, indexed by instance number */
   BOOL* cyclic_flags; /* one-d array, indexed by phase number indicating whether phase is circular or not */
+  int* cycle_ref;     /* one-d array index by phase number indicating cycle internal info causing this phase to be circular */
   int max_phase;      /* integer denoting the maximum phase number for this phylum */
-  CYCLES cycles;      /* non-fiber cycles of this phylum */
-  BOOL* empty_phase;  /* one-d array, indexed by phase number indicating whether phase is empty */
+  CYCLES cycles;      /* vector of cycles of this phylum derived by extracting phylum attributes from a cycle */
+  BOOL* empty_phase;  /* one-d array, indexed by phase number there is no attribute belonging to this phase */
+  char* name;
 } PHY_GRAPH;
 extern const char *phy_graph_name(PHY_GRAPH *);
 
