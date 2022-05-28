@@ -29,6 +29,7 @@ struct cto_node {
   CHILD_PHASE child_phase; // <ph,ch>
   Declaration child_decl;  // child decl in case of visit marker
   short visit;             // parent phase number
+  int component;           // SCC component index
 #define cto_if_false cto_next
 };
 
