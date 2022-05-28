@@ -1021,12 +1021,14 @@ static void child_visit_completeness(AUG_GRAPH* aug_graph,
 static void check_circular_visit(AUG_GRAPH* aug_graph,
                                  TOTAL_ORDER_STATE* state,
                                  CTO_NODE* cto_node,
-                                 const short parent_ph) {
+                                 short parent_ph) {
+  if (cto_node == NULL)
+    return;
+
   if (IS_VISIT_MARKER(cto_node)) {
     CHILD_PHASE group = cto_node->child_phase;
-    if (group.ph == -1) {
-      check_circular_visit(aug_graph, state, cto_node, parent_ph + 1);
-      return;
+    if (group.ch == -1) {
+      parent_ph += 1;
     } else {
       PHY_GRAPH* parent_phy =
           Declaration_info(aug_graph->lhs_decl)->node_phy_graph;
@@ -1097,6 +1099,9 @@ static CTO_NODE* end_of_visit_routine(AUG_GRAPH* aug_graph,
 
     int ph;
     for (ph = 1; ph < state->max_child_ph[ch]; ph++) {
+      if (!state->child_visit_markers[ch][ph] && !child_phy->empty_phase[ph])
+        break;
+
       if (!state->child_visit_markers[ch][ph] && child_phy->empty_phase[ph] &&
           parent_phy->cyclic_flags[parent_ph] == child_phy->cyclic_flags[ph]) {
         cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
