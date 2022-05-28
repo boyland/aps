@@ -1011,6 +1011,47 @@ static void child_visit_completeness(AUG_GRAPH* aug_graph,
 }
 
 /**
+ * This function asserts that no non-circular visit of a child is done in the
+ * circular visit of the parent.
+ * @param aug_graph Augmented dependency graph
+ * @param instance_groups array of <ph,ch> indexed by INSTANCE index
+ * @param cto_node current linked list node
+ * @param parent_ph current parent visit phase
+ */
+static void check_circular_visit(AUG_GRAPH* aug_graph,
+                                 TOTAL_ORDER_STATE* state,
+                                 CTO_NODE* cto_node,
+                                 const short parent_ph) {
+  if (IS_VISIT_MARKER(cto_node)) {
+    CHILD_PHASE group = cto_node->child_phase;
+    if (group.ph == -1) {
+      check_circular_visit(aug_graph, state, cto_node, parent_ph + 1);
+      return;
+    } else {
+      PHY_GRAPH* parent_phy =
+          Declaration_info(aug_graph->lhs_decl)->node_phy_graph;
+      PHY_GRAPH* child_phy =
+          Declaration_info(state->children.array[group.ch])->node_phy_graph;
+
+      if (child_phy != NULL && parent_phy->cyclic_flags[parent_ph] !=
+                                   child_phy->cyclic_flags[group.ch]) {
+        fatal_error(
+            "We cannot do a non-circular visit of a child visit(%s) of <%d,%d> "
+            "in the circular visit of the parent (phase:%d).",
+            decl_name(state->children.array[group.ch]), group.ph, group.ch,
+            parent_ph);
+      }
+    }
+  }
+
+  if (cto_node->cto_if_true != NULL) {
+    check_circular_visit(aug_graph, state, cto_node->cto_if_true, parent_ph);
+  }
+
+  check_circular_visit(aug_graph, state, cto_node->cto_next, parent_ph);
+}
+
+/**
  * Function that throws an error if phases are out of order
  * @param aug_graph
  * @param head head of linked list
@@ -1028,57 +1069,63 @@ static void assert_total_order(AUG_GRAPH* aug_graph,
 
   // Condition #3: consecutiveness of child visit calls
   child_visit_consecutive(aug_graph, state, head);
+
+  // Condition #4: ensure no non-circular visit of a child in the circular visit
+  // of the parent.
+  check_circular_visit(aug_graph, state, head, 1);
 }
 
-static bool end_of_visit_routine(AUG_GRAPH* aug_graph,
-                                            COMPONENT comp,
-                                            const int component_index,
-                                            CTO_NODE* prev,
-                                            CONDITION cond,
-                                            TOTAL_ORDER_STATE* state,
-                                            int remaining,
-                                            CHILD_PHASE* group,
-                                            const short parent_ph,
-                                            const short max_child_phase,
-                                            const short child_index) {
-  
-PHY_GRAPH* parent_phy =
-        Declaration_info(aug_graph->lhs_decl)->node_phy_graph;
+static CTO_NODE* end_of_visit_routine(AUG_GRAPH* aug_graph,
+                                      COMPONENT comp,
+                                      const int component_index,
+                                      CTO_NODE* prev,
+                                      CONDITION cond,
+                                      TOTAL_ORDER_STATE* state,
+                                      const int remaining,
+                                      CHILD_PHASE* group,
+                                      const short parent_ph) {
+  CTO_NODE* cto_node;
+  PHY_GRAPH* parent_phy = Declaration_info(aug_graph->lhs_decl)->node_phy_graph;
 
-    int i, j;
-    for (i = 0; i < state->children.length; i++) {
-      PHY_GRAPH* child_phy =
-          Declaration_info(state->children.array[i])->node_phy_graph;
+  int ch;
+  for (ch = 0; ch < state->children.length; ch++) {
+    PHY_GRAPH* child_phy =
+        Declaration_info(state->children.array[ch])->node_phy_graph;
 
-      for (j = 1; j <= state->max_child_ph; j++) {
-        if (!state->child_visit_markers[i][j] &&
-            parent_phy->cyclic_flags[parent_ph] == child_phy->cyclic_flags[j]) {
-          CTO_NODE* cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
-          cto_node->cto_prev = prev;
-          cto_node->child_decl = state->children.array[i];
-          cto_node->cto_instance = NULL;
-          cto_node->child_phase.ph = j;
-          cto_node->child_phase.ch = i;
-          cto_node->visit = parent_ph;
-          state->child_visit_markers[i][j] = true;
-          cto_node->cto_next =
-              schedule_end_visit(aug_graph, comp, cto_node, cond, state,
-                                 count_missing_child_visit + 1, parent_ph);
-          return cto_node;
-        }
+    if (child_phy == NULL)
+      continue;
+
+    int ph;
+    for (ph = 1; ph < state->max_child_ph[ch]; ph++) {
+      if (!state->child_visit_markers[ch][ph] && child_phy->empty_phase[ph] &&
+          parent_phy->cyclic_flags[parent_ph] == child_phy->cyclic_flags[ph]) {
+        cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
+        cto_node->cto_prev = prev;
+        cto_node->child_decl = state->children.array[ch];
+        cto_node->cto_instance = NULL;
+        cto_node->child_phase.ph = ph;
+        cto_node->child_phase.ch = ch;
+        cto_node->visit = parent_ph;
+        state->child_visit_markers[ch][ph] = true;
+        cto_node->cto_next =
+            end_of_visit_routine(aug_graph, comp, component_index, cto_node,
+                                 cond, state, remaining, group, parent_ph);
+        state->child_visit_markers[ch][ph] = false;
+        return cto_node;
       }
     }
+  }
 
-    cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
-    cto_node->cto_prev = prev;
-    cto_node->cto_instance = NULL;
-    cto_node->child_phase.ph = parent_ph;
-    cto_node->child_phase.ch = -1;
-    cto_node->visit = parent_ph;
-    cto_node->cto_next =
-        schedule_scc_group(aug_graph, comp, component_index, prev, cond, state,
-                           remaining, group, parent_ph + 1);
-
+  cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
+  cto_node->cto_prev = prev;
+  cto_node->cto_instance = NULL;
+  cto_node->child_phase.ph = parent_ph;
+  cto_node->child_phase.ch = -1;
+  cto_node->visit = parent_ph;
+  cto_node->cto_next =
+      schedule_scc_group(aug_graph, comp, component_index, prev, cond, state,
+                         remaining, group, parent_ph + 1);
+  return cto_node;
 }
 
 /**
@@ -1137,43 +1184,8 @@ static CTO_NODE* schedule_scc_transition_start_of_group(
   // have reached the end of previous phase and so add a end of parent phase
   // visit marker <ph,-1>
   if (abs(group->ph) > parent_ph && group->ch == -1) {
-    PHY_GRAPH* parent_phy =
-        Declaration_info(aug_graph->lhs_decl)->node_phy_graph;
-
-    int i, j;
-    for (i = 0; i < state->children.length; i++) {
-      PHY_GRAPH* child_phy =
-          Declaration_info(state->children.array[i])->node_phy_graph;
-
-      for (j = 1; j <= state->max_child_ph; j++) {
-        if (!state->child_visit_markers[i][j] &&
-            parent_phy->cyclic_flags[parent_ph] == child_phy->cyclic_flags[j]) {
-          CTO_NODE* cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
-          cto_node->cto_prev = prev;
-          cto_node->child_decl = state->children.array[i];
-          cto_node->cto_instance = NULL;
-          cto_node->child_phase.ph = j;
-          cto_node->child_phase.ch = i;
-          cto_node->visit = parent_ph;
-          state->child_visit_markers[i][j] = true;
-          cto_node->cto_next =
-              schedule_end_visit(aug_graph, comp, cto_node, cond, state,
-                                 count_missing_child_visit + 1, parent_ph);
-          return cto_node;
-        }
-      }
-    }
-
-    cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
-    cto_node->cto_prev = prev;
-    cto_node->cto_instance = NULL;
-    cto_node->child_phase.ph = parent_ph;
-    cto_node->child_phase.ch = -1;
-    cto_node->visit = parent_ph;
-    cto_node->cto_next =
-        schedule_scc_group(aug_graph, comp, component_index, prev, cond, state,
-                           remaining, group, parent_ph + 1);
-    return cto_node;
+    return end_of_visit_routine(aug_graph, comp, component_index, prev, cond,
+                                state, remaining, group, parent_ph);
   }
 
   return schedule_scc_group(aug_graph, comp, component_index, prev, cond, state,
@@ -1257,6 +1269,9 @@ static CTO_NODE* schedule_end_visit(AUG_GRAPH* aug_graph,
   for (i = 0; i < state->children.length; i++) {
     PHY_GRAPH* child_phy =
         Declaration_info(state->children.array[i])->node_phy_graph;
+
+    if (child_phy == NULL)
+      continue;
 
     for (j = 1; j <= state->max_child_ph[i]; j++) {
       if (!state->child_visit_markers[i][j] &&
