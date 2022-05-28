@@ -446,6 +446,15 @@ static void print_total_order(CTO_NODE* cto,
   bool extra_newline = false;
   bool print_group = true;
 
+  if (cto->component != component_index) {
+    if (component_index != -1) {
+      fprintf(stream, " Finished scheduling SCC #%d\n\n", component_index);
+    }
+
+    component_index = cto->component;
+    fprintf(stream, " Started scheduling SCC #%d\n", component_index);
+  }
+
   if (cto->cto_instance == NULL) {
     print_indent(indent, stream);
     fprintf(stream, "visit marker");
@@ -455,15 +464,6 @@ static void print_total_order(CTO_NODE* cto,
       extra_newline = true;
     }
   } else {
-    if (cto->component != component_index) {
-      if (component_index != -1) {
-        fprintf(stream, " Finished scheduling SCC #%d\n\n", component_index);
-      }
-
-      component_index = cto->component;
-      fprintf(stream, " Started scheduling SCC #%d\n", component_index);
-    }
-
     print_indent(indent, stream);
     print_instance(cto->cto_instance, stream);
     CONDITION cond = instance_condition(cto->cto_instance);
@@ -1098,7 +1098,7 @@ static CTO_NODE* end_of_visit_routine(AUG_GRAPH* aug_graph,
       continue;
 
     int ph;
-    for (ph = 1; ph < state->max_child_ph[ch]; ph++) {
+    for (ph = 1; ph <= state->max_child_ph[ch]; ph++) {
       if (!state->child_visit_markers[ch][ph] && !child_phy->empty_phase[ph])
         break;
 
@@ -1111,6 +1111,8 @@ static CTO_NODE* end_of_visit_routine(AUG_GRAPH* aug_graph,
         cto_node->child_phase.ph = ph;
         cto_node->child_phase.ch = ch;
         cto_node->visit = parent_ph;
+        cto_node->component = state->children.length * (ch + 1) *
+                              ph;  // This visit does not belong to any SCC
         state->child_visit_markers[ch][ph] = true;
         cto_node->cto_next =
             end_of_visit_routine(aug_graph, comp, component_index, cto_node,
@@ -1127,6 +1129,7 @@ static CTO_NODE* end_of_visit_routine(AUG_GRAPH* aug_graph,
   cto_node->child_phase.ph = parent_ph;
   cto_node->child_phase.ch = -1;
   cto_node->visit = parent_ph;
+  cto_node->component = component_index;
   cto_node->cto_next =
       schedule_scc_group(aug_graph, comp, component_index, prev, cond, state,
                          remaining, group, parent_ph + 1);
@@ -1240,6 +1243,7 @@ static CTO_NODE* schedule_scc_transition_end_of_group(AUG_GRAPH* aug_graph,
     cto_node->child_phase.ch = group->ch;
     cto_node->child_decl = state->children.array[group->ch];
     cto_node->visit = parent_ph;
+    cto_node->component = component_index;
     state->child_visit_markers[group->ch][-group->ph] =
         true;  // Mark this child visit as done
     cto_node->cto_next = schedule_scc_group(
@@ -1256,6 +1260,7 @@ static CTO_NODE* schedule_scc_transition_end_of_group(AUG_GRAPH* aug_graph,
 
 static CTO_NODE* schedule_end(AUG_GRAPH* aug_graph,
                               COMPONENT comp,
+                              int component_index,
                               CTO_NODE* prev,
                               CONDITION cond,
                               TOTAL_ORDER_STATE* state,
@@ -1263,6 +1268,7 @@ static CTO_NODE* schedule_end(AUG_GRAPH* aug_graph,
 
 static CTO_NODE* schedule_end_visit(AUG_GRAPH* aug_graph,
                                     COMPONENT comp,
+                                    int component_index,
                                     CTO_NODE* prev,
                                     CONDITION cond,
                                     TOTAL_ORDER_STATE* state,
@@ -1270,35 +1276,44 @@ static CTO_NODE* schedule_end_visit(AUG_GRAPH* aug_graph,
                                     const short parent_ph) {
   PHY_GRAPH* parent_phy = Declaration_info(aug_graph->lhs_decl)->node_phy_graph;
 
-  int i, j;
-  for (i = 0; i < state->children.length; i++) {
+  int ch, ph;
+  for (ch = 0; ch < state->children.length; ch++) {
     PHY_GRAPH* child_phy =
-        Declaration_info(state->children.array[i])->node_phy_graph;
+        Declaration_info(state->children.array[ch])->node_phy_graph;
 
     if (child_phy == NULL)
       continue;
 
-    for (j = 1; j <= state->max_child_ph[i]; j++) {
-      if (!state->child_visit_markers[i][j] &&
-          parent_phy->cyclic_flags[parent_ph] == child_phy->cyclic_flags[j]) {
+    for (ph = 1; ph <= state->max_child_ph[ch]; ph++) {
+      if (!state->child_visit_markers[ch][ph] &&
+          parent_phy->cyclic_flags[parent_ph] == child_phy->cyclic_flags[ph]) {
         CTO_NODE* cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
         cto_node->cto_prev = prev;
-        cto_node->child_decl = state->children.array[i];
+        cto_node->child_decl = state->children.array[ch];
         cto_node->cto_instance = NULL;
-        cto_node->child_phase.ph = j;
-        cto_node->child_phase.ch = i;
+        cto_node->child_phase.ph = ph;
+        cto_node->child_phase.ch = ch;
+        cto_node->component = state->children.length * (ch + 1) *
+                              ph;  // This visit does not belong to any SCC
         cto_node->visit = parent_ph;
-        state->child_visit_markers[i][j] = true;
+        state->child_visit_markers[ch][ph] = true;
         cto_node->cto_next =
-            schedule_end_visit(aug_graph, comp, cto_node, cond, state,
+            schedule_end_visit(aug_graph, comp, ch * ph, cto_node, cond, state,
                                count_missing_child_visit + 1, parent_ph);
+        state->child_visit_markers[ch][ph] = false;
+
         return cto_node;
       }
     }
   }
 
-  if (count_missing_child_visit > 0 || parent_ph == state->max_parent_ph) {
-    return schedule_end(aug_graph, comp, prev, cond, state, parent_ph);
+  if (count_missing_child_visit > 0) {
+    return schedule_end(aug_graph, comp, component_index, prev, cond, state,
+                        parent_ph);
+  } else if (parent_ph == state->max_parent_ph) {
+    return schedule_end(aug_graph, comp,
+                        aug_graph->components.length * parent_ph, prev, cond,
+                        state, parent_ph);
   }
 
   return NULL;
@@ -1315,6 +1330,7 @@ static CTO_NODE* schedule_end_visit(AUG_GRAPH* aug_graph,
  */
 static CTO_NODE* schedule_end(AUG_GRAPH* aug_graph,
                               COMPONENT comp,
+                              const int component_index,
                               CTO_NODE* prev,
                               CONDITION cond,
                               TOTAL_ORDER_STATE* state,
@@ -1325,8 +1341,10 @@ static CTO_NODE* schedule_end(AUG_GRAPH* aug_graph,
   cto_node->child_phase.ph = parent_ph;
   cto_node->child_phase.ch = -1;
   cto_node->visit = parent_ph;
-  cto_node->cto_next = schedule_end_visit(aug_graph, comp, cto_node, cond,
-                                          state, 0, parent_ph + 1);
+  cto_node->component = component_index;
+  cto_node->cto_next =
+      schedule_end_visit(aug_graph, comp, component_index, cto_node, cond,
+                         state, 0, parent_ph + 1);
 
   return cto_node;
 }
@@ -1366,7 +1384,8 @@ static CTO_NODE* schedule_scc_group(AUG_GRAPH* aug_graph,
 
   /* If nothing more to do, we are done. */
   if (remaining == 0) {
-    return schedule_end(aug_graph, comp, prev, cond, state, parent_ph);
+    return schedule_end(aug_graph, comp, component_index, prev, cond, state,
+                        parent_ph);
   }
 
   /* Outer condition is impossible, its a dead-end branch */
