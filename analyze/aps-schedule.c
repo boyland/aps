@@ -622,6 +622,12 @@ static bool scc_instance_ready_to_go(AUG_GRAPH* aug_graph,
                                      const CONDITION cond,
                                      const int group_index,
                                      const int attribute_index) {
+  if (oag_debug & DEBUG_ORDER) {
+    printf("Checking instance readyness of: ");
+    print_instance(&aug_graph->instances.array[attribute_index], stdout);
+    printf("\n");
+  }
+
   int k;
   EDGESET edges;
   int n = aug_graph->instances.length;
@@ -681,6 +687,7 @@ static bool scc_instance_ready_to_go(AUG_GRAPH* aug_graph,
  */
 static bool scc_group_ready_to_go(AUG_GRAPH* aug_graph,
                                   COMPONENT comp,
+                                  const int component_index,
                                   TOTAL_ORDER_STATE* state,
                                   const CONDITION cond,
                                   const int group_index) {
@@ -699,11 +706,11 @@ static bool scc_group_ready_to_go(AUG_GRAPH* aug_graph,
     INSTANCE* in = &aug_graph->instances.array[comp.array[j]];
     CHILD_PHASE current_group = state->instance_groups[in->index];
 
+    if (state->schedule[in->index])
+      continue;  // already scheduled
+
     // Instance in the same group but cannot be considered
     if (instances_in_same_group(aug_graph, state, group_index, in->index)) {
-      if (state->schedule[in->index])
-        continue;  // already scheduled
-
       if (!scc_instance_ready_to_go(aug_graph, comp, state, cond, group_index,
                                     in->index)) {
         return false;
@@ -896,18 +903,16 @@ static void total_order_sanity_check(AUG_GRAPH* aug_graph,
       if (aug_graph_contains_phase(aug_graph, state, current->child_phase.ph,
                                    current->child_phase.ch) &&
           !followed_by_child_synthesized) {
-        // fatal_error("After visit marker <%d,%d> the phase should be
-        // <ph,ch>.",
-        //             current->child_phase.ph, current->child_phase.ch);
+        fatal_error("After visit marker <%d,%d> the phase should be <ph,ch>.",
+                    current->child_phase.ph, current->child_phase.ch);
       }
 
       else if (aug_graph_contains_phase(aug_graph, state,
                                         -current->child_phase.ph,
                                         current->child_phase.ch) &&
                !preceded_by_child_inherited) {
-        // fatal_error("Before visit marker <%d,%d> the phase should be
-        // <-ph,ch>.",
-        //             current->child_phase.ph, current->child_phase.ch);
+        fatal_error("Before visit marker <%d,%d> the phase should be <-ph,ch>.",
+                    current->child_phase.ph, current->child_phase.ch);
       }
     }
   }
@@ -1077,6 +1082,32 @@ static void assert_total_order(AUG_GRAPH* aug_graph,
   check_circular_visit(aug_graph, state, head, 1);
 }
 
+static bool any_instance_in_group_ready_to_go(AUG_GRAPH* aug_graph,
+                                              COMPONENT comp,
+                                              const int component_index,
+                                              CONDITION cond,
+                                              TOTAL_ORDER_STATE* state,
+                                              CHILD_PHASE* group) {
+  int i;
+  for (i = 0; i < comp.length; i++) {
+    INSTANCE* in = &aug_graph->instances.array[comp.array[i]];
+
+    // Already scheduled, ignore
+    if (state->schedule[in->index])
+      continue;
+
+    if (!child_phases_are_equal(&state->instance_groups[in->index], group))
+      continue;
+
+    if (scc_group_ready_to_go(aug_graph, comp, component_index, state, cond,
+                              in->index)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 static CTO_NODE* end_of_visit_routine(AUG_GRAPH* aug_graph,
                                       COMPONENT comp,
                                       const int component_index,
@@ -1172,6 +1203,26 @@ static CTO_NODE* schedule_scc_transition_start_of_group(
   // followed child inherited attribute thus add a visit marker <ph,ch>
   if (group->ph > 0 && group->ch != -1 &&
       !state->child_visit_markers[group->ch][group->ph]) {
+    int ch;
+    for (ch = 0; ch < state->children.length; ch++) {
+      // Probing
+      CHILD_PHASE* child_synthesized_group =
+          (CHILD_PHASE*)alloca(sizeof(CHILD_PHASE));
+      child_synthesized_group->ph = -group->ph;
+      child_synthesized_group->ch = ch;
+
+      // See if there is any inherited attributes in this phase that are not yet
+      // scheduled
+      if (any_instance_in_group_ready_to_go(aug_graph, comp, component_index,
+                                            cond, state,
+                                            child_synthesized_group)) {
+        // Work on the inherited attributes of this phase
+        return schedule_scc_group(aug_graph, comp, component_index, prev, cond,
+                                  state, remaining, child_synthesized_group,
+                                  parent_ph);
+      }
+    }
+
     cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
     cto_node->cto_prev = prev;
     cto_node->cto_instance = NULL;
@@ -1512,7 +1563,8 @@ static CTO_NODE* schedule_scc(AUG_GRAPH* aug_graph,
     }
 
     // If edgeset condition is not impossible then go ahead with scheduling
-    if (scc_group_ready_to_go(aug_graph, comp, state, cond, instance->index)) {
+    if (scc_group_ready_to_go(aug_graph, comp, component_index, state, cond,
+                              instance->index)) {
       if (oag_debug & DEBUG_ORDER) {
         printf("-> Scheduled scc via greedy scheduler (instance: ");
         print_instance(instance, stdout);
@@ -1694,7 +1746,19 @@ static CTO_NODE* schedule_scc_find_scc(AUG_GRAPH* aug_graph,
           printf("\n");
         }
         printf("\n");
+
+        for (j = 0; j < comp.length; j++) {
+          for (k = 0; k < comp.length; k++) {
+            INSTANCE* in1 = &aug_graph->instances.array[comp.array[j]];
+            INSTANCE* in2 = &aug_graph->instances.array[comp.array[k]];
+
+            EDGESET es = aug_graph->graph[in1->index * n + in2->index];
+            print_edgeset(es, stdout);
+          }
+        }
       }
+      printf("\n");
+
       // Delegate it to the circular group scheduler
       return schedule_scc(aug_graph, comp, i, prev, cond, state, remaining,
                           group, parent_ph);
