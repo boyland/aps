@@ -95,44 +95,6 @@ vector<set<Expression>> make_instance_assignment(AUG_GRAPH* aug_graph,
   return array;
 }
 
-/**
- * Utility function to dump fixed-point child visit call
- * @param decl child node decl which will be used as parameter
- * @param n phylum graph index of child
- * @param ph phase of visit
- * @param ch child index
- * @param os FILE out
- */
-static void dump_fixed_point_loop_visit(Declaration decl,
-                                        int n,
-                                        short ph,
-                                        short ch,
-                                        ostream& os) {
-#ifdef APS2SCALA
-  os << indent(nesting_level) << "val prevChanged_" << ph << "_" << ch
-     << " = changed;\n";
-  os << indent(nesting_level) << "do {\n";
-  os << indent(nesting_level + 1) << "changed = false;\n";
-  os << indent(nesting_level + 1) << "visit_" << n << "_" << ph << "(v_"
-     << decl_name(decl) << ");\n";
-  os << indent(nesting_level) << "} while (changed);\n";
-  os << indent(nesting_level) << "changed = prevChanged_" << ph << "_" << ch
-     << ";\n\n";
-#endif /* APS2SCALA */
-}
-
-static void dump_cached_visit(Declaration decl,
-                              int n,
-                              short ph,
-                              short ch,
-                              ostream& os) {
-#ifdef APS2SCALA
-  os << indent(nesting_level) << "once(() => visit_" << n << "_" << ph << "(v_"
-     << decl_name(decl) << "), (anchor.nodeNumber," << ph << "," << ch
-     << "));\n";
-#endif /* APS2SCALA */
-}
-
 // visit procedures are called:
 // visit_n_m
 // where n is the number of the phy_graph and m is the phase.
@@ -150,11 +112,15 @@ static bool implement_visit_function(
     vector<set<Expression>> instance_assignment,
     int nch,
     CONDITION* cond,
+    int component_index,
     ostream& os) {
   for (; cto; cto = cto->cto_next) {
     INSTANCE* in = cto->cto_instance;
     int ch = cto->child_phase.ch;
     int ph = cto->child_phase.ph;
+    bool scc_changed = cto->component != component_index;
+    PHY_GRAPH* pg_parent =
+        Declaration_info(aug_graph->lhs_decl)->node_phy_graph;
 
     // Code generate if CTO_NODE belongs to this visit OR CTO_NODE is
     // conditional
@@ -172,8 +138,6 @@ static bool implement_visit_function(
       os << indent() << "// visit marker(" << ph << "," << ch << ")\n";
 
       PHY_GRAPH* pg = Declaration_info(cto->child_decl)->node_phy_graph;
-      PHY_GRAPH* pg_parent =
-          Declaration_info(aug_graph->lhs_decl)->node_phy_graph;
       int n = PHY_GRAPH_NUM(pg);
 
       os << indent() << "// parent visit of " << decl_name(pg_parent->phylum)
@@ -184,26 +148,13 @@ static bool implement_visit_function(
          << " at phase " << ph << " is "
          << (pg->cyclic_flags[ph] ? "circular" : "non-circular") << "\n";
 
-      // If current phase is not circular but visit is circular then fixed-point
-      // loop is needed
-      if (!pg_parent->cyclic_flags[phase] && pg->cyclic_flags[ph]) {
-        os << indent() << "// Fixed-point is needed here.\n";
-        dump_fixed_point_loop_visit(cto->child_decl, n, ph, ch, os);
-      }
-      // once guard is needed when current phase is circular and child visit is
-      // non-circular
-      else if (pg_parent->cyclic_flags[phase] && !pg->cyclic_flags[ph]) {
-        os << indent() << "// Visit cache is needed here.\n";
-        dump_cached_visit(cto->child_decl, n, ph, ch, os);
-      } else {
-        os << indent() << "visit_" << n << "_" << ph << "(";
+      os << indent() << "visit_" << n << "_" << ph << "(";
 #ifdef APS2SCALA
-        os << "v_" << decl_name(cto->child_decl);
+      os << "v_" << decl_name(cto->child_decl);
 #else  /* APS2SCALA */
-        os << "v_" << decl_name(cto->child_decl);
+      os << "v_" << decl_name(cto->child_decl);
 #endif /* APS2SCALA */
-        os << ");\n";
-      }
+      os << ");\n";
 
       continue;
     }
@@ -245,6 +196,18 @@ static bool implement_visit_function(
          << decl_name(aug_graph->syntax_decl)
          << ") phase visit marker for phase: " << ph << "\n";
 
+      if (!is_mod) {
+        os << indent() << "}"
+           << "\n";
+
+        if (!pg_parent->cyclic_flags[ph]) {
+          os << indent() << "while(changed);"
+             << "\n";
+          os << indent(nesting_level) << "changed = prevChanged_"
+             << component_index << "\n";
+        }
+      }
+
       // If ph == phase to implement then stop
       if (ph == phase)
         return false;
@@ -258,6 +221,16 @@ static bool implement_visit_function(
       fatal_error(
           "total_order is malformed: Instance should not be null for non-visit "
           "marker CTO nodes.");
+    }
+
+    if (scc_changed) {
+      if (!pg_parent->cyclic_flags[phase]) {
+#ifdef APS2SCALA
+        os << indent(nesting_level) << "val prevChanged_" << component_index
+           << " = changed;\n";
+        os << indent(nesting_level) << "do {\n";
+#endif /* APS2SCALA */
+      }
     }
 
     Declaration ad = in->fibered_attr.attr;
@@ -328,7 +301,7 @@ static bool implement_visit_function(
 
       cond->positive |= cmask;
       implement_visit_function(aug_graph, phase, cto->cto_if_true,
-                               true_assignment, nch, cond, os);
+                               true_assignment, nch, cond, cto->component, os);
       cond->positive &= ~cmask;
 
       --nesting_level;
@@ -349,7 +322,8 @@ static bool implement_visit_function(
                    : instance_assignment;
       cond->negative |= cmask;
       bool cont = implement_visit_function(aug_graph, phase, cto->cto_if_false,
-                                           false_assignment, nch, cond, os);
+                                           false_assignment, nch, cond,
+                                           cto->component, os);
       cond->negative &= cmask;
       --nesting_level;
 #ifdef APS2SCALA
@@ -604,7 +578,7 @@ void dump_visit_functions(PHY_GRAPH* phy_graph,
     cond.positive = 0;
     cond.negative = 0;
     implement_visit_function(aug_graph, phase, total_order, instance_assignment,
-                             nch, &cond, os);
+                             nch, &cond, -1, os);
 
     --nesting_level;
 #ifdef APS2SCALA
@@ -832,7 +806,7 @@ void dump_visit_functions(STATE* s, output_streams& oss)
   cond.negative = 0;
   implement_visit_function(&s->global_dependencies, phase,
                            s->global_dependencies.total_order,
-                           instance_assignment, 1, &cond, os);
+                           instance_assignment, 1, &cond, -1, os);
   --nesting_level;
   os << indent() << "}\n";
 }
@@ -895,7 +869,7 @@ void dump_scheduled_function_body(Declaration fd, STATE* s, ostream& bs) {
   cond.negative = 0;
 
   bool cont = implement_visit_function(aug_graph, 1, schedule,
-                                       instance_assignment, 0, &cond, bs);
+                                       instance_assignment, 0, &cond, -1, bs);
 
   Declaration returndecl = first_Declaration(function_type_return_values(ft));
   if (returndecl == 0) {
@@ -912,7 +886,7 @@ void dump_scheduled_function_body(Declaration fd, STATE* s, ostream& bs) {
     bs << "    // phase 2\n";
 
     while (implement_visit_function(aug_graph, phase, schedule,
-                                    instance_assignment, 0, &cond, bs))
+                                    instance_assignment, 0, &cond, -1, bs))
       bs << indent() << "// phase " << ++phase << "\n";
     bs << indent() << "*/\n";
   }
@@ -1043,7 +1017,5 @@ void implement_value_use(Declaration vd, ostream& os) {
 }
 }
 ;
-
-// not working yet.
 
 Implementation* static_impl = new Static();

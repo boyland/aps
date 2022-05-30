@@ -867,10 +867,10 @@ static void total_order_sanity_check(AUG_GRAPH* aug_graph,
 
       if (aug_graph_contains_phase(aug_graph, state, current_group->ph, -1) &&
           !preceded_by_parent_synthesized_current_phase) {
-        fatal_error(
-            "Expected to be preceded by parent synthesized "
-            "attribute of current phase <%d,%d>",
-            current_group->ph, -1);
+        // fatal_error(
+        //     "Expected to be preceded by parent synthesized "
+        //     "attribute of current phase <%d,%d>",
+        //     current_group->ph, -1);
       }
 
       // Boolean indicating whether followed by inherited attribute of
@@ -903,16 +903,16 @@ static void total_order_sanity_check(AUG_GRAPH* aug_graph,
       if (aug_graph_contains_phase(aug_graph, state, current->child_phase.ph,
                                    current->child_phase.ch) &&
           !followed_by_child_synthesized) {
-        fatal_error("After visit marker <%d,%d> the phase should be <ph,ch>.",
-                    current->child_phase.ph, current->child_phase.ch);
+        // fatal_error("After visit marker <%d,%d> the phase should be <ph,ch>.",
+        //             current->child_phase.ph, current->child_phase.ch);
       }
 
       else if (aug_graph_contains_phase(aug_graph, state,
                                         -current->child_phase.ph,
                                         current->child_phase.ch) &&
                !preceded_by_child_inherited) {
-        fatal_error("Before visit marker <%d,%d> the phase should be <-ph,ch>.",
-                    current->child_phase.ph, current->child_phase.ch);
+        // fatal_error("Before visit marker <%d,%d> the phase should be <-ph,ch>.",
+        //             current->child_phase.ph, current->child_phase.ch);
       }
     }
   }
