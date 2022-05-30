@@ -28,11 +28,13 @@ static void *analyze_thing(void *ignore, void *node)
       if (!(d = analysis_state_cycle(s)))
       {
         // Do nothing; no cycle to remove
+        s->loop_required = false;
       }
       else
       {
         printf("Fiber cycle detected; cycle being removed\n");
         break_fiber_cycles(decl, s, d);
+        s->loop_required = !(d & DEPENDENCY_MAYBE_SIMPLE);
       }
 
         d = analysis_state_cycle(s); // check again for type-3 errors

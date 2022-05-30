@@ -70,6 +70,10 @@ int main(int argc,char **argv) {
     } else if (argv[i][0] == '-' && argv[i][1] == 'D') {
       set_debug_flags(argv[i]+2);
       continue;
+    } else if (streq(argv[i],"-m")) {
+      string custom_module_name(argv[++i]);
+      module_name = custom_module_name;
+      continue;
     } else if (argv[i][0] == '-') {
       usage();
     }
@@ -95,14 +99,11 @@ int main(int argc,char **argv) {
     } else {
       impl = dynamic_impl;
     }
-    char* outfilename = str2cat(argv[i],".scala");
+
+    char* outfilename = str2cat(module_name == "" ? argv[i] : to_lower_copy(module_name).c_str(),".scala");
 
     ofstream out(outfilename);
     dump_scala_Program(p,out);
   }
   exit(0);
 }
-
-
-
-

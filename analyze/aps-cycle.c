@@ -128,34 +128,29 @@ static void get_fiber_cycles(STATE *s) {
     }
   }
 
-  // Hold on to phylum cycles that are not DEPENDENCY_MAYBE_SIMPLE
-  for (i = 0; i < s->phyla.length; i++)
-  {
+
+  // Hold on to phylum cycles
+  for (i = 0; i < s->phyla.length; i++) {
     int phylum_index = phylum_instance_start[i];
-    PHY_GRAPH *phy = &s->phy_graphs[i];
+    PHY_GRAPH* phy = &s->phy_graphs[i];
 
     int num_cycles = 0;
     CYCLE** cycles = (CYCLE**)alloca(sizeof(CYCLE*) * s->cycles.length);
-    for (j = 0; j < s->cycles.length; j++)
-    {
+    for (j = 0; j < s->cycles.length; j++) {
       CYCLE* cyc = &s->cycles.array[j];
       int count = 0;
-      for (k = 0; k < cyc->instances.length; ++k)
-      {
+      for (k = 0; k < cyc->instances.length; ++k) {
         INSTANCE* in1 = &cyc->instances.array[k];
-        for (l = 0; l < phy->instances.length; l++)
-        {
+        for (l = 0; l < phy->instances.length; l++) {
           INSTANCE* in2 = &phy->instances.array[l];
-          if (INSTANCE_EQUAL(in1, in2))
-          {
+          if (INSTANCE_EQUAL(in1, in2)) {
             count++;
           }
         }
       }
 
       // If there is any cycle involving instances of this phylum graph
-      if (count > 0)
-      {
+      if (count > 0) {
         CYCLE* phylum_cycle = (CYCLE*)HALLOC(sizeof(CYCLE));
         cycles[j] = phylum_cycle;
         phylum_cycle->internal_info = j;
@@ -165,24 +160,20 @@ static void get_fiber_cycles(STATE *s) {
         num_cycles++;
         count = 0;
 
-        if (cycle_debug & PRINT_UP_DOWN)
-        {
-          printf("Cycle (%d) involving phylum graph: %s\n", j, decl_name(phy->phylum));
+        if (cycle_debug & PRINT_UP_DOWN) {
+          printf("Cycle (%d) involving phylum graph: %s\n", j,
+                 decl_name(phy->phylum));
         }
 
         int count = 0;
-        for (k = 0; k < generic_cycle->instances.length; ++k)
-        {
+        for (k = 0; k < generic_cycle->instances.length; ++k) {
           INSTANCE* in1 = &generic_cycle->instances.array[k];
-          for (l = 0; l < phy->instances.length; l++)
-          {
+          for (l = 0; l < phy->instances.length; l++) {
             INSTANCE* in2 = &phy->instances.array[l];
-            if (INSTANCE_EQUAL(in1, in2))
-            {
+            if (INSTANCE_EQUAL(in1, in2)) {
               phylum_cycle->instances.array[count++] = *in1;
 
-              if (cycle_debug & PRINT_UP_DOWN)
-              {
+              if (cycle_debug & PRINT_UP_DOWN) {
                 printf("  ");
                 print_instance(in1, stdout);
                 printf("\n");
@@ -193,13 +184,12 @@ static void get_fiber_cycles(STATE *s) {
 
         // Determine the combined dependencies between attributes in the cycle
         DEPENDENCY dep = no_dependency;
-        for (k = 0; k < phylum_cycle->instances.length; k++)
-        {
+        for (k = 0; k < phylum_cycle->instances.length; k++) {
           INSTANCE* source = &phylum_cycle->instances.array[k];
-          for (l = 0; l < phylum_cycle->instances.length; l++)
-          {
+          for (l = 0; l < phylum_cycle->instances.length; l++) {
             INSTANCE* target = &phylum_cycle->instances.array[l];
-            dep |= phy->mingraph[source->index * phy->instances.length + target->index];
+            dep |= phy->mingraph[source->index * phy->instances.length +
+                                 target->index];
           }
         }
 
@@ -207,50 +197,44 @@ static void get_fiber_cycles(STATE *s) {
       }
     }
 
-    if (num_cycles > 0)
-    {
-      if (cycle_debug & PRINT_UP_DOWN)
-      {
-        printf(" => Phylum graph %s has %d cycles.\n\n", decl_name(phy->phylum), num_cycles);
+    if (num_cycles > 0) {
+      if (cycle_debug & PRINT_UP_DOWN) {
+        printf(" => Phylum graph %s has %d cycles.\n\n", decl_name(phy->phylum),
+               num_cycles);
       }
 
       VECTORALLOC(phy->cycles, CYCLE, num_cycles);
-      for (j = 0; j < num_cycles; j++)
-      {
+      for (j = 0; j < num_cycles; j++) {
         phy->cycles.array[j] = *cycles[j];
       }
     }
   }
 
   // Hold on to augmented dependency graph cycles
-  for (i = 0; i <= s->match_rules.length; ++i)
-  {
+  for (i = 0; i <= s->match_rules.length; ++i) {
     int constructor_index = constructor_instance_start[i];
-    AUG_GRAPH *aug_graph =
-        (i == s->match_rules.length) ? &s->global_dependencies : &s->aug_graphs[i];
-    
+    AUG_GRAPH* aug_graph = (i == s->match_rules.length)
+                               ? &s->global_dependencies
+                               : &s->aug_graphs[i];
+
     int num_cycles = 0;
     CYCLE** cycles = (CYCLE**)alloca(sizeof(CYCLE*) * s->cycles.length);
-    for (j = 0; j < s->cycles.length; j++)
-    {
+    for (j = 0; j < s->cycles.length; j++) {
       CYCLE* cyc = &s->cycles.array[j];
       int count = 0;
-      for (k = 0; k < cyc->instances.length; ++k)
-      {
+      for (k = 0; k < cyc->instances.length; ++k) {
         INSTANCE* in1 = &cyc->instances.array[k];
-        for (l = 0; l < aug_graph->instances.length; l++)
-        {
+        for (l = 0; l < aug_graph->instances.length; l++) {
           INSTANCE* in2 = &aug_graph->instances.array[l];
-          if (INSTANCE_EQUAL(in1, in2))
-          {
+          if (INSTANCE_EQUAL(in1, in2)) {
             count++;
           }
         }
       }
 
-      // If there is any cycle involving instances of this augmented dependency graph
-      if (count > 0)
-      {
+      // If there is any cycle involving instances of this augmented dependency
+      // graph
+      if (count > 0) {
         CYCLE* aug_graph_cycle = (CYCLE*)HALLOC(sizeof(CYCLE));
         cycles[num_cycles] = aug_graph_cycle;
         aug_graph_cycle->internal_info = j;
@@ -260,24 +244,20 @@ static void get_fiber_cycles(STATE *s) {
         num_cycles++;
         count = 0;
 
-        if (cycle_debug & PRINT_UP_DOWN)
-        {
-          printf("Cycle (%d) involving augmented dependency graph: %s\n", j, decl_name(aug_graph->syntax_decl));
+        if (cycle_debug & PRINT_UP_DOWN) {
+          printf("Cycle (%d) involving augmented dependency graph: %s\n", j,
+                 decl_name(aug_graph->syntax_decl));
         }
 
         int count = 0;
-        for (k = 0; k < generic_cycle->instances.length; ++k)
-        {
+        for (k = 0; k < generic_cycle->instances.length; ++k) {
           INSTANCE* in1 = &generic_cycle->instances.array[k];
-          for (l = 0; l < aug_graph->instances.length; l++)
-          {
+          for (l = 0; l < aug_graph->instances.length; l++) {
             INSTANCE* in2 = &aug_graph->instances.array[l];
-            if (INSTANCE_EQUAL(in1, in2))
-            {
+            if (INSTANCE_EQUAL(in1, in2)) {
               aug_graph_cycle->instances.array[count++] = *in1;
 
-              if (cycle_debug & PRINT_UP_DOWN)
-              {
+              if (cycle_debug & PRINT_UP_DOWN) {
                 printf("  ");
                 print_instance(in1, stdout);
                 printf("\n");
@@ -288,13 +268,13 @@ static void get_fiber_cycles(STATE *s) {
 
         // Determine the combined dependencies between attributes in the cycle
         DEPENDENCY dep = no_dependency;
-        for (k = 0; k < aug_graph->instances.length; k++)
-        {
+        for (k = 0; k < aug_graph->instances.length; k++) {
           INSTANCE* source = &aug_graph_cycle->instances.array[k];
-          for (l = 0; l < aug_graph_cycle->instances.length; l++)
-          {
+          for (l = 0; l < aug_graph_cycle->instances.length; l++) {
             INSTANCE* target = &aug_graph_cycle->instances.array[l];
-            dep |= get_edgeset_combine_dependencies(aug_graph->graph[source->index * aug_graph->instances.length + target->index]);
+            dep |= get_edgeset_combine_dependencies(
+                aug_graph->graph[source->index * aug_graph->instances.length +
+                                 target->index]);
           }
         }
 
@@ -302,16 +282,14 @@ static void get_fiber_cycles(STATE *s) {
       }
     }
 
-    if (num_cycles > 0)
-    {
-      if (cycle_debug & PRINT_UP_DOWN)
-      {
-        printf(" => Augmented dependency graph %s has %d cycles.\n\n", decl_name(aug_graph->syntax_decl), num_cycles);
+    if (num_cycles > 0) {
+      if (cycle_debug & PRINT_UP_DOWN) {
+        printf(" => Augmented dependency graph %s has %d cycles.\n\n",
+               decl_name(aug_graph->syntax_decl), num_cycles);
       }
 
       VECTORALLOC(aug_graph->cycles, CYCLE, num_cycles);
-      for (j = 0; j < num_cycles; j++)
-      {
+      for (j = 0; j < num_cycles; j++) {
         aug_graph->cycles.array[j] = *cycles[j];
       }
     }
@@ -940,12 +918,172 @@ static void add_up_down_attributes(STATE *s, bool direction)
   }
 }
 
+static bool is_inside_some_function(Declaration decl, Declaration *func)
+{
+  void *current = decl;
+  Declaration current_decl;
+  while (current != NULL && (current = tnode_parent(current)) != NULL)
+  {
+    switch (ABSTRACT_APS_tnode_phylum(current))
+    {
+    case KEYDeclaration:
+      current_decl = (Declaration)current;
+      switch (Declaration_KEY(current_decl))
+      {
+      case KEYsome_function_decl:
+        *func = current_decl;
+        return some_function_decl_result(current_decl) == decl;
+      }
+    }
+  }
+
+  return false;
+}
+
+/**
+ * This function determines whether attribute instance should be considered for circularity check
+ * @param instance attribute instance
+ * @return true if instance not is not: If, Match and some formal
+ * @return false everything else
+ */
+static bool instance_can_be_considered_for_circularity_check(INSTANCE *instance)
+{
+  // If and Match statements can show up in a cycle but are never declared circular or non-circular
+  if (if_rule_p(instance->fibered_attr.attr))
+    return false;
+
+  Declaration node = instance->fibered_attr.attr;
+  Declaration func = NULL;
+
+  // The result in a function/procedure may show up in a cycle but are never declared circular or non-circular
+  if (is_inside_some_function(node, &func) && some_function_decl_result(func) == node)
+    return false;
+
+  if (instance->fibered_attr.fiber != NULL)
+    return false;
+
+  // Formals may show up in a cycle as well
+  switch (ABSTRACT_APS_tnode_phylum(node))
+  {
+  case KEYDeclaration:
+  {
+    switch (Declaration_KEY(node))
+    {
+    case KEYformal:
+      return false;
+    }
+  }
+  }
+
+  return true;
+}
+
+/**
+ * Ensure that attributes that participate in a cycle are defined circular
+ * @param s Analysis state
+ */
+static void assert_circular_declaration(STATE* s) {
+  int i, j, k;
+
+  // Forall phylum in the phylum_graph
+  for (i = 0; i < s->phyla.length; i++) {
+    PHY_GRAPH* phy = &s->phy_graphs[i];
+    int n = phy->instances.length;
+    int phylum_index = phylum_instance_start[i];
+    INSTANCE* array = phy->instances.array;
+
+    for (j = 0; j < n; j++) {
+      INSTANCE* instance = &array[j];
+      Declaration node = instance->fibered_attr.attr;
+
+      if (!instance_can_be_considered_for_circularity_check(instance))
+        continue;
+
+      bool any_cycle = false;
+      bool declared_circular = instance_circular(instance);
+
+      char instance_to_str[BUFFER_SIZE];
+      FILE* f = fmemopen(instance_to_str, sizeof(instance_to_str), "w");
+      print_instance(instance, f);
+      fclose(f);
+
+      for (k = 0; k < s->cycles.length; k++) {
+        CYCLE* cyc = &s->cycles.array[k];
+        if (parent_index[j + phylum_index] == cyc->internal_info) {
+          if (declared_circular) {
+            any_cycle = true;
+          } else {
+            aps_error(node,
+                      "Instance (%s) involves in a cycle but it is not "
+                      "declared circular.",
+                      instance_to_str);
+          }
+        }
+      }
+
+      if (declared_circular && !any_cycle) {
+        aps_warning(node,
+                    "Instance (%s) is declared circular but does not involve "
+                    "in any cycle.",
+                    instance_to_str);
+      }
+    }
+  }
+
+  // Forall edges in the augmented dependency graph
+  for (i = 0; i <= s->match_rules.length; i++) {
+    AUG_GRAPH* aug_graph = (i == s->match_rules.length)
+                               ? &s->global_dependencies
+                               : &s->aug_graphs[i];
+    int n = aug_graph->instances.length;
+    int constructor_index = constructor_instance_start[i];
+    INSTANCE* array = aug_graph->instances.array;
+    for (j = 0; j < n; j++) {
+      INSTANCE* instance = &array[j];
+      Declaration node = instance->fibered_attr.attr;
+
+      if (!instance_can_be_considered_for_circularity_check(instance))
+        continue;
+
+      bool any_cycle = false;
+      bool declared_circular = instance_circular(instance);
+
+      char instance_to_str[BUFFER_SIZE];
+      FILE* f = fmemopen(instance_to_str, sizeof(instance_to_str), "w");
+      print_instance(instance, f);
+      fclose(f);
+
+      // Forall cycles in the graph
+      for (k = 0; k < s->cycles.length; k++) {
+        CYCLE* cyc = &s->cycles.array[k];
+        if (parent_index[j + constructor_index] == cyc->internal_info) {
+          if (declared_circular) {
+            any_cycle = true;
+          } else {
+            aps_error(node,
+                      "Instance (%s) involves in a cycle but it is not "
+                      "declared circular.",
+                      instance_to_str);
+          }
+        }
+      }
+
+      if (declared_circular && !any_cycle) {
+        aps_warning(node,
+                    "Instance (%s) is declared circular but does not involve "
+                    "in any cycle.",
+                    instance_to_str);
+      }
+    }
+  }
+}
 
 void break_fiber_cycles(Declaration module,STATE *s,DEPENDENCY dep) {
   void *mark = SALLOC(0);
   init_indices(s);
   make_cycles(s);
   get_fiber_cycles(s);
+  assert_circular_declaration(s);
 
   bool direction = !(dep & DEPENDENCY_NOT_JUST_FIBER);
   add_up_down_attributes(s,direction);

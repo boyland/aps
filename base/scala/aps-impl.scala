@@ -208,6 +208,7 @@ class Evaluation[T_P, T_V](val anchor : T_P, val name : String)
 
   var status : EvalStatus = UNINITIALIZED;
   var value : ValueType = null.asInstanceOf[ValueType];
+  var checkForLateUpdate = true;  // Flag that can be overridden to prevent testing for TooLateError
 
   def inCycle : CircularEvaluation[_,_] = null;
   def setInCycle(ce : CircularEvaluation[_,_]) : Unit = {
@@ -251,7 +252,7 @@ class Evaluation[T_P, T_V](val anchor : T_P, val name : String)
 
   def set(v : ValueType) : Unit = {
     status match {
-    case EVALUATED => throw TooLateError;
+    case EVALUATED => if (checkForLateUpdate) throw TooLateError;
     case _ => ();
     }
     value = v;
@@ -481,7 +482,7 @@ trait CircularEvaluation[V_P, V_T] extends Evaluation[V_P,V_T] {
     }
   }
 
-  private def check(newValue : ValueType) : Unit = {
+  def check(newValue : ValueType) : Unit = {
     if (!lattice.v_equal(value,newValue)) {
       inCycle.helper.modified = true;
       if (!lattice.v_compare(value,newValue)) {
@@ -514,5 +515,3 @@ class PatternSeqFunction[R,A](f : Any => Option[(R,Seq[A])]) {
 object P_AND {
   def unapply[T](x : T) : Option[(T,T)] = Some((x,x));
 }
-
-

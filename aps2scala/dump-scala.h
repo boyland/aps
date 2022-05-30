@@ -16,6 +16,9 @@ extern bool static_schedule;
 extern int verbose;
 extern int debug;
 
+// The name of module being exported in Scala code
+extern string module_name;
+
 class Implementation;
 
 extern Implementation *impl;
@@ -26,6 +29,7 @@ void dump_scala_Declaration(Declaration,ostream&);
 
 static const int indent_multiple = 2;
 extern int nesting_level;
+extern bool activate_static_circular;  // This flag will generate do-while loops around some visits
 string indent(int level = nesting_level);
 class InDefinition {
   int saved_nesting;
@@ -94,5 +98,8 @@ inline ostream& operator<<(ostream&os, INSTANCE*i) {
 }
 
 extern string operator+(string, int);
+
+string to_upper_copy(string const & src);
+string to_lower_copy(string const & src);
 
 #endif
