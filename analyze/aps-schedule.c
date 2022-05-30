@@ -475,7 +475,7 @@ static void print_total_order(CTO_NODE* cto,
   }
 
   if (print_group) {
-    fprintf(stream, " <%d,%d>", cto->child_phase.ph, cto->child_phase.ch);
+    fprintf(stream, " <%+d,%+d>", cto->child_phase.ph, cto->child_phase.ch);
   }
 
   fprintf(stream, "\n");
@@ -867,10 +867,11 @@ static void total_order_sanity_check(AUG_GRAPH* aug_graph,
 
       if (aug_graph_contains_phase(aug_graph, state, current_group->ph, -1) &&
           !preceded_by_parent_synthesized_current_phase) {
-        // fatal_error(
-        //     "Expected to be preceded by parent synthesized "
-        //     "attribute of current phase <%d,%d>",
-        //     current_group->ph, -1);
+        fatal_error(
+            "[%s] Expected parent synthesized attribute <%+d,%+d> preced the "
+            "end of phase visit marker <%+d,%+d>",
+            aug_graph_name(aug_graph), current_group->ph, -1, current_group->ph,
+            -1);
       }
 
       // Boolean indicating whether followed by inherited attribute of
@@ -883,8 +884,11 @@ static void total_order_sanity_check(AUG_GRAPH* aug_graph,
                                    -1) &&
           !followed_by_parent_inherited_next_phase) {
         fatal_error(
-            "Expected to be followed by parent inherited "
-            "attribute of next phase <%d,%d>",
+            "[%s] Expected after end of phase visit marker <%+d,%+d> to be "
+            "followed "
+            "by parent inherited "
+            "attribute of next phase <%+d,%+d>",
+            aug_graph_name(aug_graph), current_group->ph, -1,
             current_group->ph + 1, -1);
       }
     } else {
@@ -903,16 +907,24 @@ static void total_order_sanity_check(AUG_GRAPH* aug_graph,
       if (aug_graph_contains_phase(aug_graph, state, current->child_phase.ph,
                                    current->child_phase.ch) &&
           !followed_by_child_synthesized) {
-        // fatal_error("After visit marker <%d,%d> the phase should be <ph,ch>.",
-        //             current->child_phase.ph, current->child_phase.ch);
+        fatal_error(
+            "[%s] After visit marker <%d,%d> the phase should be <ph,ch> (i.e. "
+            "<%+d,%+d>).",
+            aug_graph_name(aug_graph), current->child_phase.ph,
+            current->child_phase.ch, current->child_phase.ph,
+            current->child_phase.ch);
       }
 
       else if (aug_graph_contains_phase(aug_graph, state,
                                         -current->child_phase.ph,
                                         current->child_phase.ch) &&
                !preceded_by_child_inherited) {
-        // fatal_error("Before visit marker <%d,%d> the phase should be <-ph,ch>.",
-        //             current->child_phase.ph, current->child_phase.ch);
+        fatal_error(
+            "[%s] Before visit marker <%+d,%+d> the phase should be <-ph,ch> "
+            "(i.e. <%+d,%+d>).",
+            aug_graph_name(aug_graph), current->child_phase.ph,
+            current->child_phase.ch, -current->child_phase.ph,
+            current->child_phase.ch);
       }
     }
   }
@@ -1043,8 +1055,9 @@ static void check_circular_visit(AUG_GRAPH* aug_graph,
       if (child_phy != NULL && parent_phy->cyclic_flags[parent_ph] !=
                                    child_phy->cyclic_flags[group.ch]) {
         fatal_error(
-            "We cannot do a non-circular visit of a child visit(%s) of <%d,%d> "
-            "in the circular visit of the parent (phase:%d).",
+            "We cannot do a non-circular visit of a child visit(%s) of "
+            "<%+d,%+d> "
+            "in the circular visit of the parent (phase: %d).",
             decl_name(state->children.array[group.ch]), group.ph, group.ch,
             parent_ph);
       }
@@ -1644,7 +1657,7 @@ static CTO_NODE* schedule_scc_find_scc(AUG_GRAPH* aug_graph,
     printf(
         "Starting schedule_scc_find_scc (%s) with (remaining: %d, "
         "group: "
-        "<%d,%d>, parent_ph: %d)\n",
+        "<%+d,%+d>, parent_ph: %d)\n",
         aug_graph_name(aug_graph), remaining, group->ph, group->ch, parent_ph);
   }
 
@@ -1925,7 +1938,7 @@ static void schedule_augmented_dependency_graph(CYCLES cycles,
       if (!group.ph && !group.ch) {
         printf("local\n");
       } else {
-        printf("<%d,%d>\n", group.ph, group.ch);
+        printf("<%+d,%+d>\n", group.ph, group.ch);
       }
     }
   }
