@@ -174,17 +174,19 @@ static void analyze_state(STATE* s) {
     make_augmented_cycles(aug_graph, graph);
     aug_graph->components = graph_scc(graph);
 
-    printf("Components of %s\n", decl_name(aug_graph->syntax_decl));
-    for (j = 0; j < aug_graph->components.length; j++) {
-      COMPONENT comp = aug_graph->components.array[j];
-      printf("Component #%d\n", j);
+    if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
+      printf("Components of %s\n", decl_name(aug_graph->syntax_decl));
+      for (j = 0; j < aug_graph->components.length; j++) {
+        COMPONENT comp = aug_graph->components.array[j];
+        printf("Component #%d\n", j);
 
-      for (k = 0; k < comp.length; k++) {
-        print_instance(&aug_graph->instances.array[comp.array[k]], stdout);
+        for (k = 0; k < comp.length; k++) {
+          print_instance(&aug_graph->instances.array[comp.array[k]], stdout);
+          printf("\n");
+        }
+
         printf("\n");
       }
-
-      printf("\n");
     }
   }
 }

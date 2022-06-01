@@ -116,6 +116,7 @@ void set_debug_flags(const char *options)
     case 'u': cycle_debug |= DEBUG_UP_DOWN; break;
     case 'U': cycle_debug |= PRINT_UP_DOWN; break;
     case 'o': oag_debug |= DEBUG_ORDER; break;
+    case 'v': oag_debug |= DEBUG_ORDER_VERBOSE; break;
     case 'O': oag_debug |= TOTAL_ORDER; break;
     case 'T': oag_debug |= PROD_ORDER; break;
     case '3': oag_debug |= TYPE_3_DEBUG; break;

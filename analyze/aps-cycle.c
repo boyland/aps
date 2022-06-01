@@ -631,8 +631,10 @@ static void add_up_down_attributes(STATE *s, bool direction)
     CYCLE *cyc = &s->cycles.array[i];
     if (cycle_debug & DEBUG_UP_DOWN) printf("Breaking Cycle #%d\n",i);
 
+    // TODO: what about circular fiber cycles?
     if (!(cyc->acc_dep & DEPENDENCY_MAYBE_SIMPLE))
     {
+      // This means all dependencies are all monotonic, then we treat them as circular attributes
       if (cycle_debug & DEBUG_UP_DOWN)
       {
         printf("Skipped breaking Cycle #%d\n",i);

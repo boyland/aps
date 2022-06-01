@@ -94,6 +94,18 @@ static CTO_NODE* schedule_scc_find_scc(AUG_GRAPH* aug_graph,
                                        int remaining,
                                        CHILD_PHASE* group,
                                        const short parent_ph);
+
+static CTO_NODE* schedule_scc_transition_start_of_group(
+    AUG_GRAPH* aug_graph,
+    COMPONENT comp,
+    const int component_index,
+    CTO_NODE* prev,
+    CONDITION cond,
+    TOTAL_ORDER_STATE* state,
+    int remaining,
+    CHILD_PHASE* group,
+    const short parent_ph);
+
 /**
  * Utility function that checks whether instance belongs to any phylum cycle or
  * not
@@ -367,6 +379,10 @@ static void schedule_summary_dependency_graph(PHY_GRAPH* phy_graph) {
     }
   } while (count_non_circular || count_circular);
 
+  if (oag_debug & TOTAL_ORDER) {
+    printf("\n");
+  }
+
   // This is used by code generation
   phy_graph->max_phase = phase - 1;
 
@@ -439,7 +455,9 @@ static void print_total_order(CTO_NODE* cto,
                               FILE* stream) {
   if (cto == NULL) {
     if (component_index != -1) {
-      fprintf(stream, " Finished scheduling SCC #%d\n\n", component_index);
+      if (oag_debug & DEBUG_ORDER_VERBOSE) {
+        fprintf(stream, " Finished scheduling SCC #%d\n\n", component_index);
+      }
     }
     return;
   }
@@ -448,11 +466,15 @@ static void print_total_order(CTO_NODE* cto,
 
   if (cto->component != component_index) {
     if (component_index != -1) {
-      fprintf(stream, " Finished scheduling SCC #%d\n\n", component_index);
+      if (oag_debug & DEBUG_ORDER_VERBOSE) {
+        fprintf(stream, " Finished scheduling SCC #%d\n\n", component_index);
+      }
     }
 
     component_index = cto->component;
-    fprintf(stream, " Started scheduling SCC #%d\n", component_index);
+    if (oag_debug & DEBUG_ORDER_VERBOSE) {
+      fprintf(stream, " Started scheduling SCC #%d\n", component_index);
+    }
   }
 
   if (cto->cto_instance == NULL) {
@@ -622,7 +644,7 @@ static bool scc_instance_ready_to_go(AUG_GRAPH* aug_graph,
                                      const CONDITION cond,
                                      const int group_index,
                                      const int attribute_index) {
-  if (oag_debug & DEBUG_ORDER) {
+  if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
     printf("Checking instance readyness of: ");
     print_instance(&aug_graph->instances.array[attribute_index], stdout);
     printf("\n");
@@ -657,7 +679,7 @@ static bool scc_instance_ready_to_go(AUG_GRAPH* aug_graph,
       DEPENDENCY dep = edges->kind;
       dep = dep & ~indirect_control_dependency;
       if (dep & DEPENDENCY_MAYBE_DIRECT) {
-        if (oag_debug & DEBUG_ORDER) {
+        if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
           // Can not continue with scheduling if a dependency with a
           // "possible" condition has not been scheduled yet
           printf(
@@ -691,7 +713,7 @@ static bool scc_group_ready_to_go(AUG_GRAPH* aug_graph,
                                   TOTAL_ORDER_STATE* state,
                                   const CONDITION cond,
                                   const int group_index) {
-  if (oag_debug & DEBUG_ORDER) {
+  if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
     printf("Checking scc group readyness of: ");
     print_instance(&aug_graph->instances.array[group_index], stdout);
     printf("\n");
@@ -880,14 +902,12 @@ static void total_order_sanity_check(AUG_GRAPH* aug_graph,
       followed_by(current->cto_next, -(current->child_phase.ph + 1), -1, false,
                   false, &followed_by_parent_inherited_next_phase);
 
-      if (aug_graph_contains_phase(aug_graph, state, current_group->ph + 1,
+      if (aug_graph_contains_phase(aug_graph, state, -(current_group->ph + 1),
                                    -1) &&
           !followed_by_parent_inherited_next_phase) {
         fatal_error(
             "[%s] Expected after end of phase visit marker <%+d,%+d> to be "
-            "followed "
-            "by parent inherited "
-            "attribute of next phase <%+d,%+d>",
+            "followed by parent inherited attribute of next phase <%+d,%+d>",
             aug_graph_name(aug_graph), current_group->ph, -1,
             current_group->ph + 1, -1);
       }
@@ -908,7 +928,8 @@ static void total_order_sanity_check(AUG_GRAPH* aug_graph,
                                    current->child_phase.ch) &&
           !followed_by_child_synthesized) {
         fatal_error(
-            "[%s] After visit marker <%d,%d> the phase should be <ph,ch> (i.e. "
+            "[%s] After visit marker <%+d,%+d> the phase should be <ph,ch> "
+            "(i.e. "
             "<%+d,%+d>).",
             aug_graph_name(aug_graph), current->child_phase.ph,
             current->child_phase.ch, current->child_phase.ph,
@@ -918,7 +939,7 @@ static void total_order_sanity_check(AUG_GRAPH* aug_graph,
       else if (aug_graph_contains_phase(aug_graph, state,
                                         -current->child_phase.ph,
                                         current->child_phase.ch) &&
-               !preceded_by_child_inherited) {
+               !preceded_by_child_inherited && false) {
         fatal_error(
             "[%s] Before visit marker <%+d,%+d> the phase should be <-ph,ch> "
             "(i.e. <%+d,%+d>).",
@@ -1174,9 +1195,9 @@ static CTO_NODE* end_of_visit_routine(AUG_GRAPH* aug_graph,
   cto_node->child_phase.ch = -1;
   cto_node->visit = parent_ph;
   cto_node->component = component_index;
-  cto_node->cto_next =
-      schedule_scc_group(aug_graph, comp, component_index, prev, cond, state,
-                         remaining, group, parent_ph + 1);
+  cto_node->cto_next = schedule_scc_transition_start_of_group(
+      aug_graph, comp, component_index, prev, cond, state, remaining, group,
+      parent_ph + 1);
   return cto_node;
 }
 
@@ -1203,7 +1224,7 @@ static CTO_NODE* schedule_scc_transition_start_of_group(
     const short parent_ph) {
   CTO_NODE* cto_node;
 
-  if (oag_debug & DEBUG_ORDER) {
+  if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
     printf(
         "Starting schedule_scc_transition_start_of_group (%s) with "
         "(remaining: %d, group: "
@@ -1260,6 +1281,17 @@ static CTO_NODE* schedule_scc_transition_start_of_group(
                                 state, remaining, group, parent_ph);
   }
 
+  if (group->ph > 0 && group->ch == -1) {
+    CHILD_PHASE* parent_inh = (CHILD_PHASE*)alloca(sizeof(CHILD_PHASE));
+    parent_inh->ph = -group->ph;
+    parent_inh->ch = -1;
+    if (is_there_more_to_schedule_in_scc_group(aug_graph, comp, state,
+                                               parent_inh)) {
+      return schedule_scc_group(aug_graph, comp, component_index, prev, cond,
+                                state, remaining, parent_inh, parent_ph);
+    }
+  }
+
   return schedule_scc_group(aug_graph, comp, component_index, prev, cond, state,
                             remaining, group, parent_ph);
 }
@@ -1284,7 +1316,7 @@ static CTO_NODE* schedule_scc_transition_end_of_group(AUG_GRAPH* aug_graph,
                                                       int remaining,
                                                       CHILD_PHASE* group,
                                                       const short parent_ph) {
-  if (oag_debug & DEBUG_ORDER) {
+  if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
     printf(
         "Starting schedule_circular_transition_end_of_group (%s) with "
         "(remaining: %d, group: "
@@ -1433,11 +1465,11 @@ static CTO_NODE* schedule_scc_group(AUG_GRAPH* aug_graph,
                                     int remaining,
                                     CHILD_PHASE* group,
                                     const short parent_ph) {
-  if (oag_debug & DEBUG_ORDER) {
+  if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
     printf(
-        "Starting schedule_circular_group (%s) with (component_index: "
-        "%d,remaining: %d, group: "
-        "<%+d,%+d>, parent_ph: %d, cycle:)\n",
+        "Starting schedule_scc_group (%s) with (component_index: "
+        "%d, remaining: %d, group: "
+        "<%+d,%+d>, parent_ph: %d)\n",
         aug_graph_name(aug_graph), component_index, remaining, group->ph,
         group->ch, parent_ph);
   }
@@ -1474,7 +1506,7 @@ static CTO_NODE* schedule_scc_group(AUG_GRAPH* aug_graph,
       cto_node->child_phase.ch = group->ch;
       cto_node->component = component_index;
 
-      if (oag_debug & DEBUG_ORDER) {
+      if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
         printf("-> Scheduled circular via group scheduler (instance: ");
         print_instance(instance, stdout);
         printf(", group: <%+d,%+d>, cond: (%+d,%+d), inst_cond: (%+d,%+d))\n",
@@ -1544,7 +1576,7 @@ static CTO_NODE* schedule_scc(AUG_GRAPH* aug_graph,
                               int remaining,
                               CHILD_PHASE* prev_group,
                               const short parent_ph) {
-  if (oag_debug & DEBUG_ORDER) {
+  if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
     printf(
         "Starting schedule_scc (%s) with (component_index: %d, remaining: %d, "
         "prev_group: "
@@ -1578,7 +1610,7 @@ static CTO_NODE* schedule_scc(AUG_GRAPH* aug_graph,
     // If edgeset condition is not impossible then go ahead with scheduling
     if (scc_group_ready_to_go(aug_graph, comp, component_index, state, cond,
                               instance->index)) {
-      if (oag_debug & DEBUG_ORDER) {
+      if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
         printf("-> Scheduled scc via greedy scheduler (instance: ");
         print_instance(instance, stdout);
         printf(", group: <%+d,%+d>, cond: (%+d,%+d), inst_cond: (%+d,%+d))\n",
@@ -1635,6 +1667,14 @@ static CTO_NODE* schedule_scc(AUG_GRAPH* aug_graph,
                                prev_group, parent_ph);
 }
 
+struct sccs_info {
+  COMPONENT* components;
+  int* components_index;
+  int count;
+};
+
+typedef struct sccs_info SccsInfo;
+
 /**
  * Utility function that find a SCC component where all instances can be
  * scheduled
@@ -1646,16 +1686,16 @@ static CTO_NODE* schedule_scc(AUG_GRAPH* aug_graph,
  * @param group parent group key
  * @return head of linked list
  */
-static CTO_NODE* schedule_scc_find_scc(AUG_GRAPH* aug_graph,
-                                       CTO_NODE* prev,
-                                       CONDITION cond,
-                                       TOTAL_ORDER_STATE* state,
-                                       int remaining,
-                                       CHILD_PHASE* group,
-                                       const short parent_ph) {
-  if (oag_debug & DEBUG_ORDER) {
+static SccsInfo* schedule_scc_find_all_sccs(AUG_GRAPH* aug_graph,
+                                            CTO_NODE* prev,
+                                            CONDITION cond,
+                                            TOTAL_ORDER_STATE* state,
+                                            int remaining,
+                                            CHILD_PHASE* group,
+                                            const short parent_ph) {
+  if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
     printf(
-        "Starting schedule_scc_find_scc (%s) with (remaining: %d, "
+        "Starting schedule_scc_find_all_sccs (%s) with (remaining: %d, "
         "group: "
         "<%+d,%+d>, parent_ph: %d)\n",
         aug_graph_name(aug_graph), remaining, group->ph, group->ch, parent_ph);
@@ -1664,6 +1704,11 @@ static CTO_NODE* schedule_scc_find_scc(AUG_GRAPH* aug_graph,
   int i, j, k;
   int n = aug_graph->instances.length;
   PHY_GRAPH* phy = Declaration_info(aug_graph->lhs_decl)->node_phy_graph;
+  int count_sccs = 0;
+  COMPONENT* components =
+      (COMPONENT*)malloc(aug_graph->components.length * sizeof(COMPONENT*));
+  int* components_index =
+      (int*)malloc(aug_graph->components.length * sizeof(int));
 
   for (i = 0; i < aug_graph->components.length; i++) {
     COMPONENT comp = aug_graph->components.array[i];
@@ -1672,38 +1717,6 @@ static CTO_NODE* schedule_scc_find_scc(AUG_GRAPH* aug_graph,
     // already scheduled
     if (state->schedule[comp.array[0]])
       continue;
-
-    // bool can_consider_scc = true;
-    //
-    // For all augmented graph instances in the SCC that are parent attributes
-    // For all phylum instances such that they have the same fibered attribute
-    // If attribute does not belong to this visit then this SCC is not ready
-    // for (j = 0; j < comp.length; j++) {
-    //   INSTANCE* aug_instance = &aug_graph->instances.array[comp.array[j]];
-
-    //   if (aug_instance->node == aug_graph->lhs_decl) {
-    //     for (k = 0; k < phy->instances.length; k++) {
-    //       INSTANCE* phylum_instance = &phy->instances.array[k];
-
-    //       if (fibered_attr_equal(&aug_instance->fibered_attr,
-    //                              &phylum_instance->fibered_attr) &&
-    //           abs(phy->summary_schedule[phylum_instance->index]) !=
-    //           parent_ph) {
-    //         printf("Instance ");
-    //         print_instance(aug_instance, stdout);
-    //         printf(" in SCC %d has phylum attribute of ", i);
-    //         print_instance(phylum_instance, stdout);
-    //         printf(" which belong to parent visit %d and not %d\n",
-    //                abs(phy->summary_schedule[phylum_instance->index]),
-    //                parent_ph);
-    //         can_consider_scc = false;
-    //       }
-    //     }
-    //   }
-    // }
-    //
-    // if (!can_consider_scc)
-    //   continue;
 
     size_t temp_schedule_size = n * sizeof(bool);
     bool* temp_schedule = (bool*)alloca(temp_schedule_size);
@@ -1736,7 +1749,7 @@ static CTO_NODE* schedule_scc_find_scc(AUG_GRAPH* aug_graph,
           if (MERGED_CONDITION_IS_IMPOSSIBLE(cond, edges->cond))
             continue;
 
-          if (oag_debug & DEBUG_ORDER) {
+          if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
             // Can't continue with scheduling if a dependency with a
             // "possible" condition has not been scheduled yet
             printf("SCC (%d) was not ready to be scheduled because of:\n", i);
@@ -1751,12 +1764,13 @@ static CTO_NODE* schedule_scc_find_scc(AUG_GRAPH* aug_graph,
 
     // This component is ready to be scheduled as a group
     if (scc_ready) {
-      if (oag_debug & DEBUG_ORDER) {
-        printf("Found a SCC ready to be scheduled:\n");
+      if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
+        printf("\nFound a SCC ready to be scheduled:\n");
         for (j = 0; j < comp.length; j++) {
           INSTANCE* in = &aug_graph->instances.array[comp.array[j]];
+          CHILD_PHASE* instance_group = &state->instance_groups[in->index];
           print_instance(in, stdout);
-          printf("\n");
+          printf(" <%+d,%+d>\n", instance_group->ph, instance_group->ch);
         }
         printf("\n");
 
@@ -1769,22 +1783,84 @@ static CTO_NODE* schedule_scc_find_scc(AUG_GRAPH* aug_graph,
             print_edgeset(es, stdout);
           }
         }
-      }
-      printf("\n");
 
-      // Delegate it to the circular group scheduler
-      return schedule_scc(aug_graph, comp, i, prev, cond, state, remaining,
-                          group, parent_ph);
+        printf("\n");
+      }
+
+      components[count_sccs] = comp;
+      components_index[count_sccs] = i;
+      count_sccs++;
     }
   }
 
-  // We get to circular scheduler is non-circular scheduler cannot go any
-  // further if circular scheduler cannot go any further then we can not
-  // scheduler this attribute grammar
-  if (remaining > 0) {
+  SccsInfo* result = (SccsInfo*)malloc(sizeof(SccsInfo));
+  result->components = components;
+  result->components_index = components_index;
+  result->count = count_sccs;
+
+  return result;
+}
+
+/**
+ * Utility function that find a SCC component where all instances can be
+ * scheduled
+ * @param aug_graph Augmented dependency graph
+ * @param prev previous CTO node
+ * @param cond current CONDITION
+ * @param state state
+ * @param remaining count of remaining instances to schedule
+ * @param group parent group key
+ * @return head of linked list
+ */
+static CTO_NODE* schedule_scc_find_scc(AUG_GRAPH* aug_graph,
+                                       CTO_NODE* prev,
+                                       CONDITION cond,
+                                       TOTAL_ORDER_STATE* state,
+                                       int remaining,
+                                       CHILD_PHASE* group,
+                                       const short parent_ph) {
+  if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
+    printf(
+        "Starting schedule_scc_find_scc (%s) with (remaining: %d, "
+        "group: "
+        "<%+d,%+d>, parent_ph: %d)\n",
+        aug_graph_name(aug_graph), remaining, group->ph, group->ch, parent_ph);
+  }
+
+  // No more SCC to schedule
+  if (remaining == 0) {
+    return NULL;
+  }
+
+  int i, j, k;
+  int n = aug_graph->instances.length;
+  PHY_GRAPH* phy = Declaration_info(aug_graph->lhs_decl)->node_phy_graph;
+  SccsInfo* components = schedule_scc_find_all_sccs(
+      aug_graph, prev, cond, state, remaining, group, parent_ph);
+
+  if (components->count == 0) {
     fflush(stdout);
     print_schedule_error_debug(aug_graph, state, prev, cond, stderr);
     fatal_error("Cannot make conditional total order!");
+  }
+
+  COMPONENT component_to_schedule = components->components[0];
+  int component_index = components->components_index[0];
+
+  for (i = 0; i < components->count; i++) {
+    COMPONENT comp = components->components[i];
+    int comp_index = components->components_index[i];
+
+    // Delegate it to the circular group scheduler
+    CHILD_PHASE* parent_inh = (CHILD_PHASE*)alloca(sizeof(CHILD_PHASE));
+    parent_inh->ph = -parent_ph;
+    parent_inh->ch = -1;
+
+    if (is_there_more_to_schedule_in_scc_group(aug_graph, comp, state,
+                                               parent_inh)) {
+      return schedule_scc_group(aug_graph, comp, comp_index, prev, cond, state,
+                                remaining, parent_inh, parent_ph);
+    }
   }
 
   return NULL;
@@ -1833,7 +1909,7 @@ static void schedule_augmented_dependency_graph(CYCLES cycles,
     printf("Scheduling conditional total order for %s\n",
            aug_graph_name(aug_graph));
   }
-  if (oag_debug & DEBUG_ORDER) {
+  if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
     for (int i = 0; i < n; ++i) {
       INSTANCE* in = &(aug_graph->instances.array[i]);
       print_instance(in, stdout);

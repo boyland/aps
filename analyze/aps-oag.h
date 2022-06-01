@@ -39,6 +39,7 @@ extern int oag_debug;
 #define PROD_ORDER 4
 #define PROD_ORDER_DEBUG 8
 #define TYPE_3_DEBUG 16
+#define DEBUG_ORDER_VERBOSE 32
 
 #define CONDITION_IS_IMPOSSIBLE(cond) ((cond).positive & (cond).negative)
 #define MERGED_CONDITION_IS_IMPOSSIBLE(cond1, cond2) (((cond1).positive|(cond2).positive) & ((cond1).negative|(cond2).negative))
