@@ -1026,6 +1026,22 @@ static void child_visit_completeness(AUG_GRAPH* aug_graph,
                                      TOTAL_ORDER_STATE* state,
                                      CTO_NODE* head) {
   int i, j, k;
+  for (i = 0; i < aug_graph->instances.length; i++) {
+    INSTANCE* in = &aug_graph->instances.array[i];
+    CHILD_PHASE* group = &state->instance_groups[in->index];
+
+    if (!state->schedule[in->index]) {
+      char instance_to_str[BUFFER_SIZE];
+      FILE* f = fmemopen(instance_to_str, sizeof(instance_to_str), "w");
+      print_instance(in, f);
+      fclose(f);
+
+      fatal_error("Instance %s <%+d,%+d> with index %d not scheduled",
+                  instance_to_str, group->ph, group->ch, in->index);
+      return;
+    }
+  }
+
   for (i = 0; i < state->children.length; i++) {
     short max_phase = (short)state->max_child_ph[i];
     for (j = 1; j <= max_phase; j++) {
@@ -1706,7 +1722,7 @@ static SccsInfo* schedule_scc_find_all_sccs(AUG_GRAPH* aug_graph,
   PHY_GRAPH* phy = Declaration_info(aug_graph->lhs_decl)->node_phy_graph;
   int count_sccs = 0;
   COMPONENT* components =
-      (COMPONENT*)malloc(aug_graph->components.length * sizeof(COMPONENT*));
+      (COMPONENT*)malloc(aug_graph->components.length * sizeof(COMPONENT));
   int* components_index =
       (int*)malloc(aug_graph->components.length * sizeof(int));
 
