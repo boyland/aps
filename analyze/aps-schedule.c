@@ -1026,21 +1026,21 @@ static void child_visit_completeness(AUG_GRAPH* aug_graph,
                                      TOTAL_ORDER_STATE* state,
                                      CTO_NODE* head) {
   int i, j, k;
-  for (i = 0; i < aug_graph->instances.length; i++) {
-    INSTANCE* in = &aug_graph->instances.array[i];
-    CHILD_PHASE* group = &state->instance_groups[in->index];
+  // for (i = 0; i < aug_graph->instances.length; i++) {
+  //   INSTANCE* in = &aug_graph->instances.array[i];
+  //   CHILD_PHASE* group = &state->instance_groups[in->index];
 
-    if (!state->schedule[in->index]) {
-      char instance_to_str[BUFFER_SIZE];
-      FILE* f = fmemopen(instance_to_str, sizeof(instance_to_str), "w");
-      print_instance(in, f);
-      fclose(f);
+  //   if (!state->schedule[in->index]) {
+  //     char instance_to_str[BUFFER_SIZE];
+  //     FILE* f = fmemopen(instance_to_str, sizeof(instance_to_str), "w");
+  //     print_instance(in, f);
+  //     fclose(f);
 
-      fatal_error("Instance %s <%+d,%+d> with index %d not scheduled",
-                  instance_to_str, group->ph, group->ch, in->index);
-      return;
-    }
-  }
+  //     fatal_error("Instance %s <%+d,%+d> with index %d not scheduled",
+  //                 instance_to_str, group->ph, group->ch, in->index);
+  //     return;
+  //   }
+  // }
 
   for (i = 0; i < state->children.length; i++) {
     short max_phase = (short)state->max_child_ph[i];
@@ -1861,7 +1861,8 @@ static CTO_NODE* schedule_scc_find_scc(AUG_GRAPH* aug_graph,
   }
 
   COMPONENT component_to_schedule = components->components[0];
-  int component_index = components->components_index[0];
+  int component_index_to_schedule = components->components_index[0];
+  CHILD_PHASE* group_to_schedule = group;
 
   for (i = 0; i < components->count; i++) {
     COMPONENT comp = components->components[i];
@@ -1874,12 +1875,16 @@ static CTO_NODE* schedule_scc_find_scc(AUG_GRAPH* aug_graph,
 
     if (is_there_more_to_schedule_in_scc_group(aug_graph, comp, state,
                                                parent_inh)) {
-      return schedule_scc_group(aug_graph, comp, comp_index, prev, cond, state,
-                                remaining, parent_inh, parent_ph);
+      component_to_schedule = comp;
+      component_index_to_schedule = comp_index;
+      group_to_schedule = parent_inh;
+      break;
     }
   }
 
-  return NULL;
+  return schedule_scc_group(aug_graph, component_to_schedule,
+                            component_index_to_schedule, prev, cond, state,
+                            remaining, group_to_schedule, parent_ph);
 }
 
 /**

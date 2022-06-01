@@ -11,6 +11,7 @@ extern "C" {
 #include "dump-scala.h"
 #include "implement.h"
 #include "version.h"
+#include <filesystem>
 
 using namespace std;
 
@@ -100,7 +101,14 @@ int main(int argc,char **argv) {
       impl = dynamic_impl;
     }
 
-    char* outfilename = str2cat(module_name == "" ? argv[i] : to_lower_copy(module_name).c_str(),".scala");
+    filesystem::path location(argv[i]);
+    if (module_name != "")
+    {
+      location.replace_filename(to_lower_copy(module_name));
+    }
+
+    location.replace_extension(".scala");
+    string outfilename = location.string();
 
     ofstream out(outfilename);
     dump_scala_Program(p,out);

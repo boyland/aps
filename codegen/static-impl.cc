@@ -1,4 +1,5 @@
 #include <string.h>
+#include <algorithm>
 #include <iostream>
 extern "C" {
 #include <stdio.h>
@@ -201,16 +202,21 @@ static bool implement_visit_function(
            << "\n";
 
         if (!pg_parent->cyclic_flags[ph]) {
+          string suffix = to_string(component_index);
+          std::replace(suffix.begin(), suffix.end(), '-', '_');
+
           os << indent() << "while(changed);"
              << "\n";
-          os << indent(nesting_level) << "changed = prevChanged_"
-             << component_index << "\n";
+          os << indent(nesting_level) << "changed = prevChanged_" << suffix
+             << "\n";
         }
       }
 
       // If ph == phase to implement then stop
       if (ph == phase)
+      {
         return false;
+      }
 
       continue;
     }
@@ -226,7 +232,11 @@ static bool implement_visit_function(
     if (scc_changed) {
       if (!pg_parent->cyclic_flags[phase]) {
 #ifdef APS2SCALA
-        os << indent(nesting_level) << "val prevChanged_" << component_index
+        // ABS value of component_index because initially it is -1
+        string suffix = to_string(component_index);
+        std::replace(suffix.begin(), suffix.end(), '-', '_');
+
+        os << indent(nesting_level) << "val prevChanged_" << suffix
            << " = changed;\n";
         os << indent(nesting_level) << "do {\n";
 #endif /* APS2SCALA */
