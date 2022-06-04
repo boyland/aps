@@ -42,14 +42,14 @@ static void *analyze_thing(void *ignore, void *node)
 	d = analysis_state_cycle(s); // check again for type-3 errors
       
       // Pure fiber cycles should have been broken when reaching this step
-      if (!(d & DEPENDENCY_NOT_JUST_FIBER))
+      if (d & DEPENDENCY_MAYBE_SIMPLE)
       {
         if (cycle_debug & PRINT_CYCLE)
         {
           print_cycles(s, stdout);
         }
 
-        aps_error(decl, "Cycle detected (%d); Attribute grammar is not OAG", d);
+        // aps_error(decl, "Cycle detected (%d); Attribute grammar is not OAG", d);
       }
       Declaration_info(decl)->analysis_state = s;
       break;
