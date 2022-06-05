@@ -3,9 +3,8 @@
 
 /**
  * @brief Computes total-preorder of set of attributes
- * @param module APS module
  * @param s state
  */
-void compute_static_schedule(Declaration module, STATE* s);
+void compute_static_schedule(STATE* s);
 
 #endif

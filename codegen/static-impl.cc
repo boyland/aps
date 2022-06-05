@@ -103,6 +103,40 @@ vector<set<Expression>> make_instance_assignment(AUG_GRAPH* aug_graph,
 // where p is the production number (0-based constructor index)
 #define PHY_GRAPH_NUM(pg) (pg - pg->global_state->phy_graphs)
 
+static void dump_loop_end(int component_index, ostream& os) {
+#ifdef APS2SCALA
+  string suffix = to_string(component_index);
+  std::replace(suffix.begin(), suffix.end(), '-', '_');
+
+  if (nesting_level <= 0) {
+    printf("not good");
+  }
+  --nesting_level;
+  os << "\n";
+  os << indent() << "// "
+     << "component_index: " << component_index << "\n";
+  os << indent() << "} while(changed);"
+     << "\n";
+  os << indent() << "changed = prevChanged_" << suffix << ";\n"
+     << "\n";
+
+#endif /* APS2SCALA */
+}
+
+static void dump_loop_start(int component_index, ostream& os) {
+#ifdef APS2SCALA
+  // ABS value of component_index because initially it is -1
+  string suffix = to_string(component_index);
+  std::replace(suffix.begin(), suffix.end(), '-', '_');
+
+  os << indent() << "// "
+     << "component_index: " << component_index << "\n";
+  os << indent() << "val prevChanged_" << suffix << " = changed;\n";
+  os << indent() << "do {\n";
+  ++nesting_level;
+#endif /* APS2SCALA */
+}
+
 // phase is what we are generating code for,
 // current is the current value of ph
 // return true if there are still more instances after this phase:
@@ -114,6 +148,10 @@ static bool implement_visit_function(
     int nch,
     CONDITION* cond,
     int component_index,
+    bool loop_allowed,
+    vector<bool> inside_conditional,
+    vector<int> loop_component_index,
+    bool skip_previous_visit_code,
     ostream& os) {
   for (; cto; cto = cto->cto_next) {
     INSTANCE* in = cto->cto_instance;
@@ -125,38 +163,9 @@ static bool implement_visit_function(
 
     // Code generate if CTO_NODE belongs to this visit OR CTO_NODE is
     // conditional
-    if (cto->visit != phase &&
+    if (skip_previous_visit_code && cto->visit != phase &&
         !(cto->cto_instance != NULL &&
           if_rule_p(cto->cto_instance->fibered_attr.attr))) {
-      continue;
-    }
-
-    // Visit marker for when child visit happens
-    if (in == NULL && ch > -1) {
-      os << "\n";
-      os << indent() << "// aug_graph: " << decl_name(aug_graph->syntax_decl)
-         << "\n";
-      os << indent() << "// visit marker(" << ph << "," << ch << ")\n";
-
-      PHY_GRAPH* pg = Declaration_info(cto->child_decl)->node_phy_graph;
-      int n = PHY_GRAPH_NUM(pg);
-
-      os << indent() << "// parent visit of " << decl_name(pg_parent->phylum)
-         << " at phase " << phase << " is "
-         << (pg_parent->cyclic_flags[phase] ? "circular" : "non-circular")
-         << "\n";
-      os << indent() << "// child visit of " << decl_name(pg->phylum)
-         << " at phase " << ph << " is "
-         << (pg->cyclic_flags[ph] ? "circular" : "non-circular") << "\n";
-
-      os << indent() << "visit_" << n << "_" << ph << "(";
-#ifdef APS2SCALA
-      os << "v_" << decl_name(cto->child_decl);
-#else  /* APS2SCALA */
-      os << "v_" << decl_name(cto->child_decl);
-#endif /* APS2SCALA */
-      os << ");\n";
-
       continue;
     }
 
@@ -198,25 +207,70 @@ static bool implement_visit_function(
          << ") phase visit marker for phase: " << ph << "\n";
 
       if (!is_mod) {
-        os << indent() << "}"
-           << "\n";
-
-        if (!pg_parent->cyclic_flags[ph]) {
-          string suffix = to_string(component_index);
-          std::replace(suffix.begin(), suffix.end(), '-', '_');
-
-          os << indent() << "while(changed);"
-             << "\n";
-          os << indent(nesting_level) << "changed = prevChanged_" << suffix
-             << "\n";
+        if (loop_allowed && !pg_parent->cyclic_flags[ph] &&
+            component_index != -1) {
+          if (!inside_conditional.back()) {
+            dump_loop_end(component_index, os);
+            loop_component_index.pop_back();
+          }
+        } else if (loop_allowed) {
+          os << indent() << "// skipped adding end\n";
         }
       }
 
       // If ph == phase to implement then stop
-      if (ph == phase)
-      {
+      if (ph == phase) {
         return false;
       }
+
+      component_index = cto->component;
+
+      continue;
+    }
+
+    if (scc_changed) {
+      if (loop_allowed && !pg_parent->cyclic_flags[phase]) {
+        if (component_index != -1) {
+          if (!inside_conditional.back()) {
+            dump_loop_end(component_index, os);
+            loop_component_index.pop_back();
+          } else {
+            fatal_error("Loop is not going to workout");
+          }
+        }
+
+        dump_loop_start(cto->component, os);
+        loop_component_index.push_back(cto->component);
+      }
+    }
+
+    // Visit marker for when child visit happens
+    if (in == NULL && ch > -1) {
+      os << "\n";
+      os << indent() << "// aug_graph: " << decl_name(aug_graph->syntax_decl)
+         << "\n";
+      os << indent() << "// visit marker(" << ph << "," << ch << ")\n";
+
+      PHY_GRAPH* pg = Declaration_info(cto->child_decl)->node_phy_graph;
+      int n = PHY_GRAPH_NUM(pg);
+
+      os << indent() << "// parent visit of " << decl_name(pg_parent->phylum)
+         << " at phase " << phase << " is "
+         << (pg_parent->cyclic_flags[phase] ? "circular" : "non-circular")
+         << "\n";
+      os << indent() << "// child visit of " << decl_name(pg->phylum)
+         << " at phase " << ph << " is "
+         << (pg->cyclic_flags[ph] ? "circular" : "non-circular") << "\n";
+
+      os << indent() << "visit_" << n << "_" << ph << "(";
+#ifdef APS2SCALA
+      os << "v_" << decl_name(cto->child_decl);
+#else  /* APS2SCALA */
+      os << "v_" << decl_name(cto->child_decl);
+#endif /* APS2SCALA */
+      os << ");\n";
+
+      component_index = cto->component;
 
       continue;
     }
@@ -227,20 +281,6 @@ static bool implement_visit_function(
       fatal_error(
           "total_order is malformed: Instance should not be null for non-visit "
           "marker CTO nodes.");
-    }
-
-    if (scc_changed) {
-      if (!pg_parent->cyclic_flags[phase]) {
-#ifdef APS2SCALA
-        // ABS value of component_index because initially it is -1
-        string suffix = to_string(component_index);
-        std::replace(suffix.begin(), suffix.end(), '-', '_');
-
-        os << indent(nesting_level) << "val prevChanged_" << suffix
-           << " = changed;\n";
-        os << indent(nesting_level) << "do {\n";
-#endif /* APS2SCALA */
-      }
     }
 
     Declaration ad = in->fibered_attr.attr;
@@ -257,6 +297,7 @@ static bool implement_visit_function(
       os << indent() << "// '" << string(instance_str)
          << "' attribute instance is impossible.\n";
 
+      component_index = cto->component;
       continue;
     }
 
@@ -309,10 +350,15 @@ static bool implement_visit_function(
       vector<set<Expression>> true_assignment =
           make_instance_assignment(aug_graph, if_true, instance_assignment);
 
+      inside_conditional.push_back(true);
       cond->positive |= cmask;
-      implement_visit_function(aug_graph, phase, cto->cto_if_true,
-                               true_assignment, nch, cond, cto->component, os);
+      implement_visit_function(
+          aug_graph, phase, cto->cto_if_true, true_assignment, nch, cond,
+          cto->component, loop_allowed, inside_conditional,
+          loop_component_index, skip_previous_visit_code, os);
       cond->positive &= ~cmask;
+
+      inside_conditional.pop_back();
 
       --nesting_level;
 #ifdef APS2SCALA
@@ -330,11 +376,17 @@ static bool implement_visit_function(
           if_false ? make_instance_assignment(aug_graph, if_false,
                                               instance_assignment)
                    : instance_assignment;
+
+      inside_conditional.push_back(true);
       cond->negative |= cmask;
-      bool cont = implement_visit_function(aug_graph, phase, cto->cto_if_false,
-                                           false_assignment, nch, cond,
-                                           cto->component, os);
+      bool cont = implement_visit_function(
+          aug_graph, phase, cto->cto_if_false, false_assignment, nch, cond,
+          cto->component, loop_allowed, inside_conditional,
+          loop_component_index, skip_previous_visit_code, os);
       cond->negative &= cmask;
+
+      inside_conditional.pop_back();
+
       --nesting_level;
 #ifdef APS2SCALA
       if (is_match) {
@@ -342,6 +394,12 @@ static bool implement_visit_function(
       } else {
         os << indent() << "}\n";
       }
+
+      if (!loop_component_index.empty() && !inside_conditional.back()) {
+        dump_loop_end(loop_component_index.back(), os);
+        loop_component_index.pop_back();
+      }
+
 #else  /* APS2SCALA */
       os << indent() << "}\n";
 #endif /* APS2SCALA */
@@ -352,6 +410,8 @@ static bool implement_visit_function(
 
     if (instance_direction(in) == instance_inward) {
       os << indent() << "// " << in << " is ready now.\n";
+
+      component_index = cto->component;
       continue;
     }
 
@@ -587,8 +647,15 @@ void dump_visit_functions(PHY_GRAPH* phy_graph,
     CONDITION cond;
     cond.positive = 0;
     cond.negative = 0;
+
+    vector<int> loop_component_index;
+
+    vector<bool> inside_condition;
+    inside_condition.push_back(false);
+
     implement_visit_function(aug_graph, phase, total_order, instance_assignment,
-                             nch, &cond, -1, os);
+                             nch, &cond, -1, true, inside_condition,
+                             loop_component_index, true, os);
 
     --nesting_level;
 #ifdef APS2SCALA
@@ -814,9 +881,16 @@ void dump_visit_functions(STATE* s, output_streams& oss)
   CONDITION cond;
   cond.positive = 0;
   cond.negative = 0;
+
+  vector<int> loop_component_index;
+
+  vector<bool> inside_condition;
+  inside_condition.push_back(false);
+
   implement_visit_function(&s->global_dependencies, phase,
                            s->global_dependencies.total_order,
-                           instance_assignment, 1, &cond, -1, os);
+                           instance_assignment, 1, &cond, -1, true,
+                           inside_condition, loop_component_index, true, os);
   --nesting_level;
   os << indent() << "}\n";
 }
@@ -878,8 +952,17 @@ void dump_scheduled_function_body(Declaration fd, STATE* s, ostream& bs) {
   cond.positive = 0;
   cond.negative = 0;
 
-  bool cont = implement_visit_function(aug_graph, 1, schedule,
-                                       instance_assignment, 0, &cond, -1, bs);
+  int max_phase =
+      Declaration_info(aug_graph->lhs_decl)->node_phy_graph->max_phase;
+
+  vector<int> loop_component_index;
+
+  vector<bool> inside_condition;
+  inside_condition.push_back(false);
+
+  bool cont = implement_visit_function(
+      aug_graph, max_phase, schedule, instance_assignment, 0, &cond, -1, false,
+      inside_condition, loop_component_index, false, bs);
 
   Declaration returndecl = first_Declaration(function_type_return_values(ft));
   if (returndecl == 0) {
@@ -895,8 +978,14 @@ void dump_scheduled_function_body(Declaration fd, STATE* s, ostream& bs) {
     bs << "    /*\n";
     bs << "    // phase 2\n";
 
-    while (implement_visit_function(aug_graph, phase, schedule,
-                                    instance_assignment, 0, &cond, -1, bs))
+    vector<int> loop_component_index;
+
+    vector<bool> inside_condition;
+    inside_condition.push_back(false);
+
+    while (implement_visit_function(
+        aug_graph, phase, schedule, instance_assignment, 0, &cond, -1, false,
+        inside_condition, loop_component_index, true, bs))
       bs << indent() << "// phase " << ++phase << "\n";
     bs << indent() << "*/\n";
   }
