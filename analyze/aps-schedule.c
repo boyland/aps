@@ -487,6 +487,9 @@ static void print_total_order(CTO_NODE* cto,
 
   if (cto->cto_instance == NULL) {
     print_indent(indent, stream);
+    if (cto->child_phase.ch != -1) {
+      fprintf(stream, " ");
+    }
     fprintf(stream, "visit marker (%d) ", cto->visit);
     if (cto->child_decl != NULL) {
       fprintf(stream, " (%s) ", decl_name(cto->child_decl));

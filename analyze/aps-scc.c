@@ -178,15 +178,15 @@ static void analyze_state(STATE* s) {
       printf("Components of %s\n", decl_name(aug_graph->syntax_decl));
       for (j = 0; j < aug_graph->components.length; j++) {
         COMPONENT comp = aug_graph->components.array[j];
-        printf("Component #%d\n", j);
+        printf(" Component #%d\n", j);
 
         for (k = 0; k < comp.length; k++) {
+          printf("  ");
           print_instance(&aug_graph->instances.array[comp.array[k]], stdout);
           printf("\n");
         }
-
-        printf("\n");
       }
+      printf("\n");
     }
   }
 }
