@@ -181,7 +181,7 @@ static void analyze_state(STATE* s) {
         printf(" Component #%d\n", j);
 
         for (k = 0; k < comp.length; k++) {
-          printf("  ");
+          printf("   ");
           print_instance(&aug_graph->instances.array[comp.array[k]], stdout);
           printf("\n");
         }
