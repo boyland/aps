@@ -29,6 +29,13 @@ struct total_order_state {
   children;
   // One-d array indicating child visit for a phase happened or not
   bool** child_visit_markers;
+
+  // One-d array indicating child visit for a phase happened or not
+  bool* parent_visit_markers;
+
+  bool** child_inh_investigations;
+
+  bool* parent_synth_investigations;
 };
 
 typedef struct total_order_state TOTAL_ORDER_STATE;
@@ -76,7 +83,8 @@ static CTO_NODE* schedule_visit_end(AUG_GRAPH* aug_graph,
                                     CONDITION cond,
                                     TOTAL_ORDER_STATE* state,
                                     const int remaining,
-                                    const short parent_ph);
+                                    const short parent_ph,
+                                    const bool circular);
 
 static void find_scc_to_schedule(AUG_GRAPH* aug_graph,
                                  CTO_NODE* prev,
@@ -1217,11 +1225,80 @@ static CTO_NODE* schedule_transition_start_of_group(AUG_GRAPH* aug_graph,
         circular ? "circular" : "non-circular");
   }
 
+  if (group->ch != -1 && abs(group->ph) > 1 &&
+      !state->child_visit_markers[group->ch][abs(group->ph) - 1]) {
+    PHY_GRAPH* phy =
+        Declaration_info(state->children.array[group->ch])->node_phy_graph;
+
+    if (phy->empty_phase[abs(group->ph) - 1]) {
+      cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
+      cto_node->cto_prev = prev;
+      cto_node->cto_instance = NULL;
+      cto_node->child_phase.ph = abs(group->ph) - 1;
+      cto_node->child_phase.ch = group->ch;
+      cto_node->child_decl = state->children.array[group->ch];
+      cto_node->visit = parent_ph;
+      cto_node->component = comp_index;
+
+      state->child_visit_markers[group->ch][abs(group->ph) - 1] = true;
+
+      if (circular) {
+        cto_node =
+            group_schedule_circular(aug_graph, comp, comp_index, prev, cond,
+                                    state, remaining, group, parent_ph);
+      } else {
+        cto_node = group_schedule_noncircular(aug_graph, prev, cond, state,
+                                              remaining, group, parent_ph);
+      }
+
+      state->child_visit_markers[group->ch][abs(group->ph) - 1] = false;
+      return cto_node;
+    } else {
+      CHILD_PHASE* child_inh = (CHILD_PHASE*)alloca(sizeof(CHILD_PHASE));
+      child_inh->ph = -(abs(group->ph) - 1);
+      child_inh->ch = group->ch;
+
+      if (circular) {
+        cto_node =
+            group_schedule_circular(aug_graph, comp, comp_index, prev, cond,
+                                    state, remaining, child_inh, parent_ph);
+      } else {
+        cto_node = group_schedule_noncircular(aug_graph, prev, cond, state,
+                                              remaining, child_inh, parent_ph);
+      }
+
+      return cto_node;
+    }
+  }
+
   // If we are starting to schedule child synthesized attribute outside of
   // group scheduler it means child synthesized attribute did not immediately
   // follow by child inherited attribute thus add a visit marker <ph,ch>
   if (group->ph > 0 && group->ch != -1 &&
       !state->child_visit_markers[group->ch][group->ph]) {
+    // Mark investigations as done
+    if (!state->child_inh_investigations[group->ch][group->ph]) {
+      CHILD_PHASE* child_inh = (CHILD_PHASE*)alloca(sizeof(CHILD_PHASE));
+      child_inh->ph = -group->ph;
+      child_inh->ch = group->ch;
+
+      // Mark investigations as done
+      state->child_inh_investigations[group->ch][group->ph] = true;
+      if (circular) {
+        cto_node =
+            group_schedule_circular(aug_graph, comp, comp_index, prev, cond,
+                                    state, remaining, child_inh, parent_ph);
+      } else {
+        cto_node = group_schedule_noncircular(aug_graph, prev, cond, state,
+                                              remaining, child_inh, parent_ph);
+      }
+
+      // Release investigations
+      state->child_inh_investigations[group->ch][group->ph] = false;
+
+      return cto_node;
+    }
+
     cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
     cto_node->cto_prev = prev;
     cto_node->cto_instance = NULL;
@@ -1229,6 +1306,7 @@ static CTO_NODE* schedule_transition_start_of_group(AUG_GRAPH* aug_graph,
     cto_node->child_phase.ch = group->ch;
     cto_node->child_decl = state->children.array[group->ch];
     cto_node->visit = parent_ph;
+    cto_node->component = comp_index;
     // Mark this child visit as done
     state->child_visit_markers[group->ch][group->ph] = true;
     if (circular) {
@@ -1247,9 +1325,13 @@ static CTO_NODE* schedule_transition_start_of_group(AUG_GRAPH* aug_graph,
   // If parent phase is greater than current parent attribute phase then we
   // have reached the end of previous phase and so add a end of parent phase
   // visit marker <ph,-1>
-  if (abs(group->ph) > parent_ph && group->ch == -1) {
-    return schedule_visit_end(aug_graph, comp, comp_index, prev, cond, state,
-                              remaining, parent_ph);
+  if (abs(group->ph) > parent_ph && group->ch == -1 &&
+      !state->parent_visit_markers[parent_ph]) {
+    state->parent_visit_markers[parent_ph] = true;
+    cto_node = schedule_visit_end(aug_graph, comp, comp_index, prev, cond,
+                                  state, remaining, parent_ph, circular);
+    state->parent_visit_markers[parent_ph] = false;
+    return cto_node;
   }
 
   if (circular) {
@@ -1291,6 +1373,8 @@ static CTO_NODE* schedule_transition_end_of_group(AUG_GRAPH* aug_graph,
         aug_graph_name(aug_graph), remaining, group->ph, group->ch, parent_ph);
   }
 
+  CTO_NODE* cto_node;
+
   // If we find ourselves scheduling a <-ph,ch>, we need to (after putting in
   // all the instances in that group), we need to schedule the visit of the
   // child (add a CTO node with a null instance but with <ph,ch) and then ALSO
@@ -1300,7 +1384,7 @@ static CTO_NODE* schedule_transition_end_of_group(AUG_GRAPH* aug_graph,
       !is_there_more_to_schedule_in_group(aug_graph, state, group) &&
       !state->child_visit_markers[group->ch][-group->ph]) {
     // Visit marker
-    CTO_NODE* cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
+    cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
     cto_node->cto_prev = prev;
     cto_node->cto_instance = NULL;
     cto_node->child_phase.ph = -group->ph;
@@ -1322,6 +1406,19 @@ static CTO_NODE* schedule_transition_end_of_group(AUG_GRAPH* aug_graph,
     }
 
     state->child_visit_markers[group->ch][-group->ph] = false;  // Release it
+    return cto_node;
+  }
+
+  if (group->ph > 0 && group->ch == -1 &&
+      !state->parent_visit_markers[group->ph]) {
+    state->parent_visit_markers[group->ph] = true;
+    state->parent_synth_investigations[group->ph] = true;
+
+    cto_node = schedule_visit_end(aug_graph, comp, comp_index, prev, cond,
+                                  state, remaining, parent_ph, circular);
+
+    state->parent_visit_markers[group->ph] = false;
+    state->parent_synth_investigations[group->ph] = false;
     return cto_node;
   }
 
@@ -1353,7 +1450,8 @@ static CTO_NODE* schedule_visit_end(AUG_GRAPH* aug_graph,
                                     CONDITION cond,
                                     TOTAL_ORDER_STATE* state,
                                     const int remaining,
-                                    const short parent_ph) {
+                                    const short parent_ph,
+                                    const bool circular) {
   PHY_GRAPH* parent_phy = Declaration_info(aug_graph->lhs_decl)->node_phy_graph;
 
   int ch, ph;
@@ -1381,9 +1479,9 @@ static CTO_NODE* schedule_visit_end(AUG_GRAPH* aug_graph,
         cto_node->component = comp_index;
         cto_node->visit = parent_ph;
         state->child_visit_markers[ch][ph] = true;
-        cto_node->cto_next =
-            schedule_visit_end(aug_graph, comp, comp_index, cto_node, cond,
-                               state, remaining /* no change*/, parent_ph);
+        cto_node->cto_next = schedule_visit_end(
+            aug_graph, comp, comp_index, cto_node, cond, state,
+            remaining /* no change*/, parent_ph, circular);
         state->child_visit_markers[ch][ph] = false;
 
         return cto_node;
@@ -1391,34 +1489,61 @@ static CTO_NODE* schedule_visit_end(AUG_GRAPH* aug_graph,
     }
   }
 
-  CTO_NODE* cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
-  cto_node->cto_prev = prev;
-  cto_node->cto_instance = NULL;
-  cto_node->child_phase.ph = parent_ph;
-  cto_node->child_phase.ch = -1;
-  cto_node->visit = parent_ph;
-  cto_node->component = comp_index;
+  CTO_NODE* cto_node;
 
-  CHILD_PHASE* parent_inh = (CHILD_PHASE*)alloca(sizeof(CHILD_PHASE));
-  parent_inh->ch = -1;
-  parent_inh->ph = parent_ph + 1;
+  if (state->parent_synth_investigations[parent_ph]) {
+    cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
+    cto_node->cto_prev = prev;
+    cto_node->cto_instance = NULL;
+    cto_node->child_phase.ph = parent_ph;
+    cto_node->child_phase.ch = comp_index;
+    cto_node->visit = parent_ph;
+    cto_node->component = comp_index;
 
-  // Short circut
-  if (parent_ph == parent_phy->max_phase) {
-    cto_node->cto_next = NULL;
-  } else if (parent_phy->cyclic_flags[parent_ph + 1]) {
-    find_scc_to_schedule(aug_graph, prev, cond, state, remaining, parent_inh,
-                         parent_ph, &comp, &comp_index);
+    CHILD_PHASE* parent_inh = (CHILD_PHASE*)alloca(sizeof(CHILD_PHASE));
+    parent_inh->ch = -1;
+    parent_inh->ph = parent_ph + 1;
 
-    cto_node->cto_next =
-        group_schedule_circular(aug_graph, comp, comp_index, prev, cond, state,
-                                remaining, parent_inh, parent_ph + 1);
+    // Short circut
+    if (parent_ph >= parent_phy->max_phase) {
+      cto_node->cto_next = NULL;
+    } else if (parent_phy->cyclic_flags[parent_ph + 1]) {
+      find_scc_to_schedule(aug_graph, prev, cond, state, remaining, parent_inh,
+                           parent_ph, &comp, &comp_index);
+
+      cto_node->cto_next =
+          group_schedule_circular(aug_graph, comp, comp_index, prev, cond,
+                                  state, remaining, parent_inh, parent_ph + 1);
+    } else {
+      cto_node->cto_next = group_schedule_noncircular(
+          aug_graph, prev, cond, state, 0, parent_inh, parent_ph + 1);
+    }
+
+    return cto_node;
   } else {
-    cto_node->cto_next = group_schedule_noncircular(
-        aug_graph, prev, cond, state, 0, parent_inh, parent_ph + 1);
-  }
+    CHILD_PHASE* parent_inh = (CHILD_PHASE*)alloca(sizeof(CHILD_PHASE));
+    parent_inh->ch = -1;
+    parent_inh->ph = parent_ph;
 
-  return cto_node;
+    state->parent_synth_investigations[parent_ph] = true;
+
+    // Short circut
+    if (parent_phy->cyclic_flags[parent_ph]) {
+      find_scc_to_schedule(aug_graph, prev, cond, state, remaining, parent_inh,
+                           parent_ph, &comp, &comp_index);
+
+      cto_node =
+          group_schedule_circular(aug_graph, comp, comp_index, prev, cond,
+                                  state, remaining, parent_inh, parent_ph);
+    } else {
+      cto_node = group_schedule_noncircular(aug_graph, prev, cond, state, 0,
+                                            parent_inh, parent_ph);
+    }
+
+    state->parent_synth_investigations[parent_ph] = false;
+
+    return cto_node;
+  }
 }
 
 /**
@@ -1452,7 +1577,7 @@ static CTO_NODE* group_schedule_noncircular(AUG_GRAPH* aug_graph,
   /* If nothing more to do, we are done. */
   if (remaining == 0) {
     return schedule_visit_end(aug_graph, NULL, -1, prev, cond, state, remaining,
-                              parent_ph);
+                              parent_ph, false /* non-circular */);
   }
 
   /* Outer condition is impossible, it's a dead-end branch */
@@ -1490,12 +1615,15 @@ static CTO_NODE* group_schedule_noncircular(AUG_GRAPH* aug_graph,
         cto_node->component = -1;
 
         if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
-          printf("-> Scheduled circular via group scheduler (instance: ");
+          printf(
+              "-> Scheduled circular via group non-circular scheduler "
+              "(instance: ");
           print_instance(instance, stdout);
-          printf(", group: <%+d,%+d>, cond: (%+d,%+d), inst_cond: (%+d,%+d))\n",
-                 group->ph, group->ch, cond.positive, cond.negative,
-                 instance_condition(instance).positive,
-                 instance_condition(instance).negative);
+          printf(
+              ", group: <%+d,%+d>, cond: (%+d,%+d), inst_cond: (%+d,%+d))\n\n",
+              group->ph, group->ch, cond.positive, cond.negative,
+              instance_condition(instance).positive,
+              instance_condition(instance).negative);
         }
 
         // instance has been scheduled (and will not be
@@ -1538,7 +1666,7 @@ static CTO_NODE* group_schedule_noncircular(AUG_GRAPH* aug_graph,
   // Try finding a scc to schedule
   if (remaining > 0) {
     return schedule_transition(aug_graph, prev, cond, state, remaining, group,
-                               remaining, parent_ph);
+                               parent_ph, false /* non-circular */);
   }
 
   // All done with scheduling
@@ -1595,9 +1723,10 @@ static CTO_NODE* greedy_schedule_noncircular(AUG_GRAPH* aug_graph,
     // If edgeset condition is not impossible then go ahead with scheduling
     if (group_ready_to_go(aug_graph, state, cond, instance->index)) {
       if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
-        printf("-> Scheduled scc via greedy scheduler (instance: ");
+        printf(
+            "-> Scheduled scc via greedy non-circular scheduler (instance: ");
         print_instance(instance, stdout);
-        printf(", group: <%+d,%+d>, cond: (%+d,%+d), inst_cond: (%+d,%+d))\n",
+        printf(", group: <%+d,%+d>, cond: (%+d,%+d), inst_cond: (%+d,%+d))\n\n",
                group->ph, group->ch, cond.positive, cond.negative,
                instance_condition(instance).positive,
                instance_condition(instance).negative);
@@ -1685,7 +1814,7 @@ static CTO_NODE* group_schedule_circular(AUG_GRAPH* aug_graph,
   /* If nothing more to do, we are done. */
   if (remaining == 0) {
     return schedule_visit_end(aug_graph, NULL, -1, prev, cond, state, remaining,
-                              parent_ph);
+                              parent_ph, true /* circular */);
   }
 
   /* Outer condition is impossible, it's a dead-end branch */
@@ -1709,12 +1838,13 @@ static CTO_NODE* group_schedule_circular(AUG_GRAPH* aug_graph,
       cto_node->child_phase.ph = group->ph;
       cto_node->child_phase.ch = group->ch;
       cto_node->visit = parent_ph;
-      cto_node->component = -1;
+      cto_node->component = comp_index;
 
       if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
-        printf("-> Scheduled circular via group scheduler (instance: ");
+        printf(
+            "-> Scheduled circular via group circular scheduler (instance: ");
         print_instance(instance, stdout);
-        printf(", group: <%+d,%+d>, cond: (%+d,%+d), inst_cond: (%+d,%+d))\n",
+        printf(", group: <%+d,%+d>, cond: (%+d,%+d), inst_cond: (%+d,%+d))\n\n",
                group->ph, group->ch, cond.positive, cond.negative,
                instance_condition(instance).positive,
                instance_condition(instance).negative);
@@ -1727,16 +1857,19 @@ static CTO_NODE* group_schedule_circular(AUG_GRAPH* aug_graph,
       if (if_rule_p(instance->fibered_attr.attr)) {
         int cmask = 1 << (if_rule_index(instance->fibered_attr.attr));
         cond.negative |= cmask;
-        cto_node->cto_if_false = group_schedule_noncircular(
-            aug_graph, cto_node, cond, state, remaining - 1, group, parent_ph);
+        cto_node->cto_if_false =
+            group_schedule_circular(aug_graph, comp, comp_index, cto_node, cond,
+                                    state, remaining - 1, group, parent_ph);
         cond.negative &= ~cmask;
         cond.positive |= cmask;
-        cto_node->cto_if_true = group_schedule_noncircular(
-            aug_graph, cto_node, cond, state, remaining - 1, group, parent_ph);
+        cto_node->cto_if_true =
+            group_schedule_circular(aug_graph, comp, comp_index, cto_node, cond,
+                                    state, remaining - 1, group, parent_ph);
         cond.positive &= ~cmask;
       } else {
-        cto_node->cto_next = group_schedule_noncircular(
-            aug_graph, cto_node, cond, state, remaining - 1, group, parent_ph);
+        cto_node->cto_next =
+            group_schedule_circular(aug_graph, comp, comp_index, cto_node, cond,
+                                    state, remaining - 1, group, parent_ph);
       }
 
       state->schedule[instance->index] = false;  // Release it
@@ -1747,15 +1880,15 @@ static CTO_NODE* group_schedule_circular(AUG_GRAPH* aug_graph,
 
   // Group scheduling is finished
   if (!is_there_more_to_schedule_in_group(aug_graph, state, group)) {
-    return schedule_transition_end_of_group(aug_graph, NULL, -1, cto_node, cond,
-                                            state, remaining, group, parent_ph,
-                                            true /* circular */);
+    return schedule_transition_end_of_group(
+        aug_graph, comp, comp_index, cto_node, cond, state, remaining, group,
+        parent_ph, true /* circular */);
   }
 
   // Try finding a scc to schedule
   if (remaining > 0) {
     return schedule_transition(aug_graph, prev, cond, state, remaining, group,
-                               parent_ph, false /* circular */);
+                               parent_ph, true /* circular */);
   }
 
   // All done with scheduling
@@ -1816,9 +1949,9 @@ static CTO_NODE* greedy_schedule_circular(AUG_GRAPH* aug_graph,
     // If edgeset condition is not impossible then go ahead with scheduling
     if (group_ready_to_go(aug_graph, state, cond, instance->index)) {
       if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
-        printf("-> Scheduled scc via greedy scheduler (instance: ");
+        printf("-> Scheduled scc via greedy circular scheduler (instance: ");
         print_instance(instance, stdout);
-        printf(", group: <%+d,%+d>, cond: (%+d,%+d), inst_cond: (%+d,%+d))\n",
+        printf(", group: <%+d,%+d>, cond: (%+d,%+d), inst_cond: (%+d,%+d))\n\n",
                group->ph, group->ch, cond.positive, cond.negative,
                instance_condition(instance).positive,
                instance_condition(instance).negative);
@@ -2149,8 +2282,13 @@ static CTO_NODE* schedule_transition(AUG_GRAPH* aug_graph,
                                                    remaining, group, parent_ph);
 
   if (components->count == 0) {
-    return group_schedule_noncircular(aug_graph, prev, cond, state, remaining,
-                                      group, parent_ph);
+    if (is_there_more_to_schedule_in_group(aug_graph, state, group)) {
+      return group_schedule_noncircular(aug_graph, prev, cond, state, remaining,
+                                        group, parent_ph);
+    } else {
+      return greedy_schedule_noncircular(aug_graph, prev, cond, state,
+                                         remaining, group, parent_ph);
+    }
   }
 
   COMPONENT* comp;
@@ -2303,11 +2441,29 @@ static void schedule_augmented_dependency_graph(AUG_GRAPH* aug_graph) {
 
   state->child_visit_markers =
       (bool**)alloca(state->children.length * sizeof(bool*));
+
+  state->child_inh_investigations =
+      (bool**)alloca(state->children.length * sizeof(bool*));
   for (i = 0; i < state->children.length; i++) {
     size_t child_visit_markers_size = state->max_child_ph[i] * sizeof(bool);
+
     state->child_visit_markers[i] = (bool*)alloca(child_visit_markers_size);
     memset(state->child_visit_markers[i], false, child_visit_markers_size);
+
+    state->child_inh_investigations[i] =
+        (bool*)alloca(child_visit_markers_size);
+    memset(state->child_inh_investigations[i], false, child_visit_markers_size);
   }
+
+  state->parent_synth_investigations =
+      (bool*)alloca(state->max_parent_ph * sizeof(bool));
+  memset(state->parent_synth_investigations, false,
+         state->max_parent_ph * sizeof(bool));
+
+  state->parent_visit_markers =
+      (bool*)alloca(state->max_parent_ph * sizeof(bool));
+  memset(state->parent_visit_markers, false,
+         state->max_parent_ph * sizeof(bool));
 
   if (oag_debug & DEBUG_ORDER) {
     printf("\nInstances %s:\n", aug_graph_name(aug_graph));
