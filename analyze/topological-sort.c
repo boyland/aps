@@ -7,16 +7,12 @@
 #include "jbb-alloc.h"
 #include "jbb.h"
 
-// Color definition
-// 0 -> NO COLOR
-// 1 -> WHITE
-// 2 -> GRAY
-// 3 -> BALCK
+// TODO: re-implement using this: https://gist.github.com/sundeepblue/10550247
 
-#define NO_COLOR 0
-#define WHITE 1
-#define GRAY 2
-#define BALCK 3
+// Color definition
+#define WHITE 0  // never visited
+#define GRAY 1   // itself is visited, but its neighbors are still under visit
+#define BLACK 2  // both itself and all its neighbors are visited
 
 // Insert a new vertex to a linked list
 AdjacencyNode* insert_vertex(AdjacencyNode** adjacency, int vertex) {
