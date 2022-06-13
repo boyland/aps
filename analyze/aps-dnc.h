@@ -73,7 +73,7 @@ typedef struct augmented_dependency_graph {
   int *schedule; /* one-d array, indexed by instance number */
   struct cto_node *total_order;
   CYCLES cycles;       /* vector of cycles of this augmented graph derived by extracting augmented graph attributes from a cycle */
-  COMPONENTS components;
+  SCC_COMPONENTS components;
 } AUG_GRAPH;
 extern const char *aug_graph_name(AUG_GRAPH *);
 

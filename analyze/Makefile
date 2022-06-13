@@ -6,7 +6,7 @@ APSAGOBJS= aps-bind.o aps-read.o aps-info.o aps-ag-util.o \
 	  aps-fiber.o aps-cond.o aps-dnc.o aps-cycle.o aps-oag.o \
 	  aps-analyze.o aps-debug.o aps-type.o table.o alist.o \
 	  prime.o hashcons.o canonical-signature.o canonical-type.o \
-	  aps-schedule.o scc.o aps-scc.o
+	  aps-schedule.o scc.o aps-scc.o topological-sort.o
 APSCOBJS= apsc.o ${APSAGOBJS} 
 APSCLIB= ${PROJECT-DIR}/lib/aps-lib.o
 
@@ -32,8 +32,9 @@ canonical-type.o : hashcons.o canonical-type.h
 canonical-signature.o : hashcons.o canonical-type.o canonical-signature.h
 canonical-signature.o : hashcons.o canonical-type.o canonical-signature.h
 scc.o : scc.h
+topological-sort.o : topological-sort.h
 aps-scc.o : aps-dnc.o scc.o aps-scc.h
-aps-schedule.o : aps-dnc.o aps-cycle.o aps-scc.o aps-schedule.h
+aps-schedule.o : aps-dnc.o aps-cycle.o aps-scc.o topological-sort.o aps-schedule.h
 
 install: apsc aps-ag.a
 	mv apsc ../bin/apssched

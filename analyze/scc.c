@@ -68,8 +68,8 @@ static bool stack_is_empty(Stack** stack) {
  * @brief Create graph given number of vertices implemented using adjacency
  * @return pointer to allocated graph
  */
-Graph* graph_create(int num_vertices) {
-  Graph* graph = malloc(sizeof(Graph));
+SccGraph* scc_graph_create(int num_vertices) {
+  SccGraph* graph = malloc(sizeof(SccGraph));
   graph->num_vertices = num_vertices;
   size_t vertices_size = num_vertices * sizeof(Vertex*);
   graph->neighbors = (Vertex**)malloc(vertices_size);
@@ -83,7 +83,7 @@ Graph* graph_create(int num_vertices) {
  * @param source index of source
  * @param sink index of sink
  */
-void graph_add_edge(Graph* graph, int source, int sink) {
+void scc_graph_add_edge(SccGraph* graph, int source, int sink) {
   Vertex* item = (Vertex*)malloc(sizeof(Vertex));
   item->value = sink;
   item->next = graph->neighbors[source];
@@ -108,7 +108,7 @@ static void graph_destroy_vertex(Vertex* vertex) {
  * @brief Deallocate graph
  * @param graph pointer to graph
  */
-void graph_destroy(Graph* graph) {
+void scc_graph_destroy(SccGraph* graph) {
   int i;
   for (i = 0; i < graph->num_vertices; i++) {
     graph_destroy_vertex(graph->neighbors[i]);
@@ -124,7 +124,7 @@ void graph_destroy(Graph* graph) {
  * @param visited visited boolean array
  * @param v vertex
  */
-static void dfs(Graph* graph, Stack** stack, bool* visited, int v) {
+static void dfs(SccGraph* graph, Stack** stack, bool* visited, int v) {
   visited[v] = true;
   Vertex* neighbors = graph->neighbors[v];
   while (neighbors != NULL) {
@@ -141,15 +141,15 @@ static void dfs(Graph* graph, Stack** stack, bool* visited, int v) {
  * @param graph pointer to graph
  * @return reversed graph
  */
-static Graph* reverse(Graph* graph) {
-  Graph* reversed_graph = graph_create(graph->num_vertices);
+static SccGraph* reverse(SccGraph* graph) {
+  SccGraph* reversed_graph = scc_graph_create(graph->num_vertices);
 
   int i;
   Vertex* neighbors;
   for (i = 0; i < graph->num_vertices; i++) {
     neighbors = graph->neighbors[i];
     while (neighbors != NULL) {
-      graph_add_edge(reversed_graph, neighbors->value, i);
+      scc_graph_add_edge(reversed_graph, neighbors->value, i);
       neighbors = neighbors->next;
     }
   }
@@ -166,7 +166,7 @@ static Graph* reverse(Graph* graph) {
  * @param result_array result int array
  * @param result_count result counter
  */
-void dfs_collect_scc(Graph* graph,
+void dfs_collect_scc(SccGraph* graph,
                      bool* visited,
                      bool* deleted,
                      int v,
@@ -189,7 +189,7 @@ void dfs_collect_scc(Graph* graph,
  * @brief Kosaraju logic
  * @param graph pointer to graph
  */
-COMPONENTS graph_scc(Graph* graph) {
+SCC_COMPONENTS scc_graph_components(SccGraph* graph) {
   if (graph == NULL || graph->num_vertices <= 0) {
     fatal_error("Graph parameter passed to Kosaraju method is not valid.");
   }
@@ -209,7 +209,7 @@ COMPONENTS graph_scc(Graph* graph) {
     }
   }
 
-  Graph* reversed_graph = reverse(graph);
+  SccGraph* reversed_graph = reverse(graph);
 
   bool* deleted = (bool*)alloca(n * sizeof(bool));
   memset(deleted, false, n * sizeof(bool));
@@ -240,20 +240,22 @@ COMPONENTS graph_scc(Graph* graph) {
   }
 
   // Collect components as vector of vector of integers
-  COMPONENTS result;
-  VECTORALLOC(result, COMPONENT, num_components);
+  SCC_COMPONENTS* result = (SCC_COMPONENTS*)malloc(sizeof(SCC_COMPONENTS));
+  VECTORALLOC(*result, SCC_COMPONENT, num_components);
 
   for (i = 0; i < num_components; i++) {
-    COMPONENT comp;
-    VECTORALLOC(comp, int, components_count[i]);
-    result.array[i] = comp;
+    SCC_COMPONENT* comp = (SCC_COMPONENT*)malloc(sizeof(SCC_COMPONENT));
+    VECTORALLOC(*comp, int, components_count[i]);
+    result->array[i] = *comp;
     for (j = 0; j < components_count[i]; j++) {
-      comp.array[j] = components_array[i * n + j];
+      comp->array[j] = components_array[i * n + j];
     }
   }
 
   // Free memory allocated via malloc
-  graph_destroy(reversed_graph);
+  scc_graph_destroy(reversed_graph);
 
-  return result;
+  SCC_COMPONENTS re = *result;
+
+  return re;
 }

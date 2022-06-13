@@ -22,6 +22,7 @@
 #include "canonical-signature.h"
 #include "scc.h"
 #include "aps-scc.h"
+#include "topological-sort.h"
 #include "aps-schedule.h"
 
 extern char *aps_yyfilename;

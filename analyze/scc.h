@@ -1,9 +1,9 @@
 #ifndef SCC_H
 #define SCC_H
 
-typedef VECTOR(int) COMPONENT;
+typedef VECTOR(int) SCC_COMPONENT;
 
-typedef VECTOR(COMPONENT) COMPONENTS;
+typedef VECTOR(SCC_COMPONENT) SCC_COMPONENTS;
 
 struct vertex {
   int value;
@@ -12,24 +12,24 @@ struct vertex {
 
 typedef struct vertex Vertex;
 
-struct graph {
+struct scc_graph {
   int num_vertices;
   Vertex** neighbors;
 };
 
-typedef struct graph Graph;
+typedef struct scc_graph SccGraph;
 
 /**
  * @brief Create graph given number of vertices implemented using adjacency
  * @return pointer to allocated graph
  */
-Graph* graph_create(int num_vertices);
+SccGraph* scc_graph_create(int num_vertices);
 
 /**
  * @brief Deallocate graph
  * @param graph pointer to graph
  */
-void graph_destroy(Graph* graph);
+void scc_graph_destroy(SccGraph* graph);
 
 /**
  * @brief Add edge method of graph
@@ -37,12 +37,12 @@ void graph_destroy(Graph* graph);
  * @param source index of source
  * @param sink index of sink
  */
-void graph_add_edge(Graph* graph, int source, int sink);
+void scc_graph_add_edge(SccGraph* graph, int source, int sink);
 
 /**
  * @brief Finds strongly connected components of a given graph
  * @param graph pointer to graph
  */
-COMPONENTS graph_scc(Graph* graph);
+SCC_COMPONENTS scc_graph_components(SccGraph* graph);
 
 #endif

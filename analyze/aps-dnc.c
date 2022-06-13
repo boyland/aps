@@ -2607,6 +2607,8 @@ void print_instance(INSTANCE *i, FILE *stream) {
 void print_edge_helper(DEPENDENCY kind, CONDITION *cond, FILE* stream) {
   if (stream == 0) stream = stdout;
 
+  fprintf(stream, " (%d) ", kind);
+
   if (!(kind & SOME_DEPENDENCY))
   {
     fputc('!',stream);  // no-dependency
