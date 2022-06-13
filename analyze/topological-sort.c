@@ -95,6 +95,10 @@ static void dfs(TopologicalSortGraph* graph, int* result) {
   }
 }
 
+TopologicalSortGraph* topological_sort_graph_destroy(int num_vertices) {
+  int i;
+}
+
 // Topological Sort
 TOPOLOGICAL_SORT_ORDER* topological_sort_order(TopologicalSortGraph* graph) {
   int* result;
