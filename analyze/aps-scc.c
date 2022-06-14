@@ -13,7 +13,9 @@ typedef struct state State;
 static void zack(AUG_GRAPH* aug_graph,
                  TopologicalSortGraph* topological_graph,
                  SCC_COMPONENT* comp1,
-                 SCC_COMPONENT* comp2) {
+                 int comp1_index,
+                 SCC_COMPONENT* comp2,
+                 int comp2_index) {
   int i, j, k;
 
   for (i = 0; i < comp1->length; i++) {
@@ -25,7 +27,8 @@ static void zack(AUG_GRAPH* aug_graph,
       if (edgeset_kind(
               aug_graph->graph[in1->index * aug_graph->instances.length +
                                in2->index])) {
-        topological_sort_add_edge(topological_graph, i, j);
+        // printf("%d -> %d\n", comp1_index, comp2_index);
+        topological_sort_add_edge(topological_graph, comp1_index, comp2_index);
       }
     }
   }
@@ -39,8 +42,8 @@ static void taha(AUG_GRAPH* aug_graph) {
   for (i = 0; i < aug_graph->components.length; i++) {
     for (j = 0; j < aug_graph->components.length; j++) {
       if (i != j) {
-        zack(aug_graph, graph, &aug_graph->components.array[i],
-             &aug_graph->components.array[j]);
+        zack(aug_graph, graph, &aug_graph->components.array[i], i,
+             &aug_graph->components.array[j], j);
       }
     }
   }

@@ -1,5 +1,5 @@
-#ifndef _TOPLOGICAL_SORT_H_
-#define _TOPLOGICAL_SORT_H_
+#ifndef _TOPOLOGICAL_SORT_H_
+#define _TOPOLOGICAL_SORT_H_
 
 // Define the basic component in adjacent list
 struct adjacency_node {

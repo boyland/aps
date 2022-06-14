@@ -2054,8 +2054,8 @@ static SccsInfo* find_all_sccs_to_schedule(AUG_GRAPH* aug_graph,
   int n = aug_graph->instances.length;
   PHY_GRAPH* phy_parent = Declaration_info(aug_graph->lhs_decl)->node_phy_graph;
   int count_sccs = 0;
-  SCC_COMPONENT** components =
-      (SCC_COMPONENT**)malloc(aug_graph->components.length * sizeof(SCC_COMPONENT*));
+  SCC_COMPONENT** components = (SCC_COMPONENT**)malloc(
+      aug_graph->components.length * sizeof(SCC_COMPONENT*));
   int* components_index =
       (int*)malloc(aug_graph->components.length * sizeof(int));
 
@@ -2498,23 +2498,8 @@ static void schedule_augmented_dependency_graph(AUG_GRAPH* aug_graph) {
 
   // It is safe to assume inherited attribute of parents have no
   // dependencies and should be scheduled right away
-  // aug_graph->total_order = group_schedule_noncircular(
-  //     aug_graph, NULL, cond, state, n, &parent_inherited_group, 1);
-
-  aug_graph->total_order = NULL;
-
-  while (true) {
-    SccsInfo* re = find_all_sccs_to_schedule(aug_graph, NULL, cond, state,
-                                             aug_graph->instances.length, 1);
-
-    for (i = 0; i < re->count; i++) {
-      SCC_COMPONENT* comp = re->components[i];
-
-      for (j = 0; j < comp->length; j++) {
-        state->schedule[comp->array[j]] = true;
-      }
-    }
-  }
+  aug_graph->total_order = group_schedule_noncircular(
+      aug_graph, NULL, cond, state, n, &parent_inherited_group, 1);
 
   if (aug_graph->total_order == NULL) {
     fatal_error("Failed to create total order.");

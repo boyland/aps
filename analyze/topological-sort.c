@@ -1,3 +1,8 @@
+
+/**
+ * Topological Sort with linear time complexity using Stack and DFS traversal
+ */
+
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -6,8 +11,6 @@
 #include "aps-ag.h"
 #include "jbb-alloc.h"
 #include "jbb.h"
-
-// TODO: re-implement using this: https://gist.github.com/sundeepblue/10550247
 
 // Color definition
 #define WHITE 0  // never visited
@@ -24,11 +27,19 @@ AdjacencyNode* insert_vertex(AdjacencyNode** adjacency, int vertex) {
   if (*adjacency != NULL) {
     // When the linked list exist, reach the end of it
     AdjacencyNode* cur = *adjacency;
-    while (cur->next) {
+    AdjacencyNode* prev = NULL;
+
+    while (cur) {
+      if (cur->vertex == vertex) {
+        // Already added this child
+        return *adjacency;
+      }
+
+      prev = cur;
       cur = cur->next;
     }
     // add the new vertex to the end
-    cur->next = new;
+    prev->next = new;
   } else {
     // When the linked list does not exist, create a new one
     *adjacency = new;
@@ -38,82 +49,76 @@ AdjacencyNode* insert_vertex(AdjacencyNode** adjacency, int vertex) {
 }
 
 // DFS Visit
-static void dfs_visit(int i,
-                      TopologicalSortGraph* graph,
-                      int* color,
-                      int* result) {
-  // Keep track of the "time"
-  static int cnt = 1;
-
-  // Extract the linked list of vertex i
-  AdjacencyNode* hnode = graph->adjacencies[i];
-
-  // Update the color
-  color[i] = WHITE;
-  while (hnode) {
-    // current operating vertex
-    int cur = hnode->vertex;
-    // Check if the edge is a back edge
-    if (color[hnode->vertex] == WHITE) {
-      fatal_error("This graph has a cycle!\n");
+static void dfs(int v,
+                int* colors,
+                TopologicalSortGraph* graph,
+                LinkedStack** stack) {
+  colors[v] = GRAY;
+  AdjacencyNode* curr = graph->adjacencies[v];
+  while (curr != NULL) {
+    int w = curr->vertex;
+    if (colors[w] == GRAY) {
+      // Found a loop
+      fatal_error("Loop found! No topological order exist!");
       return;
     }
-    // Explore the white vertex
-    if (color[hnode->vertex] == NO_COLOR) {
-      // Recursion
-      dfs_visit(hnode->vertex, graph, color, result);
+    if (colors[w] == WHITE) {
+      dfs(w, colors, graph, stack);
     }
-    // Proceed to the next node
-    hnode = hnode->next;
+    curr = curr->next;
   }
-  // Update the color and the finish time
-  color[i] = GRAY;
-  result[cnt] = i;
-  cnt += 1;
+  colors[v] = BLACK;
+  stack_push(stack, v);
 }
 
-// DFS
-static void dfs(TopologicalSortGraph* graph, int* result) {
-  int i;
-  int* color;
-  // Allocate the menory
-  color = (int*)alloca((graph->num_vertices + 1) * sizeof(int));
-  // Initialize all the vertices
-  for (i = 1; i < graph->num_vertices + 1; i++) {
-    color[i] = NO_COLOR;
-  }
-  for (i = 1; i < graph->num_vertices + 1; i++) {
-    // When the vertex is not explored
-    if (color[i] == NO_COLOR) {
-      // Visit this vertex
-      dfs_visit(i, graph, color, result);
-    }
+static void free_adjacency_node(AdjacencyNode* node) {
+  if (node != NULL) {
+    free_adjacency_node(node->next);
+    free(node);
   }
 }
 
-TopologicalSortGraph* topological_sort_graph_destroy(int num_vertices) {
+TopologicalSortGraph* topological_sort_graph_destroy(
+    TopologicalSortGraph* graph) {
   int i;
+  for (i = 0; i < graph->num_vertices; i++) {
+    AdjacencyNode* head = graph->adjacencies[i];
+    free_adjacency_node(head);
+  }
+
+  free(graph);
 }
 
 // Topological Sort
 TOPOLOGICAL_SORT_ORDER* topological_sort_order(TopologicalSortGraph* graph) {
-  int* result;
   if (graph == NULL) {
-    fatal_error("invalid graph provided to topoligical sort.");
+    fatal_error("invalid graph provided to topological sort.");
     return NULL;
   }
-  // Allocate the memory
-  result = (int*)alloca((graph->num_vertices + 1) * sizeof(int));
+
+  int i;
+  int* colors = (int*)alloca(graph->num_vertices * sizeof(int));
+
+  for (int i = 0; i < graph->num_vertices; i++) {
+    colors[i] = WHITE;
+  }
+
+  LinkedStack* stack;
+  stack_create(&stack);
+
   // DFS on the graph
-  dfs(graph, result);
+  for (i = 0; i < graph->num_vertices; i++) {
+    if (colors[i] == WHITE) {
+      dfs(i, colors, graph, &stack);
+    }
+  }
 
   TOPOLOGICAL_SORT_ORDER* order =
       (TOPOLOGICAL_SORT_ORDER*)malloc(sizeof(TOPOLOGICAL_SORT_ORDER));
   VECTORALLOC(*order, int, graph->num_vertices);
 
-  int i;
-  for (i = graph->num_vertices; i >= 1; i--) {
-    order->array[graph->num_vertices - i] = result[i] - 1;
+  for (i = 0; i < graph->num_vertices; i++) {
+    stack_pop(&stack, &order->array[i]);
   }
 
   return order;

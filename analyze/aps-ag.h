@@ -20,6 +20,7 @@
 #include "hashcons.h"
 #include "canonical-type.h"
 #include "canonical-signature.h"
+#include "stack.h"
 #include "scc.h"
 #include "aps-scc.h"
 #include "topological-sort.h"
