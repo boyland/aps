@@ -1,5 +1,6 @@
 #include "jbb-vector.h"
 #include "scc.h"
+#include "topological-sort.h"
 
 typedef struct attrset {
   struct attrset *rest;
@@ -74,6 +75,7 @@ typedef struct augmented_dependency_graph {
   struct cto_node *total_order;
   CYCLES cycles;       /* vector of cycles of this augmented graph derived by extracting augmented graph attributes from a cycle */
   SCC_COMPONENTS components;
+  TOPOLOGICAL_SORT_ORDER scc_order;
 } AUG_GRAPH;
 extern const char *aug_graph_name(AUG_GRAPH *);
 

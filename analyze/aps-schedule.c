@@ -97,6 +97,8 @@ static void find_scc_to_schedule(AUG_GRAPH* aug_graph,
                                  int* comp_index);
 
 static CTO_NODE* schedule_transition(AUG_GRAPH* aug_graph,
+                                     SCC_COMPONENT* comp,
+                                     const int comp_index,
                                      CTO_NODE* prev,
                                      CONDITION cond,
                                      TOTAL_ORDER_STATE* state,
@@ -1672,8 +1674,9 @@ static CTO_NODE* group_schedule_noncircular(AUG_GRAPH* aug_graph,
 
   // Try finding a scc to schedule
   if (remaining > 0) {
-    return schedule_transition(aug_graph, prev, cond, state, remaining, group,
-                               parent_ph, false /* non-circular */);
+    return schedule_transition(aug_graph, NULL, -1, prev, cond, state,
+                               remaining, group, parent_ph,
+                               false /* non-circular */);
   }
 
   // All done with scheduling
@@ -1783,7 +1786,7 @@ static CTO_NODE* greedy_schedule_noncircular(AUG_GRAPH* aug_graph,
   }
 
   // Fallback to scc scheduler
-  return schedule_transition(aug_graph, prev, cond, state, remaining,
+  return schedule_transition(aug_graph, NULL, -1, prev, cond, state, remaining,
                              prev_group, parent_ph, false /* non-circular*/);
 }
 
@@ -1894,8 +1897,9 @@ static CTO_NODE* group_schedule_circular(AUG_GRAPH* aug_graph,
 
   // Try finding a scc to schedule
   if (remaining > 0) {
-    return schedule_transition(aug_graph, prev, cond, state, remaining, group,
-                               parent_ph, true /* circular */);
+    return schedule_transition(aug_graph, comp, comp_index, prev, cond, state,
+                               remaining, group, parent_ph,
+                               true /* circular */);
   }
 
   // All done with scheduling
@@ -2013,8 +2017,9 @@ static CTO_NODE* greedy_schedule_circular(AUG_GRAPH* aug_graph,
   }
 
   // Fallback to scc scheduler
-  return schedule_transition(aug_graph, prev, cond, state, remaining,
-                             prev_group, parent_ph, true /* circular */);
+  return schedule_transition(aug_graph, comp, comp_index, prev, cond, state,
+                             remaining, prev_group, parent_ph,
+                             true /* circular */);
 }
 
 struct sccs_info {
@@ -2269,6 +2274,8 @@ static void find_scc_to_schedule(AUG_GRAPH* aug_graph,
  * @return head of linked list
  */
 static CTO_NODE* schedule_transition(AUG_GRAPH* aug_graph,
+                                     SCC_COMPONENT* prev_comp,
+                                     const int prev_comp_index,
                                      CTO_NODE* prev,
                                      CONDITION cond,
                                      TOTAL_ORDER_STATE* state,
@@ -2288,6 +2295,7 @@ static CTO_NODE* schedule_transition(AUG_GRAPH* aug_graph,
   if (remaining == 0) {
     return NULL;
   }
+
 
   int i;
   SccsInfo* components = find_all_sccs_to_schedule(aug_graph, prev, cond, state,
@@ -2496,14 +2504,28 @@ static void schedule_augmented_dependency_graph(AUG_GRAPH* aug_graph) {
   cond.negative = 0;
   cond.positive = 0;
 
+  printf("\ntenative order for %s\n", aug_graph_name(aug_graph));
+
+  for (i = 0; i < aug_graph->scc_order.length; i++) {
+    int comp_index = aug_graph->scc_order.array[i];
+    SCC_COMPONENT comp = aug_graph->components.array[comp_index];
+    for (j = 0; j < comp.length; j++) {
+      INSTANCE* in = &aug_graph->instances.array[comp.array[j]];
+      print_instance(in, stdout);
+      printf(" <%+d,%+d>\n", state->instance_groups[in->index].ph,
+             state->instance_groups[in->index].ch);
+    }
+  }
+
+  printf("\n");
+
   // It is safe to assume inherited attribute of parents have no
   // dependencies and should be scheduled right away
   aug_graph->total_order = group_schedule_noncircular(
       aug_graph, NULL, cond, state, n, &parent_inherited_group, 1);
 
-  if (aug_graph->total_order == NULL) {
-    fatal_error("Failed to create total order.");
-  }
+  // if (aug_graph->total_order == NULL)
+  // { fatal_error("Failed to create total order."); }
 
   if (oag_debug & DEBUG_ORDER) {
     printf("\nSchedule for %s (%d children):\n", aug_graph_name(aug_graph),
@@ -2512,7 +2534,7 @@ static void schedule_augmented_dependency_graph(AUG_GRAPH* aug_graph) {
   }
 
   // Ensure generated total order is valid
-  assert_total_order(aug_graph, state, aug_graph->total_order);
+  // assert_total_order(aug_graph, state, aug_graph->total_order);
 }
 
 /**

@@ -58,6 +58,7 @@ static void taha(AUG_GRAPH* aug_graph) {
   }
 
   printf("\n");
+  aug_graph->scc_order = *order;
 }
 
 static void analyze_state(STATE* s) {
