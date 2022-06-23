@@ -330,7 +330,6 @@ static void make_augmented_cycles_for_node(AUG_GRAPH *aug_graph,
     }
   }
 
-  // DO NOT merge cycles involving phylum and augmented graph together.
   for (i=start; i < max; ++i) {
     int phy_i = i-start;
     if (phy_graph->mingraph[phy_i*phy_n+phy_i] != no_dependency)
@@ -628,15 +627,6 @@ static void add_up_down_attributes(STATE *s, bool direction)
     if (cycle_debug & DEBUG_UP_DOWN) printf("Breaking Cycle #%d\n",i);
 
     // TODO: what about circular fiber cycles?
-    if (!(cyc->acc_dep & DEPENDENCY_MAYBE_SIMPLE))
-    {
-      // This means all dependencies are all monotonic, then we treat them as circular attributes
-      if (cycle_debug & DEBUG_UP_DOWN)
-      {
-        printf("Skipped breaking Cycle #%d\n",i);
-      }
-      continue;
-    }
 
     // Forall phylum in the phylum_graph
     for (j = 0; j < s->phyla.length; j++)
@@ -645,6 +635,11 @@ static void add_up_down_attributes(STATE *s, bool direction)
       int n = phy->instances.length;
       int phylum_index = phylum_instance_start[j];
       INSTANCE *array = phy->instances.array;
+
+      if (cycle_debug & DEBUG_UP_DOWN)
+      {
+        printf("\phylum_graph: %s\n", phy_graph_name(phy));
+      }
 
       for (k = 0; k < n; k++)
       {
@@ -773,7 +768,7 @@ static void add_up_down_attributes(STATE *s, bool direction)
 
       if (cycle_debug & DEBUG_UP_DOWN)
       {
-        printf("\naug decl is: %s\n", decl_name(aug_graph->syntax_decl));
+        printf("\naug_graph: %s\n", aug_graph_name(aug_graph));
       }
       
       for (k = 0; k < n; k++)
@@ -1084,7 +1079,10 @@ void break_fiber_cycles(Declaration module,STATE *s,DEPENDENCY dep) {
   assert_circular_declaration(s);
 
   bool direction = !(dep & DEPENDENCY_NOT_JUST_FIBER);
-  add_up_down_attributes(s,direction);
+  if (direction)
+  {
+    add_up_down_attributes(s,direction);
+  }
   release(mark);
   {
     int saved_analysis_debug = analysis_debug;
