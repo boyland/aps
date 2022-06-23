@@ -192,8 +192,6 @@ static void get_fiber_cycles(STATE *s) {
                                  target->index];
           }
         }
-
-        phylum_cycle->acc_dep = dep;
       }
     }
 
@@ -277,8 +275,6 @@ static void get_fiber_cycles(STATE *s) {
                                  target->index]);
           }
         }
-
-        aug_graph_cycle->acc_dep = dep;
       }
     }
 

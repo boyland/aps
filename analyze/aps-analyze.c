@@ -35,12 +35,13 @@ static void *analyze_thing(void *ignore, void *node)
         printf("Fiber cycle detected; cycle being removed\n");
         break_fiber_cycles(decl, s, d);
         s->loop_required = !(d & DEPENDENCY_MAYBE_SIMPLE);
+        d = 0;  // clear dependency
       }
 
         d = analysis_state_cycle(s); // check again for type-3 errors
 	compute_static_schedule(s);  // calculate OAG if grammar is DNC
 	d = analysis_state_cycle(s); // check again for type-3 errors
-      
+
       // Pure fiber cycles should have been broken when reaching this step
       if (d & DEPENDENCY_MAYBE_SIMPLE)
       {

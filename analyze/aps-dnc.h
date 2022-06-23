@@ -75,6 +75,8 @@ typedef struct augmented_dependency_graph {
   struct cto_node *total_order;
   CYCLES cycles;       /* vector of cycles of this augmented graph derived by extracting augmented graph attributes from a cycle */
   SCC_COMPONENTS components;
+  SCC_COMPONENTS consolidated_ordered_scc;
+  BOOL* consolidated_ordered_scc_cycle;
   TOPOLOGICAL_SORT_ORDER scc_order;
 } AUG_GRAPH;
 extern const char *aug_graph_name(AUG_GRAPH *);

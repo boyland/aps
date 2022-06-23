@@ -29,7 +29,7 @@ AdjacencyNode* insert_vertex(AdjacencyNode** adjacency, int vertex) {
     AdjacencyNode* cur = *adjacency;
     AdjacencyNode* prev = NULL;
 
-    while (cur) {
+    while (cur != NULL) {
       if (cur->vertex == vertex) {
         // Already added this child
         return *adjacency;
@@ -59,8 +59,8 @@ static void dfs(int v,
     int w = curr->vertex;
     if (colors[w] == GRAY) {
       // Found a loop
-      fatal_error("Loop found! No topological order exist!");
-      return;
+      aps_warning(NULL, "Loop found! No topological order may not exist!");
+      // return;
     }
     if (colors[w] == WHITE) {
       dfs(w, colors, graph, stack);
