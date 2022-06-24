@@ -2175,7 +2175,6 @@ static void schedule_augmented_dependency_graph(AUG_GRAPH* aug_graph) {
 
 /**
  * @brief Computes total-preorder of set of attributes
- * @param module APS module
  * @param s state
  */
 void compute_static_schedule(STATE* s) {
