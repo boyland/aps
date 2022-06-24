@@ -638,7 +638,7 @@ static void add_up_down_attributes(STATE *s, bool direction)
 
       if (cycle_debug & DEBUG_UP_DOWN)
       {
-        printf("\phylum_graph: %s\n", phy_graph_name(phy));
+        printf("\nphylum_graph: %s\n", phy_graph_name(phy));
       }
 
       for (k = 0; k < n; k++)
