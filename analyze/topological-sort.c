@@ -17,7 +17,12 @@
 #define GRAY 1   // itself is visited, but its neighbors are still under visit
 #define BLACK 2  // both itself and all its neighbors are visited
 
-// Insert a new vertex to a linked list
+/**
+ * Insert a new vertex to a linked list
+ * @param adjacency reference to the head of adjacency linked list
+ * @param vertex vertex to add to adjacency linked list
+ * @return new head of adjacency linked list
+ */
 AdjacencyNode* insert_vertex(AdjacencyNode** adjacency, int vertex) {
   // The new vertex
   AdjacencyNode* new = (AdjacencyNode*)malloc(sizeof(AdjacencyNode));
@@ -48,7 +53,12 @@ AdjacencyNode* insert_vertex(AdjacencyNode** adjacency, int vertex) {
   return *adjacency;
 }
 
-// DFS Visit
+/**
+ * DFS Visit
+ * @param v vertext currently being investigated
+ * @param graph the graph currently being topological sorted
+ * @param stack reference to the head of stack
+ */
 static void dfs(int v,
                 int* colors,
                 TopologicalSortGraph* graph,
@@ -60,7 +70,6 @@ static void dfs(int v,
     if (colors[w] == GRAY) {
       // Found a loop
       aps_warning(NULL, "Loop found! No topological order may not exist!");
-      // return;
     }
     if (colors[w] == WHITE) {
       dfs(w, colors, graph, stack);
@@ -71,6 +80,10 @@ static void dfs(int v,
   stack_push(stack, v);
 }
 
+/**
+ * De-allocate the adjacency node
+ * @param adjacency reference to the head of adjacency linked list
+ */
 static void free_adjacency_node(AdjacencyNode* node) {
   if (node != NULL) {
     free_adjacency_node(node->next);
@@ -78,8 +91,11 @@ static void free_adjacency_node(AdjacencyNode* node) {
   }
 }
 
-TopologicalSortGraph* topological_sort_graph_destroy(
-    TopologicalSortGraph* graph) {
+/**
+ * De-allocate topological sorted graph
+ * @param graph the graph that was topological sorted
+ */
+void topological_sort_graph_destroy(TopologicalSortGraph* graph) {
   int i;
   for (i = 0; i < graph->num_vertices; i++) {
     AdjacencyNode* head = graph->adjacencies[i];
@@ -89,7 +105,11 @@ TopologicalSortGraph* topological_sort_graph_destroy(
   free(graph);
 }
 
-// Topological Sort
+/**
+ * Finds the topological sorted order
+ * @param graph the graph that is being topological sorted
+ * @return vector of indices (integer vector)
+ */
 TOPOLOGICAL_SORT_ORDER* topological_sort_order(TopologicalSortGraph* graph) {
   if (graph == NULL) {
     fatal_error("invalid graph provided to topological sort.");
@@ -124,12 +144,23 @@ TOPOLOGICAL_SORT_ORDER* topological_sort_order(TopologicalSortGraph* graph) {
   return order;
 }
 
+/**
+ * Given topological sort graph it adds an edge between two indices
+ * @param graph the graph that is being topological sorted
+ * @param source source index of edge
+ * @param sink sink index of edge
+ */
 void topological_sort_add_edge(TopologicalSortGraph* graph,
                                int source,
                                int sink) {
   graph->adjacencies[source] = insert_vertex(&graph->adjacencies[source], sink);
 }
 
+/**
+ * Created the graph that will be used for topological sorting
+ * @param num_vertices number of vertices of the graph
+ * @return graph that will be used for topological sorting
+ */
 TopologicalSortGraph* topological_sort_graph_create(int num_vertices) {
   TopologicalSortGraph* graph =
       (TopologicalSortGraph*)malloc(sizeof(TopologicalSortGraph));

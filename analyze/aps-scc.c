@@ -191,7 +191,10 @@ static void analyze_sccs(AUG_GRAPH* aug_graph) {
   }
 }
 
-static void analyze_state(STATE* s) {
+/**
+ * @param s state
+ */
+void state_scc(STATE* s) {
   int i, j, k;
   /* augmented dependency graph */
   for (i = 0; i <= s->match_rules.length; i++) {
@@ -226,8 +229,4 @@ static void analyze_state(STATE* s) {
 
     analyze_sccs(aug_graph);
   }
-}
-
-void state_scc(STATE* s) {
-  analyze_state(s);
 }

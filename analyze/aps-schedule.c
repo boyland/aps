@@ -353,7 +353,7 @@ static void schedule_summary_dependency_graph(PHY_GRAPH* phy_graph) {
   if (done < n) {
     if (cycle_debug & PRINT_CYCLE) {
       printf("Failed to schedule phylum graph for: %s\n",
-             decl_name(phy_graph->phylum));
+             phy_graph_name(phy_graph));
       for (i = 0; i < n; ++i) {
         INSTANCE* in = &phy_graph->instances.array[i];
         int s = phy_graph->summary_schedule[i];

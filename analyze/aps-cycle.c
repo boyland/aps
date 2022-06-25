@@ -128,7 +128,6 @@ static void get_fiber_cycles(STATE *s) {
     }
   }
 
-
   // Hold on to phylum cycles
   for (i = 0; i < s->phyla.length; i++) {
     int phylum_index = phylum_instance_start[i];
@@ -143,8 +142,11 @@ static void get_fiber_cycles(STATE *s) {
         INSTANCE* in1 = &cyc->instances.array[k];
         for (l = 0; l < phy->instances.length; l++) {
           INSTANCE* in2 = &phy->instances.array[l];
-          if (INSTANCE_EQUAL(in1, in2)) {
+          if (in1 == in2) {
             count++;
+            printf("graph: %s", phy_graph_name(phy));
+            print_instance(in1, stdout);
+            printf("\n");
           }
         }
       }
@@ -170,7 +172,7 @@ static void get_fiber_cycles(STATE *s) {
           INSTANCE* in1 = &generic_cycle->instances.array[k];
           for (l = 0; l < phy->instances.length; l++) {
             INSTANCE* in2 = &phy->instances.array[l];
-            if (INSTANCE_EQUAL(in1, in2)) {
+            if (in1 == in2) {
               phylum_cycle->instances.array[count++] = *in1;
 
               if (cycle_debug & PRINT_UP_DOWN) {
@@ -179,17 +181,6 @@ static void get_fiber_cycles(STATE *s) {
                 printf("\n");
               }
             }
-          }
-        }
-
-        // Determine the combined dependencies between attributes in the cycle
-        DEPENDENCY dep = no_dependency;
-        for (k = 0; k < phylum_cycle->instances.length; k++) {
-          INSTANCE* source = &phylum_cycle->instances.array[k];
-          for (l = 0; l < phylum_cycle->instances.length; l++) {
-            INSTANCE* target = &phylum_cycle->instances.array[l];
-            dep |= phy->mingraph[source->index * phy->instances.length +
-                                 target->index];
           }
         }
       }
@@ -224,7 +215,7 @@ static void get_fiber_cycles(STATE *s) {
         INSTANCE* in1 = &cyc->instances.array[k];
         for (l = 0; l < aug_graph->instances.length; l++) {
           INSTANCE* in2 = &aug_graph->instances.array[l];
-          if (INSTANCE_EQUAL(in1, in2)) {
+          if (in1 == in2) {
             count++;
           }
         }
@@ -252,7 +243,7 @@ static void get_fiber_cycles(STATE *s) {
           INSTANCE* in1 = &generic_cycle->instances.array[k];
           for (l = 0; l < aug_graph->instances.length; l++) {
             INSTANCE* in2 = &aug_graph->instances.array[l];
-            if (INSTANCE_EQUAL(in1, in2)) {
+            if (in1 == in2) {
               aug_graph_cycle->instances.array[count++] = *in1;
 
               if (cycle_debug & PRINT_UP_DOWN) {
@@ -261,18 +252,6 @@ static void get_fiber_cycles(STATE *s) {
                 printf("\n");
               }
             }
-          }
-        }
-
-        // Determine the combined dependencies between attributes in the cycle
-        DEPENDENCY dep = no_dependency;
-        for (k = 0; k < aug_graph->instances.length; k++) {
-          INSTANCE* source = &aug_graph_cycle->instances.array[k];
-          for (l = 0; l < aug_graph_cycle->instances.length; l++) {
-            INSTANCE* target = &aug_graph_cycle->instances.array[l];
-            dep |= get_edgeset_combine_dependencies(
-                aug_graph->graph[source->index * aug_graph->instances.length +
-                                 target->index]);
           }
         }
       }
@@ -1000,8 +979,8 @@ static void assert_circular_declaration(STATE* s) {
       print_instance(instance, f);
       fclose(f);
 
-      for (k = 0; k < s->cycles.length; k++) {
-        CYCLE* cyc = &s->cycles.array[k];
+      for (k = 0; k < phy->cycles.length; k++) {
+        CYCLE* cyc = &phy->cycles.array[k];
         if (parent_index[j + phylum_index] == cyc->internal_info) {
           if (declared_circular) {
             any_cycle = true;
@@ -1047,8 +1026,8 @@ static void assert_circular_declaration(STATE* s) {
       fclose(f);
 
       // Forall cycles in the graph
-      for (k = 0; k < s->cycles.length; k++) {
-        CYCLE* cyc = &s->cycles.array[k];
+      for (k = 0; k < aug_graph->cycles.length; k++) {
+        CYCLE* cyc = &aug_graph->cycles.array[k];
         if (parent_index[j + constructor_index] == cyc->internal_info) {
           if (declared_circular) {
             any_cycle = true;
