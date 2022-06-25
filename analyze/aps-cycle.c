@@ -184,6 +184,7 @@ static void get_fiber_cycles(STATE *s) {
                num_cycles);
       }
 
+      phy->cycles = *(CYCLES*)HALLOC(sizeof(CYCLES));
       VECTORALLOC(phy->cycles, CYCLE, num_cycles);
       for (j = 0; j < num_cycles; j++) {
         phy->cycles.array[j] = *cycles[j];
@@ -248,6 +249,7 @@ static void get_fiber_cycles(STATE *s) {
                decl_name(aug_graph->syntax_decl), num_cycles);
       }
 
+      aug_graph->cycles = *(CYCLES*)HALLOC(sizeof(CYCLES));
       VECTORALLOC(aug_graph->cycles, CYCLE, num_cycles);
       for (j = 0; j < num_cycles; j++) {
         aug_graph->cycles.array[j] = *cycles[j];
