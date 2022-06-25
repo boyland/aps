@@ -135,49 +135,41 @@ static void get_fiber_cycles(STATE *s) {
 
     int num_cycles = 0;
     CYCLE** cycles = (CYCLE**)alloca(sizeof(CYCLE*) * s->cycles.length);
-    for (j = 0; j < s->cycles.length; j++) {
-      CYCLE* cyc = &s->cycles.array[j];
-      int count = 0;
-      for (k = 0; k < cyc->instances.length; ++k) {
-        INSTANCE* in1 = &cyc->instances.array[k];
-        for (l = 0; l < phy->instances.length; l++) {
-          INSTANCE* in2 = &phy->instances.array[l];
-          if (in1 == in2) {
+
+    for (j = 0; j < num_instances; j++) {
+      if (parent_index[j] == j) {
+        int count = 0;
+
+        for (k = 0; k < phy->instances.length; k++) {
+          if (parent_index[phylum_index + k] == j) {
             count++;
-            printf("graph: %s", phy_graph_name(phy));
-            print_instance(in1, stdout);
-            printf("\n");
           }
         }
-      }
 
-      // If there is any cycle involving instances of this phylum graph
-      if (count > 0) {
-        CYCLE* phylum_cycle = (CYCLE*)HALLOC(sizeof(CYCLE));
-        cycles[j] = phylum_cycle;
-        phylum_cycle->internal_info = j;
-        VECTORALLOC(phylum_cycle->instances, INSTANCE, count);
+        // If there is any cycle involving instances of this phylum graph
+        if (count > 0) {
+          CYCLE* phylum_cycle = (CYCLE*)HALLOC(sizeof(CYCLE));
+          cycles[num_cycles] = phylum_cycle;
+          phylum_cycle->internal_info = j;
+          VECTORALLOC(phylum_cycle->instances, INSTANCE, count);
 
-        CYCLE* generic_cycle = &s->cycles.array[j];
-        num_cycles++;
-        count = 0;
+          if (cycle_debug & PRINT_UP_DOWN) {
+            printf("Cycle (%d) involving phylum graph: %s\n", num_cycles,
+                   decl_name(phy->phylum));
+          }
 
-        if (cycle_debug & PRINT_UP_DOWN) {
-          printf("Cycle (%d) involving phylum graph: %s\n", j,
-                 decl_name(phy->phylum));
-        }
+          CYCLE* generic_cycle = &s->cycles.array[j];
+          num_cycles++;
+          count = 0;
 
-        int count = 0;
-        for (k = 0; k < generic_cycle->instances.length; ++k) {
-          INSTANCE* in1 = &generic_cycle->instances.array[k];
-          for (l = 0; l < phy->instances.length; l++) {
-            INSTANCE* in2 = &phy->instances.array[l];
-            if (in1 == in2) {
-              phylum_cycle->instances.array[count++] = *in1;
+          for (k = 0; k < phy->instances.length; k++) {
+            INSTANCE* in = &phy->instances.array[k];
+            if (parent_index[phylum_index + k] == j) {
+              phylum_cycle->instances.array[count++] = *in;
 
               if (cycle_debug & PRINT_UP_DOWN) {
                 printf("  ");
-                print_instance(in1, stdout);
+                print_instance(in, stdout);
                 printf("\n");
               }
             }
@@ -200,7 +192,7 @@ static void get_fiber_cycles(STATE *s) {
   }
 
   // Hold on to augmented dependency graph cycles
-  for (i = 0; i <= s->match_rules.length; ++i) {
+  for (i = 0; i <= s->match_rules.length; i++) {
     int constructor_index = constructor_instance_start[i];
     AUG_GRAPH* aug_graph = (i == s->match_rules.length)
                                ? &s->global_dependencies
@@ -208,47 +200,41 @@ static void get_fiber_cycles(STATE *s) {
 
     int num_cycles = 0;
     CYCLE** cycles = (CYCLE**)alloca(sizeof(CYCLE*) * s->cycles.length);
-    for (j = 0; j < s->cycles.length; j++) {
-      CYCLE* cyc = &s->cycles.array[j];
-      int count = 0;
-      for (k = 0; k < cyc->instances.length; ++k) {
-        INSTANCE* in1 = &cyc->instances.array[k];
-        for (l = 0; l < aug_graph->instances.length; l++) {
-          INSTANCE* in2 = &aug_graph->instances.array[l];
-          if (in1 == in2) {
+
+    for (j = 0; j < num_instances; j++) {
+      if (parent_index[j] == j) {
+        int count = 0;
+
+        for (k = 0; k < aug_graph->instances.length; k++) {
+          if (parent_index[constructor_index + k] == j) {
             count++;
           }
         }
-      }
 
-      // If there is any cycle involving instances of this augmented dependency
-      // graph
-      if (count > 0) {
-        CYCLE* aug_graph_cycle = (CYCLE*)HALLOC(sizeof(CYCLE));
-        cycles[num_cycles] = aug_graph_cycle;
-        aug_graph_cycle->internal_info = j;
-        VECTORALLOC(aug_graph_cycle->instances, INSTANCE, count);
+        // If there is any cycle involving instances of this phylum graph
+        if (count > 0) {
+          CYCLE* aug_cycle = (CYCLE*)HALLOC(sizeof(CYCLE));
+          cycles[num_cycles] = aug_cycle;
+          aug_cycle->internal_info = j;
+          VECTORALLOC(aug_cycle->instances, INSTANCE, count);
 
-        CYCLE* generic_cycle = &s->cycles.array[j];
-        num_cycles++;
-        count = 0;
+          if (cycle_debug & PRINT_UP_DOWN) {
+            printf("Cycle (%d) involving augmented dependency graph: %s\n", num_cycles,
+                   decl_name(aug_graph->syntax_decl));
+          }
 
-        if (cycle_debug & PRINT_UP_DOWN) {
-          printf("Cycle (%d) involving augmented dependency graph: %s\n", j,
-                 decl_name(aug_graph->syntax_decl));
-        }
+          CYCLE* generic_cycle = &s->cycles.array[j];
+          num_cycles++;
+          count = 0;
 
-        int count = 0;
-        for (k = 0; k < generic_cycle->instances.length; ++k) {
-          INSTANCE* in1 = &generic_cycle->instances.array[k];
-          for (l = 0; l < aug_graph->instances.length; l++) {
-            INSTANCE* in2 = &aug_graph->instances.array[l];
-            if (in1 == in2) {
-              aug_graph_cycle->instances.array[count++] = *in1;
+          for (k = 0; k < aug_graph->instances.length; k++) {
+            INSTANCE* in = &aug_graph->instances.array[k];
+            if (parent_index[constructor_index + k] == j) {
+              aug_cycle->instances.array[count++] = *in;
 
               if (cycle_debug & PRINT_UP_DOWN) {
                 printf("  ");
-                print_instance(in1, stdout);
+                print_instance(in, stdout);
                 printf("\n");
               }
             }
@@ -256,7 +242,6 @@ static void get_fiber_cycles(STATE *s) {
         }
       }
     }
-
     if (num_cycles > 0) {
       if (cycle_debug & PRINT_UP_DOWN) {
         printf(" => Augmented dependency graph %s has %d cycles.\n\n",

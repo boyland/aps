@@ -2114,7 +2114,7 @@ static void schedule_augmented_dependency_graph(AUG_GRAPH* aug_graph) {
         printf(" <%+d,%+d>\n", state->instance_groups[in->index].ph,
                state->instance_groups[in->index].ch);
       }
-      printf(">>> Ending SCC %d\n", comp_index);
+      printf("<<< Ending SCC %d\n", comp_index);
     }
 
     printf("\n");
