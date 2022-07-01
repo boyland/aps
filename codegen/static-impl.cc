@@ -157,29 +157,58 @@ static bool implement_visit_function(
     INSTANCE* in = cto->cto_instance;
     int ch = cto->child_phase.ch;
     int ph = cto->child_phase.ph;
-    bool scc_changed = cto->component != component_index;
+    bool scc_changed =
+        component_index != -1 && cto->component != component_index;
     PHY_GRAPH* pg_parent =
         Declaration_info(aug_graph->lhs_decl)->node_phy_graph;
 
-    // Code generate if CTO_NODE belongs to this visit OR CTO_NODE is
-    // conditional
-    if (skip_previous_visit_code && cto->visit != phase &&
-        !(cto->cto_instance != NULL &&
-          if_rule_p(cto->cto_instance->fibered_attr.attr))) {
-      continue;
+    bool is_conditional = cto->cto_instance != NULL &&
+                          if_rule_p(cto->cto_instance->fibered_attr.attr);
+
+    bool is_mod = false;
+    switch (Declaration_KEY(aug_graph->syntax_decl)) {
+      case KEYsome_class_decl:
+        is_mod = TRUE;
+        break;
+      default:
+        break;
     }
+
+    if (!is_mod && scc_changed) {
+      // Need to close the loop if any
+      if (!loop_component_index.empty()) {
+        dump_loop_end(loop_component_index.back(), os);
+        loop_component_index.pop_back();
+      }
+
+      if (loop_allowed &&
+          aug_graph->consolidated_ordered_scc_cycle[component_index]) {
+        if (!pg_parent->cyclic_flags[phase]) {
+          dump_loop_start(cto->component, os);
+          loop_component_index.push_back(cto->component);
+        } else {
+          os << indent() << "// Parent phase " << phase
+             << " is circular, fixed-point loop cannot be added here";
+        }
+      }
+    }
+
+    // Code generate if:
+    // - CTO_NODE belongs to this visit
+    // - OR CTO_NODE is conditional
+    if (skip_previous_visit_code && !is_conditional) {
+      // CTO_NODE belongs to this visit
+      if (cto->visit != phase) {
+        component_index = cto->component;
+        continue;
+      }
+    }
+
+    // Update SCC component idnex
+    component_index = cto->component;
 
     // Visit marker for when visit ends
     if (in == NULL && ch == -1) {
-      bool is_mod = false;
-      switch (Declaration_KEY(aug_graph->syntax_decl)) {
-        case KEYsome_class_decl:
-          is_mod = TRUE;
-          break;
-        default:
-          break;
-      }
-
       if (is_mod) {
         int n = PHY_GRAPH_NUM(
             Declaration_info(aug_graph->syntax_decl)->node_phy_graph);
@@ -202,19 +231,14 @@ static bool implement_visit_function(
         os << indent() << "}\n";
       }
 
-      os << indent() << "// End of parent ("
-         << decl_name(aug_graph->syntax_decl)
+      os << indent() << "// End of parent (" << aug_graph_name(aug_graph)
          << ") phase visit marker for phase: " << ph << "\n";
 
       if (!is_mod) {
-        if (loop_allowed && !pg_parent->cyclic_flags[ph] &&
-            component_index != -1) {
-          if (!inside_conditional.back()) {
-            dump_loop_end(component_index, os);
-            loop_component_index.pop_back();
-          }
-        } else if (loop_allowed) {
-          os << indent() << "// skipped adding end\n";
+        // Need to close the loop if any
+        if (!loop_component_index.empty()) {
+          dump_loop_end(loop_component_index.back(), os);
+          loop_component_index.pop_back();
         }
       }
 
@@ -223,32 +247,14 @@ static bool implement_visit_function(
         return false;
       }
 
-      component_index = cto->component;
-
+      // Otherwise, continue, there is more instances to implement
       continue;
-    }
-
-    if (scc_changed) {
-      if (loop_allowed && !pg_parent->cyclic_flags[phase]) {
-        if (component_index != -1) {
-          if (!inside_conditional.back()) {
-            dump_loop_end(component_index, os);
-            loop_component_index.pop_back();
-          } else {
-            fatal_error("Loop is not going to workout");
-          }
-        }
-
-        dump_loop_start(cto->component, os);
-        loop_component_index.push_back(cto->component);
-      }
     }
 
     // Visit marker for when child visit happens
     if (in == NULL && ch > -1) {
       os << "\n";
-      os << indent() << "// aug_graph: " << decl_name(aug_graph->syntax_decl)
-         << "\n";
+      os << indent() << "// aug_graph: " << aug_graph_name(aug_graph) << "\n";
       os << indent() << "// visit marker(" << ph << "," << ch << ")\n";
 
       PHY_GRAPH* pg = Declaration_info(cto->child_decl)->node_phy_graph;
@@ -269,8 +275,6 @@ static bool implement_visit_function(
       os << "v_" << decl_name(cto->child_decl);
 #endif /* APS2SCALA */
       os << ");\n";
-
-      component_index = cto->component;
 
       continue;
     }
@@ -296,8 +300,6 @@ static bool implement_visit_function(
       fclose(f);
       os << indent() << "// '" << string(instance_str)
          << "' attribute instance is impossible.\n";
-
-      component_index = cto->component;
       continue;
     }
 
@@ -410,8 +412,6 @@ static bool implement_visit_function(
 
     if (instance_direction(in) == instance_inward) {
       os << indent() << "// " << in << " is ready now.\n";
-
-      component_index = cto->component;
       continue;
     }
 
@@ -642,7 +642,7 @@ void dump_visit_functions(PHY_GRAPH* phy_graph,
 #endif /* APS2SCALA */
 
     os << indent() << "// Implementing visit function for "
-       << decl_name(aug_graph->syntax_decl) << " phase: " << phase << "\n";
+       << aug_graph_name(aug_graph) << " phase: " << phase << "\n";
 
     CONDITION cond;
     cond.positive = 0;
