@@ -592,8 +592,6 @@ static void add_up_down_attributes(STATE *s, bool direction)
     CYCLE *cyc = &s->cycles.array[i];
     if (cycle_debug & DEBUG_UP_DOWN) printf("Breaking Cycle #%d\n",i);
 
-    // TODO: what about circular fiber cycles?
-
     // Forall phylum in the phylum_graph
     for (j = 0; j < s->phyla.length; j++)
     {

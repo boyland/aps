@@ -113,6 +113,29 @@ static int instance_in_phylum_cycle(PHY_GRAPH* phy_graph, INSTANCE* in) {
 }
 
 /**
+ * Utility function that checks whether instance belongs to any augmented
+ * dependency graph cycle or not
+ * @param aug_graph augmented dependency graph
+ * @param in attribute instance
+ * @return -1 if instance does not belong to any cycle or index of augmented
+ * dependency graph cycle
+ */
+static int instance_in_aug_cycle(AUG_GRAPH* aug_graph, INSTANCE* in) {
+  int i, j;
+  for (i = 0; i < aug_graph->cycles.length; i++) {
+    CYCLE* cyc = &aug_graph->cycles.array[i];
+    for (j = 0; j < cyc->instances.length; j++) {
+      INSTANCE* other = &cyc->instances.array[j];
+      if (in->index == other->index) {
+        return i;
+      }
+    }
+  }
+
+  return -1;
+}
+
+/**
  * Utility function that schedules a single phase of all circular attributes
  * @param phy_graph phylum graph
  * @param ph phase its currently scheduling for
@@ -640,8 +663,10 @@ static bool instance_ready_to_go(AUG_GRAPH* aug_graph,
                                  const int group_index,
                                  const int attribute_index) {
   if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
+    CHILD_PHASE* group = &state->instance_groups[group_index];
     printf("Checking instance readiness of: ");
     print_instance(&aug_graph->instances.array[attribute_index], stdout);
+    printf(" <%+d,%+d>", group->ph, group->ch);
     printf("\n");
   }
 
@@ -673,28 +698,33 @@ static bool instance_ready_to_go(AUG_GRAPH* aug_graph,
 
       DEPENDENCY dep = edges->kind;
 
-      if (aug_graph->consolidated_ordered_scc_cycle[comp_index]) {
-        if (!(dep & DEPENDENCY_MAYBE_DIRECT)) {
-          continue;
-        } else {
-          printf("interesing");
-        }
+      // No dependency
+      if (!dep)
+        continue;
+
+      // If there is a dependency and we are working with circular SCC and
+      // dependency is not direct, then forgive/ignore this dependent edge
+      if (aug_graph->consolidated_ordered_scc_cycle[comp_index] &&
+          !(dep & DEPENDENCY_MAYBE_DIRECT)) {
+        continue;
       }
 
-      dep = dep & ~indirect_control_dependency;
-      if (dep & DEPENDENCY_MAYBE_DIRECT) {
-        if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
-          // Can not continue with scheduling if a dependency with a
-          // "possible" condition has not been scheduled yet
-          printf(
-              "This edgeset (%d) was not ready to be scheduled because of:\n",
-              edges->kind);
-          print_edgeset(edges, stdout);
-          printf("\n");
-        }
+      if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
+        CHILD_PHASE* group1 = &state->instance_groups[in->index];
+        CHILD_PHASE* group2 = &state->instance_groups[group_index];
 
-        return false;
+        // Can not continue with scheduling if a dependency with a
+        // "possible" condition has not been scheduled yet
+        printf("This edgeset (%d) was not ready to be scheduled because of:\n",
+               edges->kind);
+        print_instance(in, stdout);
+        printf(" <%+d,%+d> -> ", group1->ph, group1->ch);
+        print_instance(&aug_graph->instances.array[attribute_index], stdout);
+        printf(" <%+d,%+d>", group2->ph, group2->ch);
+        printf(" (dependency: %d)\n\n", dep);
       }
+
+      return false;
     }
   }
 
@@ -718,9 +748,10 @@ static bool group_ready_to_go(AUG_GRAPH* aug_graph,
                               const CONDITION cond,
                               const int group_index) {
   if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
+    CHILD_PHASE* group = &state->instance_groups[group_index];
     printf("Checking scc group readiness of: ");
     print_instance(&aug_graph->instances.array[group_index], stdout);
-    printf("\n");
+    printf(" <%+d,%+d>\n", group->ph, group->ch);
   }
 
   INSTANCE in = aug_graph->instances.array[group_index];
@@ -1219,46 +1250,11 @@ static CTO_NODE* schedule_transition_start_of_group(AUG_GRAPH* aug_graph,
         aug_graph_name(aug_graph), remaining, group->ph, group->ch, parent_ph);
   }
 
-  if (group->ch != -1 && abs(group->ph) > 1 &&
-      !state->child_visit_markers[group->ch][abs(group->ph) - 1]) {
-    PHY_GRAPH* phy =
-        Declaration_info(state->children.array[group->ch])->node_phy_graph;
-
-    if (phy->empty_phase[abs(group->ph) - 1]) {
-      cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
-      cto_node->cto_prev = prev;
-      cto_node->cto_instance = NULL;
-      cto_node->child_phase.ph = abs(group->ph) - 1;
-      cto_node->child_phase.ch = group->ch;
-      cto_node->child_decl = state->children.array[group->ch];
-      cto_node->visit = parent_ph;
-      cto_node->component = comp_index;
-
-      state->child_visit_markers[group->ch][abs(group->ph) - 1] = true;
-
-      cto_node = group_schedule(aug_graph, comp, comp_index, prev, cond, state,
-                                remaining, group, parent_ph);
-
-      state->child_visit_markers[group->ch][abs(group->ph) - 1] = false;
-      return cto_node;
-    } else {
-      CHILD_PHASE* child_inh = (CHILD_PHASE*)alloca(sizeof(CHILD_PHASE));
-      child_inh->ph = -(abs(group->ph) - 1);
-      child_inh->ch = group->ch;
-
-      cto_node = group_schedule(aug_graph, comp, comp_index, prev, cond, state,
-                                remaining, child_inh, parent_ph);
-
-      return cto_node;
-    }
-  }
-
-  // If we are starting to schedule child synthesized attribute outside of
-  // group scheduler it means child synthesized attribute did not immediately
-  // follow by child inherited attribute thus add a visit marker <ph,ch>
-  if (group->ph > 0 && group->ch != -1 &&
-      !state->child_visit_markers[group->ch][group->ph]) {
-    // Mark investigations as done
+  // If we are scheduling child synthesized attributes we need to make sure we
+  // have investigated child inherited attributes of this phase before moving
+  // forward
+  if (group->ph > 0 && group->ch != -1) {
+    // If child inherited attributes has not been investigated yet
     if (!state->child_inh_investigations[group->ch][group->ph]) {
       CHILD_PHASE* child_inh = (CHILD_PHASE*)alloca(sizeof(CHILD_PHASE));
       child_inh->ph = -group->ph;
@@ -1274,22 +1270,25 @@ static CTO_NODE* schedule_transition_start_of_group(AUG_GRAPH* aug_graph,
 
       return cto_node;
     }
-
-    cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
-    cto_node->cto_prev = prev;
-    cto_node->cto_instance = NULL;
-    cto_node->child_phase.ph = group->ph;
-    cto_node->child_phase.ch = group->ch;
-    cto_node->child_decl = state->children.array[group->ch];
-    cto_node->visit = parent_ph;
-    cto_node->component = comp_index;
-    // Mark this child visit as done
-    state->child_visit_markers[group->ch][group->ph] = true;
-    cto_node->cto_next = group_schedule(aug_graph, comp, comp_index, prev, cond,
-                                        state, remaining, group, parent_ph);
-    // Release it
-    state->child_visit_markers[group->ch][group->ph] = false;
-    return cto_node;
+    // If child inherited attributes has been investigated
+    else {
+      cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
+      cto_node->cto_prev = prev;
+      cto_node->cto_instance = NULL;
+      cto_node->child_phase.ph = group->ph;
+      cto_node->child_phase.ch = group->ch;
+      cto_node->child_decl = state->children.array[group->ch];
+      cto_node->visit = parent_ph;
+      cto_node->component = comp_index;
+      // Mark this child visit as done
+      state->child_visit_markers[group->ch][group->ph] = true;
+      cto_node->cto_next =
+          group_schedule(aug_graph, comp, comp_index, prev, cond, state,
+                         remaining, group, parent_ph);
+      // Release it
+      state->child_visit_markers[group->ch][group->ph] = false;
+      return cto_node;
+    }
   }
 
   // If parent phase is greater than current parent attribute phase then we
@@ -1297,31 +1296,13 @@ static CTO_NODE* schedule_transition_start_of_group(AUG_GRAPH* aug_graph,
   // visit marker <ph,-1>
   if (abs(group->ph) > parent_ph && group->ch == -1 &&
       !state->parent_visit_markers[parent_ph]) {
+    // Mark the parent visit marker as done
     state->parent_visit_markers[parent_ph] = true;
     cto_node = schedule_visit_end(aug_graph, comp, comp_index, prev, cond,
                                   state, remaining, parent_ph);
+    // Release ti
     state->parent_visit_markers[parent_ph] = false;
     return cto_node;
-  }
-
-  // We are scheduling circular SCC but we can't schedule parent synthesized
-  // attribute without scheduling remaining attributes in the SCC
-  if (aug_graph->consolidated_ordered_scc_cycle[comp_index] && group->ph > 0 &&
-      group->ch == -1) {
-    int i;
-    for (i = 0; i < comp->length; i++) {
-      INSTANCE* in = &aug_graph->instances.array[comp->array[i]];
-      CHILD_PHASE* in_group = &state->instance_groups[in->index];
-
-      if (state->schedule[in->index])
-        continue;
-
-      if (child_phases_are_equal(in_group, group))
-        continue;
-
-      return group_schedule(aug_graph, comp, comp_index, prev, cond, state,
-                            remaining, in_group, parent_ph);
-    }
   }
 
   return group_schedule(aug_graph, comp, comp_index, prev, cond, state,
@@ -1364,8 +1345,7 @@ static CTO_NODE* schedule_transition_end_of_group(AUG_GRAPH* aug_graph,
   // child (add a CTO node with a null instance but with <ph,ch) and then ALSO
   // schedule immediately all the syn attributes of that child's phase.
   // (<+ph,ch> group, if any).
-  if (group->ph < 0 && group->ch != -1 &&
-      !state->child_visit_markers[group->ch][-group->ph]) {
+  if (group->ph < 0 && group->ch != -1) {
     // Visit marker
     cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
     cto_node->cto_prev = prev;
@@ -1803,7 +1783,11 @@ static CTO_NODE* schedule_transition(AUG_GRAPH* aug_graph,
     SCC_COMPONENT* current_comp = &aug_graph->consolidated_ordered_scc.array[i];
 
     if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
-      printf("\nInvestigating readiness of SCC #%d:\n", current_comp_index);
+      printf("\nInvestigating readiness of [%s] SCC #%d:\n",
+             aug_graph->consolidated_ordered_scc_cycle[current_comp_index]
+                 ? "circular"
+                 : "non-circular",
+             current_comp_index);
       for (j = 0; j < current_comp->length; j++) {
         INSTANCE* in = &aug_graph->instances.array[current_comp->array[j]];
         CHILD_PHASE* instance_group = &state->instance_groups[in->index];
@@ -1910,8 +1894,9 @@ static CTO_NODE* schedule_transition(AUG_GRAPH* aug_graph,
            group->ph, group->ch);
   }
 
-  // If we are begining to schedule a circular SCC then end the current parent
-  // phase
+  // If we are trying to schedule SCC that is not circular but parent phase is
+  // circular then end the current parent phase if possible (to prevent adding
+  // once)
   if (phy_parent->cyclic_flags[parent_ph] &&
       !aug_graph->consolidated_ordered_scc_cycle[comp_index] &&
       parent_ph < state->max_parent_ph) {
@@ -1957,6 +1942,24 @@ static void set_aug_graph_children(AUG_GRAPH* aug_graph,
   state->children.length = children_count;
 }
 
+void test_stuff(AUG_GRAPH* aug_graph) {
+  printf("aug is: %s\n", aug_graph_name(aug_graph));
+
+  int i, j;
+  int n = aug_graph->instances.length;
+  for (i = 0; i < aug_graph->instances.length; i++) {
+    for (j = 0; j < aug_graph->instances.length; j++) {
+      EDGESET es = aug_graph->graph[i * n + j];
+      while (es != NULL) {
+        if (!es->kind) {
+          fatal_error("Bad 273");
+        }
+        es = es->rest;
+      }
+    }
+  }
+}
+
 /**
  * Utility function to schedule augmented dependency graph
  * @param aug_graph Augmented dependency graph
@@ -1966,6 +1969,7 @@ static void schedule_augmented_dependency_graph(AUG_GRAPH* aug_graph) {
   CONDITION cond;
   int i, j, ch;
 
+  test_stuff(aug_graph);
   (void)close_augmented_dependency_graph(aug_graph);
 
   // Now schedule graph: we need to generate a conditional total order.
@@ -2093,6 +2097,13 @@ static void schedule_augmented_dependency_graph(AUG_GRAPH* aug_graph) {
       print_instance(in, stdout);
       printf(": ");
 
+      int cycle = instance_in_aug_cycle(aug_graph, in);
+      if (cycle > -1) {
+        printf(" [in cycle:%d] ", cycle);
+      } else {
+        printf(" [non-circular] ");
+      }
+
       if (!group.ph && !group.ch) {
         printf("local\n");
       } else {
@@ -2180,24 +2191,23 @@ static void schedule_augmented_dependency_graph(AUG_GRAPH* aug_graph) {
 void compute_static_schedule(STATE* s) {
   state_scc(s);
 
-  int j;
-  for (j = 0; j < s->phyla.length; ++j) {
-    schedule_summary_dependency_graph(&s->phy_graphs[j]);
+  int i, j;
+  for (i = 0; i < s->phyla.length; i++) {
+    schedule_summary_dependency_graph(&s->phy_graphs[i]);
 
     /* now perform closure */
     int saved_analysis_debug = analysis_debug;
-    int j;
 
     if (oag_debug & TYPE_3_DEBUG) {
       analysis_debug |= TWO_EDGE_CYCLE;
     }
 
     if (analysis_debug & DNC_ITERATE) {
-      printf("\n**** After OAG schedule for phylum %d:\n\n", j);
+      printf("\n**** After OAG schedule for phylum %d:\n\n", i);
     }
 
     if (analysis_debug & ASSERT_CLOSED) {
-      for (j = 0; j < s->match_rules.length; ++j) {
+      for (j = 0; j < s->match_rules.length; j++) {
         printf("Checking rule %d\n", j);
         assert_closed(&s->aug_graphs[j]);
       }
@@ -2208,14 +2218,14 @@ void compute_static_schedule(STATE* s) {
     analysis_debug = saved_analysis_debug;
 
     if (analysis_debug & DNC_ITERATE) {
-      printf("\n*** After closure after schedule OAG phylum %d\n\n", j);
+      printf("\n*** After closure after schedule OAG phylum %d\n\n", i);
       print_analysis_state(s, stdout);
       print_cycles(s, stdout);
     }
   }
 
-  for (j = 0; j < s->match_rules.length; ++j) {
-    schedule_augmented_dependency_graph(&s->aug_graphs[j]);
+  for (i = 0; i < s->match_rules.length; i++) {
+    schedule_augmented_dependency_graph(&s->aug_graphs[i]);
   }
   schedule_augmented_dependency_graph(&s->global_dependencies);
 
