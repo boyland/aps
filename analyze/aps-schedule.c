@@ -436,15 +436,18 @@ static void print_indent(int count, FILE* stream) {
  * @param indent current indent count
  * @param stream output stream
  */
-static void print_total_order(CTO_NODE* cto,
+static void print_total_order(AUG_GRAPH* aug_graph,
+                              CTO_NODE* cto,
                               int component_index,
                               int indent,
                               FILE* stream) {
   if (cto == NULL) {
-    if (component_index != -1) {
-      if (oag_debug & DEBUG_ORDER_VERBOSE) {
-        fprintf(stream, " Finished scheduling SCC #%d\n\n", component_index);
-      }
+    if (oag_debug & DEBUG_ORDER_VERBOSE) {
+      fprintf(stream, " Finished scheduling [%s] SCC #%d\n\n",
+              aug_graph->consolidated_ordered_scc_cycle[component_index]
+                  ? "circular"
+                  : "non-circular",
+              component_index);
     }
     return;
   }
@@ -454,15 +457,21 @@ static void print_total_order(CTO_NODE* cto,
   if (cto->component != component_index) {
     if (component_index != -1) {
       if (oag_debug & DEBUG_ORDER_VERBOSE) {
-        fprintf(stream, " Finished scheduling SCC #%d\n\n", component_index);
+        fprintf(stream, " Finished scheduling [%s] SCC #%d\n\n",
+                aug_graph->consolidated_ordered_scc_cycle[component_index]
+                    ? "circular"
+                    : "non-circular",
+                component_index);
       }
     }
 
     component_index = cto->component;
-    if (component_index != -1) {
-      if (oag_debug & DEBUG_ORDER_VERBOSE) {
-        fprintf(stream, " Started scheduling SCC #%d\n", component_index);
-      }
+    if (oag_debug & DEBUG_ORDER_VERBOSE) {
+      fprintf(stream, " Started scheduling [%s] SCC #%d\n",
+              aug_graph->consolidated_ordered_scc_cycle[component_index]
+                  ? "circular"
+                  : "non-circular",
+              component_index);
     }
   }
 
@@ -502,13 +511,14 @@ static void print_total_order(CTO_NODE* cto,
   if (cto->cto_if_true != NULL) {
     print_indent(indent + 1, stream);
     fprintf(stream, "(true)\n");
-    print_total_order(cto->cto_if_true, component_index, indent + 2, stdout);
+    print_total_order(aug_graph, cto->cto_if_true, component_index, indent + 2,
+                      stdout);
     print_indent(indent + 1, stream);
     fprintf(stream, "(false)\n");
     indent += 2;
   }
 
-  print_total_order(cto->cto_next, component_index, indent, stdout);
+  print_total_order(aug_graph, cto->cto_next, component_index, indent, stdout);
 }
 
 /**
@@ -556,7 +566,7 @@ static void print_schedule_error_debug(AUG_GRAPH* aug_graph,
     prev = prev->cto_prev;
   }
 
-  print_total_order(prev, -1, 0, stream);
+  print_total_order(aug_graph, prev, -1, 0, stream);
 
   printf("Relevant dependencies from non-scheduled instances: \n");
   for (i = 0; i < n; i++) {
@@ -2177,7 +2187,7 @@ static void schedule_augmented_dependency_graph(AUG_GRAPH* aug_graph) {
   if (oag_debug & DEBUG_ORDER) {
     printf("\nSchedule for %s (%d children):\n", aug_graph_name(aug_graph),
            state->children.length);
-    print_total_order(aug_graph->total_order, -1, 0, stdout);
+    print_total_order(aug_graph, aug_graph->total_order, -1, 0, stdout);
   }
 
   // Ensure generated total order is valid
