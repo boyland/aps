@@ -128,18 +128,6 @@ void dump_static_circular_trait(std::ostream& oss)
   oss << indent(nesting_level) << "}\n";
 }
 
-void dump_visit_cache(std::ostream& oss)
-{
-  oss << "\n";
-  oss << indent(nesting_level) << "private val visitCache = scala.collection.mutable.HashMap[String, Boolean]();\n";
-  oss << indent(nesting_level) << "private def once[T](fn: () => T, key: Any): Unit = {\n";
-  oss << indent(nesting_level + 1) << "if (!visitCache.getOrElse(key.toString, false)) {\n";
-  oss << indent(nesting_level + 2) << "visitCache.update(key.toString, true);\n";
-  oss << indent(nesting_level + 2) << "fn();\n";
-  oss << indent(nesting_level + 1) << "}\n";
-  oss << indent(nesting_level) << "}\n";
-}
-
 void dump_scala_Declaration_header(Declaration, std::ostream&);
 
 void dump_scala_Program(Program p,std::ostream&oss)
@@ -1620,7 +1608,6 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
       {
         activate_static_circular = s->loop_required;
         dump_static_circular_trait(oss);
-        dump_visit_cache(oss);
       }
 
       if (result_typeval != "") {
