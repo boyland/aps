@@ -127,135 +127,6 @@ static void get_fiber_cycles(STATE *s) {
       }
     }
   }
-
-  // Hold on to phylum cycles
-  for (i = 0; i < s->phyla.length; i++) {
-    int phylum_index = phylum_instance_start[i];
-    PHY_GRAPH* phy = &s->phy_graphs[i];
-
-    int num_cycles = 0;
-    CYCLE** cycles = (CYCLE**)alloca(sizeof(CYCLE*) * s->cycles.length);
-
-    for (j = 0; j < num_instances; j++) {
-      if (parent_index[j] == j) {
-        int count = 0;
-
-        for (k = 0; k < phy->instances.length; k++) {
-          if (parent_index[phylum_index + k] == j) {
-            count++;
-          }
-        }
-
-        // If there is any cycle involving instances of this phylum graph
-        if (count > 0) {
-          CYCLE* phylum_cycle = (CYCLE*)HALLOC(sizeof(CYCLE));
-          cycles[num_cycles] = phylum_cycle;
-          phylum_cycle->internal_info = j;
-          VECTORALLOC(phylum_cycle->instances, INSTANCE, count);
-
-          if (cycle_debug & PRINT_UP_DOWN) {
-            printf("Cycle (%d) involving phylum graph: %s\n", num_cycles,
-                   decl_name(phy->phylum));
-          }
-
-          CYCLE* generic_cycle = &s->cycles.array[j];
-          num_cycles++;
-          count = 0;
-
-          for (k = 0; k < phy->instances.length; k++) {
-            INSTANCE* in = &phy->instances.array[k];
-            if (parent_index[phylum_index + k] == j) {
-              phylum_cycle->instances.array[count++] = *in;
-
-              if (cycle_debug & PRINT_UP_DOWN) {
-                printf("  ");
-                print_instance(in, stdout);
-                printf("\n");
-              }
-            }
-          }
-        }
-      }
-    }
-
-    if (num_cycles > 0) {
-      if (cycle_debug & PRINT_UP_DOWN) {
-        printf(" => Phylum graph %s has %d cycles.\n\n", decl_name(phy->phylum),
-               num_cycles);
-      }
-
-      phy->cycles = *(CYCLES*)HALLOC(sizeof(CYCLES));
-      VECTORALLOC(phy->cycles, CYCLE, num_cycles);
-      for (j = 0; j < num_cycles; j++) {
-        phy->cycles.array[j] = *cycles[j];
-      }
-    }
-  }
-
-  // Hold on to augmented dependency graph cycles
-  for (i = 0; i <= s->match_rules.length; i++) {
-    int constructor_index = constructor_instance_start[i];
-    AUG_GRAPH* aug_graph = (i == s->match_rules.length)
-                               ? &s->global_dependencies
-                               : &s->aug_graphs[i];
-
-    int num_cycles = 0;
-    CYCLE** cycles = (CYCLE**)alloca(sizeof(CYCLE*) * s->cycles.length);
-
-    for (j = 0; j < num_instances; j++) {
-      if (parent_index[j] == j) {
-        int count = 0;
-
-        for (k = 0; k < aug_graph->instances.length; k++) {
-          if (parent_index[constructor_index + k] == j) {
-            count++;
-          }
-        }
-
-        // If there is any cycle involving instances of this phylum graph
-        if (count > 0) {
-          CYCLE* aug_cycle = (CYCLE*)HALLOC(sizeof(CYCLE));
-          cycles[num_cycles] = aug_cycle;
-          aug_cycle->internal_info = j;
-          VECTORALLOC(aug_cycle->instances, INSTANCE, count);
-
-          if (cycle_debug & PRINT_UP_DOWN) {
-            printf("Cycle (%d) involving augmented dependency graph: %s\n", num_cycles,
-                   decl_name(aug_graph->syntax_decl));
-          }
-
-          CYCLE* generic_cycle = &s->cycles.array[j];
-          num_cycles++;
-          count = 0;
-
-          for (k = 0; k < aug_graph->instances.length; k++) {
-            INSTANCE* in = &aug_graph->instances.array[k];
-            if (parent_index[constructor_index + k] == j) {
-              aug_cycle->instances.array[count++] = *in;
-
-              if (cycle_debug & PRINT_UP_DOWN) {
-                printf("  ");
-                print_instance(in, stdout);
-                printf("\n");
-              }
-            }
-          }
-        }
-      }
-    }
-    if (num_cycles > 0) {
-      if (cycle_debug & PRINT_UP_DOWN) {
-        printf(" => Augmented dependency graph %s has %d cycles.\n\n",
-               decl_name(aug_graph->syntax_decl), num_cycles);
-      }
-
-      aug_graph->cycles = *(CYCLES*)HALLOC(sizeof(CYCLES));
-      VECTORALLOC(aug_graph->cycles, CYCLE, num_cycles);
-      for (j = 0; j < num_cycles; j++) {
-        aug_graph->cycles.array[j] = *cycles[j];
-      }
-    }
-  }
 }
 
 /*** determining strongly connected sets of attributes ***/
@@ -964,16 +835,17 @@ static void assert_circular_declaration(STATE* s) {
       print_instance(instance, f);
       fclose(f);
 
-      for (k = 0; k < phy->cycles.length; k++) {
-        CYCLE* cyc = &phy->cycles.array[k];
-        if (parent_index[j + phylum_index] == cyc->internal_info) {
-          if (declared_circular) {
-            any_cycle = true;
-          } else {
-            aps_error(node,
-                      "Instance (%s) involves in a cycle but it is not "
-                      "declared circular.",
-                      instance_to_str);
+      for (k = 0; k < num_instances; k++) {
+        if (parent_index[k] == k) {
+          if (parent_index[phylum_index + j] == k) {
+            if (declared_circular) {
+              any_cycle = true;
+            } else {
+              aps_error(node,
+                        "Instance (%s) involves in a cycle but it is not "
+                        "declared circular.",
+                        instance_to_str);
+            }
           }
         }
       }
@@ -1011,20 +883,20 @@ static void assert_circular_declaration(STATE* s) {
       fclose(f);
 
       // Forall cycles in the graph
-      for (k = 0; k < aug_graph->cycles.length; k++) {
-        CYCLE* cyc = &aug_graph->cycles.array[k];
-        if (parent_index[j + constructor_index] == cyc->internal_info) {
-          if (declared_circular) {
-            any_cycle = true;
-          } else {
-            aps_error(node,
-                      "Instance (%s) involves in a cycle but it is not "
-                      "declared circular.",
-                      instance_to_str);
+      for (k = 0; k < num_instances; k++) {
+        if (parent_index[k] == k) {
+          if (parent_index[constructor_index + j] == k) {
+            if (declared_circular) {
+              any_cycle = true;
+            } else {
+              aps_error(node,
+                        "Instance (%s) involves in a cycle but it is not "
+                        "declared circular.",
+                        instance_to_str);
+            }
           }
         }
       }
-
       if (declared_circular && !any_cycle) {
         aps_warning(node,
                     "Instance (%s) is declared circular but does not involve "

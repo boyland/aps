@@ -154,11 +154,15 @@ static int schedule_phase_circular(PHY_GRAPH* phy_graph, int phase) {
   int n = phy_graph->instances.length;
   int i, j, k;
 
-  for (i = 0; i < phy_graph->cycles.length; i++) {
-    CYCLE* cyc = &phy_graph->cycles.array[i];
+  for (i = 0; i < phy_graph->components.length; i++) {
+    SCC_COMPONENT* comp = &phy_graph->components.array[i];
+
+    // Not a circular SCC
+    if (comp->length == 1)
+      continue;
 
     // This cycle is already scheduled
-    if (phy_graph->summary_schedule[cyc->instances.array[0].index])
+    if (phy_graph->summary_schedule[comp->array[0]])
       continue;
 
     size_t temp_schedule_size = n * sizeof(int);
@@ -166,15 +170,15 @@ static int schedule_phase_circular(PHY_GRAPH* phy_graph, int phase) {
     memcpy(temp_schedule, phy_graph->summary_schedule, temp_schedule_size);
 
     // Temporarily mark all attributes in this cycle as scheduled
-    for (j = 0; j < cyc->instances.length; j++) {
-      INSTANCE* in = &cyc->instances.array[j];
+    for (j = 0; j < comp->length; j++) {
+      INSTANCE* in = &phy_graph->instances.array[comp->array[j]];
       temp_schedule[in->index] = 1;
     }
 
     bool cycle_ready = true;
 
-    for (j = 0; j < cyc->instances.length; j++) {
-      INSTANCE* in = &cyc->instances.array[j];
+    for (j = 0; j < comp->length; j++) {
+      INSTANCE* in = &phy_graph->instances.array[comp->array[j]];
       for (k = 0; k < n; k++) {
         // If there is an attribute that is not scheduled but it should
         // come first then this cycle is not ready
@@ -187,8 +191,8 @@ static int schedule_phase_circular(PHY_GRAPH* phy_graph, int phase) {
 
     // If all attributes in this cycle are ready
     if (cycle_ready) {
-      for (j = 0; j < cyc->instances.length; j++) {
-        INSTANCE* in = &cyc->instances.array[j];
+      for (j = 0; j < comp->length; j++) {
+        INSTANCE* in = &phy_graph->instances.array[comp->array[j]];
         // -phase for inherited attributes
         // +phase for synthesized attributes
         phy_graph->summary_schedule[in->index] =
@@ -205,8 +209,8 @@ static int schedule_phase_circular(PHY_GRAPH* phy_graph, int phase) {
 
       // Force extra dependencies between instances that are already
       // scheduled and attributes in this cycle
-      for (j = 0; j < cyc->instances.length; j++) {
-        INSTANCE* in = &cyc->instances.array[j];
+      for (j = 0; j < comp->length; j++) {
+        INSTANCE* in = &phy_graph->instances.array[comp->array[j]];
         for (k = 0; k < n; k++) {
           int sch = phy_graph->summary_schedule[k];
           // Add edge from already scheduled instances to instances in
@@ -218,7 +222,7 @@ static int schedule_phase_circular(PHY_GRAPH* phy_graph, int phase) {
         }
       }
 
-      return cyc->instances.length;
+      return comp->length;
     }
   }
 
