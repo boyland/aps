@@ -89,6 +89,7 @@ static CTO_NODE* schedule_transition(AUG_GRAPH* aug_graph,
                                      CHILD_PHASE* group,
                                      const short parent_ph,
                                      const bool continue_with_group);
+
 /**
  * Utility function that checks whether instance belongs to any phylum cycle
  * or not
@@ -99,10 +100,14 @@ static CTO_NODE* schedule_transition(AUG_GRAPH* aug_graph,
  */
 static int instance_in_phylum_cycle(PHY_GRAPH* phy_graph, INSTANCE* in) {
   int i, j;
-  for (i = 0; i < phy_graph->cycles.length; i++) {
-    CYCLE* cyc = &phy_graph->cycles.array[i];
-    for (j = 0; j < cyc->instances.length; j++) {
-      INSTANCE* other = &cyc->instances.array[j];
+  for (i = 0; i < phy_graph->components.length; i++) {
+    SCC_COMPONENT* comp = &phy_graph->components.array[i];
+
+    if (comp->length == 1)
+      continue;
+
+    for (j = 0; j < comp->length; j++) {
+      INSTANCE* other = &phy_graph->instances.array[comp->array[j]];
       if (in->index == other->index) {
         return i;
       }
@@ -122,10 +127,14 @@ static int instance_in_phylum_cycle(PHY_GRAPH* phy_graph, INSTANCE* in) {
  */
 static int instance_in_aug_cycle(AUG_GRAPH* aug_graph, INSTANCE* in) {
   int i, j;
-  for (i = 0; i < aug_graph->cycles.length; i++) {
-    CYCLE* cyc = &aug_graph->cycles.array[i];
-    for (j = 0; j < cyc->instances.length; j++) {
-      INSTANCE* other = &cyc->instances.array[j];
+  for (i = 0; i < aug_graph->components.length; i++) {
+    SCC_COMPONENT* comp = &aug_graph->components.array[i];
+
+    if (comp->length == 1)
+      continue;
+
+    for (j = 0; j < comp->length; j++) {
+      INSTANCE* other = &aug_graph->instances.array[comp->array[j]];
       if (in->index == other->index) {
         return i;
       }
@@ -221,6 +230,7 @@ static int schedule_phase_circular(PHY_GRAPH* phy_graph, int phase) {
  * attributes
  * @param phy_graph phylum graph
  * @param ph phase its currently scheduling for
+ * @param ignore_cycles ignore cycles
  * @return number of nodes scheduled successfully for this phase
  */
 static int schedule_phase_non_circular(PHY_GRAPH* phy_graph, int phase) {
@@ -292,6 +302,7 @@ static int schedule_phase_non_circular(PHY_GRAPH* phy_graph, int phase) {
 /**
  * Utility function that calculates ph (phase) for each attribute of a phylum
  * @param phy_graph phylum graph to schedule
+ * they have been broken by fiber cycle logic (up./down)
  */
 static void schedule_summary_dependency_graph(PHY_GRAPH* phy_graph) {
   int n = phy_graph->instances.length;
@@ -323,6 +334,7 @@ static void schedule_summary_dependency_graph(PHY_GRAPH* phy_graph) {
 
   int count_non_circular = 0, count_circular = 0;
   bool cycle_happened = false;
+
   do {
     // Schedule non-circular attributes in this phase
     count_non_circular = schedule_phase_non_circular(phy_graph, phase);
@@ -1895,7 +1907,10 @@ static CTO_NODE* schedule_transition(AUG_GRAPH* aug_graph,
 
   if (comp_index == -1) {
     print_schedule_error_debug(aug_graph, state, prev, cond, stdout);
-    fatal_error("Failed to propertly transiton between SCC components");
+    fatal_error(
+        "Failed to propertly transiton between SCC components while scheduling "
+        "%s",
+        aug_graph_name(aug_graph));
     return NULL;
   }
 

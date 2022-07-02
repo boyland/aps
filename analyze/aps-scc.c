@@ -11,6 +11,16 @@ struct state {
 
 typedef struct state State;
 
+/**
+ * Adds edges between SCCs needed by topological sort to sort SCCs using
+ * topological sort
+ * @param aug_graph augmented dependency graph
+ * @param topological_graph adjacency matrix for topological sorting
+ * @param comp1 SCC component1 SCC
+ * @param comp1 SCC component1 index
+ * @param comp1 SCC component2 SCC
+ * @param comp1 SCC component2 index
+ */
 static void add_scc_edge(AUG_GRAPH* aug_graph,
                          TopologicalSortGraph* topological_graph,
                          SCC_COMPONENT* comp1,
@@ -41,6 +51,11 @@ static void add_scc_edge(AUG_GRAPH* aug_graph,
   }
 }
 
+/**
+ * Sort SCC component containing non-circular instances using topological sort
+ * @param aug_graph augmented dependency graph
+ * @param comp SCC component containing non-circular instances
+ */
 static void topological_sort_component(AUG_GRAPH* aug_graph,
                                        SCC_COMPONENT* comp) {
   TopologicalSortGraph* graph = topological_sort_graph_create(comp->length);
@@ -91,7 +106,12 @@ static void topological_sort_component(AUG_GRAPH* aug_graph,
   }
 }
 
-static void analyze_sccs(AUG_GRAPH* aug_graph) {
+/**
+ * Combine non-circular SCC of augmented dependency graph using topological sort
+ * to create consolidated SCCs
+ * @param aug_graph augmented dependency graph
+ */
+static void analyze_aug_graph_sccs(AUG_GRAPH* aug_graph) {
   TopologicalSortGraph* graph =
       topological_sort_graph_create(aug_graph->components.length);
   int i, j;
@@ -192,10 +212,42 @@ static void analyze_sccs(AUG_GRAPH* aug_graph) {
 }
 
 /**
+ * Resolve the SCC of phylums and augmented dependency graph
  * @param s state
  */
 void state_scc(STATE* s) {
   int i, j, k;
+
+  /* phylum dependency graph */
+  for (i = 0; i < s->phyla.length; i++) {
+    PHY_GRAPH* phy_graph = &s->phy_graphs[i];
+    int n = phy_graph->instances.length;
+    SccGraph* graph = scc_graph_create(n);
+    for (j = 0; j < n; j++) {
+      for (k = 0; k < n; k++) {
+        if (phy_graph->mingraph[j * n + k] != no_dependency) {
+          scc_graph_add_edge(graph, j, k);
+        }
+      }
+    }
+    phy_graph->components = scc_graph_components(graph);
+
+    if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
+      printf("Components of Phylum Graph: %s\n", phy_graph_name(phy_graph));
+      for (j = 0; j < phy_graph->components.length; j++) {
+        SCC_COMPONENT* comp = &phy_graph->components.array[j];
+        printf(" Component #%d\n", j);
+
+        for (k = 0; k < comp->length; k++) {
+          printf("   ");
+          print_instance(&phy_graph->instances.array[comp->array[k]], stdout);
+          printf("\n");
+        }
+      }
+      printf("\n");
+    }
+  }
+
   /* augmented dependency graph */
   for (i = 0; i <= s->match_rules.length; i++) {
     AUG_GRAPH* aug_graph = (i == s->match_rules.length)
@@ -213,7 +265,7 @@ void state_scc(STATE* s) {
     aug_graph->components = scc_graph_components(graph);
 
     if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
-      printf("Components of %s\n", decl_name(aug_graph->syntax_decl));
+      printf("Components of Augmented Graph: %s\n", aug_graph_name(aug_graph));
       for (j = 0; j < aug_graph->components.length; j++) {
         SCC_COMPONENT* comp = &aug_graph->components.array[j];
         printf(" Component #%d\n", j);
@@ -227,6 +279,7 @@ void state_scc(STATE* s) {
       printf("\n");
     }
 
-    analyze_sccs(aug_graph);
+    // Futher analyze SCC components of augmeneted dependency graph
+    analyze_aug_graph_sccs(aug_graph);
   }
 }

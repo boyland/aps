@@ -87,6 +87,7 @@ typedef struct summary_dependency_graph {
   VECTOR(INSTANCE) instances;
   DEPENDENCY *mingraph; /* two-d array, indexed by instance number */
   struct summary_dependency_graph *next_in_phy_worklist;
+  SCC_COMPONENTS components;
   int *summary_schedule; /* one-d array, indexed by instance number */
   BOOL* cyclic_flags; /* one-d array, indexed by phase number indicating whether phase is circular or not */
   int max_phase;      /* integer denoting the maximum phase number for this phylum */
