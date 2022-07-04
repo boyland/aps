@@ -640,8 +640,8 @@ Declaration responsible_node_shared_info(void *node, STATE *s) {
   return phylum_shared_info_attribute(phy,s);
 }
 
-// return true if this pattern variable is controlled by a case
-// statement and if so what the case statement is.
+// return true if this pattern variable is controlled by a case/for
+// statement and if so what the case/for statement is.
 Declaration formal_in_case_p(Declaration formal) {
   if (Declaration_KEY(formal) != KEYnormal_formal) return NULL;
   if (ABSTRACT_APS_tnode_phylum(tnode_parent(formal)) == KEYPattern) {
@@ -666,7 +666,7 @@ Declaration formal_in_case_p(Declaration formal) {
       fatal_error("%d: not a case",tnode_line_number(parent));
       return NULL; /* Keep CC happy */
       break;
-    case KEYcase_stmt:
+    case KEYsome_case_stmt:
       return (Declaration)parent;
     case KEYtop_level_match:
       return NULL;
