@@ -537,6 +537,25 @@ static void *init_decl_cond(void *vcond, void *node) {
 	traverse_Block(init_decl_cond,&new_cond,case_stmt_default(decl));
       }
       return NULL;
+    case KEYfor_stmt: /* almost same as case, but no negative conditions */
+      {
+	Matches ms = for_stmt_matchers(decl);
+	Expression testvar = for_stmt_expr(decl);
+	CONDITION new_cond = *cond;
+	Match m;
+
+	Expression_info(testvar)->next_expr = 0;
+	traverse_Matches(get_match_tests,&testvar,ms);
+	for (m = first_Match(ms); m; m=MATCH_NEXT(m)) {
+	  int index = Match_info(m)->if_index;
+	  Match_info(m)->match_cond = new_cond;
+	  new_cond.positive |= (1 << index); /* first set it */
+	  traverse_Block(init_decl_cond,&new_cond,matcher_body(m));
+	  new_cond.positive &= ~(1 << index); /* now clear it */
+	  /* do not do a negative test */
+	}
+      }
+      return NULL;
     default: break;
     }
   default:
@@ -1552,6 +1571,24 @@ static void *get_edges(void *vaug_graph, void *node) {
 	  sink.node = 0;
 	  sink.modifier = NO_MODIFIER;
 	  for (m=first_Match(case_stmt_matchers(decl)); m; m=MATCH_NEXT(m)) {
+	    Expression test = Match_info(m)->match_test;
+	    sink.attr = (Declaration)m;
+	    record_condition_dependencies(&sink,cond,aug_graph);
+
+	    for (; test != 0; test = Expression_info(test)->next_expr) {
+	      record_expression_dependencies(&sink,cond,control_dependency,
+					     NO_MODIFIER, test, aug_graph);
+	    }
+	  }
+	}
+	break;
+      case KEYfor_stmt:
+	{
+	  Match m;
+	  VERTEX sink;
+	  sink.node = 0;
+	  sink.modifier = NO_MODIFIER;
+	  for (m=first_Match(for_stmt_matchers(decl)); m; m=MATCH_NEXT(m)) {
 	    Expression test = Match_info(m)->match_test;
 	    sink.attr = (Declaration)m;
 	    record_condition_dependencies(&sink,cond,aug_graph);
