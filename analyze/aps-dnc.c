@@ -1582,6 +1582,18 @@ static void *get_edges(void *vaug_graph, void *node) {
 	  }
 	}
 	break;
+      case KEYfor_in_stmt:
+        { Declaration formal = for_in_stmt_formal(decl);
+          Expression expr = for_in_stmt_seq(decl);
+          VERTEX f;
+          f.node = 0;
+          f.attr = formal;
+          f.modifier = NO_MODIFIER;
+          record_condition_dependencies(&f,cond,aug_graph);
+          record_expression_dependencies(&f,cond,dependency,NO_MODIFIER,
+                                         expr,aug_graph);
+	}
+        break;
       default:
 	printf("%d: don't handle this kind yet\n",tnode_line_number(decl));
 	break;
