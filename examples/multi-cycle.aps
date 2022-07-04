@@ -1,5 +1,5 @@
 with "tiny";
-module CYCLE_SERIES[T :: var TINY[]] extends T begin
+module MULTI_CYCLE[T :: var TINY[]] extends T begin
   type IntegerLattice := MAX_LATTICE[Integer](-1000);
 
   circular attribute Wood.i1 : IntegerLattice;
