@@ -262,6 +262,25 @@ static SCOPE inst_services(TypeEnvironment use_type_env,
    *
    * services = signature_services(tdecl,psig,services); 
    */
+  Declaration td = some_class_decl_result_type(class_decl);
+  if (Declaration_KEY(td) == KEYtype_decl) {
+    Type ty = type_decl_type(td);
+    switch (Type_KEY(ty))
+    {
+    case KEYtype_inst:
+    {
+      Module m = type_inst_module(ty);
+      Use u = module_use_use(m);
+      Declaration mdecl = USE_DECL(u);
+      // Cannot use type_inst_type_actuals(ty) here, we need to use
+      // tacts for the "actuals" to be replaced with real type_inst actuals.
+      TypeActuals tas = tacts;
+      services = inst_services(use_type_env, mdecl, td, tas, services);
+      break;
+    }
+    }
+  }
+
   traverse_Block(get_public_bindings,&services,
 		 some_class_decl_contents(class_decl));  
   pop_type_contour(); /* not actually necessary */
