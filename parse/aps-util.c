@@ -260,3 +260,21 @@ Block some_function_decl_body(Declaration _node) {
   case KEYprocedure_decl: return procedure_decl_body(_node);
   }
 }
+
+Expression some_case_stmt_expr(Declaration node) {
+  switch (Declaration_KEY(node)) {
+  default: fatal_error("some_case_stmt_expr: called with something on line %d",
+		       tnode_line_number(node));
+  case KEYcase_stmt: return case_stmt_expr(node);
+  case KEYfor_stmt: return for_stmt_expr(node);
+  }
+}
+
+Matches some_case_stmt_matchers(Declaration node) {
+  switch (Declaration_KEY(node)) {
+  default: fatal_error("some_case_stmt_matchers: called with something on line %d",
+		       tnode_line_number(node));
+  case KEYcase_stmt: return case_stmt_matchers(node);
+  case KEYfor_stmt: return for_stmt_matchers(node);
+  }
+}
