@@ -1,0 +1,29 @@
+with "tiny";
+-- Example to test implementation of for-in loops
+module TEST_FORIN[T :: var TINY[]] extends T begin
+
+  -- Sets of names:
+  type Leaves := SET[Integer];
+
+  type Biggest := MAX_LATTICE[Integer](-1000); 
+
+  var collection all_leaves : Leaves; 
+
+  collection attribute Root.answer : Biggest;
+  
+  pragma synthesized(answer);
+  
+  match ?r=root(?w) begin
+    for leaf in all_leaves begin
+      r.answer :> leaf;
+    end;
+  end;
+
+  match ?w=branch(?x,?y) begin
+  end;
+
+  match ?l=leaf(?x) begin
+    all_leaves :> {x};
+  end;
+  
+end;
