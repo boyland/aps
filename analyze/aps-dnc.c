@@ -1564,31 +1564,13 @@ static void *get_edges(void *vaug_graph, void *node) {
 					 NO_MODIFIER, test, aug_graph);
 	}
 	break;
-      case KEYcase_stmt:
+      case KEYsome_case_stmt:
 	{
 	  Match m;
 	  VERTEX sink;
 	  sink.node = 0;
 	  sink.modifier = NO_MODIFIER;
-	  for (m=first_Match(case_stmt_matchers(decl)); m; m=MATCH_NEXT(m)) {
-	    Expression test = Match_info(m)->match_test;
-	    sink.attr = (Declaration)m;
-	    record_condition_dependencies(&sink,cond,aug_graph);
-
-	    for (; test != 0; test = Expression_info(test)->next_expr) {
-	      record_expression_dependencies(&sink,cond,control_dependency,
-					     NO_MODIFIER, test, aug_graph);
-	    }
-	  }
-	}
-	break;
-      case KEYfor_stmt:
-	{
-	  Match m;
-	  VERTEX sink;
-	  sink.node = 0;
-	  sink.modifier = NO_MODIFIER;
-	  for (m=first_Match(for_stmt_matchers(decl)); m; m=MATCH_NEXT(m)) {
+	  for (m=first_Match(some_case_stmt_matchers(decl)); m; m=MATCH_NEXT(m)) {
 	    Expression test = Match_info(m)->match_test;
 	    sink.attr = (Declaration)m;
 	    record_condition_dependencies(&sink,cond,aug_graph);
