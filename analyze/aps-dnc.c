@@ -1439,7 +1439,7 @@ static void *get_edges(void *vaug_graph, void *node) {
       case KEYformal:
 	{ Declaration case_stmt = formal_in_case_p(decl);
 	  if (case_stmt != NULL) {
-	    Expression expr = case_stmt_expr(case_stmt);
+	    Expression expr = some_case_stmt_expr(case_stmt);
 	    VERTEX f;
 	    f.node = 0;
 	    f.attr = decl;
