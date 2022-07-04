@@ -11,7 +11,7 @@ module MULTI_CYCLE[T :: var TINY[]] extends T begin
   attribute Root.answer : Integer;
 
   pragma synthesized(answer, s1, s2);
-  pragma inherited(i1, 12);
+  pragma inherited(i1, i2);
   
   match ?r=root(?w) begin
     w.i1 := IntegerLattice$join(0,w.s1);
@@ -22,7 +22,7 @@ module MULTI_CYCLE[T :: var TINY[]] extends T begin
   match ?w=branch(?x,?y) begin
     x.i1 := w.i1;
     w.s1 := x.s1;
-    a : Integer := - x.i1;
+    a : Integer := - w.i1;
     x.i2 := y.s1;
     y.i1 := IntegerLattice$join(a,x.s2);
     y.i2 := w.i2;
