@@ -270,9 +270,11 @@ FIBERSET intersect_fiberset(FIBERSET fs1, FIBERSET fs2) {
  */
 Declaration field_ref_p(Expression expr) {
   switch (Expression_KEY(expr)) {
+  default: break;
   case KEYfuncall:
     { Expression func = funcall_f(expr);
       switch (Expression_KEY(func)) {
+      default: break;
       case KEYvalue_use:
 	{ Declaration attr = USE_DECL(value_use_use(func));
 	  if (attr == NULL) aps_error(func,"unbound function");
@@ -286,14 +288,17 @@ Declaration field_ref_p(Expression expr) {
 
 Declaration attr_ref_p(Expression expr) {
   switch (Expression_KEY(expr)) {
+  default: break;
   case KEYfuncall:
     { Expression func = funcall_f(expr);
       switch (Expression_KEY(func)) {
+      default: break;
       case KEYvalue_use:
 	{ Declaration attr = USE_DECL(value_use_use(func));
 	  if (attr == NULL) aps_error(func,"unbound function");
 	  else if (DECL_IS_LOCAL(attr) && !FIELD_DECL_P(attr)) {
 	    switch (Declaration_KEY(attr)) {
+            default: break;
 	    case KEYattribute_decl:
 	      return attr;
 	    }
@@ -307,14 +312,17 @@ Declaration attr_ref_p(Expression expr) {
 
 Declaration constructor_call_p(Expression expr) {
   switch (Expression_KEY(expr)) {
+  default: break;
   case KEYfuncall:
     { Expression func = funcall_f(expr);
       switch (Expression_KEY(func)) {
+      default: break;
       case KEYvalue_use:
 	{ Declaration decl = USE_DECL(value_use_use(func));
 	  if (decl == NULL) aps_error(func,"unbound function");
 	  else if (DECL_IS_LOCAL(decl) && !FIELD_DECL_P(decl)) {
 	    switch (Declaration_KEY(decl)) {
+            default: break;
 	    case KEYconstructor_decl:
 	      return decl;
 	    }
@@ -352,13 +360,16 @@ BOOL local_type_p(Type ty) { /* could this type carry an object? */
 
 Declaration local_call_p(Expression expr) {
   switch (Expression_KEY(expr)) {
+  default: break;
   case KEYfuncall:
     { Expression func = funcall_f(expr);
       switch (Expression_KEY(func)) {
+      default: break;
       case KEYvalue_use:
 	{ Declaration decl = USE_DECL(value_use_use(func));
 	  if (decl != NULL && DECL_IS_LOCAL(decl)) {
 	    switch (Declaration_KEY(decl)) {
+            default: break;
 	    case KEYprocedure_decl:
 	    case KEYfunction_decl:
 	      return decl;
@@ -408,8 +419,10 @@ Declaration result_decl_p(Declaration rdecl) {
   while (ABSTRACT_APS_tnode_phylum(node) == KEYDeclarations)
     node = tnode_parent(node);
   switch (ABSTRACT_APS_tnode_phylum(node)) {
+  default: break;
   case KEYType:
     switch (Type_KEY((Type)node)) {
+    default: break;
     case KEYfunction_type:
       return (Declaration)tnode_parent(node);
     }
@@ -525,15 +538,19 @@ Declaration phylum_shared_info_attribute(Declaration phylum, STATE *s) {
 Declaration responsible_node_declaration(void *node) {
   while (node != NULL) {
     switch (ABSTRACT_APS_tnode_phylum(node)) {
+    default: break;
     case KEYDeclaration:
       { Declaration decl = (Declaration)node;
 	switch (Declaration_KEY(decl)) {
+        default: break;
 	case KEYtop_level_match:
 	  { Pattern pat=matcher_pat(top_level_match_m((Declaration)node));
 	    switch (Pattern_KEY(pat)) {
+            default: break;
 	    case KEYand_pattern:
 	      pat = and_pattern_p1(pat);
 	      switch (Pattern_KEY(pat)) {
+              default: break;
 	      case KEYpattern_var:
 		return pattern_var_formal(pat);
 		break;
@@ -562,10 +579,12 @@ Declaration shared_use_p(Expression expr) {
    */
   if (responsible_node_declaration(expr) == NULL) return NULL;
   switch (Expression_KEY(expr)) {
+  default: break;
   case KEYvalue_use:
     { Declaration decl = USE_DECL(value_use_use(expr));
       if (decl == NULL || !DECL_IS_SHARED(decl)) return NULL;
       switch (Declaration_KEY(decl)) {
+      default: break;
       case KEYvalue_decl:
 	return decl;
       }
@@ -783,6 +802,7 @@ void init_field_decls(Declaration module, STATE *s) {
        decl = DECL_NEXT(decl)) {
     Declaration_info(decl)->decl_flags |= SHARED_DECL_FLAG;
     switch (Declaration_KEY(decl)) {
+    default: break;
     case KEYvalue_decl:
       { Declaration reversed;
 	if (fiber_debug & FIBER_INTRO) {
@@ -841,6 +861,7 @@ static void *lhs_key = &lhs_key;
 /* for now, lhs and rhs cover everything */
 void *init_rhs_lhs(void *key, void *node) {
   switch (ABSTRACT_APS_tnode_phylum(node)) {
+  default: break;
   case KEYExpression:
     { Expression expr = (Expression)node;
       Expression_info(expr)->expr_flags |= EXPR_RHS_FLAG;
@@ -849,6 +870,7 @@ void *init_rhs_lhs(void *key, void *node) {
   case KEYDeclaration:
     { Declaration decl = (Declaration)node;
       switch (Declaration_KEY(decl)) {
+      default: break;
       case KEYpragma_call:
 	return NULL;
       case KEYassign:
@@ -869,6 +891,7 @@ void *preinitialize_fibersets(void *statep, void *node)
   FIBERSETS *fss = 0;
   int i;
   switch (ABSTRACT_APS_tnode_phylum(node)) {
+  default: break;
   case KEYDeclaration: {
 		Declaration decl = (Declaration)node;
     fss = &fibersets_for((Declaration)node);
@@ -955,6 +978,7 @@ void print_shared_info_fibersets(STATE *state) {
 
 void finalize_fibersets_for_decl(Declaration decl) {
   switch (Declaration_KEY(decl)) {
+  default: break;
   case KEYdeclaration:
     {
       fiberset_for(decl,FIBERSET_REVERSE_FINAL) =
@@ -995,10 +1019,12 @@ static void *add_fiberset_to_value_uses(void *fsp, void *node) {
   FIBERSET fs = (FIBERSET)fsp;
   int fstype = fs->fiberset_type;
   switch (ABSTRACT_APS_tnode_phylum(node)) {
+  default: break;
   case KEYExpression:
     { Expression expr = (Expression)node;
       if (!EXPR_IS_RHS(expr)) return fsp; /* don't look at LHS */
       switch (Expression_KEY(expr)) {
+      default: break;
       case KEYvalue_use:
 	/* if we have a use, and the use is unshared
 	 * (i.e. the decl is not a shared value decl or
@@ -1022,6 +1048,7 @@ static void *add_fiberset_to_direct_defs(void *fsp, void *node) {
   FIBERSET fs = (FIBERSET)fsp;
   int fstype = fs->fiberset_type;
   switch (ABSTRACT_APS_tnode_phylum(node)) {
+  default: break;
   case KEYExpression:
     { Expression expr = (Expression)node;
       Declaration field;
@@ -1032,6 +1059,7 @@ static void *add_fiberset_to_direct_defs(void *fsp, void *node) {
 	  return fsp; /* not a field ref */
       object = field_ref_object(expr);
       switch (Expression_KEY(object)) {
+      default: break;
       case KEYvalue_use:
 	/* if we have a direct field assignment, and the use is unshared
 	 * (i.e. the decl is not a shared value decl or
@@ -1077,10 +1105,12 @@ static void *add_fiberset_to_value_defs(void *fsp, void *node) {
   FIBERSET fs = (FIBERSET)fsp;
   int fstype = fs->fiberset_type;
   switch (ABSTRACT_APS_tnode_phylum(node)) {
+  default: break;
   case KEYExpression:
     { Expression expr = (Expression)node;
       if (!EXPR_IS_LHS(expr)) return fsp; /* only look at LHS */
       switch (Expression_KEY(expr)) {
+      default: break;
       case KEYvalue_use:
 	/* if we have a use, and the use is unshared
 	 * (i.e. the decl is not a shared value decl or
@@ -1108,9 +1138,11 @@ static void *add_fiberset_to_function_use_shared_info(void *fsp, void *node) {
   FIBERSET fs = (FIBERSET)fsp;
   int fstype = fs->fiberset_type;
   switch (ABSTRACT_APS_tnode_phylum(node)) {
+  default: break;
   case KEYExpression:
     { Expression expr = (Expression)node;
       switch (Expression_KEY(expr)) {
+      default: break;
       case KEYfuncall:
 	if (attribute_decl_phylum(fs->tnode) == local_call_p(expr)) {
 	  Declaration attr =
@@ -1132,9 +1164,11 @@ static void *add_fiberset_to_function_call_shared_info(void *fsp, void *node) {
   FIBERSET fs = (FIBERSET)fsp;
   int fstype = fs->fiberset_type;
   switch (ABSTRACT_APS_tnode_phylum(node)) {
+  default: break;
   case KEYExpression:
     { Expression expr = (Expression)node;
       switch (Expression_KEY(expr)) {
+      default: break;
       case KEYfuncall:
 	{ Declaration decl = local_call_p(expr);
 	  if (decl != NULL) {
@@ -1156,6 +1190,7 @@ static void *add_fiberset_to_function_call_shared_info(void *fsp, void *node) {
  */
 static void *add_fiberset_to_shared_info(void *fsp, void *node) {
   switch (ABSTRACT_APS_tnode_phylum(node)) {
+  default: break;
   case KEYDeclaration:
     { Declaration tdecl = (Declaration)node;
       switch (Declaration_KEY(tdecl)) {
@@ -1214,9 +1249,11 @@ static void *add_fiberset_to_shared_use(void *fsp, void *node) {
   FIBERSET fs = (FIBERSET)fsp;
   int fstype = fs->fiberset_type;
   switch (ABSTRACT_APS_tnode_phylum(node)) {
+  default: break;
   case KEYExpression:
     { Expression expr = (Expression)node;
       switch (Expression_KEY(expr)) {
+      default: break;
       case KEYvalue_use:
 	{ Declaration sdecl = USE_DECL(value_use_use(expr));
 	  /* if we have a shared use, that use is equivalent to
@@ -1274,9 +1311,11 @@ static void *add_fiberset_to_attr_use(void *fsp, void *node) {
   FIBERSET fs = (FIBERSET)fsp;
   int fstype = fs->fiberset_type;
   switch (ABSTRACT_APS_tnode_phylum(node)) {
+  default: break;
   case KEYExpression:
     { Expression expr = (Expression)node;
       switch (Expression_KEY(expr)) {
+      default: break;
       case KEYfuncall:
 	if (fs->tnode == attr_ref_p(expr))
 	  add_to_fiberset(fs->fiber,expr,fstype,&expr_fiberset_for(expr,fstype));
@@ -1293,9 +1332,11 @@ static void *add_fiberset_to_function_call(void *fsp, void *node) {
   int fstype = fs->fiberset_type;
   Declaration formal=(Declaration)fs->tnode;
   switch (ABSTRACT_APS_tnode_phylum(node)) {
+  default: break;
   case KEYExpression:
     { Expression expr = (Expression)node;
       switch (Expression_KEY(expr)) {
+      default: break;
       case KEYfuncall:
 	{ Declaration func = formal_function_decl(formal);
 	  if (local_call_p(expr) == func) {
@@ -1322,6 +1363,7 @@ static void *add_fiberset_to_pattern_vars(void *fsp, void *node) {
   case KEYPattern:
     { Pattern pat = (Pattern)node;
       switch (Pattern_KEY(node)) {
+      default: break;
       case KEYpattern_var:
 	{ Declaration pvar = pattern_var_formal(pat);
 	  add_to_fiberset(fs->fiber,pvar,fstype,&fiberset_for(pvar,fstype));
@@ -1800,10 +1842,10 @@ void *print_all_ou(void *statep, void *node) {
   switch (ABSTRACT_APS_tnode_phylum(node)) {
   case KEYDeclaration: {
     Declaration decl = (Declaration)node;
-    switch (Declaration_KEY(decl))
-    {
-      case KEYassign:
-        return statep;
+    switch (Declaration_KEY(decl)) {
+    default: break;
+    case KEYassign:
+      return statep;
     }
     if (Declaration_info(decl)->oset != NULL) {
       printf("OSET of node: %s\n", decl_name(decl));
@@ -1947,6 +1989,7 @@ void print_fields(EDGES fields_list){
 void *count_node(void *u, void *node)
 {
   switch (ABSTRACT_APS_tnode_phylum(node)) {
+  default: break;
   case KEYDeclaration:
     {
       Declaration decl = (Declaration)node;
@@ -2017,10 +2060,12 @@ void *count_node(void *u, void *node)
 void *compute_OU(void *u, void *node)
 {
   switch (ABSTRACT_APS_tnode_phylum(node)) {
+  default: break;
   case KEYDeclaration:
     {
       Declaration decl = (Declaration)node;
       switch (Declaration_KEY(decl)) {
+      default: break;
       case KEYtop_level_match: {
 	// shared_info
 	Declaration lhs = top_level_match_lhs_decl(decl);
@@ -2192,6 +2237,7 @@ void *build_FSA(void *vstate, void *node)
     omega = add_to_nodeset(omega,FSA_default_node+1);
   }
   switch (ABSTRACT_APS_tnode_phylum(node)) {
+  default: break;
   case KEYDeclaration:
     {   
       Declaration decl = (Declaration)node;
@@ -2212,6 +2258,7 @@ void *build_FSA(void *vstate, void *node)
       if (uset != NULL) add_edges_uset(decl,NULL);	// Qx(-)-->Qu(-)
       	
       switch (Declaration_KEY(decl)) {
+      default: break;
       case KEYmodule_decl:
 	if (uset != NULL) {
 	  USET q;
@@ -2650,35 +2697,36 @@ NODESET link_expr_lhs(Expression e, NODESET ns) {
 
     } //if 
     return set_of_node(get_node_decl(decl)+1);  // Qd(-)
-    break;
   } // case value_use
-	case KEYfuncall: {
-	  Declaration fdecl;
-	  if ((fdecl = attr_ref_p(e)) != NULL) { // attr ref: X.a
-				// same as value_use
-	    return set_of_node(get_node_decl(fdecl)+1); //{Qd(-)}
-	  } else if ((fdecl = field_ref_p(e)) != NULL) { //field ref: w.f
-	    NODESET n;
-	    for (n=ns; n; n = n->rest) {
-	      // Qe(-)----f.--->n
-	      add_FSA_edge(get_node_expr(e)+1, n->node, reverse_field(fdecl));
-	      add_FSA_edge(get_node_expr(e), n->node, fdecl);
-	      // Qe(-) to n: bar node is even number.
-	      // the edge is reverse_field(fdecl);
-	    } // for end
-	    {
-	      Expression object = field_ref_object(e);
-	      link_expr_lhs(object, set_of_node(get_node_expr(e)+1) );	// Qe(-)
-	      {
-		USET uset = doUO(e, EMPTY_OSET);
-		// printf("DEBUG: after doUO in link_expr.\n");
-		return uset_to_nodeset(uset);
-	      }
-	    }
-	  } // if end
-	  break;
-	}	// KEYfuncall
-	} // switch
+  case KEYfuncall: {
+    Declaration fdecl;
+    if ((fdecl = attr_ref_p(e)) != NULL) { // attr ref: X.a
+      // same as value_use
+      return set_of_node(get_node_decl(fdecl)+1); //{Qd(-)}
+    } else if ((fdecl = field_ref_p(e)) != NULL) { //field ref: w.f
+      NODESET n;
+      for (n=ns; n; n = n->rest) {
+        // Qe(-)----f.--->n
+        add_FSA_edge(get_node_expr(e)+1, n->node, reverse_field(fdecl));
+        add_FSA_edge(get_node_expr(e), n->node, fdecl);
+        // Qe(-) to n: bar node is even number.
+        // the edge is reverse_field(fdecl);
+      } // for end
+      {
+        Expression object = field_ref_object(e);
+        link_expr_lhs(object, set_of_node(get_node_expr(e)+1) );	// Qe(-)
+        {
+          USET uset = doUO(e, EMPTY_OSET);
+          // printf("DEBUG: after doUO in link_expr.\n");
+          return uset_to_nodeset(uset);
+        }
+      }
+    } else {
+      aps_error(e, "wrong: not a proper funcall to add edges.");
+      return EMPTY_NODESET;
+    }
+  }	// KEYfuncall
+  } // switch
 }
 
 static int edge_num = 0;
@@ -2979,6 +3027,7 @@ void *DFA_fiber_set(void *u, void *node)
   STATE *state = (STATE *)u;
   
   switch (ABSTRACT_APS_tnode_phylum(node)) {
+  default: break;
   case KEYDeclaration:
     {
       Declaration decl = (Declaration)node;
@@ -3088,6 +3137,8 @@ int circle_check_rec(NODESET old, int node){
 		}
 	}
 	if (terminal == 1) return 0;
+        fatal_error("circle_check_rec assertion failure");
+        return 0;
 }
 
 int circle_check(){
@@ -3315,6 +3366,7 @@ void print_fiberset_entry(FIBERSET fs, FILE *stream) {
   }
   print_fiber(fs->fiber,stdout);
   switch (ABSTRACT_APS_tnode_phylum(tnode)) {
+  default: break;
   case KEYDeclaration:
     {
       Declaration decl = (Declaration)tnode;
@@ -3331,6 +3383,7 @@ void print_fiberset_entry(FIBERSET fs, FILE *stream) {
   case KEYExpression:
     { Expression expr = (Expression)tnode;
       switch (Expression_KEY(expr)) {
+      default: break;
       case KEYvalue_use:
 	printf(" of use(%s)",
 	       symbol_name(use_name(value_use_use(expr))));
@@ -3353,6 +3406,7 @@ void print_fiberset_entry(FIBERSET fs, FILE *stream) {
 	  } else {
 	    Expression func = funcall_f(expr);
 	    switch (Expression_KEY(func)) {
+            default: break;
 	    case KEYvalue_use:
 	      {
 		Use u = value_use_use(func);
