@@ -87,6 +87,11 @@ extern Def some_function_decl_def(Declaration);
 extern Type some_function_decl_type(Declaration);
 extern Block some_function_decl_body(Declaration);
 
+#define KEYsome_case_stmt KEYcase_stmt: \
+                     case KEYfor_stmt
+extern Expression some_case_stmt_expr(Declaration);
+extern Matches some_case_stmt_matchers(Declaration);
+
 /* for loop for accessing elements (only works in C++ with stl) */
 #define FOR_SEQUENCE(etype,id,stype,seq,body) \
    { stack<stype> _st; _st.push(seq); \

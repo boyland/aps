@@ -537,6 +537,25 @@ static void *init_decl_cond(void *vcond, void *node) {
 	traverse_Block(init_decl_cond,&new_cond,case_stmt_default(decl));
       }
       return NULL;
+    case KEYfor_stmt: /* almost same as case, but no negative conditions */
+      {
+	Matches ms = for_stmt_matchers(decl);
+	Expression testvar = for_stmt_expr(decl);
+	CONDITION new_cond = *cond;
+	Match m;
+
+	Expression_info(testvar)->next_expr = 0;
+	traverse_Matches(get_match_tests,&testvar,ms);
+	for (m = first_Match(ms); m; m=MATCH_NEXT(m)) {
+	  int index = Match_info(m)->if_index;
+	  Match_info(m)->match_cond = new_cond;
+	  new_cond.positive |= (1 << index); /* first set it */
+	  traverse_Block(init_decl_cond,&new_cond,matcher_body(m));
+	  new_cond.positive &= ~(1 << index); /* now clear it */
+	  /* do not do a negative test */
+	}
+      }
+      return NULL;
     default: break;
     }
   default:
@@ -1420,7 +1439,7 @@ static void *get_edges(void *vaug_graph, void *node) {
       case KEYformal:
 	{ Declaration case_stmt = formal_in_case_p(decl);
 	  if (case_stmt != NULL) {
-	    Expression expr = case_stmt_expr(case_stmt);
+	    Expression expr = some_case_stmt_expr(case_stmt);
 	    VERTEX f;
 	    f.node = 0;
 	    f.attr = decl;
@@ -1545,13 +1564,13 @@ static void *get_edges(void *vaug_graph, void *node) {
 					 NO_MODIFIER, test, aug_graph);
 	}
 	break;
-      case KEYcase_stmt:
+      case KEYsome_case_stmt:
 	{
 	  Match m;
 	  VERTEX sink;
 	  sink.node = 0;
 	  sink.modifier = NO_MODIFIER;
-	  for (m=first_Match(case_stmt_matchers(decl)); m; m=MATCH_NEXT(m)) {
+	  for (m=first_Match(some_case_stmt_matchers(decl)); m; m=MATCH_NEXT(m)) {
 	    Expression test = Match_info(m)->match_test;
 	    sink.attr = (Declaration)m;
 	    record_condition_dependencies(&sink,cond,aug_graph);
@@ -1563,6 +1582,18 @@ static void *get_edges(void *vaug_graph, void *node) {
 	  }
 	}
 	break;
+      case KEYfor_in_stmt:
+        { Declaration formal = for_in_stmt_formal(decl);
+          Expression expr = for_in_stmt_seq(decl);
+          VERTEX f;
+          f.node = 0;
+          f.attr = formal;
+          f.modifier = NO_MODIFIER;
+          record_condition_dependencies(&f,cond,aug_graph);
+          record_expression_dependencies(&f,cond,dependency,NO_MODIFIER,
+                                         expr,aug_graph);
+	}
+        break;
       default:
 	printf("%d: don't handle this kind yet\n",tnode_line_number(decl));
 	break;
