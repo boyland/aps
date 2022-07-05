@@ -13,8 +13,12 @@ typedef VECTOR(int) TOPOLOGICAL_SORT_ORDER;
 
 struct topological_sort_graph {
   AdjacencyNode**
-      adjacencies;   // Adjacency linked list (indexed by vertex number)
-  int num_vertices;  // number of vertices in the graph
+      adjacencies;     // Adjacency linked list (indexed by vertex number)
+  int num_vertices;    // number of vertices in the graph
+  BOOL ignore_cycles;  // true if topological sorting algorithm ignores the
+                       // cycles and returns the one of possibly many valid
+                       // order, false if existence of cycle should cause a
+                       // fatal error
 };
 
 typedef struct topological_sort_graph TopologicalSortGraph;
@@ -22,9 +26,13 @@ typedef struct topological_sort_graph TopologicalSortGraph;
 /**
  * Created the graph that will be used for topological sorting
  * @param num_vertices number of vertices of the graph
+ * @param ignore_cycles true if topological sorting algorithm ignores the cycles
+ * and returns the one of possibly many valid order, false if existence of cycle
+ * should cause a fatal error
  * @return graph that will be used for topological sorting
  */
-TopologicalSortGraph* topological_sort_graph_create(int num_vertices);
+TopologicalSortGraph* topological_sort_graph_create(int num_vertices,
+                                                    BOOL ignore_cycles);
 
 /**
  * Given topological sort graph it adds an edge between two indices

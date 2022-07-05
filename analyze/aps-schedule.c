@@ -2198,19 +2198,19 @@ static void schedule_augmented_dependency_graph(AUG_GRAPH* aug_graph) {
   }
 
   if (oag_debug & DEBUG_ORDER) {
-    printf("\nTenative order for %s\n", aug_graph_name(aug_graph));
+    printf("\nTenative consolidated SCC order for %s\n", aug_graph_name(aug_graph));
 
     for (i = 0; i < aug_graph->consolidated_ordered_scc.length; i++) {
       int comp_index = i;
       SCC_COMPONENT comp = aug_graph->consolidated_ordered_scc.array[i];
-      printf(">>> Starting SCC %d\n", comp_index);
+      printf(">>> Starting consolidated SCC #%d\n", comp_index);
       for (j = 0; j < comp.length; j++) {
         INSTANCE* in = &aug_graph->instances.array[comp.array[j]];
         print_instance(in, stdout);
         printf(" <%+d,%+d>\n", state->instance_groups[in->index].ph,
                state->instance_groups[in->index].ch);
       }
-      printf("<<< Ending SCC %d\n", comp_index);
+      printf("<<< Ending consolidated SCC #%d\n\n", comp_index);
     }
 
     printf("\n");

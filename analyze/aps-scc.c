@@ -38,7 +38,7 @@ static void add_scc_edge(AUG_GRAPH* aug_graph,
               aug_graph->graph[in1->index * aug_graph->instances.length +
                                in2->index])) {
         if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
-          printf("%d -> %d\t", comp1_index, comp2_index);
+          printf("SCC #%d -> SCC #%d because ", comp1_index, comp2_index);
           print_instance(in1, stdout);
           printf(" -> ");
           print_instance(in2, stdout);
@@ -54,14 +54,19 @@ static void add_scc_edge(AUG_GRAPH* aug_graph,
  * Sort SCC component containing circular instances using topological sort
  * @param aug_graph augmented dependency graph
  * @param comp SCC component containing non-circular instances
+ * @param comp_index component index
  */
 static void topological_sort_component(AUG_GRAPH* aug_graph,
-                                       SCC_COMPONENT* comp) {
-  TopologicalSortGraph* graph = topological_sort_graph_create(comp->length);
+                                       SCC_COMPONENT* comp,
+                                       int comp_index) {
+  TopologicalSortGraph* graph = topological_sort_graph_create(
+      comp->length, true /* encountering cycle is expected */);
 
   if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
-    printf("topological sorting circular component %s\n",
-           aug_graph_name(aug_graph));
+    printf(
+        "Topological sorting circular component #%d of %s augmented dependency "
+        "graph\n",
+        comp_index, aug_graph_name(aug_graph));
   }
   int i, j, k;
 
@@ -76,7 +81,6 @@ static void topological_sort_component(AUG_GRAPH* aug_graph,
               aug_graph->graph[in1->index * aug_graph->instances.length +
                                in2->index])) {
         if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
-          printf("%d -> %d\t", in1->index, in2->index);
           print_instance(in1, stdout);
           printf(" -> ");
           print_instance(in2, stdout);
@@ -95,6 +99,11 @@ static void topological_sort_component(AUG_GRAPH* aug_graph,
   }
 
   if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
+    printf(
+        "Topological sort order of component of %s augmented dependency "
+        "graph: \n",
+        aug_graph_name(aug_graph));
+
     for (i = 0; i < comp->length; i++) {
       if (i > 0) {
         printf(" -> ");
@@ -113,10 +122,18 @@ static void topological_sort_component(AUG_GRAPH* aug_graph,
  * @param aug_graph augmented dependency graph
  */
 static void analyze_aug_graph_sccs(AUG_GRAPH* aug_graph) {
-  TopologicalSortGraph* graph =
-      topological_sort_graph_create(aug_graph->components.length);
-  int i, j;
+  TopologicalSortGraph* graph = topological_sort_graph_create(
+      aug_graph->components.length,
+      false /* encountering cycle is NOT expected */);
 
+  if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
+    printf(
+        "Topological sorting all components of %s augmented dependency "
+        "graph\n",
+        aug_graph_name(aug_graph));
+  }
+
+  int i, j;
   for (i = 0; i < aug_graph->components.length; i++) {
     for (j = 0; j < aug_graph->components.length; j++) {
       if (i != j) {
@@ -196,7 +213,7 @@ static void analyze_aug_graph_sccs(AUG_GRAPH* aug_graph) {
         count_consolidated_sccs++;
 
         // Topological sort the circular SCC
-        topological_sort_component(aug_graph, comp);
+        topological_sort_component(aug_graph, comp, comp_index);
       }
     }
   }

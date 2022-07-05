@@ -68,9 +68,17 @@ static void dfs(int v,
   while (curr != NULL) {
     int w = curr->vertex;
     if (colors[w] == GRAY) {
-      if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
-        // Found a loop
-        aps_warning(NULL, "Loop found! No topological order may not exist!");
+      // Found a loop
+      if (graph->ignore_cycles) {
+        if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
+          aps_warning(
+              NULL,
+              "Cycle was expected! will continue to find the topological "
+              "order.");
+        }
+      } else {
+        fatal_error(
+            "Did not expect cycle while topological sorting the graph.");
       }
     }
     if (colors[w] == WHITE) {
@@ -161,13 +169,18 @@ void topological_sort_add_edge(TopologicalSortGraph* graph,
 /**
  * Created the graph that will be used for topological sorting
  * @param num_vertices number of vertices of the graph
+ * @param ignore_cycles true if topological sorting algorithm ignores the cycles
+ * and returns the one of possibly many valid order, false if existence of cycle
+ * should cause a fatal error
  * @return graph that will be used for topological sorting
  */
-TopologicalSortGraph* topological_sort_graph_create(int num_vertices) {
+TopologicalSortGraph* topological_sort_graph_create(int num_vertices,
+                                                    BOOL ignore_cycles) {
   TopologicalSortGraph* graph =
       (TopologicalSortGraph*)malloc(sizeof(TopologicalSortGraph));
 
   graph->num_vertices = num_vertices;
+  graph->ignore_cycles = ignore_cycles;
 
   size_t adjacencies_size = num_vertices * sizeof(AdjacencyNode*);
   graph->adjacencies = (AdjacencyNode**)malloc(adjacencies_size);
