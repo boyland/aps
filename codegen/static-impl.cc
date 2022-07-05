@@ -952,8 +952,7 @@ void dump_scheduled_function_body(Declaration fd, STATE* s, ostream& bs) {
   cond.positive = 0;
   cond.negative = 0;
 
-  int max_phase =
-      Declaration_info(aug_graph->lhs_decl)->node_phy_graph->max_phase;
+  int max_phase = Declaration_info(aug_graph->lhs_decl)->node_phy_graph->max_phase;
 
   vector<int> loop_component_index;
 
