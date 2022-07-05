@@ -2050,6 +2050,7 @@ static void init_analysis_state(STATE *s, Declaration module) {
 	/*DEBUG fprintf(stderr,"got an extension!\n"); */
 	for (; edecl != NULL; edecl = Declaration_info(edecl)->next_decl) {
 	  switch (Declaration_KEY(edecl)) {
+          default: break;
 	  case KEYphylum_decl:
 	    if (def_is_public(phylum_decl_def(edecl))) ++phyla_count;
 	    if (DECL_IS_START_PHYLUM(edecl)) s->start_phylum = edecl;
@@ -2065,6 +2066,7 @@ static void init_analysis_state(STATE *s, Declaration module) {
       { Declaration decl = first_Declaration(decls);
 	for (; decl != NULL; decl = DECL_NEXT(decl)) {
 	  switch (Declaration_KEY(decl)) {
+          default: break;
 	  case KEYsome_function_decl:
 	    ++phyla_count;
 	    break;
@@ -2078,6 +2080,7 @@ static void init_analysis_state(STATE *s, Declaration module) {
 	for (edecl = first_Declaration(edecls);
 	     edecl != NULL; edecl = Declaration_info(edecl)->next_decl) {
 	  switch (Declaration_KEY(edecl)) {
+          default: break;
 	  case KEYphylum_decl:
 	    if (def_is_public(phylum_decl_def(edecl)))  {
 	      s->phyla.array[phyla_count++] = edecl;
@@ -2089,6 +2092,7 @@ static void init_analysis_state(STATE *s, Declaration module) {
       { Declaration decl = first_Declaration(decls);
 	for (; decl != NULL; decl = DECL_NEXT(decl)) {
 	  switch (Declaration_KEY(decl)) {
+          default: break;
 	  case KEYsome_function_decl:
 	    s->phyla.array[phyla_count++] = decl;
 	    break;
@@ -2104,6 +2108,7 @@ static void init_analysis_state(STATE *s, Declaration module) {
     if (decl == NULL) aps_error(module,"empty module");
     for (; decl != NULL; decl = Declaration_info(decl)->next_decl) {
       switch (Declaration_KEY(decl)) {
+      default: break;
       case KEYsome_function_decl:
       case KEYtop_level_match: ++match_rule_count; break;
 	/*DEBUG
@@ -2122,6 +2127,7 @@ static void init_analysis_state(STATE *s, Declaration module) {
 	 decl != NULL;
 	 decl = Declaration_info(decl)->next_decl) {
       switch (Declaration_KEY(decl)) {
+      default: break;
       case KEYsome_function_decl:
       case KEYtop_level_match:
 	s->match_rules.array[match_rule_count++] = decl;
@@ -2138,6 +2144,7 @@ static void init_analysis_state(STATE *s, Declaration module) {
   { Declaration decl = first_Declaration(decls);
     for (; decl != NULL; decl = Declaration_info(decl)->next_decl) {
       switch (Declaration_KEY(decl)) {
+      default: break;
       case KEYattribute_decl:
 	if (!ATTR_DECL_IS_SYN(decl) && !ATTR_DECL_IS_INH(decl) &&
 	    !FIELD_DECL_P(decl)) {
@@ -2149,6 +2156,7 @@ static void init_analysis_state(STATE *s, Declaration module) {
 	  Declaration formal = first_Declaration(function_type_formals(ftype));
 	  Type ntype = formal_type(formal);
 	  switch (Type_KEY(ntype)) {
+          default: break;
 	  case KEYtype_use:
 	    { Declaration phylum=Use_info(type_use_use(ntype))->use_decl;
 	      if (phylum == NULL)
@@ -2322,6 +2330,7 @@ void *augment_dependency_graph_func_calls(void *paug_graph, void *node) {
   case KEYDeclaration:
     { Declaration decl = (Declaration)node;
       switch (Declaration_KEY(decl)) {
+      default: break;
       case KEYsome_function_decl:
       case KEYtop_level_match:
 	/* don't look inside (unless its what we're doing the analysis for) */
@@ -2709,6 +2718,7 @@ const char *aug_graph_name(AUG_GRAPH *aug_graph) {
   case KEYtop_level_match:
     { Pattern pat=matcher_pat(top_level_match_m(aug_graph->match_rule));
       switch (Pattern_KEY(pat)) {
+      default: break;
       case KEYand_pattern:
 	pat = and_pattern_p2(pat);
       }
@@ -2748,6 +2758,7 @@ void print_aug_graph(AUG_GRAPH *aug_graph, FILE *stream) {
   case KEYtop_level_match:
     { Pattern pat=matcher_pat(top_level_match_m(aug_graph->match_rule));
       switch (Pattern_KEY(pat)) {
+      default: break;
       case KEYand_pattern:
 	pat = and_pattern_p2(pat);
       }
