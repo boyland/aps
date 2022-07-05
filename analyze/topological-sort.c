@@ -68,8 +68,10 @@ static void dfs(int v,
   while (curr != NULL) {
     int w = curr->vertex;
     if (colors[w] == GRAY) {
-      // Found a loop
-      aps_warning(NULL, "Loop found! No topological order may not exist!");
+      if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
+        // Found a loop
+        aps_warning(NULL, "Loop found! No topological order may not exist!");
+      }
     }
     if (colors[w] == WHITE) {
       dfs(w, colors, graph, stack);

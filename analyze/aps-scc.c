@@ -28,7 +28,6 @@ static void add_scc_edge(AUG_GRAPH* aug_graph,
                          SCC_COMPONENT* comp2,
                          int comp2_index) {
   int i, j, k;
-
   for (i = 0; i < comp1->length; i++) {
     INSTANCE* in1 = &aug_graph->instances.array[comp1->array[i]];
 
@@ -52,7 +51,7 @@ static void add_scc_edge(AUG_GRAPH* aug_graph,
 }
 
 /**
- * Sort SCC component containing non-circular instances using topological sort
+ * Sort SCC component containing circular instances using topological sort
  * @param aug_graph augmented dependency graph
  * @param comp SCC component containing non-circular instances
  */
@@ -60,8 +59,10 @@ static void topological_sort_component(AUG_GRAPH* aug_graph,
                                        SCC_COMPONENT* comp) {
   TopologicalSortGraph* graph = topological_sort_graph_create(comp->length);
 
-  printf("topological sorting circular component %s\n",
-         aug_graph_name(aug_graph));
+  if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
+    printf("topological sorting circular component %s\n",
+           aug_graph_name(aug_graph));
+  }
   int i, j, k;
 
   for (i = 0; i < comp->length; i++) {
@@ -125,7 +126,9 @@ static void analyze_aug_graph_sccs(AUG_GRAPH* aug_graph) {
     }
   }
 
+  // Topological sort all the SCCs
   TOPOLOGICAL_SORT_ORDER* order = topological_sort_order(graph);
+
   if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
     for (i = 0; i < order->length; i++) {
       if (i > 0) {
@@ -155,10 +158,14 @@ static void analyze_aug_graph_sccs(AUG_GRAPH* aug_graph) {
   for (i = 0; i < order->length; i++) {
     int comp_index = order->array[i];
     SCC_COMPONENT* comp = &aug_graph->components.array[comp_index];
+
+    // If SCC is not circular, add it to the buffer
     if (comp->length == 1) {
       buffer_array[buffer_count++] = comp_index;
     }
 
+    // If SCC is circular OR this is the last SCC in the topological sort order
+    // then convert the buffer into a consolidated SCC
     if (comp->length > 1 || i + 1 == order->length) {
       if (buffer_count > 0) {
         // Combine all SCC that are non-circular (i.e. have a size of 1)
@@ -167,6 +174,7 @@ static void analyze_aug_graph_sccs(AUG_GRAPH* aug_graph) {
         merged_scc->array = (int*)malloc(sizeof(int) * buffer_count);
         merged_scc->length = 0;
 
+        // Add non-circular into the consolidated SCC
         for (j = 0; j < buffer_count; j++) {
           SCC_COMPONENT* current_comp =
               &aug_graph->components.array[buffer_array[j]];
@@ -174,17 +182,20 @@ static void analyze_aug_graph_sccs(AUG_GRAPH* aug_graph) {
           merged_scc->array[merged_scc->length++] = current_comp->array[0];
         }
 
+        // Reset the buffer of non-circular SCCs
         buffer_count = 0;
         consolidated_sccs_cycles[count_consolidated_sccs] = false;
         consolidated_sccs->array[count_consolidated_sccs] = *merged_scc;
         count_consolidated_sccs++;
       }
 
+      // If SCC is circular then just add it to the array
       if (comp->length > 1) {
         consolidated_sccs_cycles[count_consolidated_sccs] = true;
         consolidated_sccs->array[count_consolidated_sccs] = *comp;
         count_consolidated_sccs++;
 
+        // Topological sort the circular SCC
         topological_sort_component(aug_graph, comp);
       }
     }

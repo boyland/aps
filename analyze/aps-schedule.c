@@ -67,7 +67,29 @@ static CTO_NODE* schedule_visit_end(AUG_GRAPH* aug_graph,
                                     CONDITION cond,
                                     TOTAL_ORDER_STATE* state,
                                     const int remaining,
+                                    CHILD_PHASE* prev_group,
                                     const short parent_ph);
+
+static CTO_NODE* schedule_empty_visits(AUG_GRAPH* aug_graph,
+                                       SCC_COMPONENT* comp,
+                                       int comp_index,
+                                       CTO_NODE* prev,
+                                       CONDITION cond,
+                                       TOTAL_ORDER_STATE* state,
+                                       const int remaining,
+                                       CHILD_PHASE* prev_group,
+                                       const short parent_ph,
+                                       bool visit_end);
+
+static CTO_NODE* schedule_visit_end_marker(AUG_GRAPH* aug_graph,
+                                           SCC_COMPONENT* comp,
+                                           int comp_index,
+                                           CTO_NODE* prev,
+                                           CONDITION cond,
+                                           TOTAL_ORDER_STATE* state,
+                                           const int remaining,
+                                           CHILD_PHASE* prev_group,
+                                           const short parent_ph);
 
 static void find_scc_to_schedule(AUG_GRAPH* aug_graph,
                                  CTO_NODE* prev,
@@ -1276,6 +1298,16 @@ static CTO_NODE* schedule_transition_start_of_group(AUG_GRAPH* aug_graph,
         aug_graph_name(aug_graph), remaining, group->ph, group->ch, parent_ph);
   }
 
+  // If we are scheduling a child instance but we have not scheduled previous
+  // group visit then we are missing empty visit
+  if (group->ch != -1 && abs(group->ph) > 1 &&
+      !state->child_visit_markers[group->ch][abs(group->ph) - 1]) {
+    return schedule_empty_visits(
+        aug_graph, comp, comp_index, prev, cond, state, remaining, group,
+        parent_ph,
+        false /* do not close of the visit, follow up with group scheduler */);
+  }
+
   // If we are scheduling child synthesized attributes we need to make sure we
   // have investigated child inherited attributes of this phase before moving
   // forward
@@ -1325,12 +1357,13 @@ static CTO_NODE* schedule_transition_start_of_group(AUG_GRAPH* aug_graph,
     // Mark the parent visit marker as done
     state->parent_visit_markers[parent_ph] = true;
     cto_node = schedule_visit_end(aug_graph, comp, comp_index, prev, cond,
-                                  state, remaining, parent_ph);
+                                  state, remaining, group, parent_ph);
     // Release ti
     state->parent_visit_markers[parent_ph] = false;
     return cto_node;
   }
 
+  // Continue with group scheduler
   return group_schedule(aug_graph, comp, comp_index, prev, cond, state,
                         remaining, group, parent_ph);
 }
@@ -1397,7 +1430,7 @@ static CTO_NODE* schedule_transition_end_of_group(AUG_GRAPH* aug_graph,
     state->parent_synth_investigations[group->ph] = true;
 
     cto_node = schedule_visit_end(aug_graph, comp, comp_index, prev, cond,
-                                  state, remaining, parent_ph);
+                                  state, remaining, group, parent_ph);
 
     state->parent_synth_investigations[group->ph] = false;
     return cto_node;
@@ -1409,29 +1442,26 @@ static CTO_NODE* schedule_transition_end_of_group(AUG_GRAPH* aug_graph,
 }
 
 /**
- * Utility function to handle visit end marker
+ * Utility function that schedules missing empty visits
  * @param aug_graph Augmented dependency graph
  * @param comp SCC component
  * @param prev previous CTO node
  * @param instance_groups array of <ph,ch> indexed by INSTANCE index
  * @param parent_ph current parent phase being worked on
+ * @param visit_end if true then it will add end of phase visit marker otherwise
+ * it will continue with group scheduler
  * @return head of linked list
  */
-static CTO_NODE* schedule_visit_end(AUG_GRAPH* aug_graph,
-                                    SCC_COMPONENT* comp,
-                                    int comp_index,
-                                    CTO_NODE* prev,
-                                    CONDITION cond,
-                                    TOTAL_ORDER_STATE* state,
-                                    const int remaining,
-                                    const short parent_ph) {
-  if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
-    printf(
-        "Starting schedule_visit_end (%s) with "
-        "(remaining: %d parent_ph: %d)\n",
-        aug_graph_name(aug_graph), remaining, parent_ph);
-  }
-
+static CTO_NODE* schedule_empty_visits(AUG_GRAPH* aug_graph,
+                                       SCC_COMPONENT* comp,
+                                       int comp_index,
+                                       CTO_NODE* prev,
+                                       CONDITION cond,
+                                       TOTAL_ORDER_STATE* state,
+                                       const int remaining,
+                                       CHILD_PHASE* prev_group,
+                                       const short parent_ph,
+                                       bool visit_end) {
   PHY_GRAPH* parent_phy = Declaration_info(aug_graph->lhs_decl)->node_phy_graph;
 
   int ch, ph;
@@ -1443,8 +1473,7 @@ static CTO_NODE* schedule_visit_end(AUG_GRAPH* aug_graph,
       continue;
 
     for (ph = 1; ph <= state->max_child_ph[ch]; ph++) {
-      if (!state->child_visit_markers[ch][ph] &&
-          parent_phy->cyclic_flags[parent_ph] == child_phy->cyclic_flags[ph]) {
+      if (!state->child_visit_markers[ch][ph]) {
         // As soon as we encounter a child visit that is not empty and not
         // scheduler, stop. Otherwise, we would be going too far
         if (!state->child_visit_markers[ch][ph] && !child_phy->empty_phase[ph])
@@ -1460,14 +1489,51 @@ static CTO_NODE* schedule_visit_end(AUG_GRAPH* aug_graph,
         cto_node->visit = parent_ph;
         state->child_visit_markers[ch][ph] = true;
         cto_node->cto_next =
-            schedule_visit_end(aug_graph, comp, comp_index, cto_node, cond,
-                               state, remaining /* no change*/, parent_ph);
+            schedule_empty_visits(aug_graph, comp, comp_index, cto_node, cond,
+                                  state, remaining /* no change*/,
+                                  &cto_node->child_phase, parent_ph, visit_end);
         state->child_visit_markers[ch][ph] = false;
 
         return cto_node;
       }
     }
   }
+
+  if (visit_end) {
+    return schedule_visit_end_marker(aug_graph, comp, comp_index, prev, cond,
+                                     state, remaining, prev_group, parent_ph);
+  } else {
+    return group_schedule(aug_graph, comp, comp_index, prev, cond, state,
+                          remaining, prev_group, parent_ph);
+  }
+}
+
+/**
+ * Utility function that adds end of parent visit marker
+ * @param aug_graph Augmented dependency graph
+ * @param comp SCC component
+ * @param prev previous CTO node
+ * @param instance_groups array of <ph,ch> indexed by INSTANCE index
+ * @param parent_ph current parent phase being worked on
+ * @return head of linked list
+ */
+static CTO_NODE* schedule_visit_end_marker(AUG_GRAPH* aug_graph,
+                                           SCC_COMPONENT* comp,
+                                           int comp_index,
+                                           CTO_NODE* prev,
+                                           CONDITION cond,
+                                           TOTAL_ORDER_STATE* state,
+                                           const int remaining,
+                                           CHILD_PHASE* prev_group,
+                                           const short parent_ph) {
+  if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
+    printf(
+        "Starting schedule_visit_end (%s) with "
+        "(remaining: %d parent_ph: %d)\n",
+        aug_graph_name(aug_graph), remaining, parent_ph);
+  }
+
+  PHY_GRAPH* parent_phy = Declaration_info(aug_graph->lhs_decl)->node_phy_graph;
 
   CTO_NODE* cto_node;
 
@@ -1523,6 +1589,38 @@ static CTO_NODE* schedule_visit_end(AUG_GRAPH* aug_graph,
 }
 
 /**
+ * Utility function that handles the necessary routine to end the parent phase
+ * @param aug_graph Augmented dependency graph
+ * @param comp SCC component
+ * @param prev previous CTO node
+ * @param instance_groups array of <ph,ch> indexed by INSTANCE index
+ * @param prev_group previous scheduling group
+ * @param parent_ph current parent phase being worked on
+ * @return head of linked list
+ */
+static CTO_NODE* schedule_visit_end(AUG_GRAPH* aug_graph,
+                                    SCC_COMPONENT* comp,
+                                    int comp_index,
+                                    CTO_NODE* prev,
+                                    CONDITION cond,
+                                    TOTAL_ORDER_STATE* state,
+                                    const int remaining,
+                                    CHILD_PHASE* prev_group,
+                                    const short parent_ph) {
+  if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
+    printf(
+        "Starting schedule_visit_end (%s) with "
+        "(remaining: %d parent_ph: %d)\n",
+        aug_graph_name(aug_graph), remaining, parent_ph);
+  }
+
+  // Schedule any remaining empty visits if any
+  return schedule_empty_visits(
+      aug_graph, comp, comp_index, prev, cond, state, remaining, prev_group,
+      parent_ph, true /* follow up next with scheduling visit end marker */);
+}
+
+/**
  * Greedy circular group scheduler
  * @param aug_graph Augmented dependency graph
  * @param comp SCC component
@@ -1556,7 +1654,7 @@ static CTO_NODE* group_schedule(AUG_GRAPH* aug_graph,
   /* If nothing more to do, we are done. */
   if (remaining == 0) {
     return schedule_visit_end(aug_graph, NULL, comp_index, prev, cond, state,
-                              remaining, parent_ph);
+                              remaining, group, parent_ph);
   }
 
   /* Outer condition is impossible, it's a dead-end branch */
@@ -1635,7 +1733,7 @@ static CTO_NODE* group_schedule(AUG_GRAPH* aug_graph,
 
   // All done with scheduling
   return schedule_visit_end(aug_graph, comp, comp_index, prev, cond, state,
-                            remaining, parent_ph);
+                            remaining, group, parent_ph);
 }
 
 /**
@@ -1789,7 +1887,7 @@ static CTO_NODE* schedule_transition(AUG_GRAPH* aug_graph,
   if (remaining == 0) {
     if (!state->parent_visit_markers[parent_ph]) {
       return schedule_visit_end(aug_graph, prev_comp, prev_comp_index, prev,
-                                cond, state, remaining, parent_ph);
+                                cond, state, remaining, group, parent_ph);
     }
 
     return NULL;
@@ -1930,7 +2028,7 @@ static CTO_NODE* schedule_transition(AUG_GRAPH* aug_graph,
       !aug_graph->consolidated_ordered_scc_cycle[comp_index] &&
       parent_ph < state->max_parent_ph) {
     return schedule_visit_end(aug_graph, prev_comp, prev_comp_index, prev, cond,
-                              state, remaining, parent_ph);
+                              state, remaining, group, parent_ph);
   }
 
   if (continue_with_group) {
@@ -1971,24 +2069,6 @@ static void set_aug_graph_children(AUG_GRAPH* aug_graph,
   state->children.length = children_count;
 }
 
-void test_stuff(AUG_GRAPH* aug_graph) {
-  printf("aug is: %s\n", aug_graph_name(aug_graph));
-
-  int i, j;
-  int n = aug_graph->instances.length;
-  for (i = 0; i < aug_graph->instances.length; i++) {
-    for (j = 0; j < aug_graph->instances.length; j++) {
-      EDGESET es = aug_graph->graph[i * n + j];
-      while (es != NULL) {
-        if (!es->kind) {
-          fatal_error("Bad 273");
-        }
-        es = es->rest;
-      }
-    }
-  }
-}
-
 /**
  * Utility function to schedule augmented dependency graph
  * @param aug_graph Augmented dependency graph
@@ -1998,37 +2078,12 @@ static void schedule_augmented_dependency_graph(AUG_GRAPH* aug_graph) {
   CONDITION cond;
   int i, j, ch;
 
-  test_stuff(aug_graph);
   (void)close_augmented_dependency_graph(aug_graph);
 
   // Now schedule graph: we need to generate a conditional total order.
   if (oag_debug & PROD_ORDER) {
     printf("Scheduling conditional total order for %s\n",
            aug_graph_name(aug_graph));
-  }
-  if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
-    for (i = 0; i < n; ++i) {
-      INSTANCE* in = &(aug_graph->instances.array[i]);
-      print_instance(in, stdout);
-      printf(": ");
-      Declaration ad = in->fibered_attr.attr;
-      Declaration chdecl;
-
-      j = 0, ch = -1;
-      for (chdecl = aug_graph->first_rhs_decl; chdecl != 0;
-           chdecl = DECL_NEXT(chdecl)) {
-        if (in->node == chdecl)
-          ch = j;
-        ++j;
-      }
-      if (in->node == aug_graph->lhs_decl || ch >= 0) {
-        PHY_GRAPH* npg = Declaration_info(in->node)->node_phy_graph;
-        int ph = attribute_schedule(npg, &(in->fibered_attr));
-        printf("<%d,%d>\n", ph, ch);
-      } else {
-        printf("local\n");
-      }
-    }
   }
 
   TOTAL_ORDER_STATE* state =
@@ -2047,9 +2102,10 @@ static void schedule_augmented_dependency_graph(AUG_GRAPH* aug_graph) {
     int j = 0, ch = -1;
     for (chdecl = aug_graph->first_rhs_decl; chdecl != 0;
          chdecl = DECL_NEXT(chdecl)) {
-      if (in->node == chdecl)
+      if (in->node == chdecl) {
         ch = j;
-      ++j;
+      }
+      j++;
     }
 
     if (in->node == aug_graph->lhs_decl || ch >= 0) {
@@ -2124,7 +2180,7 @@ static void schedule_augmented_dependency_graph(AUG_GRAPH* aug_graph) {
       INSTANCE* in = &(aug_graph->instances.array[i]);
       CHILD_PHASE group = state->instance_groups[i];
       print_instance(in, stdout);
-      printf(": ");
+      printf(":");
 
       int cycle = instance_in_aug_cycle(aug_graph, in);
       if (cycle > -1) {
@@ -2158,33 +2214,6 @@ static void schedule_augmented_dependency_graph(AUG_GRAPH* aug_graph) {
     }
 
     printf("\n");
-  }
-
-  printf("print stuff for %s\n", aug_graph_name(aug_graph));
-  for (i = 0; i < aug_graph->instances.length; i++) {
-    INSTANCE* in1 = &aug_graph->instances.array[i];
-    for (j = 0; j < aug_graph->instances.length; j++) {
-      INSTANCE* in2 = &aug_graph->instances.array[j];
-      DEPENDENCY dep = edgeset_kind(
-          aug_graph
-              ->graph[in1->index * aug_graph->instances.length + in2->index]);
-      if (!(dep & DEPENDENCY_MAYBE_DIRECT) &&
-          (dep & DEPENDENCY_MAYBE_CARRYING)) {
-        print_instance(in1, stdout);
-        printf(" <%+d,%+d> -> ", state->instance_groups[in1->index].ph,
-               state->instance_groups[in1->index].ch);
-        print_instance(in2, stdout);
-        printf(" <%+d,%+d> (dependency: %d)\n",
-               state->instance_groups[in2->index].ph,
-               state->instance_groups[in2->index].ch, dep);
-      }
-    }
-  }
-
-  for (i = 0; i < aug_graph->consolidated_ordered_scc.length; i++) {
-    printf("[%d] %s\n", i,
-           aug_graph->consolidated_ordered_scc_cycle[i] ? "circuclar"
-                                                        : "non-circular");
   }
 
   cond.negative = 0;
