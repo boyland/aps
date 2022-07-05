@@ -23,6 +23,7 @@ static void *analyze_thing(void *ignore, void *node)
     Declaration decl = (Declaration)node;
     switch (Declaration_KEY(decl))
     {
+    default: break;
     case KEYmodule_decl:
       s = compute_dnc(decl);
       if (!(d = analysis_state_cycle(s)))
