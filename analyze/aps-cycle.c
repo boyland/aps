@@ -842,9 +842,10 @@ static void assert_circular_declaration(STATE* s) {
               any_cycle = true;
             } else {
               aps_error(node,
-                        "Instance (%s) involves in a cycle but it is not "
+                        "Phylum graph (%s) instance (%s) involves in a cycle "
+                        "but it is not "
                         "declared circular.",
-                        instance_to_str);
+                        phy_graph_name(phy), instance_to_str);
             }
           }
         }
@@ -852,9 +853,10 @@ static void assert_circular_declaration(STATE* s) {
 
       if (declared_circular && !any_cycle) {
         aps_warning(node,
-                    "Instance (%s) is declared circular but does not involve "
+                    "Phylum graph (%s) instance (%s) is declared circular but "
+                    "does not involve "
                     "in any cycle.",
-                    instance_to_str);
+                    phy_graph_name(phy), instance_to_str);
       }
     }
   }
@@ -890,18 +892,20 @@ static void assert_circular_declaration(STATE* s) {
               any_cycle = true;
             } else {
               aps_error(node,
-                        "Instance (%s) involves in a cycle but it is not "
+                        "Augmented graph (%s) instance (%s) involves in a "
+                        "cycle but it is not "
                         "declared circular.",
-                        instance_to_str);
+                        aug_graph_name(aug_graph), instance_to_str);
             }
           }
         }
       }
       if (declared_circular && !any_cycle) {
         aps_warning(node,
-                    "Instance (%s) is declared circular but does not involve "
+                    "Augmented graph (%s) instance (%s) is declared circular "
+                    "but does not involve "
                     "in any cycle.",
-                    instance_to_str);
+                    aug_graph_name(aug_graph), instance_to_str);
       }
     }
   }
