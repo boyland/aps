@@ -123,7 +123,10 @@ static void dump_loop_end(int component_index, ostream& os) {
 #endif /* APS2SCALA */
 }
 
-static void dump_loop_start(int component_index, ostream& os) {
+static void dump_loop_start(AUG_GRAPH* aug_graph,
+                            int parent_ph,
+                            int component_index,
+                            ostream& os) {
 #ifdef APS2SCALA
   // ABS value of component_index because initially it is -1
   string suffix = to_string(component_index);
@@ -133,6 +136,7 @@ static void dump_loop_start(int component_index, ostream& os) {
      << "component_index: " << component_index << "\n";
   os << indent() << "val prevChanged_" << suffix << " = changed;\n";
   os << indent() << "do {\n";
+  os << indent() << "changed = false;\n";
   ++nesting_level;
 #endif /* APS2SCALA */
 }
@@ -149,8 +153,7 @@ static bool implement_visit_function(
     CONDITION* cond,
     int component_index,
     bool loop_allowed,
-    vector<bool> inside_conditional,
-    vector<int> loop_component_index,
+    int loop_component_index,
     bool skip_previous_visit_code,
     ostream& os) {
   for (; cto; cto = cto->cto_next) {
@@ -168,27 +171,33 @@ static bool implement_visit_function(
     bool is_mod = false;
     switch (Declaration_KEY(aug_graph->syntax_decl)) {
       case KEYsome_class_decl:
-        is_mod = TRUE;
+        is_mod = true;
         break;
       default:
         break;
     }
 
     if (!is_mod && scc_changed) {
+      os << indent() << "// Finished with consolidated SCC #" << component_index
+         << "\n";
+
       // Need to close the loop if any
-      if (!loop_component_index.empty()) {
-        dump_loop_end(loop_component_index.back(), os);
-        loop_component_index.pop_back();
+      if (loop_allowed && loop_component_index != -1) {
+        dump_loop_end(loop_component_index, os);
+        loop_component_index = -1;
       }
 
+      os << indent() << "// Started working on with consolidated SCC #"
+         << cto->component << "\n";
+
       if (loop_allowed &&
-          aug_graph->consolidated_ordered_scc_cycle[component_index]) {
+          aug_graph->consolidated_ordered_scc_cycle[cto->component]) {
         if (!pg_parent->cyclic_flags[phase]) {
-          dump_loop_start(cto->component, os);
-          loop_component_index.push_back(cto->component);
+          dump_loop_start(aug_graph, phase, cto->component, os);
+          loop_component_index = cto->component;
         } else {
           os << indent() << "// Parent phase " << phase
-             << " is circular, fixed-point loop cannot be added here";
+             << " is circular, fixed-point loop cannot be added here\n";
         }
       }
     }
@@ -236,9 +245,9 @@ static bool implement_visit_function(
 
       if (!is_mod) {
         // Need to close the loop if any
-        if (!loop_component_index.empty()) {
-          dump_loop_end(loop_component_index.back(), os);
-          loop_component_index.pop_back();
+        if (loop_allowed && loop_component_index != -1) {
+          dump_loop_end(loop_component_index, os);
+          loop_component_index = -1;
         }
       }
 
@@ -268,6 +277,14 @@ static bool implement_visit_function(
          << " at phase " << ph << " is "
          << (pg->cyclic_flags[ph] ? "circular" : "non-circular") << "\n";
 
+      if (!pg_parent->cyclic_flags[phase] && pg->cyclic_flags[ph] &&
+          loop_allowed && loop_component_index == -1) {
+        fatal_error(
+            "The child visit(%d,%d) of %s should have been wrapped in a "
+            "do-while loop.",
+            n, ph, aug_graph_name(aug_graph));
+      }
+
       os << indent() << "visit_" << n << "_" << ph << "(";
 #ifdef APS2SCALA
       os << "v_" << decl_name(cto->child_decl);
@@ -294,12 +311,7 @@ static bool implement_visit_function(
 
     CONDITION icond = instance_condition(in);
     if (MERGED_CONDITION_IS_IMPOSSIBLE(*cond, icond)) {
-      char instance_str[BUFFER_SIZE];
-      FILE* f = fmemopen(instance_str, sizeof(instance_str), "w");
-      print_instance(in, f);
-      fclose(f);
-      os << indent() << "// '" << string(instance_str)
-         << "' attribute instance is impossible.\n";
+      os << indent() << "// '" << in << "' attribute instance is impossible.\n";
       continue;
     }
 
@@ -352,15 +364,11 @@ static bool implement_visit_function(
       vector<set<Expression>> true_assignment =
           make_instance_assignment(aug_graph, if_true, instance_assignment);
 
-      inside_conditional.push_back(true);
       cond->positive |= cmask;
-      implement_visit_function(
-          aug_graph, phase, cto->cto_if_true, true_assignment, nch, cond,
-          cto->component, loop_allowed, inside_conditional,
-          loop_component_index, skip_previous_visit_code, os);
+      implement_visit_function(aug_graph, phase, cto->cto_if_true,
+                               true_assignment, nch, cond, cto->component,
+                               loop_allowed, -1, skip_previous_visit_code, os);
       cond->positive &= ~cmask;
-
-      inside_conditional.pop_back();
 
       --nesting_level;
 #ifdef APS2SCALA
@@ -379,15 +387,11 @@ static bool implement_visit_function(
                                               instance_assignment)
                    : instance_assignment;
 
-      inside_conditional.push_back(true);
       cond->negative |= cmask;
       bool cont = implement_visit_function(
           aug_graph, phase, cto->cto_if_false, false_assignment, nch, cond,
-          cto->component, loop_allowed, inside_conditional,
-          loop_component_index, skip_previous_visit_code, os);
+          cto->component, loop_allowed, -1, skip_previous_visit_code, os);
       cond->negative &= cmask;
-
-      inside_conditional.pop_back();
 
       --nesting_level;
 #ifdef APS2SCALA
@@ -397,9 +401,9 @@ static bool implement_visit_function(
         os << indent() << "}\n";
       }
 
-      if (!loop_component_index.empty() && !inside_conditional.back()) {
-        dump_loop_end(loop_component_index.back(), os);
-        loop_component_index.pop_back();
+      if (loop_allowed && loop_component_index != -1) {
+        dump_loop_end(loop_component_index, os);
+        loop_component_index = -1;
       }
 
 #else  /* APS2SCALA */
@@ -648,14 +652,8 @@ void dump_visit_functions(PHY_GRAPH* phy_graph,
     cond.positive = 0;
     cond.negative = 0;
 
-    vector<int> loop_component_index;
-
-    vector<bool> inside_condition;
-    inside_condition.push_back(false);
-
     implement_visit_function(aug_graph, phase, total_order, instance_assignment,
-                             nch, &cond, -1, true, inside_condition,
-                             loop_component_index, true, os);
+                             nch, &cond, -1, true, -1, true, os);
 
     --nesting_level;
 #ifdef APS2SCALA
@@ -882,15 +880,9 @@ void dump_visit_functions(STATE* s, output_streams& oss)
   cond.positive = 0;
   cond.negative = 0;
 
-  vector<int> loop_component_index;
-
-  vector<bool> inside_condition;
-  inside_condition.push_back(false);
-
-  implement_visit_function(&s->global_dependencies, phase,
-                           s->global_dependencies.total_order,
-                           instance_assignment, 1, &cond, -1, true,
-                           inside_condition, loop_component_index, true, os);
+  implement_visit_function(
+      &s->global_dependencies, phase, s->global_dependencies.total_order,
+      instance_assignment, 1, &cond, -1, true, -1, false, os);
   --nesting_level;
   os << indent() << "}\n";
 }
@@ -952,16 +944,12 @@ void dump_scheduled_function_body(Declaration fd, STATE* s, ostream& bs) {
   cond.positive = 0;
   cond.negative = 0;
 
-  int max_phase = Declaration_info(aug_graph->lhs_decl)->node_phy_graph->max_phase;
+  int max_phase =
+      Declaration_info(aug_graph->lhs_decl)->node_phy_graph->max_phase;
 
-  vector<int> loop_component_index;
-
-  vector<bool> inside_condition;
-  inside_condition.push_back(false);
-
-  bool cont = implement_visit_function(
-      aug_graph, max_phase, schedule, instance_assignment, 0, &cond, -1, false,
-      inside_condition, loop_component_index, false, bs);
+  bool cont = implement_visit_function(aug_graph, max_phase, schedule,
+                                       instance_assignment, 0, &cond, -1, false,
+                                       -1, false, bs);
 
   Declaration returndecl = first_Declaration(function_type_return_values(ft));
   if (returndecl == 0) {
@@ -977,14 +965,9 @@ void dump_scheduled_function_body(Declaration fd, STATE* s, ostream& bs) {
     bs << "    /*\n";
     bs << "    // phase 2\n";
 
-    vector<int> loop_component_index;
-
-    vector<bool> inside_condition;
-    inside_condition.push_back(false);
-
-    while (implement_visit_function(
-        aug_graph, phase, schedule, instance_assignment, 0, &cond, -1, false,
-        inside_condition, loop_component_index, true, bs))
+    while (implement_visit_function(aug_graph, phase, schedule,
+                                    instance_assignment, 0, &cond, -1, false,
+                                    -1, true, bs))
       bs << indent() << "// phase " << ++phase << "\n";
     bs << indent() << "*/\n";
   }
