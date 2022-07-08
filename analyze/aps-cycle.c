@@ -77,6 +77,7 @@ static void get_fiber_cycles(STATE *s) {
       INSTANCE *iarray;
       int count = 0;
       CYCLE *cyc = &s->cycles.array[num_sets++];
+      DEPENDENCY kind = no_dependency;
       cyc->internal_info = i;
       for (j=0; j < num_instances; ++j) {
 	if (parent_index[j] >= 0 && get_set(j) == i) ++count;
@@ -87,9 +88,11 @@ static void get_fiber_cycles(STATE *s) {
       for (j=0; j < s->phyla.length; ++j) {
 	int phylum_index = phylum_instance_start[j];
 	PHY_GRAPH *phy = &s->phy_graphs[j];
-	for (k = 0; k < phy->instances.length; ++k) {
+        int n = phy->instances.length;
+	for (k = 0; k < n; ++k) {
 	  if (parent_index[phylum_index+k] == i) {
 	    iarray[count++] = phy->instances.array[k];
+            kind = dependency_join(kind,phy->mingraph[k*n+k]);
 	  }
 	}
       }
@@ -99,12 +102,16 @@ static void get_fiber_cycles(STATE *s) {
 	  (j == s->match_rules.length) ?
 	    &s->global_dependencies :
 	      &s->aug_graphs[j];
-	for (k = 0; k < aug_graph->instances.length; ++k) {
+        int n = aug_graph->instances.length;
+	for (k = 0; k < n; ++k) {
 	  if (parent_index[constructor_index+k] == i) {
 	    iarray[count++] = aug_graph->instances.array[k];
+            DEPENDENCY k1 = edgeset_kind(aug_graph->graph[k*n+k]);
+            kind = dependency_join(kind,k1);
 	  }
 	}
       }
+      cyc->kind = kind;
       if (count != cyc->instances.length) {
 	fatal_error("Counted %d instances in cycle, now have %d\n",
 		    cyc->instances.length,count);
@@ -115,7 +122,7 @@ static void get_fiber_cycles(STATE *s) {
     printf("%d independent fiber cycle%s found\n",num_sets,num_sets>1?"s":"");
     for (i=0; i < s->cycles.length; ++i) {
       CYCLE *cyc = &s->cycles.array[i];
-      printf("Cycle %d:\n",i);
+      printf("Cycle %d (%d):\n",i,cyc->kind);
       for (j = 0; j < cyc->instances.length; ++j) {
 	printf("  ");
 	print_instance(&cyc->instances.array[j],stdout);
