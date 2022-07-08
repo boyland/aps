@@ -2528,6 +2528,14 @@ DEPENDENCY analysis_state_cycle(STATE *s) {
       kind = dependency_join(kind,k1);
     }
   }
+  {
+    AUG_GRAPH *aug_graph = &s->global_dependencies;
+    int n = aug_graph->instances.length;
+    for (j=0; j < n; ++j) {
+      DEPENDENCY k1 = edgeset_kind(aug_graph->graph[j*n+j]);
+      kind = dependency_join(kind,k1);
+    }
+  }
   return kind;
 }
 
