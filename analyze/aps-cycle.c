@@ -69,7 +69,7 @@ static void merge_sets(int index1, int index2) {
 typedef VECTOR(int) SETS;
 
 static void get_fiber_cycles(STATE *s) {
-  int i,j,k,l;
+  int i,j,k;
   int num_sets = 0;
   for (i=0; i < num_instances; ++i) {
     if (parent_index[i] == i) ++num_sets;
