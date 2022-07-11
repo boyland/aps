@@ -12,7 +12,7 @@ UTILSLIB= ${PROJECT-DIR}/utils/utils.o
 
 all : apsc aps-ag.a
 
-CFLAGS=-I${PROJECT-DIR}/parse -I${PROJECT-DIR}/utils -g 
+CFLAGS= -I${PROJECT-DIR}/parse -I${PROJECT-DIR}/utils -g 
 apsc : ${APSCOBJS} ${APSCLIB}
 	${CC} ${CFLAGS} -o apsc ${APSCOBJS} ${APSCLIB} ${UTILSLIB}
 
