@@ -1,6 +1,7 @@
 #ifndef SCC_H
 #define SCC_H
 
+// Structure describing single SCC component
 struct scc_component {
   int size;
   int* array;
@@ -8,13 +9,15 @@ struct scc_component {
 
 typedef struct scc_component SCC_COMPONENT;
 
+// Structure describing vector of SCC components
 struct scc_components {
   int size;
-  SCC_COMPONENT* array;
+  SCC_COMPONENT** array;
 };
 
 typedef struct scc_components SCC_COMPONENTS;
 
+// Structure describing single vertex in an adjacency graph
 struct vertex {
   int value;
   struct vertex* next;
@@ -22,6 +25,7 @@ struct vertex {
 
 typedef struct vertex Vertex;
 
+// Structure describing adjacency graph
 struct scc_graph {
   int num_vertices;
   Vertex** neighbors;

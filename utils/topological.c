@@ -1,5 +1,5 @@
 /**
- * Topological Sort with linear time complexity using Stack and DFS traversal
+ * Topological Sort with linear time complexity using Stack and DFS traversal.
  */
 
 #include "topological.h"
@@ -66,14 +66,9 @@ static void dfs(int v,
     int w = curr->vertex;
     if (colors[w] == GRAY) {
       // Found a loop
-      if (graph->ignore_cycles) {
-        printf(
-
-            "Cycle was expected! will continue to find the topological "
-            "order.");
-      } else {
-        printf("Did not expect cycle while topological sorting the graph.");
-        exit(0);
+      if (!graph->ignore_cycles) {
+        perror("Did not expect cycle while topological sorting the graph.");
+        exit(1);
       }
     }
     if (colors[w] == WHITE) {
@@ -118,8 +113,8 @@ void topological_sort_graph_destroy(TopologicalSortGraph* graph) {
 TOPOLOGICAL_SORT_ORDER* find_topological_sort_order(
     TopologicalSortGraph* graph) {
   if (graph == NULL) {
-    printf("invalid graph provided to topological sort.");
-    exit(0);
+    perror("Invalid graph provided to topological sort.");
+    exit(1);
     return NULL;
   }
 

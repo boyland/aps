@@ -1,8 +1,12 @@
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <stdbool.h>
+/**
+ * Stack data structure using a linkedlist.
+ */
+
 #include "stack.h"
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 /**
  * @brief Create stack using endogenous linked list
@@ -18,7 +22,7 @@ void stack_create(LinkedStack** stack) {
  * @param value value to push to stack
  */
 void stack_push(LinkedStack** stack, int value) {
-  LinkedStack* item = malloc(sizeof(LinkedStack));
+  LinkedStack* item = (LinkedStack*)malloc(sizeof(LinkedStack));
   item->value = value;
   item->next = *stack;
   *stack = item;

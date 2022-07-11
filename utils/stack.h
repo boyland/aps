@@ -4,6 +4,7 @@
 
 #include <stdbool.h>
 
+// Structure describing stack linked list node
 struct linked_stack {
   int value;
   struct linked_stack* next;

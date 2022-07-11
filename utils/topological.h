@@ -11,6 +11,7 @@ struct adjacency_node {
 
 typedef struct adjacency_node AdjacencyNode;
 
+// Structure describing the result of topological sort
 struct topological_sort_order {
   int size;
   int* array;
@@ -56,6 +57,7 @@ void topological_sort_add_edge(TopologicalSortGraph* graph,
  * @param graph the graph that is being topological sorted
  * @return vector of indices (integer vector)
  */
-TOPOLOGICAL_SORT_ORDER* find_topological_sort_order(TopologicalSortGraph* graph);
+TOPOLOGICAL_SORT_ORDER* find_topological_sort_order(
+    TopologicalSortGraph* graph);
 
 #endif

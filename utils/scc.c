@@ -16,7 +16,7 @@
  * @return pointer to allocated graph
  */
 SccGraph* scc_graph_create(int num_vertices) {
-  SccGraph* graph = malloc(sizeof(SccGraph));
+  SccGraph* graph = (SccGraph*)malloc(sizeof(SccGraph));
   graph->num_vertices = num_vertices;
   size_t vertices_size = num_vertices * sizeof(Vertex*);
   graph->neighbors = (Vertex**)malloc(vertices_size);
@@ -138,8 +138,8 @@ void dfs_collect_scc(SccGraph* graph,
  */
 SCC_COMPONENTS* scc_graph_components(SccGraph* graph) {
   if (graph == NULL || graph->num_vertices <= 0) {
-    printf("Graph parameter passed to Kosaraju method is not valid.");
-    exit(0);
+    perror("Graph parameter passed to Kosaraju method is not valid.");
+    exit(1);
   }
 
   int i, j;
@@ -191,12 +191,12 @@ SCC_COMPONENTS* scc_graph_components(SccGraph* graph) {
   SCC_COMPONENTS* result = (SCC_COMPONENTS*)malloc(sizeof(SCC_COMPONENTS));
   result->size = num_components;
   result->array =
-      (SCC_COMPONENT*)malloc(num_components * sizeof(SCC_COMPONENT));
+      (SCC_COMPONENT**)malloc(num_components * sizeof(SCC_COMPONENT*));
 
   for (i = 0; i < num_components; i++) {
     SCC_COMPONENT* comp = (SCC_COMPONENT*)malloc(sizeof(SCC_COMPONENT));
     comp->size = components_count[i];
-    result->array[i] = *comp;
+    result->array[i] = comp;
     for (j = 0; j < components_count[i]; j++) {
       comp->array[j] = components_array[i * n + j];
     }
