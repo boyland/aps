@@ -19,6 +19,7 @@ struct topological_sort_order {
 
 typedef struct topological_sort_order TOPOLOGICAL_SORT_ORDER;
 
+// Structure describing the graph being topologically sorted
 struct topological_sort_graph {
   AdjacencyNode**
       adjacencies;     // Adjacency linked list (indexed by vertex number)
