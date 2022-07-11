@@ -139,8 +139,8 @@ static void dump_loop_start(AUG_GRAPH* aug_graph,
      << "component_index: " << component_index << "\n";
   os << indent() << "val prevChanged_" << suffix << " = changed;\n";
   os << indent() << "do {\n";
-  os << indent() << "changed = false;\n";
   ++nesting_level;
+  os << indent() << "changed = false;\n";
 #endif /* APS2SCALA */
 }
 
@@ -186,7 +186,7 @@ static bool implement_visit_function(
 
       // Need to close the loop if any
       if (loop_allowed && loop_component_index != -1) {
-        dump_loop_end(loop_component_index, os);
+        dump_loop_end(aug_graph, phase, loop_component_index, os);
         loop_component_index = -1;
       }
 
@@ -256,7 +256,7 @@ static bool implement_visit_function(
       if (!is_mod) {
         // Need to close the loop if any
         if (loop_allowed && loop_component_index != -1) {
-          dump_loop_end(loop_component_index, os);
+          dump_loop_end(aug_graph, phase, loop_component_index, os);
           loop_component_index = -1;
         }
       }
@@ -412,7 +412,7 @@ static bool implement_visit_function(
       }
 
       if (loop_allowed && loop_component_index != -1) {
-        dump_loop_end(loop_component_index, os);
+        dump_loop_end(aug_graph, phase, loop_component_index, os);
         loop_component_index = -1;
       }
 
