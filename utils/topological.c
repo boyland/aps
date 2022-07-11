@@ -2,7 +2,7 @@
  * Topological Sort with linear time complexity using Stack and DFS traversal
  */
 
-#include "topological-sort.h"
+#include "topological.h"
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>

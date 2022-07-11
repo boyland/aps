@@ -1,4 +1,4 @@
-SUBDIRS= parse analyze aps2scala 
+SUBDIRS= parse utils analyze aps2scala 
 install:
 	-mkdir lib bin
 	for d in ${SUBDIRS}; do \
