@@ -10,6 +10,7 @@ extern int cycle_debug;
 
 typedef struct cycle_description {
   int internal_info;
+  DEPENDENCY kind;
   VECTOR(INSTANCE) instances;
 } CYCLE;
 
