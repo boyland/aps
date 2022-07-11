@@ -1,8 +1,8 @@
 CPP=g++ 
-CPPFLAGS=-Wall -g -DUSING_CXX -I../parse -I../analyze -I../codegen
+CPPFLAGS=-Wall -g -DUSING_CXX -I../parse -I../analyze -I../codegen -I../utils
 
 APSCPPOBJS = apscpp.o dump-cpp.o implement.o dyn-impl.o static-impl.o
-APSCPPLIBS = ../lib/aps-lib.o ../lib/aps-ag.a
+APSCPPLIBS = ../lib/aps-lib.o ../lib/aps-ag.a ../utils/utils.o
 apscpp : ${APSCPPOBJS} ${APSCPPLIBS}
 	${CPP} ${CPPFLAGS} ${APSCPPOBJS} ${APSCPPLIBS} -o apscpp
 
