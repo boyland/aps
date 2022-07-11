@@ -103,7 +103,10 @@ vector<set<Expression>> make_instance_assignment(AUG_GRAPH* aug_graph,
 // where p is the production number (0-based constructor index)
 #define PHY_GRAPH_NUM(pg) (pg - pg->global_state->phy_graphs)
 
-static void dump_loop_end(int component_index, ostream& os) {
+static void dump_loop_end(AUG_GRAPH* aug_graph,
+                          int parent_ph,
+                          int component_index,
+                          ostream& os) {
 #ifdef APS2SCALA
   string suffix = to_string(component_index);
   std::replace(suffix.begin(), suffix.end(), '-', '_');
@@ -113,8 +116,8 @@ static void dump_loop_end(int component_index, ostream& os) {
   }
   --nesting_level;
   os << "\n";
-  os << indent() << "// "
-     << "component_index: " << component_index << "\n";
+  // os << indent() << "// "
+  //    << "component_index: " << component_index << "\n";
   os << indent() << "} while(changed);"
      << "\n";
   os << indent() << "changed = prevChanged_" << suffix << ";\n"
@@ -222,6 +225,9 @@ static bool implement_visit_function(
         int n = PHY_GRAPH_NUM(
             Declaration_info(aug_graph->syntax_decl)->node_phy_graph);
 
+        if (pg_parent->cyclic_flags[ph]) {
+          dump_loop_start(aug_graph, phase, component_index, os);
+        }
 #ifdef APS2SCALA
         os << indent() << "for (root <- roots) {\n";
 #else  /* APS2SCALA */
@@ -238,6 +244,10 @@ static bool implement_visit_function(
 
         --nesting_level;
         os << indent() << "}\n";
+
+        if (pg_parent->cyclic_flags[ph]) {
+          dump_loop_end(aug_graph, phase, component_index, os);
+        }
       }
 
       os << indent() << "// End of parent (" << aug_graph_name(aug_graph)

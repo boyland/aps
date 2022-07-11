@@ -13,6 +13,9 @@
 // <ph,ch> representing the parent inherited attributes
 CHILD_PHASE parent_inherited_group = {-1, -1};
 
+// Continuation type enums
+enum ContinueType { Group, Greedy, EndOfVisit };
+
 // Utility struct to keep of track of information needed to handle group
 // scheduling
 struct total_order_state {
@@ -33,8 +36,12 @@ struct total_order_state {
   // One-d array indicating child visit for a phase happened or not
   bool* parent_visit_markers;
 
+  // Boolean indexed by parent phase number indicating the investigation of
+  // parent inherited attributes
   bool** child_inh_investigations;
 
+  // Boolean indexed by parent phase number indicating the investigation of
+  // parent synthesized attributes
   bool* parent_synth_investigations;
 };
 
@@ -79,7 +86,7 @@ static CTO_NODE* schedule_empty_visits(AUG_GRAPH* aug_graph,
                                        const int remaining,
                                        CHILD_PHASE* prev_group,
                                        const short parent_ph,
-                                       bool visit_end);
+                                       const enum ContinueType continue_type);
 
 static CTO_NODE* schedule_visit_end_marker(AUG_GRAPH* aug_graph,
                                            SCC_COMPONENT* comp,
@@ -107,10 +114,10 @@ static CTO_NODE* schedule_transition(AUG_GRAPH* aug_graph,
                                      CTO_NODE* prev,
                                      CONDITION cond,
                                      TOTAL_ORDER_STATE* state,
-                                     int remaining,
+                                     const int remaining,
                                      CHILD_PHASE* group,
                                      const short parent_ph,
-                                     const bool continue_with_group);
+                                     const enum ContinueType continue_type);
 
 /**
  * Utility function that checks whether instance belongs to any phylum cycle
@@ -164,6 +171,26 @@ static int instance_in_aug_cycle(AUG_GRAPH* aug_graph, INSTANCE* in) {
   }
 
   return -1;
+}
+
+/**
+ * Utility function that returns boolean indicating whether attributes in SCC
+ * contain parent or not
+ * @param aug_graph augmented dependency graph
+ * @param comp SCC component
+ * @return boolean indicating whether attributes of parent are in SCC
+ */
+static bool scc_involves_parent(AUG_GRAPH* aug_graph, SCC_COMPONENT* comp) {
+  int i;
+  for (i = 0; i < comp->length; i++) {
+    INSTANCE* in = &aug_graph->instances.array[comp->array[i]];
+
+    if (aug_graph->lhs_decl == in->node) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 /**
@@ -1305,7 +1332,7 @@ static CTO_NODE* schedule_transition_start_of_group(AUG_GRAPH* aug_graph,
     return schedule_empty_visits(
         aug_graph, comp, comp_index, prev, cond, state, remaining, group,
         parent_ph,
-        false /* do not close of the visit, follow up with group scheduler */);
+        Group /* do not close of the visit, follow up with group scheduler */);
   }
 
   // If we are scheduling child synthesized attributes we need to make sure we
@@ -1425,6 +1452,8 @@ static CTO_NODE* schedule_transition_end_of_group(AUG_GRAPH* aug_graph,
     return cto_node;
   }
 
+  // Add end of parent visit marker when finishing parent synthesized
+  // attributes.
   if (group->ph > 0 && group->ch == -1 &&
       !state->parent_visit_markers[group->ph]) {
     state->parent_synth_investigations[group->ph] = true;
@@ -1461,7 +1490,7 @@ static CTO_NODE* schedule_empty_visits(AUG_GRAPH* aug_graph,
                                        const int remaining,
                                        CHILD_PHASE* prev_group,
                                        const short parent_ph,
-                                       bool visit_end) {
+                                       const enum ContinueType continue_type) {
   PHY_GRAPH* parent_phy = Declaration_info(aug_graph->lhs_decl)->node_phy_graph;
 
   int ch, ph;
@@ -1476,7 +1505,12 @@ static CTO_NODE* schedule_empty_visits(AUG_GRAPH* aug_graph,
       if (!state->child_visit_markers[ch][ph]) {
         // As soon as we encounter a child visit that is not empty and not
         // scheduler, stop. Otherwise, we would be going too far
-        if (!state->child_visit_markers[ch][ph] && !child_phy->empty_phase[ph])
+        if (!child_phy->empty_phase[ph])
+          break;
+
+        // If parent visit is circular but child visit is not circular, then
+        // this visit is not an appropriate for this empty visit call
+        if (parent_phy->cyclic_flags[parent_ph] && !child_phy->cyclic_flags[ph])
           break;
 
         CTO_NODE* cto_node = (CTO_NODE*)HALLOC(sizeof(CTO_NODE));
@@ -1488,10 +1522,10 @@ static CTO_NODE* schedule_empty_visits(AUG_GRAPH* aug_graph,
         cto_node->component = comp_index;
         cto_node->visit = parent_ph;
         state->child_visit_markers[ch][ph] = true;
-        cto_node->cto_next =
-            schedule_empty_visits(aug_graph, comp, comp_index, cto_node, cond,
-                                  state, remaining /* no change*/,
-                                  &cto_node->child_phase, parent_ph, visit_end);
+        cto_node->cto_next = schedule_empty_visits(
+            aug_graph, comp, comp_index, cto_node, cond, state,
+            remaining /* no change*/, &cto_node->child_phase, parent_ph,
+            continue_type);
         state->child_visit_markers[ch][ph] = false;
 
         return cto_node;
@@ -1499,12 +1533,24 @@ static CTO_NODE* schedule_empty_visits(AUG_GRAPH* aug_graph,
     }
   }
 
-  if (visit_end) {
-    return schedule_visit_end_marker(aug_graph, comp, comp_index, prev, cond,
-                                     state, remaining, prev_group, parent_ph);
-  } else {
-    return group_schedule(aug_graph, comp, comp_index, prev, cond, state,
-                          remaining, prev_group, parent_ph);
+  // If request was ending the visit then just add the end of visit marker
+  // otherwise continue with group scheduler
+  switch (continue_type) {
+    case Group:
+      return group_schedule(aug_graph, comp, comp_index, prev, cond, state,
+                            remaining, prev_group, parent_ph);
+    case Greedy:
+      return greedy_schedule(aug_graph, comp, comp_index, prev, cond, state,
+                             remaining, prev_group, parent_ph);
+    case EndOfVisit:
+      return schedule_visit_end_marker(aug_graph, comp, comp_index, prev, cond,
+                                       state, remaining, prev_group, parent_ph);
+    default:
+      fatal_error(
+          "Unexpected scheduling continuation type %d while scheduling empty "
+          "visits.",
+          continue_type);
+      return NULL;
   }
 }
 
@@ -1617,7 +1663,8 @@ static CTO_NODE* schedule_visit_end(AUG_GRAPH* aug_graph,
   // Schedule any remaining empty visits if any
   return schedule_empty_visits(
       aug_graph, comp, comp_index, prev, cond, state, remaining, prev_group,
-      parent_ph, true /* follow up next with scheduling visit end marker */);
+      parent_ph,
+      EndOfVisit /* follow up next with scheduling visit end marker */);
 }
 
 /**
@@ -1728,7 +1775,7 @@ static CTO_NODE* group_schedule(AUG_GRAPH* aug_graph,
   if (remaining > 0) {
     return schedule_transition(aug_graph, comp, comp_index, prev, cond, state,
                                remaining, group, parent_ph,
-                               true /* contnue with group scheduler */);
+                               Group /* contnue with group scheduler */);
   }
 
   // All done with scheduling
@@ -1851,7 +1898,7 @@ static CTO_NODE* greedy_schedule(AUG_GRAPH* aug_graph,
   // Fallback to scc scheduler
   return schedule_transition(aug_graph, comp, comp_index, prev, cond, state,
                              remaining, prev_group, parent_ph,
-                             false /* contnue with greedy scheduler */);
+                             Greedy /* contnue with greedy scheduler */);
 }
 
 /**
@@ -1871,10 +1918,10 @@ static CTO_NODE* schedule_transition(AUG_GRAPH* aug_graph,
                                      CTO_NODE* prev,
                                      CONDITION cond,
                                      TOTAL_ORDER_STATE* state,
-                                     int remaining,
+                                     const int remaining,
                                      CHILD_PHASE* group,
                                      const short parent_ph,
-                                     const bool continue_with_group) {
+                                     const enum ContinueType continue_type) {
   if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
     printf(
         "Starting schedule_transition (%s) with (remaining: %d, "
@@ -2031,12 +2078,34 @@ static CTO_NODE* schedule_transition(AUG_GRAPH* aug_graph,
                               state, remaining, group, parent_ph);
   }
 
-  if (continue_with_group) {
-    return group_schedule(aug_graph, comp, comp_index, prev, cond, state,
-                          remaining, group, parent_ph);
-  } else {
-    return greedy_schedule(aug_graph, comp, comp_index, prev, cond, state,
-                           remaining, group, parent_ph);
+  // If we are trying to schedule SCC that is circular containing parent
+  // attributes but parent phase is non-circular then end the current parent
+  // phase if possible (to prevent adding once)
+  if (!phy_parent->cyclic_flags[parent_ph] &&
+      aug_graph->consolidated_ordered_scc_cycle[comp_index] &&
+      scc_involves_parent(aug_graph, comp) &&
+      parent_ph < state->max_parent_ph) {
+    return schedule_visit_end(aug_graph, prev_comp, prev_comp_index, prev, cond,
+                              state, remaining, group, parent_ph);
+  }
+
+  switch (continue_type) {
+    case Group:
+      return group_schedule(aug_graph, comp, comp_index, prev, cond, state,
+                            remaining, group, parent_ph);
+    case Greedy:
+      return greedy_schedule(aug_graph, comp, comp_index, prev, cond, state,
+                             remaining, group, parent_ph);
+    case EndOfVisit:
+      return schedule_visit_end(aug_graph, prev_comp, prev_comp_index, prev,
+                                cond, state, remaining, group, parent_ph);
+
+    default:
+      fatal_error(
+          "Unexpected scheduling continuation type %d while transitioning "
+          "between consolidated SCCs.",
+          continue_type);
+      return NULL;
   }
 }
 
@@ -2198,12 +2267,15 @@ static void schedule_augmented_dependency_graph(AUG_GRAPH* aug_graph) {
   }
 
   if (oag_debug & DEBUG_ORDER) {
-    printf("\nTenative consolidated SCC order for %s\n", aug_graph_name(aug_graph));
+    printf("\nTenative consolidated SCC order for %s\n",
+           aug_graph_name(aug_graph));
 
     for (i = 0; i < aug_graph->consolidated_ordered_scc.length; i++) {
       int comp_index = i;
       SCC_COMPONENT comp = aug_graph->consolidated_ordered_scc.array[i];
-      printf(">>> Starting consolidated SCC #%d\n", comp_index);
+      printf(">>> Starting consolidated SCC #%d [%s]\n", comp_index,
+             scc_involves_parent(aug_graph, &comp) ? "involving parent"
+                                                   : "NOT involving parnet");
       for (j = 0; j < comp.length; j++) {
         INSTANCE* in = &aug_graph->instances.array[comp.array[j]];
         print_instance(in, stdout);
