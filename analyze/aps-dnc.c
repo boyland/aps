@@ -1587,7 +1587,7 @@ static void *get_edges(void *vaug_graph, void *node) {
 	    record_condition_dependencies(&sink,cond,aug_graph);
 
 	    // Traverse the case_expr and add edge from things inside the case_expr to Match inside Case 
-	    record_expression_dependencies(&sink, cond, dependency, NO_MODIFIER, case_stmt_expr(decl), aug_graph);
+	    record_expression_dependencies(&sink, cond, dependency, NO_MODIFIER, some_case_stmt_expr(decl), aug_graph);
 
 	    for (; test != 0; test = Expression_info(test)->next_expr) {
 	      record_expression_dependencies(&sink,cond,control_dependency,
