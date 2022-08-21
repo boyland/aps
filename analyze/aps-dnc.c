@@ -1447,6 +1447,17 @@ static void *get_edges(void *vaug_graph, void *node) {
 	    record_condition_dependencies(&f,cond,aug_graph);
 	    record_expression_dependencies(&f,cond,dependency,NO_MODIFIER,
 					   expr,aug_graph);
+
+            // Add edge from formal inside of case_expr to every Match inside Case 
+            Match m;
+            VERTEX sink;
+            sink.node = 0;
+            sink.modifier = NO_MODIFIER;
+            for (m = first_Match(some_case_stmt_matchers(case_stmt)); m;
+                m = MATCH_NEXT(m)) {
+              sink.attr = (Declaration)m;
+              add_edges_to_graph(&f, &sink, cond, control_dependency, aug_graph);
+            }  
 	  }
 	}
 	break;
@@ -1574,6 +1585,9 @@ static void *get_edges(void *vaug_graph, void *node) {
 	    Expression test = Match_info(m)->match_test;
 	    sink.attr = (Declaration)m;
 	    record_condition_dependencies(&sink,cond,aug_graph);
+
+	    // Traverse the case_expr and edge from things inside the case_expr to Match inside Case 
+	    record_expression_dependencies(&sink, cond, dependency, NO_MODIFIER, case_stmt_expr(decl), aug_graph);
 
 	    for (; test != 0; test = Expression_info(test)->next_expr) {
 	      record_expression_dependencies(&sink,cond,control_dependency,
