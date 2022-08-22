@@ -1,0 +1,23 @@
+with "tiny";
+
+module TEST_COLL[T :: TINY[]] extends T begin
+  type Integers := SET[Integer];
+
+  attribute Root.result : Integer;
+  attribute Wood.total : Integer;
+  pragma synthesized(result,total);
+
+  match ?p=root(?w) begin
+    p.result := 100;
+    if w.total > 0 then
+      p.result := w.total;
+    endif;
+  end;
+  match ?l=leaf(?x) begin
+    l.total := x;
+  end;
+  match ?b=branch(?x,?y) begin
+    b.total := x.total + y.total;
+  end;
+
+end;
