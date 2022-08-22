@@ -1,0 +1,40 @@
+-- An abstract syntax tree definition for Featherweight Java
+-- (See Pierce et al, 2002)
+-- John Boyland
+-- March 2002
+
+with "symbol";
+module FJ[] begin
+
+  phylum Program;
+  phylum Classes := SEQUENCE[Class];
+  phylum Class;
+  phylum Features := SEQUENCE[Feature];
+  phylum Feature;
+  phylum Type;
+  phylum Formals := SEQUENCE[Formal];
+  phylum Formal;
+  phylum Expression;
+  phylum Actuals := SEQUENCE[Expression];
+  
+  constructor program(classes : Classes) : Program;
+
+  constructor class_decl(name : Symbol; superclass : Symbol; 
+			 contents : Features);
+  
+  -- no constructor constructor, since in FJ, it is sugar
+  
+  constructor field(name : Symbol; (type) : Type) : Feature;
+  constructor method(name : Symbol; formals : Formals; return_type : Type;
+		     body : Expression) : Feature;
+  
+  constructor class_type(name : Symbol) : Type;
+  
+  constructor formal(name : Symbol; (type) : Type) : Formal;
+  
+  constructor new_expr((type) : Type; actuals : Actuals) : Expression;
+  constructor call(receiver : Expression; name : Symbol; 
+		   actuals : Actuals) : Expression;
+  constructor select(object : Expression; name : Symbol);
+  constructor this_expr() : Expression;
+end;
