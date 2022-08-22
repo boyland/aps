@@ -1,0 +1,43 @@
+-- TEST-REMOTE.APS
+-- August 2022
+-- Test extending remote attribution to uses of attributes of remote nodes.
+
+-- This test uses some circumlocutions to hide what we are doing:
+-- - using "RWood" instead of "remote Wood" gets past one check
+-- - using "other.s" rather than "l.w.s" gets past another syntactic check
+-- But semantically the examples still does something that the
+-- scheduler cannot handle.  In the version of APS that this file
+-- was first checked in on, apssched will happily schedule this file,
+-- incorrectly evaluating x.s before y.i despite the fact that
+-- x.s depends indirectly on y.i
+
+with "tiny";
+module TEST_REMOTE[T :: var TINY[]] extends T begin
+	type RWood := remote Wood;
+	
+        attribute Wood.s : Integer;
+        attribute Wood.i : Integer;
+        attribute Wood.w : RWood;
+
+        attribute Root.r : Integer;
+
+        pragma inherited(i, w);
+        pragma synthesized(s, r);
+
+	match ?self=root(?t) begin
+       	      self.r := t.s;
+	end;
+
+	match ?self=branch(?x, ?y) begin
+		x.w := y;
+		y.w := self.w;
+		x.i := self.i + 1;
+		y.i := self.i + 2;
+		self.s := x.s + y.s;
+	end;
+
+	match ?l=leaf(?n) begin
+		other : RWood := l.w;
+		l.s := l.i + other.i + other.s;
+	end;
+end;
