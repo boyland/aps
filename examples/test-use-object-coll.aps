@@ -1,0 +1,32 @@
+with "tiny";
+
+module USE_OBJECT_COLL[T :: var TINY[]] extends T
+begin
+  phylum Object;
+  constructor object(x : Integer) : Object;
+
+  var collection attribute Object.col : Integer :> 0, (+);
+
+  type Obj := remote Object;
+
+  attribute Wood.obj : Obj;
+  pragma inherited(obj);
+
+  attribute Root.total : Integer;
+  pragma synthesized(total);
+
+  match ?p=root(?w) begin
+    o : Object := object(42);
+    w.obj := o;
+    p.total := o.col;
+  end;
+
+  match ?self=branch(?w1,?w2) begin
+    w1.obj := self.obj;
+    w2.obj := self.obj;
+  end;
+
+  match ?self=leaf(?n) begin
+    self.obj.col :> n;
+  end;
+end;
