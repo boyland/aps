@@ -26,6 +26,8 @@ module TEST_REMOTE[T :: var TINY[]] extends T begin
 
 	match ?self=root(?t) begin
        	      self.r := t.s;
+	      t.i := 0;
+	      t.w := Wood$nil;
 	end;
 
 	match ?self=branch(?x, ?y) begin
@@ -38,6 +40,10 @@ module TEST_REMOTE[T :: var TINY[]] extends T begin
 
 	match ?l=leaf(?n) begin
 		other : RWood := l.w;
-		l.s := l.i + other.i + other.s;
+		if other = nil then
+			l.s := n + l.i;
+		else
+			l.s := l.i + other.i + other.s;
+		endif;
 	end;
 end;
