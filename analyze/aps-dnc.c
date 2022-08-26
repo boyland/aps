@@ -1947,6 +1947,142 @@ static void init_augmented_dependency_graph(AUG_GRAPH *aug_graph,
   aug_graph->schedule = (int *)HALLOC(aug_graph->instances.length*sizeof(int));
 }
 
+static void* set_rhs_decl_flag(void* vstate, void* node) {
+  if (ABSTRACT_APS_tnode_phylum(node) == KEYDeclaration) {
+    Declaration decl = (Declaration)node;
+    switch (Declaration_KEY(decl)) {
+      case KEYassign: {
+        Declaration pdecl = proc_call_p(assign_rhs(decl));
+        if (pdecl != NULL) {
+          Declaration_info(decl)->decl_flags |= DECL_RHS_FLAG;
+        }
+        break;
+      }
+    }
+  }
+  return vstate;
+}
+
+static void set_decl_flags_aug_graph(Declaration tlm, STATE* state) {
+  // Traverse the tlm and set RHS flags of assignments
+  traverse_Declaration(set_rhs_decl_flag, state, tlm);
+
+  switch (Declaration_KEY(tlm)) {
+    case KEYmodule_decl: /* representing shared instances. */
+    {
+      Declaration_info(tlm)->decl_flags |= DECL_RHS_FLAG;
+      break;
+    }
+    case KEYsome_function_decl:
+    {
+      Declaration_info(tlm)->decl_flags |= DECL_LHS_FLAG;
+      
+      Type ftype = some_function_decl_type(tlm);
+      Declaration formal = first_Declaration(function_type_formals(ftype));
+      Declaration result =
+          first_Declaration(function_type_return_values(ftype));
+      for (; formal != NULL; formal = Declaration_info(formal)->next_decl) {
+        Declaration_info(formal)->decl_flags |= ATTR_DECL_INH_FLAG;
+      }
+      for (; result != NULL; result = Declaration_info(result)->next_decl) {
+        Declaration_info(result)->decl_flags |= ATTR_DECL_SYN_FLAG;
+      }
+      break;
+    }
+    case KEYtop_level_match:
+    {
+      Pattern pat = matcher_pat(top_level_match_m(tlm));
+      switch (Pattern_KEY(pat)) {
+        case KEYand_pattern:
+          switch (Pattern_KEY(and_pattern_p1(pat))) {
+            case KEYpattern_var:
+              Declaration lhs_decl = pattern_var_formal(and_pattern_p1(pat));
+              Declaration_info(lhs_decl)->decl_flags |= DECL_LHS_FLAG;
+              break;
+            default:
+              break;
+          }
+          pat = and_pattern_p2(pat);
+          break;
+        default:
+          break;
+      }
+      switch (Pattern_KEY(pat)) {
+        case KEYpattern_call:
+        {
+          Declaration last_rhs = NULL;
+          Pattern next_pat;
+          for (next_pat = first_PatternActual(pattern_call_actuals(pat));
+                next_pat != NULL;
+                next_pat = Pattern_info(next_pat)->next_pattern_actual) {
+            switch (Pattern_KEY(next_pat)) {
+              case KEYpattern_var: {
+                Declaration next_rhs = pattern_var_formal(next_pat);
+                Declaration_info(next_rhs)->decl_flags |= DECL_RHS_FLAG;
+                if (last_rhs != NULL) {
+                  Declaration_info(last_rhs)->next_decl = next_rhs;
+                }
+                last_rhs = next_rhs;
+                break;
+              }
+              default:
+                break;
+            }
+          }
+          break;
+        }
+        default:
+          break;
+      }
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+static void set_decl_flags(STATE* s, Declaration module) {
+  int i;
+  for (i = 0; i < s->match_rules.length; ++i) {
+    set_decl_flags_aug_graph(s->match_rules.array[i], s);
+  }
+  set_decl_flags_aug_graph(module, s);
+
+  Declarations decls = block_body(module_decl_contents(module));
+  /* initialize attribute kind of decls */
+  Declaration decl = first_Declaration(decls);
+  for (; decl != NULL; decl = Declaration_info(decl)->next_decl) {
+    switch (Declaration_KEY(decl)) {
+      case KEYattribute_decl:
+        if (!ATTR_DECL_IS_SYN(decl) && !ATTR_DECL_IS_INH(decl) &&
+            !FIELD_DECL_P(decl)) {
+          aps_warning(decl,
+                      "%s not declared either synthesized or inherited. "
+                      "Marking it as synthesized for now.",
+                      decl_name(decl));
+          Declaration_info(decl)->decl_flags |= ATTR_DECL_SYN_FLAG;
+        }
+        break;
+      case KEYsome_function_decl:
+      {
+        Type ftype = some_function_decl_type(decl);
+        Declaration d;
+        for (d = first_Declaration(function_type_formals(ftype)); d != NULL;
+              d = DECL_NEXT(d)) {
+          Declaration_info(d)->decl_flags |= ATTR_DECL_INH_FLAG;
+        }
+        for (d = first_Declaration(function_type_return_values(ftype));
+              d != NULL; d = DECL_NEXT(d)) {
+          Declaration_info(d)->decl_flags |= ATTR_DECL_SYN_FLAG;
+        }
+        break;
+      }
+      default:
+        break;
+    }
+  }
+}
+
 static void init_summary_dependency_graph(PHY_GRAPH *phy_graph,
 					  Declaration phylum,
 					  STATE *state)
@@ -2135,6 +2271,9 @@ static void init_analysis_state(STATE *s, Declaration module) {
       }
     }
   }
+
+  // Ensure declaration flags are all set before fibering begins
+  set_decl_flags(s, module);
   
   /* perform fibering */
   fiber_module(s->module,s);
