@@ -1968,7 +1968,7 @@ static void set_decl_flags_aug_graph(Declaration tlm, STATE* state) {
   traverse_Declaration(set_rhs_decl_flag, state, tlm);
 
   switch (Declaration_KEY(tlm)) {
-    case KEYmodule_decl: /* representing shared instances. */
+    case KEYmodule_decl:
     {
       Declaration_info(tlm)->decl_flags |= DECL_RHS_FLAG;
       break;
