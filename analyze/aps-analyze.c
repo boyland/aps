@@ -23,6 +23,7 @@ static void *analyze_thing(void *ignore, void *node)
     Declaration decl = (Declaration)node;
     switch (Declaration_KEY(decl))
     {
+    default: break;
     case KEYmodule_decl:
       s = compute_dnc(decl);
       if (!(d = analysis_state_cycle(s)))
@@ -31,7 +32,11 @@ static void *analyze_thing(void *ignore, void *node)
       }
       else if (!(d & DEPENDENCY_MAYBE_SIMPLE) || !(d & DEPENDENCY_NOT_JUST_FIBER))
       {
-        printf("Fiber cycle detected; cycle being removed\n");
+        printf("Fiber cycle detected (%d); cycle being removed\n", d);
+        if (cycle_debug & PRINT_CYCLE)
+        {
+          print_cycles(s, stdout);
+        }
         break_fiber_cycles(decl, s, d);
         d = 0;  // clear dependency
       }

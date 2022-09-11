@@ -1,0 +1,20 @@
+with "tiny";
+
+module THREE[T :: var TINY[]] extends T begin
+  
+  attribute Wood.i : Integer := 0;
+  attribute Wood.s : Integer := 0;
+  
+  pragma inherited(i);
+  pragma synthesized(s);
+  
+  match ?l=leaf(?n) begin
+    l.s := l.i + n;
+  end;
+  match ?b=branch(?x,?y) begin
+    b.s := 0;
+    x.i := y.s + b.i;
+    y.i := x.s + b.i;
+  end;
+end;
+    

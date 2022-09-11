@@ -56,10 +56,7 @@ static int get_set(int index) {
 }
 
 static void merge_sets(int index1, int index2) {
-  if (parent_index[index1] == -1) /* non normally cyclic */
-    parent_index[index1] = get_set(index2);
-  else
-    parent_index[get_set(index1)] = get_set(index2);
+  parent_index[get_set(index1)] = get_set(index2);
 }
 
 typedef VECTOR(int) SETS;
@@ -68,7 +65,8 @@ static void get_fiber_cycles(STATE *s) {
   int i,j,k;
   int num_sets = 0;
   for (i=0; i < num_instances; ++i) {
-    if (parent_index[i] == i) ++num_sets;
+    if (parent_index[i] < 0) continue;
+    if (get_set(i) == i) ++num_sets;
   }
   VECTORALLOC(s->cycles,CYCLE,num_sets);
   num_sets=0;
@@ -77,6 +75,7 @@ static void get_fiber_cycles(STATE *s) {
       INSTANCE *iarray;
       int count = 0;
       CYCLE *cyc = &s->cycles.array[num_sets++];
+      DEPENDENCY kind = no_dependency;
       cyc->internal_info = i;
       for (j=0; j < num_instances; ++j) {
 	if (parent_index[j] >= 0 && get_set(j) == i) ++count;
@@ -87,9 +86,11 @@ static void get_fiber_cycles(STATE *s) {
       for (j=0; j < s->phyla.length; ++j) {
 	int phylum_index = phylum_instance_start[j];
 	PHY_GRAPH *phy = &s->phy_graphs[j];
-	for (k = 0; k < phy->instances.length; ++k) {
+        int n = phy->instances.length;
+	for (k = 0; k < n; ++k) {
 	  if (parent_index[phylum_index+k] == i) {
 	    iarray[count++] = phy->instances.array[k];
+            kind = dependency_join(kind,phy->mingraph[k*n+k]);
 	  }
 	}
       }
@@ -99,12 +100,16 @@ static void get_fiber_cycles(STATE *s) {
 	  (j == s->match_rules.length) ?
 	    &s->global_dependencies :
 	      &s->aug_graphs[j];
-	for (k = 0; k < aug_graph->instances.length; ++k) {
+        int n = aug_graph->instances.length;
+	for (k = 0; k < n; ++k) {
 	  if (parent_index[constructor_index+k] == i) {
 	    iarray[count++] = aug_graph->instances.array[k];
+            DEPENDENCY k1 = edgeset_kind(aug_graph->graph[k*n+k]);
+            kind = dependency_join(kind,k1);
 	  }
 	}
       }
+      cyc->kind = kind;
       if (count != cyc->instances.length) {
 	fatal_error("Counted %d instances in cycle, now have %d\n",
 		    cyc->instances.length,count);
@@ -115,7 +120,7 @@ static void get_fiber_cycles(STATE *s) {
     printf("%d independent fiber cycle%s found\n",num_sets,num_sets>1?"s":"");
     for (i=0; i < s->cycles.length; ++i) {
       CYCLE *cyc = &s->cycles.array[i];
-      printf("Cycle %d:\n",i);
+      printf("Cycle %d (%d):\n",i,cyc->kind);
       for (j = 0; j < cyc->instances.length; ++j) {
 	printf("  ");
 	print_instance(&cyc->instances.array[j],stdout);
@@ -262,6 +267,24 @@ static void make_augmented_cycles(AUG_GRAPH *aug_graph, int constructor_index)
   
 }
 
+/* true if dependencies can flow over a serial composition */
+static BOOL can_trans(EDGESET es1, EDGESET es2) {
+  EDGESET e1;
+  EDGESET e2;
+  for (e1 = es1; e1 != NULL; e1=e1->rest) {
+    for (e2 = es2; e2 != NULL; e2=e2->rest) {
+      CONDITION* cond1 = &e1->cond;
+      CONDITION* cond2 = &e2->cond;
+      CONDITION cond;
+      cond.positive = cond1->positive|cond2->positive;
+      cond.negative = cond1->negative|cond2->negative;
+      if (cond.positive & cond.negative) continue;
+      return TRUE;
+    }
+  }
+  return FALSE;
+}
+
 static void make_cycles(STATE *s) {
   int i,j,k;
   /* summary cycles */
@@ -303,7 +326,10 @@ static void make_cycles(STATE *s) {
 	  if (k != j &&
 	      edgeset_kind(aug_graph->graph[j*n+k]) != no_dependency &&
 	      edgeset_kind(aug_graph->graph[k*n+j]) != no_dependency) {
-	    merge_sets(constructor_index+j,constructor_index+k);
+            /* check to make sure conditions are compatible */
+            if (can_trans(aug_graph->graph[j*n+k],aug_graph->graph[k*n+j])) {
+              merge_sets(constructor_index+j,constructor_index+k);
+            }
 	  }
 	}
       }

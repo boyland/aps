@@ -537,6 +537,25 @@ static void *init_decl_cond(void *vcond, void *node) {
 	traverse_Block(init_decl_cond,&new_cond,case_stmt_default(decl));
       }
       return NULL;
+    case KEYfor_stmt: /* almost same as case, but no negative conditions */
+      {
+	Matches ms = for_stmt_matchers(decl);
+	Expression testvar = for_stmt_expr(decl);
+	CONDITION new_cond = *cond;
+	Match m;
+
+	Expression_info(testvar)->next_expr = 0;
+	traverse_Matches(get_match_tests,&testvar,ms);
+	for (m = first_Match(ms); m; m=MATCH_NEXT(m)) {
+	  int index = Match_info(m)->if_index;
+	  Match_info(m)->match_cond = new_cond;
+	  new_cond.positive |= (1 << index); /* first set it */
+	  traverse_Block(init_decl_cond,&new_cond,matcher_body(m));
+	  new_cond.positive &= ~(1 << index); /* now clear it */
+	  /* do not do a negative test */
+	}
+      }
+      return NULL;
     default: break;
     }
   default:
@@ -1420,7 +1439,7 @@ static void *get_edges(void *vaug_graph, void *node) {
       case KEYformal:
 	{ Declaration case_stmt = formal_in_case_p(decl);
 	  if (case_stmt != NULL) {
-	    Expression expr = case_stmt_expr(case_stmt);
+	    Expression expr = some_case_stmt_expr(case_stmt);
 	    VERTEX f;
 	    f.node = 0;
 	    f.attr = decl;
@@ -1545,13 +1564,13 @@ static void *get_edges(void *vaug_graph, void *node) {
 					 NO_MODIFIER, test, aug_graph);
 	}
 	break;
-      case KEYcase_stmt:
+      case KEYsome_case_stmt:
 	{
 	  Match m;
 	  VERTEX sink;
 	  sink.node = 0;
 	  sink.modifier = NO_MODIFIER;
-	  for (m=first_Match(case_stmt_matchers(decl)); m; m=MATCH_NEXT(m)) {
+	  for (m=first_Match(some_case_stmt_matchers(decl)); m; m=MATCH_NEXT(m)) {
 	    Expression test = Match_info(m)->match_test;
 	    sink.attr = (Declaration)m;
 	    record_condition_dependencies(&sink,cond,aug_graph);
@@ -1563,6 +1582,18 @@ static void *get_edges(void *vaug_graph, void *node) {
 	  }
 	}
 	break;
+      case KEYfor_in_stmt:
+        { Declaration formal = for_in_stmt_formal(decl);
+          Expression expr = for_in_stmt_seq(decl);
+          VERTEX f;
+          f.node = 0;
+          f.attr = formal;
+          f.modifier = NO_MODIFIER;
+          record_condition_dependencies(&f,cond,aug_graph);
+          record_expression_dependencies(&f,cond,dependency,NO_MODIFIER,
+                                         expr,aug_graph);
+	}
+        break;
       default:
 	printf("%d: don't handle this kind yet\n",tnode_line_number(decl));
 	break;
@@ -2019,6 +2050,7 @@ static void init_analysis_state(STATE *s, Declaration module) {
 	/*DEBUG fprintf(stderr,"got an extension!\n"); */
 	for (; edecl != NULL; edecl = Declaration_info(edecl)->next_decl) {
 	  switch (Declaration_KEY(edecl)) {
+          default: break;
 	  case KEYphylum_decl:
 	    if (def_is_public(phylum_decl_def(edecl))) ++phyla_count;
 	    if (DECL_IS_START_PHYLUM(edecl)) s->start_phylum = edecl;
@@ -2034,6 +2066,7 @@ static void init_analysis_state(STATE *s, Declaration module) {
       { Declaration decl = first_Declaration(decls);
 	for (; decl != NULL; decl = DECL_NEXT(decl)) {
 	  switch (Declaration_KEY(decl)) {
+          default: break;
 	  case KEYsome_function_decl:
 	    ++phyla_count;
 	    break;
@@ -2047,6 +2080,7 @@ static void init_analysis_state(STATE *s, Declaration module) {
 	for (edecl = first_Declaration(edecls);
 	     edecl != NULL; edecl = Declaration_info(edecl)->next_decl) {
 	  switch (Declaration_KEY(edecl)) {
+          default: break;
 	  case KEYphylum_decl:
 	    if (def_is_public(phylum_decl_def(edecl)))  {
 	      s->phyla.array[phyla_count++] = edecl;
@@ -2058,6 +2092,7 @@ static void init_analysis_state(STATE *s, Declaration module) {
       { Declaration decl = first_Declaration(decls);
 	for (; decl != NULL; decl = DECL_NEXT(decl)) {
 	  switch (Declaration_KEY(decl)) {
+          default: break;
 	  case KEYsome_function_decl:
 	    s->phyla.array[phyla_count++] = decl;
 	    break;
@@ -2073,6 +2108,7 @@ static void init_analysis_state(STATE *s, Declaration module) {
     if (decl == NULL) aps_error(module,"empty module");
     for (; decl != NULL; decl = Declaration_info(decl)->next_decl) {
       switch (Declaration_KEY(decl)) {
+      default: break;
       case KEYsome_function_decl:
       case KEYtop_level_match: ++match_rule_count; break;
 	/*DEBUG
@@ -2091,6 +2127,7 @@ static void init_analysis_state(STATE *s, Declaration module) {
 	 decl != NULL;
 	 decl = Declaration_info(decl)->next_decl) {
       switch (Declaration_KEY(decl)) {
+      default: break;
       case KEYsome_function_decl:
       case KEYtop_level_match:
 	s->match_rules.array[match_rule_count++] = decl;
@@ -2107,6 +2144,7 @@ static void init_analysis_state(STATE *s, Declaration module) {
   { Declaration decl = first_Declaration(decls);
     for (; decl != NULL; decl = Declaration_info(decl)->next_decl) {
       switch (Declaration_KEY(decl)) {
+      default: break;
       case KEYattribute_decl:
 	if (!ATTR_DECL_IS_SYN(decl) && !ATTR_DECL_IS_INH(decl) &&
 	    !FIELD_DECL_P(decl)) {
@@ -2118,6 +2156,7 @@ static void init_analysis_state(STATE *s, Declaration module) {
 	  Declaration formal = first_Declaration(function_type_formals(ftype));
 	  Type ntype = formal_type(formal);
 	  switch (Type_KEY(ntype)) {
+          default: break;
 	  case KEYtype_use:
 	    { Declaration phylum=Use_info(type_use_use(ntype))->use_decl;
 	      if (phylum == NULL)
@@ -2291,6 +2330,7 @@ void *augment_dependency_graph_func_calls(void *paug_graph, void *node) {
   case KEYDeclaration:
     { Declaration decl = (Declaration)node;
       switch (Declaration_KEY(decl)) {
+      default: break;
       case KEYsome_function_decl:
       case KEYtop_level_match:
 	/* don't look inside (unless its what we're doing the analysis for) */
@@ -2488,6 +2528,14 @@ DEPENDENCY analysis_state_cycle(STATE *s) {
       kind = dependency_join(kind,k1);
     }
   }
+  {
+    AUG_GRAPH *aug_graph = &s->global_dependencies;
+    int n = aug_graph->instances.length;
+    for (j=0; j < n; ++j) {
+      DEPENDENCY k1 = edgeset_kind(aug_graph->graph[j*n+j]);
+      kind = dependency_join(kind,k1);
+    }
+  }
   return kind;
 }
 
@@ -2676,6 +2724,7 @@ const char *aug_graph_name(AUG_GRAPH *aug_graph) {
   case KEYtop_level_match:
     { Pattern pat=matcher_pat(top_level_match_m(aug_graph->match_rule));
       switch (Pattern_KEY(pat)) {
+      default: break;
       case KEYand_pattern:
 	pat = and_pattern_p2(pat);
       }
@@ -2715,6 +2764,7 @@ void print_aug_graph(AUG_GRAPH *aug_graph, FILE *stream) {
   case KEYtop_level_match:
     { Pattern pat=matcher_pat(top_level_match_m(aug_graph->match_rule));
       switch (Pattern_KEY(pat)) {
+      default: break;
       case KEYand_pattern:
 	pat = and_pattern_p2(pat);
       }

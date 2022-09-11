@@ -27,6 +27,7 @@ all : test_cycle_implicit.class TestCycleDriver.class
 all : test_use_coll_implicit.class TestUseCollDriver.class
 all : grammar_implicit.class GrammarDriver.class
 all : nested_cycles_implicit.class NestedCyclesDriver.class
+all : broad_fiber_cycle_implicit.class BroadFiberCycleDriver.class
 
 .PHONY: run
 
@@ -145,6 +146,14 @@ use_global_implicit.class : use-global.scala tiny_implicit.class
 
 UseGlobal.class : use_global_implicit.class TinyParser.class
 UseGlobal.class : use-global-driver.scala
+	${SCALAC} ${SCALACFLAGS} $<
+
+broad_fiber_cycle_implicit.class : tiny_implicit.class
+broad_fiber_cycle_implicit.class : broad-fiber-cycle.scala
+	${SCALAC} ${SCALACFLAGS} $<
+
+BroadFiberCycleDriver.class : broad_fiber_cycle_implicit.class tiny_implicit.class
+BroadFiberCycleDriver.class : broad-fiber-cycle-driver.scala
 	${SCALAC} ${SCALACFLAGS} $<
 
 .PHONY: %.run
