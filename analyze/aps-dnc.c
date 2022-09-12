@@ -759,7 +759,6 @@ static void *get_instances(void *vaug_graph, void *node) {
 	    STATE *s = aug_graph->global_state;
 	    int i;
 	    Declaration_info(decl)->instance_index = index;
-	    Declaration_info(decl)->decl_flags |= DECL_RHS_FLAG;
 	    for (i=0; i < s->phyla.length; ++i) {
 	      if (s->phyla.array[i] == pdecl) {
 		Declaration_info(decl)->node_phy_graph = &s->phy_graphs[i];
@@ -1766,7 +1765,6 @@ static void init_augmented_dependency_graph(AUG_GRAPH *aug_graph,
 	fatal_error("%d: Cannot find start phylum summary graph",
 		    tnode_line_number(tlm));
       Declaration_info(tlm)->node_phy_graph = &state->phy_graphs[i];
-      Declaration_info(tlm)->decl_flags |= DECL_RHS_FLAG;
     }
     body = module_decl_contents(tlm);
     break;
@@ -1784,16 +1782,9 @@ static void init_augmented_dependency_graph(AUG_GRAPH *aug_graph,
       Declaration_info(tlm)->node_phy_graph = &state->phy_graphs[i];
     }
     body = some_function_decl_body(tlm);
-    Declaration_info(tlm)->decl_flags |= DECL_LHS_FLAG;
     { Type ftype=some_function_decl_type(tlm);
       Declaration formal=first_Declaration(function_type_formals(ftype));
       Declaration result=first_Declaration(function_type_return_values(ftype));
-      for (; formal != NULL; formal=Declaration_info(formal)->next_decl) {
-	Declaration_info(formal)->decl_flags |= ATTR_DECL_INH_FLAG;
-      }
-      for (; result != NULL; result=Declaration_info(result)->next_decl) {
-	Declaration_info(result)->decl_flags |= ATTR_DECL_SYN_FLAG;
-      }
     }
     break;
   case KEYtop_level_match:
@@ -1808,7 +1799,6 @@ static void init_augmented_dependency_graph(AUG_GRAPH *aug_graph,
 			     tnode_line_number(tlm));
 	case KEYpattern_var:
 	  aug_graph->lhs_decl = pattern_var_formal(and_pattern_p1(pat));
-	  Declaration_info(aug_graph->lhs_decl)->decl_flags |= DECL_LHS_FLAG;
 	  init_node_phy_graph(aug_graph->lhs_decl,state);
 	  break;
 	}
@@ -1839,7 +1829,6 @@ static void init_augmented_dependency_graph(AUG_GRAPH *aug_graph,
 	      break;
 	    case KEYpattern_var:
 	      { Declaration next_rhs = pattern_var_formal(next_pat);
-		Declaration_info(next_rhs)->decl_flags |= DECL_RHS_FLAG;
 		init_node_phy_graph(next_rhs,state);
 		if (last_rhs == NULL) {
 		  aug_graph->first_rhs_decl = next_rhs;
@@ -2010,7 +1999,6 @@ static void set_decl_flags_aug_graph(Declaration tlm, STATE* state) {
       switch (Pattern_KEY(pat)) {
         case KEYpattern_call:
         {
-          Declaration last_rhs = NULL;
           Pattern next_pat;
           for (next_pat = first_PatternActual(pattern_call_actuals(pat));
                 next_pat != NULL;
@@ -2019,10 +2007,6 @@ static void set_decl_flags_aug_graph(Declaration tlm, STATE* state) {
               case KEYpattern_var: {
                 Declaration next_rhs = pattern_var_formal(next_pat);
                 Declaration_info(next_rhs)->decl_flags |= DECL_RHS_FLAG;
-                if (last_rhs != NULL) {
-                  Declaration_info(last_rhs)->next_decl = next_rhs;
-                }
-                last_rhs = next_rhs;
                 break;
               }
               default:
