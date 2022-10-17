@@ -71,6 +71,7 @@ static void list_debug_flags() {
   fprintf(stderr,"\tw  WORKLIST_CHANGES\n");
   fprintf(stderr,"\tx  SUMMARY_EDGE_EXTRA\n");
   fprintf(stderr,"\t0  ASSERT_CLOSED\n");
+  fprintf(stderr,"\t@  EDGESET_ASSERTIONS\n");
   fprintf(stderr,"\tE  SUMMARY_EDGE\n");
   fprintf(stderr,"\t2  TWO_EDGE_CYCLE\n");
   fprintf(stderr,"\tD  DNC_FINAL\n");
@@ -112,6 +113,7 @@ void set_debug_flags(const char *options)
     case 'E': analysis_debug |= SUMMARY_EDGE; break;
     case 'D': analysis_debug |= DNC_FINAL; break;
     case 'I': analysis_debug |= DNC_ITERATE; break;
+    case '@': analysis_debug |= EDGESET_ASSERTIONS; break;
     case 'C': cycle_debug |= PRINT_CYCLE; break;
     case 'u': cycle_debug |= DEBUG_UP_DOWN; break;
     case 'U': cycle_debug |= PRINT_UP_DOWN; break;
