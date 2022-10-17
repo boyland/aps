@@ -170,24 +170,25 @@ static EDGESET edgeset_freelist = NULL;
 
 static VECTOR(EDGESET) private_check_vector;
 static int private_check_vector_used = 0;
-static Boolean check_all_edgesets__add(EDGESET e) {
+static bool check_all_edgesets__add(EDGESET e) {
   int n = private_check_vector_used;
   int i;
   if (private_check_vector.array == 0) {
-    VECTORALLOC(private_check_vector,EDGESET,16);
+    private_check_vector.length = 16;
+    private_check_vector.array = (EDGESET*)malloc(private_check_vector.length * sizeof(EDGESET));
+    printf("private_check_vector.length initialized to: %d\n", private_check_vector.length);
   }
   for (i=0; i < n; ++i) {
     if (private_check_vector.array[i] == e) return false;
   }
   if (n >= private_check_vector.length) {
-    EDGESET *oldarray = private_check_vector.array;
-    VECTORALLOC(private_check_vector,EDGESET,n*2);
-    for (i=0; i < n; ++i) {
-      private_check_vector.array[i] = oldarray[i];
-    }
+    private_check_vector.length = (private_check_vector.length << 2) + 1;
+    private_check_vector.array = (EDGESET*)realloc(private_check_vector.array, private_check_vector.length * sizeof(EDGESET));
+    printf("private_check_vector.length resized to: %d\n", private_check_vector.length);
   }
   private_check_vector.array[n] = e;
   ++private_check_vector_used;
+  return true;
 }
   
 void check_all_edgesets(AUG_GRAPH *aug_graph) {
@@ -207,10 +208,10 @@ void check_all_edgesets(AUG_GRAPH *aug_graph) {
     for (j=0; j < n; ++j) {
       EDGESET es = aug_graph->graph[i*n+j];
       while (es != NULL) {
-	if (!check_all_edgesets__add(es)) {
-	  fatal_error("Found duplicate edge set %d -> %d\n",i,j);
-	}
-	es = es->rest;
+        if (!check_all_edgesets__add(es)) {
+          fatal_error("Found duplicate edge set %d -> %d\n",i,j);
+        }
+	      es = es->rest;
       }
     }
   }
@@ -253,9 +254,6 @@ void free_edge(EDGESET old, AUG_GRAPH *aug_graph) {
   old->kind = no_dependency;
   remove_from_worklist(old,aug_graph);
   edgeset_freelist = old;
-  if (analysis_debug & EDGESET_ASSERTIONS) {
-    check_all_edgesets(aug_graph);
-  }
 }
 
 void free_edgeset(EDGESET es, AUG_GRAPH *aug_graph) {
@@ -365,6 +363,10 @@ void add_edge_to_graph(INSTANCE *source,
 
   aug_graph->graph[index] =
     add_edge(source,sink,cond,kind,aug_graph->graph[index],aug_graph);
+
+  if (analysis_debug & EDGESET_ASSERTIONS) {
+    check_all_edgesets(aug_graph);
+  }
 }
 
 void add_transitive_edge_to_graph(INSTANCE *source,
