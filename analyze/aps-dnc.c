@@ -211,7 +211,7 @@ void check_all_edgesets(AUG_GRAPH *aug_graph) {
         if (!check_all_edgesets__add(es)) {
           fatal_error("Found duplicate edge set %d -> %d\n",i,j);
         }
-	      es = es->rest;
+        es = es->rest;
       }
     }
   }
