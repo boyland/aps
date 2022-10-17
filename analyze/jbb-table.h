@@ -1,5 +1,5 @@
-#ifndef JBB_VECTOR_H
-#define JBB_VECTOR_H
+#ifndef JBB_TABLE_H
+#define JBB_TABLE_H
 
 typedef struct table *TABLE;
 
