@@ -1,3 +1,6 @@
+#ifndef JBB_ALIST_H
+#define JBB_ALIST_H
+
 typedef struct alist *ALIST;
 extern ALIST acons(void *key, void *value, ALIST rest);
 extern void *assoc(void *key, ALIST alist);
@@ -11,3 +14,4 @@ extern void* alist_key(ALIST);
 extern void* alist_value(ALIST);
 extern ALIST alist_next(ALIST);
 
+#endif

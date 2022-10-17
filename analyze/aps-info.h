@@ -4,6 +4,9 @@
  * we need a new slot.
  */
 
+#ifndef APS_INFO_H
+#define APS_INFO_H
+
 struct Program_info {
   unsigned program_flags;
 #define PROGRAM_BOUND_FLAG 1
@@ -178,3 +181,5 @@ extern void set_tnode_parent(Program p);
 extern void *tnode_parent(void *);
 
 #define decl_name(decl) (char*)symbol_name(def_name(declaration_def(decl)))
+
+#endif

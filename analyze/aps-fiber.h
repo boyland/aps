@@ -1,3 +1,6 @@
+#ifndef APS_FIBER_H
+#define APS_FIBER_H
+
 typedef struct fiber {
   /* three possibilities:
    * 1> null, only for a special case base fiber (never stored in sets)
@@ -114,5 +117,4 @@ typedef struct uset {
 #define EMPTY_OSET (OSET)NULL
 #define EMPTY_USET (USET)NULL
 
-
-
+#endif

@@ -1,3 +1,6 @@
+#ifndef APS_BIND_H
+#define APS_BIND_H
+
 extern void bind_Program(Program);
 extern Unit first_Unit(Units);
 extern Declaration first_Declaration(Declarations);
@@ -29,3 +32,5 @@ extern int decl_namespaces(Declaration d);
 
 extern int bind_debug;
 #define PRAGMA_ACTIVATION 1
+
+#endif

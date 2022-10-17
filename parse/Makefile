@@ -1,5 +1,6 @@
 CC=gcc
-CFLAGS=-Wall -g -DYYDEBUG -DYY_SKIP_YYWRAP
+LINTER_FLAGS= -Wno-pointer-to-int-cast -Wno-discarded-qualifiers -Wno-unused-function -Wno-int-to-pointer-cast
+CFLAGS=-Wall -g -DYYDEBUG -DYY_SKIP_YYWRAP ${LINTER_FLAGS}
 
 APSLIBOBJS= alloc.o string.o symbol.o \
 	    aps-tree.o aps-traverse.o aps-util.o \

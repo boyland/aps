@@ -2,6 +2,9 @@
 // Dec. 1999
 // Yu Wang
 
+#ifndef APS_FIBER_CALLSITE_H
+#define APS_FIBER_CALLSITE_H
+
 #include <string.h>
 #include "vector.h"
 
@@ -25,3 +28,5 @@ int callsite_set_empty_p(CALLSITE_SET) ;
 CALLSITE_SET empty_callsite_set() ;
 void INCLUDE(CALLSITE_SET*, CALLSITE_SET);
 int assign_sets(CALLSITE_SET , void* , CALLSITE_SET ) ;
+
+#endif

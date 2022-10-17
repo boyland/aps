@@ -1,3 +1,6 @@
+#ifndef APS_OAG_H
+#define APS_OAG_H
+
 extern void compute_oag(Declaration,STATE *);
 
 /** Return phase (synthesized) or -phase (inherited)
@@ -27,3 +30,5 @@ extern int oag_debug;
 #define PROD_ORDER 4
 #define PROD_ORDER_DEBUG 8
 #define TYPE_3_DEBUG 16
+
+#endif

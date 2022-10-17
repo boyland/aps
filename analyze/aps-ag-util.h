@@ -1,3 +1,6 @@
+#ifndef APS_AG_UTILS_H
+#define APS_AG_UTILS_H
+
 /** We require that top-level matches have the form
  *     match ?name:Type=constructor(?arg1,?arg2,...)
  * and provide the following functions for accessing the pieces.
@@ -12,5 +15,4 @@ extern Declaration match_constructor_decl(Match);
 extern Declaration match_first_rhs_decl(Match);
 extern Declaration next_rhs_decl(Declaration);
 
-
-
+#endif
