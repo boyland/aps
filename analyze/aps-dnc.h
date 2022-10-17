@@ -1,3 +1,6 @@
+#ifndef APS_DNC_H
+#define APS_DNC_H
+
 #include "jbb-vector.h"
 
 typedef struct attrset {
@@ -141,3 +144,5 @@ extern int analysis_debug;
 #define DNC_ITERATE (1<<11)
 #define TWO_EDGE_CYCLE (1<<12)
 #define ASSERT_CLOSED (1<<13)
+
+#endif

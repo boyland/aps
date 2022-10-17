@@ -426,7 +426,8 @@ bool type_is_syntax(Type t)
 
 static Declaration find_basic_decl(string name)
 {
-  Program p = find_Program(make_string("basic"));
+  char* basic = (char*)"basic";
+  Program p = find_Program(make_string(basic));
   Units us = program_units(p);
   for (Unit u = first_Unit(us); u; u = UNIT_NEXT(u)) {
     switch (Unit_KEY(u)) {
