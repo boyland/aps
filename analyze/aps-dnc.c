@@ -254,6 +254,10 @@ void free_edge(EDGESET old, AUG_GRAPH *aug_graph) {
   old->kind = no_dependency;
   remove_from_worklist(old,aug_graph);
   edgeset_freelist = old;
+
+  if (analysis_debug & EDGESET_ASSERTIONS) {
+    check_all_edgesets(aug_graph);
+  }
 }
 
 void free_edgeset(EDGESET es, AUG_GRAPH *aug_graph) {
@@ -363,10 +367,6 @@ void add_edge_to_graph(INSTANCE *source,
 
   aug_graph->graph[index] =
     add_edge(source,sink,cond,kind,aug_graph->graph[index],aug_graph);
-
-  if (analysis_debug & EDGESET_ASSERTIONS) {
-    check_all_edgesets(aug_graph);
-  }
 }
 
 void add_transitive_edge_to_graph(INSTANCE *source,
