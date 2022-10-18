@@ -176,7 +176,6 @@ static bool check_all_edgesets__add(EDGESET e) {
   if (private_check_vector.array == 0) {
     private_check_vector.length = 16;
     private_check_vector.array = (EDGESET*)malloc(private_check_vector.length * sizeof(EDGESET));
-    printf("private_check_vector.length initialized to: %d\n", private_check_vector.length);
   }
   for (i=0; i < n; ++i) {
     if (private_check_vector.array[i] == e) return false;
@@ -184,7 +183,6 @@ static bool check_all_edgesets__add(EDGESET e) {
   if (n >= private_check_vector.length) {
     private_check_vector.length = (private_check_vector.length << 2) + 1;
     private_check_vector.array = (EDGESET*)realloc(private_check_vector.array, private_check_vector.length * sizeof(EDGESET));
-    printf("private_check_vector.length resized to: %d\n", private_check_vector.length);
   }
   private_check_vector.array[n] = e;
   ++private_check_vector_used;
@@ -254,7 +252,6 @@ void free_edge(EDGESET old, AUG_GRAPH *aug_graph) {
   old->kind = no_dependency;
   remove_from_worklist(old,aug_graph);
   edgeset_freelist = old;
-
   if (analysis_debug & EDGESET_ASSERTIONS) {
     check_all_edgesets(aug_graph);
   }
