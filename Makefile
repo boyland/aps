@@ -1,6 +1,6 @@
 SUBDIRS= parse analyze aps2scala 
 install:
-	-mkdir lib bin
+	-mkdir -p lib bin
 	for d in ${SUBDIRS}; do \
 	  (cd $$d; ${MAKE} install); \
 	done

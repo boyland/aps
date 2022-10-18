@@ -17,9 +17,9 @@ void assert_true(const char *message, bool b)
   }
 }
 
-int hashcons_integer_hash(void *p)
+long hashcons_integer_hash(void *p)
 {
-  return *((int *)p);
+  return *((long *)p);
 }
 
 bool hashcons_integer_equals(void *p1, void *p2)
@@ -170,7 +170,7 @@ typedef struct dummy {
   char text[];
 } *DUMMY;
 
-int hashcons_dummy_hash(void *untyped)
+long hashcons_dummy_hash(void *untyped)
 {
   DUMMY item = (DUMMY) untyped;
   return hash_mix(item->key, hash_string(item->text));

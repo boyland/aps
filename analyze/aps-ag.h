@@ -20,6 +20,7 @@
 #include "hashcons.h"
 #include "canonical-type.h"
 #include "canonical-signature.h"
+#include "hashtable.h"
 
 extern char *aps_yyfilename;
 extern void aps_error(const void *tnode, const char *fmt, ...);
