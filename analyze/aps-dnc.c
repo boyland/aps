@@ -188,6 +188,7 @@ static Boolean check_all_edgesets__add(EDGESET e) {
   }
   private_check_vector.array[n] = e;
   ++private_check_vector_used;
+  return true;
 }
   
 void check_all_edgesets(AUG_GRAPH *aug_graph) {
@@ -2446,10 +2447,12 @@ void close_using_edge(AUG_GRAPH *aug_graph, EDGESET edge) {
 
   for (i=0; i < n; ++i) {
     EDGESET e;
+    EDGESET rest;
     /* first: instance[i]->source */
     for (e = aug_graph->graph[i*n+source_index];
 	 e != NULL;
-	 e = e->rest) {
+	 e = rest) {
+      rest = e->rest; /* may be modified in following: */
       add_transitive_edge_to_graph(e->source,edge->sink,
 				   &e->cond,&edge->cond,
 				   e->kind,edge->kind,
@@ -2458,7 +2461,8 @@ void close_using_edge(AUG_GRAPH *aug_graph, EDGESET edge) {
     /* then sink->instance[i] */
     for (e = aug_graph->graph[sink_index*n+i];
 	 e != NULL;
-	 e = e->rest) {
+	 e = rest) {
+      rest = e->rest;
       add_transitive_edge_to_graph(edge->source,e->sink,
 				   &edge->cond,&e->cond,
 				   edge->kind,e->kind,
