@@ -315,6 +315,16 @@ EDGESET add_edge(INSTANCE *source,
 		 DEPENDENCY kind,
 		 EDGESET current,
 		 AUG_GRAPH *aug_graph) {
+  if (!kind) {
+    print_instance(source,stdout);
+    fputs("->",stdout);
+    print_instance(sink,stdout);
+    fputs(":",stdout);
+    print_edge_helper(kind,cond,stdout);
+    puts("\n");
+    fatal_error("Trying to add dependency with kind=0 %d->%d", source->index, sink->index);
+  }
+
   if (current == NULL) {
     EDGESET new_edge=new_edgeset(source,sink,cond,kind);
     add_to_worklist(new_edge,aug_graph);
@@ -363,9 +373,11 @@ void add_edge_to_graph(INSTANCE *source,
 		       DEPENDENCY kind,
 		       AUG_GRAPH *aug_graph) {
   int index = source->index*(aug_graph->instances.length)+sink->index;
+  EDGESET current = aug_graph->graph[index];
+  aug_graph->graph[index] = NULL;
 
   aug_graph->graph[index] =
-    add_edge(source,sink,cond,kind,aug_graph->graph[index],aug_graph);
+    add_edge(source,sink,cond,kind,current,aug_graph);
 }
 
 void add_transitive_edge_to_graph(INSTANCE *source,
