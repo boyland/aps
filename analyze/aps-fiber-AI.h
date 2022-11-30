@@ -2,6 +2,9 @@
 // Dec. 1999
 // Yu Wang
 
+#ifndef APS_FIBER_AI_H
+#define APS_FIBER_AI_H
+
 #include <string.h>
 #include "vector.h"
 
@@ -26,3 +29,5 @@ void *check_all_decls(void *nouse, void * node) ;
 void expr_type(Expression e) ;
 void decl_type(Declaration d) ;
 void value_use_decl_type(Expression e) ;
+
+#endif

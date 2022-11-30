@@ -1,0 +1,22 @@
+with "tiny";
+
+module TINY_COLL[T :: var TINY[]] extends T
+begin
+  type Integers := SET[Integer];
+
+  collection attribute Wood.sum : Integer :> 0, (+);
+
+  pragma synthesized(sum);
+
+  match ?l=leaf(?x) begin
+    l.sum :> x;
+  end;
+  match ?b=branch(?x,?y) begin
+    b.sum :> x.sum;
+    b.sum :> y.sum;
+  end;
+
+  match ?p=root(?b) begin
+  end;
+
+end;
