@@ -1,18 +1,19 @@
 CC= gcc
 AR= ar
-CFLAGS= -Wall -shared
+CFLAGS= -shared
 
 .PHONY: default all clean
 
-all : utils.o
+all : utilities.o
 prime.o : prime.h
 hashcons.o : prime.o hashcons.h
 stack.o : stack.h
 scc.o : stack.o scc.h
-topological.o : topological.h
+topological.o : stack.o topological.h
+hashtable.o : prime.o hashtable.h
 
-install: utils.o
-utils.o: prime.o  hashcons.o stack.o scc.o topological.o
+install: utilities.o
+utilities.o: prime.o hashcons.o stack.o scc.o topological.o hashtable.o
 	$(AR) -cr $@ $^
 
 %.o: %.c

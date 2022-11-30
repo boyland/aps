@@ -8,13 +8,13 @@ APSAGOBJS= aps-bind.o aps-read.o aps-info.o aps-ag-util.o \
 	  canonical-signature.o canonical-type.o
 APSCOBJS= apsc.o ${APSAGOBJS} 
 APSCLIB= ${PROJECT-DIR}/lib/aps-lib.o
-UTILSLIB= ${PROJECT-DIR}/utils/utils.o
+UTILITIESLIB= ${PROJECT-DIR}/utilities/utilities.o
 
 all : apsc aps-ag.a
 
-CFLAGS= -I${PROJECT-DIR}/parse -I${PROJECT-DIR}/utils -g 
+CFLAGS= -I${PROJECT-DIR}/parse -I${PROJECT-DIR}/utilities -g 
 apsc : ${APSCOBJS} ${APSCLIB}
-	${CC} ${CFLAGS} -o apsc ${APSCOBJS} ${APSCLIB} ${UTILSLIB}
+	${CC} ${CFLAGS} -o apsc ${APSCOBJS} ${APSCLIB} ${UTILITIESLIB}
 
 aps-ag.a : ${APSAGOBJS}
 	${AR} -cr aps-ag.a ${APSAGOBJS}

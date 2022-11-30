@@ -27,9 +27,9 @@ static void sieve_of_eratosthenes(int n) {
 
   size_t bytes = n * sizeof(bool);
   if (primes.array == NULL) {
-    primes.array = (bool*)malloc(bytes);
+    primes.array = malloc(bytes);
   } else {
-    primes.array = (bool*)realloc(primes.array, bytes);
+    primes.array = realloc(primes.array, bytes);
   }
 
   memset(primes.array, true, bytes);
@@ -50,28 +50,57 @@ static void sieve_of_eratosthenes(int n) {
 }
 
 /**
+ * Resizes the primes table given new size.
+ * @param n lower bound prime number
+ */
+static void resize(int n) {
+  // If array size is not enough then resize the array
+  if (n >= primes.size) {
+    int new_size = DOUBLE_SIZE(primes.size + INITIAL_TABLE_SIZE);
+
+    // Resized array is also not enough
+    if (new_size <= n) {
+      new_size = DOUBLE_SIZE(n);
+    }
+
+    sieve_of_eratosthenes(new_size);
+  }
+}
+
+/**
  * Return the next prime number n great that or equal to the argument
  * such that n -2 is also prime
  * @param x lower bound prime number
  * @return larger of the next twin prime
  */
 int next_twin_prime(int p) {
-  // If array size is not enough then resize the array
-  if (p >= primes.size) {
-    int new_size = DOUBLE_SIZE(primes.size + INITIAL_TABLE_SIZE);
-
-    // Resized array is also not enough
-    if (new_size <= p) {
-      new_size = DOUBLE_SIZE(p);
-    }
-
-    sieve_of_eratosthenes(new_size);
-  }
+  resize(p);
 
   while (true) {
     int i;
     for (i = p; i < primes.size; i++) {
       if (primes.array[i] && primes.array[i - 2]) {
+        return i;
+      }
+    }
+
+    // Resize the prime array and try again
+    sieve_of_eratosthenes(DOUBLE_SIZE(primes.size));
+  }
+}
+
+/**
+ * Return the next prime number n great that or equal to the argument
+ * @param x lower bound prime number
+ * @return the next prime
+ */
+int next_prime(int p) {
+  resize(p);
+
+  while (true) {
+    int i;
+    for (i = p; i < primes.size; i++) {
+      if (primes.array[i]) {
         return i;
       }
     }

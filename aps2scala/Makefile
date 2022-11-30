@@ -1,8 +1,8 @@
 CPP=g++ 
-CPPFLAGS=-Wall -g -DUSING_CXX -DAPS2SCALA -I../parse -I../analyze -I../codegen -I../utils
+CPPFLAGS=-Wall -g -DUSING_CXX -DAPS2SCALA -I../parse -I../analyze -I../codegen
 
 APS2SCALAOBJS = aps2scala.o dump-scala.o implement.o dyn-impl.o static-impl.o
-APS2SCALALIBS = ../lib/aps-lib.o ../lib/aps-ag.a ../utils/utils.o
+APS2SCALALIBS = ../lib/aps-lib.o ../lib/aps-ag.a
 aps2scala : ${APS2SCALAOBJS} ${APS2SCALALIBS}
 	${CPP} ${CPPFLAGS} ${APS2SCALAOBJS} ${APS2SCALALIBS} -o aps2scala
 

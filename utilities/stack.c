@@ -1,11 +1,7 @@
-/**
- * Stack data structure using a linkedlist.
- */
-
 #include "stack.h"
+#include <malloc.h>
 #include <stdbool.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 
 /**
@@ -21,7 +17,7 @@ void stack_create(LinkedStack** stack) {
  * @param stack pointer to a stack pointer
  * @param value value to push to stack
  */
-void stack_push(LinkedStack** stack, int value) {
+void stack_push(LinkedStack** stack, uintptr_t value) {
   LinkedStack* item = (LinkedStack*)malloc(sizeof(LinkedStack));
   item->value = value;
   item->next = *stack;
@@ -35,7 +31,7 @@ void stack_push(LinkedStack** stack, int value) {
  * @return boolean indicating whether popping from the stack was successful or
  * not
  */
-bool stack_pop(LinkedStack** stack, int* v) {
+bool stack_pop(LinkedStack** stack, uintptr_t* v) {
   LinkedStack* old = *stack;
   if (old == NULL)
     return false;
@@ -61,7 +57,7 @@ bool stack_is_empty(LinkedStack** stack) {
  * @param stack pointer to a stack pointer
  */
 void stack_destroy(LinkedStack** stack) {
-  int v;
+  uintptr_t v;
   while (stack_pop(stack, &v))
     ;
 }

@@ -1,5 +1,6 @@
+
 /**
- * Topological Sort with linear time complexity using Stack and DFS traversal.
+ * Topological Sort with linear time complexity using Stack and DFS traversal
  */
 
 #include "topological.h"
@@ -7,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "prime.h"
 #include "stack.h"
 
 // Color definition
@@ -20,7 +22,7 @@
  * @param vertex vertex to add to adjacency linked list
  * @return new head of adjacency linked list
  */
-AdjacencyNode* insert_vertex(AdjacencyNode** adjacency, int vertex) {
+AdjacencyNode* insert_vertex(AdjacencyNode** adjacency, uintptr_t vertex) {
   // The new vertex
   AdjacencyNode* new = (AdjacencyNode*)malloc(sizeof(AdjacencyNode));
   new->vertex = vertex;
@@ -63,12 +65,16 @@ static void dfs(int v,
   colors[v] = GRAY;
   AdjacencyNode* curr = graph->adjacencies[v];
   while (curr != NULL) {
-    int w = curr->vertex;
+    int w = curr->vertex % graph->prime_size;
     if (colors[w] == GRAY) {
       // Found a loop
-      if (!graph->ignore_cycles) {
-        perror("Did not expect cycle while topological sorting the graph.");
-        exit(1);
+      if (graph->ignore_cycles) {
+        aps_warning(NULL,
+                    "Cycle was expected! will continue to find the topological "
+                    "order.");
+      } else {
+        fatal_error(
+            "Did not expect cycle while topological sorting the graph.");
       }
     }
     if (colors[w] == WHITE) {
@@ -110,18 +116,17 @@ void topological_sort_graph_destroy(TopologicalSortGraph* graph) {
  * @param graph the graph that is being topological sorted
  * @return vector of indices (integer vector)
  */
-TOPOLOGICAL_SORT_ORDER* find_topological_sort_order(
-    TopologicalSortGraph* graph) {
+TOPOLOGICAL_SORT_ORDER* topological_sort_order(TopologicalSortGraph* graph) {
   if (graph == NULL) {
-    perror("Invalid graph provided to topological sort.");
-    exit(1);
+    fatal_error("Invalid graph provided to topological sort.");
     return NULL;
   }
 
   int i;
-  int* colors = (int*)alloca(graph->num_vertices * sizeof(int));
+  int n = graph->prime_size;
+  int* colors = (int*)alloca(n * sizeof(int));
 
-  for (int i = 0; i < graph->num_vertices; i++) {
+  for (int i = 0; i < n; i++) {
     colors[i] = WHITE;
   }
 
@@ -129,7 +134,7 @@ TOPOLOGICAL_SORT_ORDER* find_topological_sort_order(
   stack_create(&stack);
 
   // DFS on the graph
-  for (i = 0; i < graph->num_vertices; i++) {
+  for (i = 0; i < n; i++) {
     if (colors[i] == WHITE) {
       dfs(i, colors, graph, &stack);
     }
@@ -137,10 +142,9 @@ TOPOLOGICAL_SORT_ORDER* find_topological_sort_order(
 
   TOPOLOGICAL_SORT_ORDER* order =
       (TOPOLOGICAL_SORT_ORDER*)malloc(sizeof(TOPOLOGICAL_SORT_ORDER));
-  order->size = graph->num_vertices;
-  order->array = (int*)malloc(sizeof(int) * graph->num_vertices);
+  VECTORALLOC(*order, uintptr_t, graph->num_vertices);
 
-  for (i = 0; i < graph->num_vertices; i++) {
+  for (i = 0; i < n; i++) {
     stack_pop(&stack, &order->array[i]);
   }
 
@@ -154,9 +158,10 @@ TOPOLOGICAL_SORT_ORDER* find_topological_sort_order(
  * @param sink sink index of edge
  */
 void topological_sort_add_edge(TopologicalSortGraph* graph,
-                               int source,
-                               int sink) {
-  graph->adjacencies[source] = insert_vertex(&graph->adjacencies[source], sink);
+                               uintptr_t source,
+                               uintptr_t sink) {
+  graph->adjacencies[source] =
+      insert_vertex(&graph->adjacencies[source % graph->prime_size], sink);
 }
 
 /**
@@ -174,6 +179,7 @@ TopologicalSortGraph* topological_sort_graph_create(int num_vertices,
 
   graph->num_vertices = num_vertices;
   graph->ignore_cycles = ignore_cycles;
+  graph->prime_size = next_prime(num_vertices);
 
   size_t adjacencies_size = num_vertices * sizeof(AdjacencyNode*);
   graph->adjacencies = (AdjacencyNode**)malloc(adjacencies_size);

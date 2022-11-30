@@ -1,11 +1,13 @@
-#ifndef STACK_H
-#define STACK_H
+
+#ifndef LINKED_STACK_H
+#define LINKED_STACK_H
 
 #include <stdbool.h>
+#include <stdint.h>
+#include "imports.r"
 
-// Structure describing stack linked list node
 struct linked_stack {
-  int value;
+  uintptr_t value;
   struct linked_stack* next;
 };
 
@@ -22,7 +24,7 @@ void stack_create(LinkedStack** stack);
  * @param stack pointer to a stack pointer
  * @param value value to push to stack
  */
-void stack_push(LinkedStack** stack, int value);
+void stack_push(LinkedStack** stack, uintptr_t value);
 
 /**
  * @brief Pop method of stack
@@ -31,7 +33,7 @@ void stack_push(LinkedStack** stack, int value);
  * @return boolean indicating whether popping from the stack was successful or
  * not
  */
-bool stack_pop(LinkedStack** stack, int* v);
+bool stack_pop(LinkedStack** stack, uintptr_t* v);
 
 /**
  * @brief Checks whether stack is empty or not

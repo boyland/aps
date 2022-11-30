@@ -1,34 +1,16 @@
 #ifndef SCC_H
 #define SCC_H
 
-// Structure describing single SCC component
-struct scc_component {
-  int size;
-  int* array;
-};
+#include <stdbool.h>
+#include "imports.r"
 
-typedef struct scc_component SCC_COMPONENT;
+typedef VECTOR(int) SCC_COMPONENT;
 
-// Structure describing vector of SCC components
-struct scc_components {
-  int size;
-  SCC_COMPONENT** array;
-};
+typedef VECTOR(SCC_COMPONENT) SCC_COMPONENTS;
 
-typedef struct scc_components SCC_COMPONENTS;
-
-// Structure describing single vertex in an adjacency graph
-struct vertex {
-  int value;
-  struct vertex* next;
-};
-
-typedef struct vertex Vertex;
-
-// Structure describing adjacency graph
 struct scc_graph {
   int num_vertices;
-  Vertex** neighbors;
+  bool* adjacency;
 };
 
 typedef struct scc_graph SccGraph;
@@ -57,6 +39,6 @@ void scc_graph_add_edge(SccGraph* graph, int source, int sink);
  * @brief Finds strongly connected components of a given graph
  * @param graph pointer to graph
  */
-SCC_COMPONENTS* scc_graph_components(SccGraph* graph);
+SCC_COMPONENTS scc_graph_components(SccGraph* graph);
 
 #endif
