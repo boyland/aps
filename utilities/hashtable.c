@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "imports.r"
 #include "prime.h"
 
 #define MAX_DENSITY 0.5
@@ -14,7 +15,7 @@
  * @param table hash table
  * @return candidate index to insert or search for hash entry
  */
-static int hash_table_candidate_index(const void* key, HASH_TABLE* table) {
+static int hash_table_candidate_index(void* key, HASH_TABLE* table) {
   long hash = table->hashf(key) & LONG_MAX;
   int index = hash % table->capacity;
   int step_size = hash % (table->capacity - 2) + 1;
@@ -36,8 +37,8 @@ static int hash_table_candidate_index(const void* key, HASH_TABLE* table) {
  * @param index index to insert the hash entry
  * @param item the item intended to get inserted into the table
  */
-static void hash_table_insert_at(const void* key,
-                                 const void* value,
+static void hash_table_insert_at(void* key,
+                                 void* value,
                                  const int index,
                                  HASH_TABLE* table) {
   table->table[index].key = key;
@@ -50,7 +51,7 @@ static void hash_table_insert_at(const void* key,
  * @param item the key of the hash entry
  * @return possible index of the hash entry
  */
-static int hash_table_search(const void* key, HASH_TABLE* table) {
+static int hash_table_search(void* key, HASH_TABLE* table) {
   int index = hash_table_candidate_index(key, table);
 
   return index;
@@ -82,7 +83,7 @@ static void hash_table_resize(const int capacity, HASH_TABLE* table) {
  * @param table hash table
  * @return the value of the hash entry given the key or NULL
  */
-const void* hash_table_get(const void* key, HASH_TABLE* table) {
+void* hash_table_get(void* key, HASH_TABLE* table) {
   int candidate_index = hash_table_search(key, table);
 
   if (table->equalf(table->table[candidate_index].key, key)) {
@@ -99,12 +100,9 @@ const void* hash_table_get(const void* key, HASH_TABLE* table) {
  * @param value hash entry value
  * @param table hash table
  */
-void hash_table_add_or_update(const void* key,
-                              const void* value,
-                              HASH_TABLE* table) {
+void hash_table_add_or_update(void* key, void* value, HASH_TABLE* table) {
   if (key == NULL) {
-    printf("NULL key is not allowed in hashtable.");
-    exit(1);
+    fatal_error("NULL key is not allowed in hashtable.");
     return;
   }
 
@@ -148,7 +146,7 @@ void hash_table_initialize(unsigned int initial_capacity,
  * @return boolean indicating if updating the entry's value was successful or
  * not
  */
-bool hash_table_remove(const void* key, HASH_TABLE* table) {
+bool hash_table_remove(void* key, HASH_TABLE* table) {
   int candidate_index = hash_table_search(key, table);
 
   if (table->equalf(table->table[candidate_index].key, key)) {
@@ -177,7 +175,7 @@ void hash_table_clear(HASH_TABLE* table) {
  * @param table hash table
  * @return boolean indicating whether entry with the value exists or not
  */
-bool hash_table_contains(const void* key, HASH_TABLE* table) {
+bool hash_table_contains(void* key, HASH_TABLE* table) {
   int candidate_index = hash_table_search(key, table);
 
   if (table->equalf(table->table[candidate_index].key, key)) {
@@ -185,4 +183,23 @@ bool hash_table_contains(const void* key, HASH_TABLE* table) {
   }
 
   return false;
+}
+
+/**
+ * Generic function that maps void* ptr to hash value
+ * @param v void* ptr
+ * @return address of void* ptr used as hash value
+ */
+long ptr_hashf(void* v) {
+  return (long)v;
+}
+
+/**
+ * Generic function that creates void* equality
+ * @param v1 void* ptr1
+ * @param v1 void* ptr2
+ * @return boolean indicating whether two ptrs are equal
+ */
+bool ptr_equalf(void* v1, void* v2) {
+  return v1 == v2;
 }

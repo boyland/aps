@@ -1,20 +1,20 @@
+# include ../external.variable
+
 CC=gcc 
-CFLAGS=-g -I ..
+LINTER_FLAGS=-Wno-int-to-pointer-cast -Wno-pointer-to-int-cast
+UTILITIES=../utilities.o
+CFLAGS=-g ${LINTER_FLAGS} -I. -I.. -I../../lib
+TESTS=hashcons_test.o hashtable_test.o 
+EXTERNAL_DEPENDENCIES=../../lib/aps-ag.a ../../lib/aps-lib.o ../utilities.o
 
 all: build test clean
-build: prime.o hashcons.o hashcons_test.o driver.o
+build: ${TESTS} ${UTILITIES} ${EXTERNAL_DEPENDENCIES} driver.o 
 	$(CC) $(CFLAGS) $^ -o test.out
 
-prime.o: ../prime.h ../prime.c
-	$(CC) -c $(CFLAGS) ../prime.c -o prime.o
+%_test.o: %_test.h %_test.c ${UTILITIES} 
+	$(CC) -c $(CFLAGS) $*_test.c
 
-hashcons.o: prime.o ../hashcons.h ../hashcons.c
-	$(CC) -c $(CFLAGS) prime.o ../hashcons.c -o hashcons.o
-
-hashcons_test.o: hashcons.o hashcons_test.h hashcons_test.c
-	$(CC) -c $(CFLAGS) hashcons_test.c
-
-driver.o: hashcons_test.o driver.c
+driver.o: ${TESTS} driver.c
 	$(CC) -c $(CFLAGS) driver.c -o driver.o
 
 test: build

@@ -8,8 +8,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "hashtable.h"
-#include "prime.h"
 #include "stack.h"
 
 // Color definition
@@ -17,12 +15,12 @@
 #define GRAY 1   // itself is visited, but its neighbors are still under visit
 #define BLACK 2  // both itself and all its neighbors are visited
 
-static int get_vertex_index(TopologicalSortGraph* graph, uintptr_t v) {
-  if (!hash_table_contains((const void*)v, graph->vertices_map)) {
-    fatal_error("Failed to find vertex %d in the vertex map", v);
+static int get_vertex_index_from_ptr(TopologicalSortGraph* graph, void* v) {
+  if (!hash_table_contains(v, graph->vertices_ptr_to_index_map)) {
+    fatal_error("Failed to find vertex ptr %d in the vertex map", v);
   }
 
-  int index = VOIDP2INT(hash_table_get((const void*)v, graph->vertices_map));
+  int index = VOIDP2INT(hash_table_get(v, graph->vertices_ptr_to_index_map));
 
   if (index < 0 || index >= graph->num_vertices) {
     fatal_error("Unexpected index %d was retrevied from the vertex map", index);
@@ -31,13 +29,24 @@ static int get_vertex_index(TopologicalSortGraph* graph, uintptr_t v) {
   return index;
 }
 
+static void* get_vertex_ptr_from_int(TopologicalSortGraph* graph, int v) {
+  if (!hash_table_contains(INT2VOIDP(v), graph->vertices_ptr_to_index_map)) {
+    fatal_error("Failed to find ptr of vertex with index %d in the vertex map",
+                v);
+  }
+
+  void* ptr = hash_table_get(INT2VOIDP(v), graph->vertices_ptr_to_index_map);
+
+  return ptr;
+}
+
 /**
  * Insert a new vertex to a linked list
  * @param adjacency reference to the head of adjacency linked list
  * @param vertex vertex to add to adjacency linked list
  * @return new head of adjacency linked list
  */
-AdjacencyNode* insert_vertex(AdjacencyNode** adjacency, uintptr_t vertex) {
+AdjacencyNode* insert_vertex(AdjacencyNode** adjacency, int vertex) {
   // The new vertex
   AdjacencyNode* new = (AdjacencyNode*)malloc(sizeof(AdjacencyNode));
   new->vertex = vertex;
@@ -73,34 +82,32 @@ AdjacencyNode* insert_vertex(AdjacencyNode** adjacency, uintptr_t vertex) {
  * @param graph the graph currently being topological sorted
  * @param stack reference to the head of stack
  */
-static void dfs(uintptr_t v,
+static void dfs(int v,
                 int* colors,
                 TopologicalSortGraph* graph,
                 LinkedStack** stack) {
-  int v_index = get_vertex_index(graph, v);
-  colors[v_index] = GRAY;
-  AdjacencyNode* curr = graph->adjacencies[v_index];
+  colors[v] = GRAY;
+  AdjacencyNode* curr = graph->adjacencies[v];
   while (curr != NULL) {
-    uintptr_t w = curr->vertex;
-    int w_index = get_vertex_index(graph, curr->vertex);
-    if (colors[w_index] == GRAY) {
+    int w = curr->vertex;
+    if (colors[w] == GRAY) {
       // Found a loop
       if (graph->ignore_cycles) {
         aps_warning(NULL,
                     "Cycle was expected! will continue to find the topological "
-                    "order.\n");
+                    "order.");
       } else {
         fatal_error(
             "Did not expect cycle while topological sorting the graph.");
       }
     }
-    if (colors[w_index] == WHITE) {
+    if (colors[w] == WHITE) {
       dfs(w, colors, graph, stack);
     }
     curr = curr->next;
   }
-  colors[v_index] = BLACK;
-  stack_push(stack, v);
+  colors[v] = BLACK;
+  stack_push(stack, INT2VOIDP(v));
 }
 
 /**
@@ -125,8 +132,11 @@ void topological_sort_graph_destroy(TopologicalSortGraph* graph) {
     free_adjacency_node(head);
   }
 
-  hash_table_clear(graph->vertices_map);
-  free(graph->vertices_map);
+  hash_table_clear(graph->vertices_ptr_to_index_map);
+  hash_table_clear(graph->vertices_index_to_ptr_map);
+
+  free(graph->vertices_ptr_to_index_map);
+  free(graph->vertices_index_to_ptr_map);
 
   free(graph);
 }
@@ -161,10 +171,12 @@ TOPOLOGICAL_SORT_ORDER* topological_sort_order(TopologicalSortGraph* graph) {
 
   TOPOLOGICAL_SORT_ORDER* order =
       (TOPOLOGICAL_SORT_ORDER*)malloc(sizeof(TOPOLOGICAL_SORT_ORDER));
-  VECTORALLOC(*order, uintptr_t, graph->num_vertices);
+  VECTORALLOC(*order, void*, graph->num_vertices);
 
   for (i = 0; i < graph->num_vertices; i++) {
-    stack_pop(&stack, &order->array[i]);
+    void* temp;
+    stack_pop(&stack, &temp);
+    order->array[i] = get_vertex_ptr_from_int(graph, VOIDP2INT(temp));
   }
 
   return order;
@@ -177,25 +189,35 @@ TOPOLOGICAL_SORT_ORDER* topological_sort_order(TopologicalSortGraph* graph) {
  * @param sink sink index of edge
  */
 void topological_sort_add_edge(TopologicalSortGraph* graph,
-                               uintptr_t source,
-                               uintptr_t sink) {
-  graph->adjacencies[get_vertex_index(graph, source)] =
-      insert_vertex(&graph->adjacencies[get_vertex_index(graph, source)], sink);
+                               void* source,
+                               void* sink) {
+  int source_index = get_vertex_index_from_ptr(graph, source);
+  int sink_index = get_vertex_index_from_ptr(graph, sink);
+
+  graph->adjacencies[source_index] =
+      insert_vertex(&graph->adjacencies[source_index], sink_index);
 }
 
-void topological_sort_add_vertex(TopologicalSortGraph* graph, uintptr_t v) {
-  hash_table_add_or_update((const void*)v, INT2VOIDP(graph->next_vertex_index),
-                           graph->vertices_map);
+/**
+ * Given topological sort graph it adds a vertex
+ * @param graph the graph that is being topological sorted
+ * @param v vertex
+ */
+void topological_sort_add_vertex(TopologicalSortGraph* graph, void* v) {
+  if (graph->next_vertex_index >= graph->num_vertices) {
+    fatal_error("Expected %d vertices to be added", graph->num_vertices);
+    return;
+  }
+
+  // ptr -> index
+  hash_table_add_or_update(v, INT2VOIDP(graph->next_vertex_index),
+                           graph->vertices_ptr_to_index_map);
+
+  // index -> ptr
+  hash_table_add_or_update(INT2VOIDP(graph->next_vertex_index), v,
+                           graph->vertices_index_to_ptr_map);
 
   graph->next_vertex_index++;
-}
-
-static long vertex_hash(const void* v) {
-  return (long)v;
-}
-
-static bool vertex_equals(const void* v1, const void* v2) {
-  return v1 == v2;
 }
 
 /**
@@ -211,18 +233,25 @@ TopologicalSortGraph* topological_sort_graph_create(int num_vertices,
   TopologicalSortGraph* graph =
       (TopologicalSortGraph*)malloc(sizeof(TopologicalSortGraph));
 
-  graph->next_vertex_index = 0;
   graph->num_vertices = num_vertices;
   graph->ignore_cycles = ignore_cycles;
 
   size_t adjacencies_size = num_vertices * sizeof(AdjacencyNode*);
   graph->adjacencies = (AdjacencyNode**)malloc(adjacencies_size);
 
-  graph->vertices_map = (HASH_TABLE*)malloc(sizeof(HASH_TABLE));
-  hash_table_initialize(num_vertices, vertex_hash, vertex_equals,
-                        graph->vertices_map);
-
   memset(graph->adjacencies, 0, adjacencies_size);
+
+  // Create a map to lookup from ptr to index
+  graph->vertices_ptr_to_index_map = (HASH_TABLE*)malloc(sizeof(HASH_TABLE));
+  hash_table_initialize(num_vertices, ptr_hashf, ptr_equalf,
+                        graph->vertices_ptr_to_index_map);
+
+  // Create a map to lookup from index to ptr
+  graph->vertices_index_to_ptr_map = (HASH_TABLE*)malloc(sizeof(HASH_TABLE));
+  hash_table_initialize(num_vertices, ptr_hashf, ptr_equalf,
+                        graph->vertices_index_to_ptr_map);
+
+  graph->next_vertex_index = 0;
 
   return graph;
 }

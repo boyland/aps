@@ -8,13 +8,13 @@
 
 // Define the basic component in adjacent list
 struct adjacency_node {
-  uintptr_t vertex;             // The vertex number
+  int vertex;                   // The vertex number
   struct adjacency_node* next;  // vertices of nodes connected to this node
 };
 
 typedef struct adjacency_node AdjacencyNode;
 
-typedef VECTOR(uintptr_t) TOPOLOGICAL_SORT_ORDER;
+typedef VECTOR(void*) TOPOLOGICAL_SORT_ORDER;
 
 struct topological_sort_graph {
   AdjacencyNode**
@@ -24,8 +24,10 @@ struct topological_sort_graph {
                        // cycles and returns the one of possibly many valid
                        // order, false if existence of cycle should cause a
                        // fatal error
-  HASH_TABLE* vertices_map;  // Map of uintptr_t to int index
-  int next_vertex_index;     // Index of the next vertex
+  HASH_TABLE* vertices_ptr_to_index_map;  // Map of void* to int index
+  HASH_TABLE* vertices_index_to_ptr_map;  // Map of int index to void*
+
+  int next_vertex_index;  // Index of the next vertex
 };
 
 typedef struct topological_sort_graph TopologicalSortGraph;
@@ -48,8 +50,15 @@ TopologicalSortGraph* topological_sort_graph_create(int num_vertices,
  * @param sink sink index of edge
  */
 void topological_sort_add_edge(TopologicalSortGraph* graph,
-                               uintptr_t source,
-                               uintptr_t sink);
+                               void* source,
+                               void* sink);
+
+/**
+ * Given topological sort graph it adds a vertex
+ * @param graph the graph that is being topological sorted
+ * @param v vertex
+ */
+void topological_sort_add_vertex(TopologicalSortGraph* graph, void* v);
 
 /**
  * Finds the topological sorted order

@@ -6,15 +6,25 @@
 #include "hashtable.h"
 #include "imports.r"
 
-typedef VECTOR(uintptr_t) SCC_COMPONENT;
+typedef VECTOR(void*) SCC_COMPONENT;
 
 typedef VECTOR(SCC_COMPONENT) SCC_COMPONENTS;
 
+struct vertex {
+  int value;
+  struct vertex* next;
+};
+
+typedef struct vertex Vertex;
+
 struct scc_graph {
   int num_vertices;
-  bool* adjacency;
-  HASH_TABLE* vertices_map;  // Map of uintptr_t to int index
-  int next_vertex_index;     // Index of the next vertex
+  Vertex** neighbors;
+
+  HASH_TABLE* vertices_ptr_to_index_map;  // Map of void* to int index
+  HASH_TABLE* vertices_index_to_ptr_map;  // Map of int index to void*
+
+  int next_vertex_index;  // Index of the next vertex
 };
 
 typedef struct scc_graph SccGraph;
@@ -36,7 +46,7 @@ void scc_graph_destroy(SccGraph* graph);
  * @param graph pointer to graph
  * @param v pointer of vertex
  */
-void scc_graph_add_vertex(SccGraph* graph, uintptr_t v);
+void scc_graph_add_vertex(SccGraph* graph, void* v);
 
 /**
  * @brief Add edge method of graph
@@ -44,7 +54,7 @@ void scc_graph_add_vertex(SccGraph* graph, uintptr_t v);
  * @param source pointer of source
  * @param sink pointer of sink
  */
-void scc_graph_add_edge(SccGraph* graph, uintptr_t source, uintptr_t sink);
+void scc_graph_add_edge(SccGraph* graph, void* source, void* sink);
 
 /**
  * @brief Finds strongly connected components of a given graph
