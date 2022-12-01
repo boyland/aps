@@ -32,7 +32,7 @@ void aps_warning(const void *tnode, const char *fmt, ...)
   fflush(stdout);
 
   (void)  fprintf(stderr, "%s.aps:%d:Warning: ",
-                  aps_yyfilename,tnode_line_number(tnode));
+                  aps_yyfilename,tnode == NULL ? -1 : tnode_line_number(tnode));
   (void) vfprintf(stderr, fmt, args);
   (void)  fprintf(stderr, "\n");
   (void)   fflush(stderr);

@@ -17,7 +17,7 @@ void stack_create(LinkedStack** stack) {
  * @param stack pointer to a stack pointer
  * @param value value to push to stack
  */
-void stack_push(LinkedStack** stack, uintptr_t value) {
+void stack_push(LinkedStack** stack, void* value) {
   LinkedStack* item = (LinkedStack*)malloc(sizeof(LinkedStack));
   item->value = value;
   item->next = *stack;
@@ -31,7 +31,7 @@ void stack_push(LinkedStack** stack, uintptr_t value) {
  * @return boolean indicating whether popping from the stack was successful or
  * not
  */
-bool stack_pop(LinkedStack** stack, uintptr_t* v) {
+bool stack_pop(LinkedStack** stack, void** v) {
   LinkedStack* old = *stack;
   if (old == NULL)
     return false;
@@ -57,7 +57,7 @@ bool stack_is_empty(LinkedStack** stack) {
  * @param stack pointer to a stack pointer
  */
 void stack_destroy(LinkedStack** stack) {
-  uintptr_t v;
+  void* v;
   while (stack_pop(stack, &v))
     ;
 }

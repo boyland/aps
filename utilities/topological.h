@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include "hashtable.h"
 #include "imports.r"
 
 // Define the basic component in adjacent list
@@ -23,7 +24,8 @@ struct topological_sort_graph {
                        // cycles and returns the one of possibly many valid
                        // order, false if existence of cycle should cause a
                        // fatal error
-  int prime_size;      // prime number >= the num_vertices
+  HASH_TABLE* vertices_map;  // Map of uintptr_t to int index
+  int next_vertex_index;     // Index of the next vertex
 };
 
 typedef struct topological_sort_graph TopologicalSortGraph;

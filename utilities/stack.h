@@ -7,7 +7,7 @@
 #include "imports.r"
 
 struct linked_stack {
-  uintptr_t value;
+  void* value;
   struct linked_stack* next;
 };
 
@@ -24,7 +24,7 @@ void stack_create(LinkedStack** stack);
  * @param stack pointer to a stack pointer
  * @param value value to push to stack
  */
-void stack_push(LinkedStack** stack, uintptr_t value);
+void stack_push(LinkedStack** stack, void* value);
 
 /**
  * @brief Pop method of stack
@@ -33,7 +33,7 @@ void stack_push(LinkedStack** stack, uintptr_t value);
  * @return boolean indicating whether popping from the stack was successful or
  * not
  */
-bool stack_pop(LinkedStack** stack, uintptr_t* v);
+bool stack_pop(LinkedStack** stack, void** v);
 
 /**
  * @brief Checks whether stack is empty or not

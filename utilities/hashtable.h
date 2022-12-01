@@ -3,6 +3,10 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
+
+#define INT2VOIDP(i) (void*)(uintptr_t)(i)
+#define VOIDP2INT(i) (int)(uintptr_t)(i)
 
 typedef long (*Hash_Table_Hash)(const void*);
 typedef bool (*Hash_Table_Equal)(const void*, const void*);

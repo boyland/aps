@@ -53,7 +53,7 @@ static void sieve_of_eratosthenes(int n) {
  * Resizes the primes table given new size.
  * @param n lower bound prime number
  */
-static void resize(int n) {
+static void resize_table(int n) {
   // If array size is not enough then resize the array
   if (n >= primes.size) {
     int new_size = DOUBLE_SIZE(primes.size + INITIAL_TABLE_SIZE);
@@ -74,33 +74,12 @@ static void resize(int n) {
  * @return larger of the next twin prime
  */
 int next_twin_prime(int p) {
-  resize(p);
+  resize_table(p);
 
   while (true) {
     int i;
     for (i = p; i < primes.size; i++) {
       if (primes.array[i] && primes.array[i - 2]) {
-        return i;
-      }
-    }
-
-    // Resize the prime array and try again
-    sieve_of_eratosthenes(DOUBLE_SIZE(primes.size));
-  }
-}
-
-/**
- * Return the next prime number n great that or equal to the argument
- * @param x lower bound prime number
- * @return the next prime
- */
-int next_prime(int p) {
-  resize(p);
-
-  while (true) {
-    int i;
-    for (i = p; i < primes.size; i++) {
-      if (primes.array[i]) {
         return i;
       }
     }

@@ -6,10 +6,34 @@
 
 #include "scc.h"
 #include <alloca.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "hashtable.h"
 #include "stack.h"
+
+static int get_vertex_index(SccGraph* graph, uintptr_t v) {
+  if (!hash_table_contains((const void*)v, graph->vertices_map)) {
+    fatal_error("Failed to find vertex %d in the vertex map", v);
+  }
+
+  int index = VOIDP2INT(hash_table_get((const void*)v, graph->vertices_map));
+
+  if (index < 0 || index >= graph->num_vertices) {
+    fatal_error("Unexpected index %d was retrevied from the vertex map", index);
+  }
+
+  return index;
+}
+
+static long vertex_hash(const void* v) {
+  return (long)v;
+}
+
+static bool vertex_equals(const void* v1, const void* v2) {
+  return v1 == v2;
+}
 
 /**
  * @brief Create graph given number of vertices implemented using adjacency
@@ -21,6 +45,11 @@ SccGraph* scc_graph_create(int num_vertices) {
   size_t vertices_size = num_vertices * num_vertices * sizeof(bool);
   graph->adjacency = (bool*)malloc(vertices_size);
   memset(graph->adjacency, false, vertices_size);
+
+  graph->vertices_map = (HASH_TABLE*)malloc(sizeof(HASH_TABLE));
+  hash_table_initialize(num_vertices, vertex_hash, vertex_equals,
+                        graph->vertices_map);
+
   return graph;
 }
 
@@ -30,8 +59,30 @@ SccGraph* scc_graph_create(int num_vertices) {
  * @param source index of source
  * @param sink index of sink
  */
-void scc_graph_add_edge(SccGraph* graph, int source, int sink) {
+static void scc_graph_add_edge_internal(SccGraph* graph, int source, int sink) {
   graph->adjacency[source * graph->num_vertices + sink] = true;
+}
+
+/**
+ * @brief Add edge method of graph
+ * @param graph pointer to graph
+ * @param source index of source
+ * @param sink index of sink
+ */
+void scc_graph_add_edge(SccGraph* graph, uintptr_t source, uintptr_t sink) {
+  graph->adjacency[get_vertex_index(graph, source) * graph->num_vertices +
+                   get_vertex_index(graph, sink)] = true;
+}
+
+/**
+ * @brief Add vertex to the graph
+ * @param graph pointer to graph
+ * @param v pointer of vertex
+ */
+void scc_graph_add_vertex(SccGraph* graph, uintptr_t v) {
+  hash_table_add_or_update((const void*)v, INT2VOIDP(graph->next_vertex_index),
+                           graph->vertices_map);
+  graph->next_vertex_index++;
 }
 
 /**
@@ -39,11 +90,14 @@ void scc_graph_add_edge(SccGraph* graph, int source, int sink) {
  * @param graph pointer to graph
  */
 void scc_graph_destroy(SccGraph* graph) {
+  hash_table_clear(graph->vertices_map);
+
+  free(graph->vertices_map);
   free(graph->adjacency);
   free(graph);
 }
 
-static bool contains_edge(SccGraph* graph, int source, int sink) {
+static bool contains_edge(SccGraph* graph, uintptr_t source, uintptr_t sink) {
   return graph->adjacency[source * graph->num_vertices + sink];
 }
 
@@ -52,7 +106,7 @@ static bool contains_edge(SccGraph* graph, int source, int sink) {
  * @param graph pointer to graph
  */
 static void get_neighbors(SccGraph* graph,
-                          int source,
+                          uintptr_t source,
                           int* neighbors,
                           int* count_neighbors) {
   int i;
@@ -72,8 +126,12 @@ static void get_neighbors(SccGraph* graph,
  * @param visited visited boolean array
  * @param v vertex
  */
-static void dfs(SccGraph* graph, LinkedStack** stack, bool* visited, int v) {
-  visited[v] = true;
+static void dfs(SccGraph* graph,
+                LinkedStack** stack,
+                bool* visited,
+                uintptr_t v) {
+  int v_index = get_vertex_index(graph, v);
+  visited[v_index] = true;
   int n = graph->num_vertices;
   int* neighbors = (int*)alloca(n * sizeof(int));
   int count_neighbors = 0;
@@ -228,7 +286,7 @@ SCC_COMPONENTS scc_graph_components(SccGraph* graph) {
 
   for (i = 0; i < num_components; i++) {
     SCC_COMPONENT* comp = (SCC_COMPONENT*)malloc(sizeof(SCC_COMPONENT));
-    VECTORALLOC(*comp, int, components_count[i]);
+    VECTORALLOC(*comp, uintptr_t, components_count[i]);
     result->array[i] = *comp;
     for (j = 0; j < components_count[i]; j++) {
       comp->array[j] = components_array[i * n + j];
