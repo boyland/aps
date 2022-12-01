@@ -1,5 +1,5 @@
-#ifndef _TOPOLOGICAL_SORT_H_
-#define _TOPOLOGICAL_SORT_H_
+#ifndef TOPOLOGICAL_SORT_H
+#define TOPOLOGICAL_SORT_H
 
 #include <stdbool.h>
 #include <stdint.h>
