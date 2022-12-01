@@ -6,8 +6,9 @@
 #define INITIAL_TABLE_SIZE 4973
 #define DOUBLE_SIZE(x) (((x) << 1) + 1)
 
-typedef struct {
-  bool* array;
+typedef struct
+{
+  bool *array;
   unsigned int size;
 } PRIMES;
 
@@ -22,13 +23,17 @@ static PRIMES primes = {NULL, 0};
  * finally be false if i is not a prime, else true.
  * @param n size of the lookup array
  */
-static void sieve_of_eratosthenes(int n) {
+static void sieve_of_eratosthenes(int n)
+{
   primes.size = n;
 
   size_t bytes = n * sizeof(bool);
-  if (primes.array == NULL) {
+  if (primes.array == NULL)
+  {
     primes.array = malloc(bytes);
-  } else {
+  }
+  else
+  {
     primes.array = realloc(primes.array, bytes);
   }
 
@@ -38,11 +43,14 @@ static void sieve_of_eratosthenes(int n) {
   primes.array[1] = false;  // 1 is not a prime
 
   int i, j;
-  for (i = 2; i * i < n; i++) {
+  for (i = 2; i * i < n; i++)
+  {
     // If primes[p] is not changed, then it is a prime
-    if (primes.array[i] == true) {
+    if (primes.array[i] == true)
+    {
       // Update all multiples of p
-      for (j = i * i; j < n; j += i) {
+      for (j = i * i; j < n; j += i)
+      {
         primes.array[j] = false;
       }
     }
@@ -50,36 +58,34 @@ static void sieve_of_eratosthenes(int n) {
 }
 
 /**
- * Resizes the primes table given new size.
- * @param n lower bound prime number
+ * Return the next prime number n great that or equal to the argument
+ * such that n -2 is also prime
+ * @param x lower bound prime number
+ * @return larger of the next twin prime 
  */
-static void resize_table(int n) {
+int next_twin_prime(int p)
+{
   // If array size is not enough then resize the array
-  if (n >= primes.size) {
+  if (p >= primes.size)
+  {
     int new_size = DOUBLE_SIZE(primes.size + INITIAL_TABLE_SIZE);
 
     // Resized array is also not enough
-    if (new_size <= n) {
-      new_size = DOUBLE_SIZE(n);
+    if (new_size <= p)
+    {
+      new_size = DOUBLE_SIZE(p);
     }
 
     sieve_of_eratosthenes(new_size);
   }
-}
 
-/**
- * Return the next prime number n great that or equal to the argument
- * such that n -2 is also prime
- * @param x lower bound prime number
- * @return larger of the next twin prime
- */
-int next_twin_prime(int p) {
-  resize_table(p);
-
-  while (true) {
+  while (true)
+  {
     int i;
-    for (i = p; i < primes.size; i++) {
-      if (primes.array[i] && primes.array[i - 2]) {
+    for (i = p; i < primes.size; i++)
+    {
+      if (primes.array[i] && primes.array[i - 2])
+      {
         return i;
       }
     }
