@@ -6,6 +6,7 @@
 
 #include "scc.h"
 #include <alloca.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,6 +14,12 @@
 #include "hashtable.h"
 #include "stack.h"
 
+/**
+ * Give a graph and vertex it returns the internal index
+ * @param graph SCC graph
+ * @param v vertex to lookup
+ * @return int corresponding internal index of vertex
+ */
 static int get_vertex_index_from_ptr(SccGraph* graph, void* v) {
   if (!hash_table_contains(v, graph->vertices_ptr_to_index_map)) {
     fatal_error("Failed to find vertex ptr %d in the vertex map", v);
@@ -27,13 +34,21 @@ static int get_vertex_index_from_ptr(SccGraph* graph, void* v) {
   return index;
 }
 
-static void* get_vertex_ptr_from_int(SccGraph* graph, int v) {
-  if (!hash_table_contains(INT2VOIDP(v), graph->vertices_ptr_to_index_map)) {
+/**
+ * Give a graph and internal index it returns the vertex
+ * @param graph SCC graph
+ * @param index internal index
+ * @return int corresponding vertex
+ */
+static void* get_vertex_ptr_from_int(SccGraph* graph, int index) {
+  if (!hash_table_contains(INT2VOIDP(index),
+                           graph->vertices_ptr_to_index_map)) {
     fatal_error("Failed to find ptr of vertex with index %d in the vertex map",
-                v);
+                index);
   }
 
-  void* ptr = hash_table_get(INT2VOIDP(v), graph->vertices_ptr_to_index_map);
+  void* ptr =
+      hash_table_get(INT2VOIDP(index), graph->vertices_ptr_to_index_map);
 
   return ptr;
 }
@@ -59,7 +74,9 @@ SccGraph* scc_graph_create(int num_vertices) {
   hash_table_initialize(num_vertices, ptr_hashf, ptr_equalf,
                         graph->vertices_index_to_ptr_map);
 
+  // Index of vertex starts from 0
   graph->next_vertex_index = 0;
+
   return graph;
 }
 
@@ -211,6 +228,26 @@ void dfs_collect_scc(SccGraph* graph,
 }
 
 /**
+ * @brief Internal utility function that checks whether edge exists
+ * @param graph pointer to graph
+ * @param source index of source
+ * @param sink index of sink
+ * @return boolean indicating the edge between source and sink
+ */
+static bool contains_edge(SccGraph* graph, int source, int sink) {
+  Vertex* sinks = graph->neighbors[source];
+  while (sinks != NULL) {
+    if (sinks->value == sink) {
+      return true;
+    }
+
+    sinks = sinks->next;
+  }
+
+  return false;
+}
+
+/**
  * @brief Kosaraju logic
  * @param graph pointer to graph
  */
@@ -219,8 +256,28 @@ SCC_COMPONENTS scc_graph_components(SccGraph* graph) {
     fatal_error("Graph parameter passed to Kosaraju method is not valid.");
   }
 
-  int i, j;
+  int i, j, k;
   int n = graph->num_vertices;
+
+  // Run transitive closure of the graph
+  bool changed;
+  do {
+    changed = false;
+    for (i = 0; i < n; i++) {
+      for (j = 0; j < n; j++) {
+        for (k = 0; k < n; k++) {
+          if (contains_edge(graph, i, j) && contains_edge(graph, j, k) &&
+              !contains_edge(graph, i, k)) {
+            scc_graph_add_edge_internal(graph, i, k);
+            changed = true;
+            aps_warning(graph,
+                        "Graph provided to SCC utility has not gone through "
+                        "transitive closure");
+          }
+        }
+      }
+    }
+  } while (changed);
 
   LinkedStack* stack;
   stack_create(&stack);
