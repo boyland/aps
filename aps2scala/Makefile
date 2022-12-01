@@ -1,5 +1,5 @@
 CPP=g++ 
-CPPFLAGS=-Wall -g -DUSING_CXX -DAPS2SCALA -I../parse -I../analyze -I../codegen -I../utilities
+CPPFLAGS=-Wall -g -Wno-unused-variable -DUSING_CXX -DAPS2SCALA -I../parse -I../analyze -I../codegen -I../utilities
 
 APS2SCALAOBJS = aps2scala.o dump-scala.o implement.o dyn-impl.o static-impl.o
 APS2SCALALIBS = ../lib/aps-lib.o ../lib/aps-ag.a ../utilities/utilities.o

@@ -1,5 +1,5 @@
 CPP=g++ 
-CPPFLAGS=-Wall -g -DUSING_CXX -I../parse -I../analyze -I../codegen -I../utilities
+CPPFLAGS=-Wall -g -Wno-write-strings -Wno-unused-variable -DUSING_CXX -I../parse -I../analyze -I../codegen -I../utilities
 
 APSCPPOBJS = apscpp.o dump-cpp.o implement.o dyn-impl.o static-impl.o
 APSCPPLIBS = ../lib/aps-lib.o ../lib/aps-ag.a ../utilities/utilities.o
