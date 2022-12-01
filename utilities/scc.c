@@ -42,13 +42,13 @@ static int get_vertex_index_from_ptr(SccGraph* graph, void* v) {
  */
 static void* get_vertex_ptr_from_int(SccGraph* graph, int index) {
   if (!hash_table_contains(INT2VOIDP(index),
-                           graph->vertices_ptr_to_index_map)) {
+                           graph->vertices_index_to_ptr_map)) {
     fatal_error("Failed to find ptr of vertex with index %d in the vertex map",
                 index);
   }
 
   void* ptr =
-      hash_table_get(INT2VOIDP(index), graph->vertices_ptr_to_index_map);
+      hash_table_get(INT2VOIDP(index), graph->vertices_index_to_ptr_map);
 
   return ptr;
 }
