@@ -6,7 +6,7 @@ extern void *stack, *stacktop, *more_stack(int);
 extern void release(void *); /* release things from stack */
 
 static int ntemp;
-static void* temp;
+static void *temp;
 #define ALIGN(size) (((size)+7)&~7)
 #define ALLOC(n,p,top,more) \
   (((p=(char *)(temp=p)+ALIGN(ntemp=n))>top)?more(ntemp):temp)
