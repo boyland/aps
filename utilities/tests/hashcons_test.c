@@ -1,4 +1,5 @@
-#include "../utilities.h"
+#include "../hashcons.h"
+#include "../hashtable.h"
 
 #include <stdbool.h>
 #include <stdio.h>

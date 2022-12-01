@@ -102,7 +102,8 @@ void* hash_table_get(void* key, HASH_TABLE* table) {
  */
 void hash_table_add_or_update(void* key, void* value, HASH_TABLE* table) {
   if (key == NULL) {
-    fatal_error("NULL key is not allowed in hashtable.");
+    fprintf(stdout, "NULL key is not allowed in hashtable.\n");
+    exit(1);
     return;
   }
 

@@ -1,17 +1,14 @@
-# include ../external.variable
-
 CC=gcc 
 LINTER_FLAGS=-Wno-int-to-pointer-cast -Wno-pointer-to-int-cast
-UTILITIES=../utilities.o
-CFLAGS=-g ${LINTER_FLAGS} -I. -I.. -I../../lib
+EXTERNAL_DEPENDENCIES=prime.o hashcons.o hashtable.o
+CFLAGS=-g ${LINTER_FLAGS} -I. -I..
 TESTS=hashcons_test.o hashtable_test.o 
-EXTERNAL_DEPENDENCIES=../../lib/aps-ag.a ../../lib/aps-lib.o ../utilities.o
 
 all: build test clean
-build: ${TESTS} ${UTILITIES} ${EXTERNAL_DEPENDENCIES} driver.o 
+build: ${TESTS} $(addprefix ../, ${EXTERNAL_DEPENDENCIES}) driver.o
 	$(CC) $(CFLAGS) $^ -o test.out
 
-%_test.o: %_test.h %_test.c ${UTILITIES} 
+%_test.o: %_test.h %_test.c
 	$(CC) -c $(CFLAGS) $*_test.c
 
 driver.o: ${TESTS} driver.c
