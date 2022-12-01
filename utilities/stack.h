@@ -4,7 +4,6 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include "imports.r"
 
 struct linked_stack {
   void* value;
@@ -41,5 +40,12 @@ bool stack_pop(LinkedStack** stack, void** v);
  * @return boolean indicating whether stack is empty or not
  */
 bool stack_is_empty(LinkedStack** stack);
+
+/**
+ * @brief Frees the memory allocated for the stack and deallocates each
+ * individual element of stack
+ * @param stack pointer to a stack pointer
+ */
+void stack_destroy(LinkedStack** stack);
 
 #endif

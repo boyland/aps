@@ -4,11 +4,16 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include "hashtable.h"
-#include "imports.r"
 
-typedef VECTOR(void*) SCC_COMPONENT;
+typedef struct scc_component {
+  void** array;
+  int length;
+} SCC_COMPONENT;
 
-typedef VECTOR(SCC_COMPONENT) SCC_COMPONENTS;
+typedef struct scc_components {
+  SCC_COMPONENT* array;
+  int length;
+} SCC_COMPONENTS;
 
 // Vertex linked list node
 struct vertex {
@@ -19,8 +24,8 @@ struct vertex {
 typedef struct vertex Vertex;
 
 struct scc_graph {
-  int num_vertices;       // Number of vertices in the graph
-  Vertex** neighbors;     // adjacency list of the edges
+  int num_vertices;    // Number of vertices in the graph
+  Vertex** neighbors;  // adjacency list of the edges
 
   HASH_TABLE* vertices_ptr_to_index_map;  // Map of void* to int index
   HASH_TABLE* vertices_index_to_ptr_map;  // Map of int index to void*
@@ -61,6 +66,6 @@ void scc_graph_add_edge(SccGraph* graph, void* source, void* sink);
  * @brief Finds strongly connected components of a given graph
  * @param graph ptr to SCC graph
  */
-SCC_COMPONENTS scc_graph_components(SccGraph* graph);
+SCC_COMPONENTS* scc_graph_components(SccGraph* graph);
 
 #endif

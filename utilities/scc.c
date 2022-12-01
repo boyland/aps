@@ -22,13 +22,17 @@
  */
 static int get_vertex_index_from_ptr(SccGraph* graph, void* v) {
   if (!hash_table_contains(v, graph->vertices_ptr_to_index_map)) {
-    fatal_error("Failed to find vertex ptr %d in the vertex map", v);
+    printf("Failed to find vertex ptr %d in the vertex map\n", VOIDP2INT(v));
+    exit(1);
+    return -1;
   }
 
   int index = VOIDP2INT(hash_table_get(v, graph->vertices_ptr_to_index_map));
 
   if (index < 0 || index >= graph->num_vertices) {
-    fatal_error("Unexpected index %d was retrevied from the vertex map", index);
+    printf("Unexpected index %d was retrevied from the vertex map\n", index);
+    exit(1);
+    return -1;
   }
 
   return index;
@@ -43,8 +47,10 @@ static int get_vertex_index_from_ptr(SccGraph* graph, void* v) {
 static void* get_vertex_ptr_from_int(SccGraph* graph, int index) {
   if (!hash_table_contains(INT2VOIDP(index),
                            graph->vertices_index_to_ptr_map)) {
-    fatal_error("Failed to find ptr of vertex with index %d in the vertex map",
-                index);
+    printf("Failed to find ptr of vertex with index %d in the vertex map\n",
+           index);
+    exit(1);
+    return NULL;
   }
 
   void* ptr =
@@ -185,7 +191,8 @@ static SccGraph* reverse(SccGraph* graph) {
  */
 void scc_graph_add_vertex(SccGraph* graph, void* v) {
   if (graph->next_vertex_index >= graph->num_vertices) {
-    fatal_error("Expected %d vertices to be added", graph->num_vertices);
+    printf("Expected %d vertices to be added\n", graph->num_vertices);
+    exit(1);
     return;
   }
 
@@ -251,9 +258,11 @@ static bool contains_edge(SccGraph* graph, int source, int sink) {
  * @brief Kosaraju logic
  * @param graph pointer to graph
  */
-SCC_COMPONENTS scc_graph_components(SccGraph* graph) {
+SCC_COMPONENTS* scc_graph_components(SccGraph* graph) {
   if (graph == NULL || graph->num_vertices <= 0) {
-    fatal_error("Graph parameter passed to Kosaraju method is not valid.");
+    printf("Graph parameter passed to Kosaraju method is not valid.\n");
+    exit(1);
+    return NULL;
   }
 
   int i, j, k;
@@ -270,9 +279,9 @@ SCC_COMPONENTS scc_graph_components(SccGraph* graph) {
               !contains_edge(graph, i, k)) {
             scc_graph_add_edge_internal(graph, i, k);
             changed = true;
-            aps_warning(graph,
-                        "Graph provided to SCC utility has not gone through "
-                        "transitive closure");
+            printf(
+                "Graph provided to SCC utility has not gone through "
+                "transitive closure\n");
           }
         }
       }
@@ -324,22 +333,25 @@ SCC_COMPONENTS scc_graph_components(SccGraph* graph) {
 
   // Collect components as vector of vector of integers
   SCC_COMPONENTS* result = (SCC_COMPONENTS*)malloc(sizeof(SCC_COMPONENTS));
-  VECTORALLOC(*result, SCC_COMPONENT, num_components);
+  result->length = num_components;
+  result->array =
+      (SCC_COMPONENT*)malloc(num_components * sizeof(SCC_COMPONENT));
 
   for (i = 0; i < num_components; i++) {
     SCC_COMPONENT* comp = (SCC_COMPONENT*)malloc(sizeof(SCC_COMPONENT));
-    VECTORALLOC(*comp, void*, components_count[i]);
-    result->array[i] = *comp;
+    comp->length = components_count[i];
+    comp->array = (void**)malloc(components_count[i] * sizeof(void*));
+
     for (j = 0; j < components_count[i]; j++) {
       comp->array[j] =
           get_vertex_ptr_from_int(graph, components_array[i * n + j]);
     }
+
+    result->array[i] = *comp;
   }
 
   // Free memory allocated via malloc
   scc_graph_destroy(reversed_graph);
 
-  SCC_COMPONENTS re = *result;
-
-  return re;
+  return result;
 }

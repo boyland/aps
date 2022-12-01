@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "imports.r"
 #include "prime.h"
 
 #define MAX_DENSITY 0.5

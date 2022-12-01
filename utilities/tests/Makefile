@@ -1,8 +1,8 @@
 CC=gcc 
 LINTER_FLAGS=-Wno-int-to-pointer-cast -Wno-pointer-to-int-cast
-EXTERNAL_DEPENDENCIES=prime.o hashcons.o hashtable.o
+EXTERNAL_DEPENDENCIES=prime.o hashcons.o hashtable.o stack.o
 CFLAGS=-g ${LINTER_FLAGS} -I. -I..
-TESTS=hashcons_test.o hashtable_test.o 
+TESTS=hashcons_test.o hashtable_test.o stack_test.o 
 
 all: build test clean
 build: ${TESTS} $(addprefix ../, ${EXTERNAL_DEPENDENCIES}) driver.o
