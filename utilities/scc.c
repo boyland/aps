@@ -22,7 +22,8 @@
  */
 static int get_vertex_index_from_ptr(SccGraph* graph, void* v) {
   if (!hash_table_contains(v, graph->vertices_ptr_to_index_map)) {
-    printf("Failed to find vertex ptr %d in the vertex map\n", VOIDP2INT(v));
+    fprintf(stderr, "Failed to find vertex ptr %d in the vertex map\n",
+            VOIDP2INT(v));
     exit(1);
     return -1;
   }
@@ -30,7 +31,8 @@ static int get_vertex_index_from_ptr(SccGraph* graph, void* v) {
   int index = VOIDP2INT(hash_table_get(v, graph->vertices_ptr_to_index_map));
 
   if (index < 0 || index >= graph->num_vertices) {
-    printf("Unexpected index %d was retrevied from the vertex map\n", index);
+    fprintf(stderr, "Unexpected index %d was retrevied from the vertex map\n",
+            index);
     exit(1);
     return -1;
   }
@@ -45,16 +47,15 @@ static int get_vertex_index_from_ptr(SccGraph* graph, void* v) {
  * @return int corresponding vertex
  */
 static void* get_vertex_ptr_from_int(SccGraph* graph, int index) {
-  if (!hash_table_contains(INT2VOIDP(index),
-                           graph->vertices_index_to_ptr_map)) {
-    printf("Failed to find ptr of vertex with index %d in the vertex map\n",
-           index);
+  if (index < 0 || index >= graph->num_vertices) {
+    fprintf(stderr,
+            "Unexpected index %d was retrevied requested the vertex map\n",
+            index);
     exit(1);
     return NULL;
   }
 
-  void* ptr =
-      hash_table_get(INT2VOIDP(index), graph->vertices_index_to_ptr_map);
+  void* ptr = graph->vertices_index_to_ptr_map[index];
 
   return ptr;
 }
@@ -76,9 +77,8 @@ SccGraph* scc_graph_create(int num_vertices) {
                         graph->vertices_ptr_to_index_map);
 
   // Create a map to lookup from index to ptr
-  graph->vertices_index_to_ptr_map = (HASH_TABLE*)malloc(sizeof(HASH_TABLE));
-  hash_table_initialize(num_vertices, ptr_hashf, ptr_equalf,
-                        graph->vertices_index_to_ptr_map);
+  graph->vertices_index_to_ptr_map =
+      (void**)malloc(sizeof(void*) * num_vertices);
 
   // Index of vertex starts from 0
   graph->next_vertex_index = 0;
@@ -137,7 +137,6 @@ void scc_graph_destroy(SccGraph* graph) {
   }
 
   hash_table_clear(graph->vertices_ptr_to_index_map);
-  hash_table_clear(graph->vertices_index_to_ptr_map);
 
   free(graph->vertices_ptr_to_index_map);
   free(graph->vertices_index_to_ptr_map);
@@ -191,16 +190,23 @@ static SccGraph* reverse(SccGraph* graph) {
  */
 void scc_graph_add_vertex(SccGraph* graph, void* v) {
   if (graph->next_vertex_index >= graph->num_vertices) {
-    printf("Expected %d vertices to be added\n", graph->num_vertices);
+    fprintf(stderr, "Expected %d vertices to be added\n", graph->num_vertices);
     exit(1);
     return;
   }
 
+  if (hash_table_contains(v, graph->vertices_ptr_to_index_map)) {
+    fprintf(stderr, "Graph already contains the vertice\n");
+    exit(1);
+    return;
+  }
+
+  // Associate ptr -> index
   hash_table_add_or_update(v, INT2VOIDP(graph->next_vertex_index),
                            graph->vertices_ptr_to_index_map);
 
-  hash_table_add_or_update(INT2VOIDP(graph->next_vertex_index), v,
-                           graph->vertices_index_to_ptr_map);
+  // Associate index -> ptr
+  graph->vertices_index_to_ptr_map[graph->next_vertex_index] = v;
 
   graph->next_vertex_index++;
 }
@@ -260,7 +266,8 @@ static bool contains_edge(SccGraph* graph, int source, int sink) {
  */
 SCC_COMPONENTS* scc_graph_components(SccGraph* graph) {
   if (graph == NULL || graph->num_vertices <= 0) {
-    printf("Graph parameter passed to Kosaraju method is not valid.\n");
+    fprintf(stderr,
+            "Graph parameter passed to Kosaraju method is not valid.\n");
     exit(1);
     return NULL;
   }
@@ -270,6 +277,7 @@ SCC_COMPONENTS* scc_graph_components(SccGraph* graph) {
 
   // Run transitive closure of the graph
   bool changed;
+  int transitive_edgees_added = 0;
   do {
     changed = false;
     for (i = 0; i < n; i++) {
@@ -279,14 +287,19 @@ SCC_COMPONENTS* scc_graph_components(SccGraph* graph) {
               !contains_edge(graph, i, k)) {
             scc_graph_add_edge_internal(graph, i, k);
             changed = true;
-            printf(
-                "Graph provided to SCC utility has not gone through "
-                "transitive closure\n");
+            transitive_edgees_added++;
           }
         }
       }
     }
   } while (changed);
+
+  if (transitive_edgees_added > 0) {
+    printf(
+        "Graph provided to SCC utility has not gone through "
+        "transitive closure (%d new transtive edges have been added)\n",
+        transitive_edgees_added);
+  }
 
   LinkedStack* stack;
   stack_create(&stack);
@@ -335,7 +348,7 @@ SCC_COMPONENTS* scc_graph_components(SccGraph* graph) {
   SCC_COMPONENTS* result = (SCC_COMPONENTS*)malloc(sizeof(SCC_COMPONENTS));
   result->length = num_components;
   result->array =
-      (SCC_COMPONENT*)malloc(num_components * sizeof(SCC_COMPONENT));
+      (SCC_COMPONENT**)malloc(num_components * sizeof(SCC_COMPONENT*));
 
   for (i = 0; i < num_components; i++) {
     SCC_COMPONENT* comp = (SCC_COMPONENT*)malloc(sizeof(SCC_COMPONENT));
@@ -347,7 +360,7 @@ SCC_COMPONENTS* scc_graph_components(SccGraph* graph) {
           get_vertex_ptr_from_int(graph, components_array[i * n + j]);
     }
 
-    result->array[i] = *comp;
+    result->array[i] = comp;
   }
 
   // Free memory allocated via malloc

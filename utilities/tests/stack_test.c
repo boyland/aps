@@ -1,27 +1,21 @@
 #include "../stack.h"
 #include <stdio.h>
 #include "../hashtable.h"
-#include "assert.h"
+#include "common.h"
 
 static void test_empty() {
-  printf("Started <test_empty>\n");
-
   LinkedStack* stack;
   stack_create(&stack);
 
   void* temp;
-  assert(("Stack should be empty", !stack_pop(&stack, &temp)));
-
-  printf("Started <test_empty>\n");
+  assert_true("Stack should be empty", !stack_pop(&stack, &temp));
 }
 
 static void test_push_pop() {
-  printf("Started <test_push_pop>\n");
-
   LinkedStack* stack;
   stack_create(&stack);
 
-  int n = 1000;
+  int n = TOTAL_COUNT;
   int i;
   for (i = 0; i < n; i++) {
     void* temp;
@@ -30,16 +24,12 @@ static void test_push_pop() {
 
   for (i = 0; i < n; i++) {
     void* temp;
-    assert(("Stack should be empty", stack_pop(&stack, &temp)));
-    assert(("Should contain the right valud", VOIDP2INT(temp) == i));
+    assert_true("Stack should be empty", stack_pop(&stack, &temp));
+    assert_true("Should contain the right valud", VOIDP2INT(temp) == i);
   }
-
-  printf("Started <test_push_pop>\n");
 }
 
 static void test_clear() {
-  printf("Started <test_clear>\n");
-
   LinkedStack* stack;
   stack_create(&stack);
 
@@ -52,13 +42,13 @@ static void test_clear() {
 
   stack_destroy(&stack);
   void* temp;
-  assert(("Stack should be empty", !stack_pop(&stack, &temp)));
-
-  printf("Started <test_clear>\n");
+  assert_true("Stack should be empty", !stack_pop(&stack, &temp));
 }
 
 void test_stack() {
-  test_empty();
-  test_push_pop();
-  test_clear();
+  TEST tests[] = {{test_empty, "empty stack consistency"},
+                  {test_push_pop, "push pop consistency"},
+                  {test_clear, "clear consistency"}};
+
+  run_tests("stack", tests, 3);
 }
