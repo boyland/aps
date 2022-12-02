@@ -153,13 +153,49 @@ static void test_n_connected_components() {
   scc_graph_destroy(graph);
 }
 
+static void test_small_logical() {
+  SccGraph* graph = scc_graph_create(5);
+
+  scc_graph_add_vertex(graph, INT2VOIDP(1));
+  scc_graph_add_vertex(graph, INT2VOIDP(2));
+  scc_graph_add_vertex(graph, INT2VOIDP(3));
+  scc_graph_add_vertex(graph, INT2VOIDP(4));
+  scc_graph_add_vertex(graph, INT2VOIDP(5));
+
+  // Component 1
+  scc_graph_add_edge(graph, INT2VOIDP(1), INT2VOIDP(2));
+  scc_graph_add_edge(graph, INT2VOIDP(2), INT2VOIDP(1));
+
+  // Component 2
+  scc_graph_add_edge(graph, INT2VOIDP(3), INT2VOIDP(4));
+  scc_graph_add_edge(graph, INT2VOIDP(4), INT2VOIDP(3));
+
+  SCC_COMPONENTS* components = scc_graph_components(graph);
+
+  assert_true("should have 3 component", components->length == 3);
+
+  int i;
+  for (i = 0; i < components->length; i++) {
+    SCC_COMPONENT* component = components->array[i];
+
+    if (component->length > 1) {
+      assert_true("Component should contain 2 vertices",
+                  component->length == 2);
+    } else {
+      assert_true("Component should have vertex 5",
+                  VOIDP2INT(component->array[0]) == 5);
+    }
+  }
+}
+
 void test_scc() {
   TEST tests[] = {
+      {test_small_logical, "SCC with 2 connected components"},
       {test_all_disjoints, "SCC all disjoints"},
       {test_all_disjoints2, "SCC all disjoints with edges"},
       {test_all_connected, "SCC all connected"},
       {test_two_connected_components, "SCC two connected component"},
       {test_n_connected_components, "SCC n connected component"}};
 
-  run_tests("scc", tests, 5);
+  run_tests("scc", tests, 6);
 }

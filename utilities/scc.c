@@ -102,8 +102,7 @@ static void* get_vertex_ptr_from_int(SccGraph* graph, int index) {
 SccGraph* scc_graph_create(int num_vertices) {
   SccGraph* graph = malloc(sizeof(SccGraph));
   graph->num_vertices = num_vertices;
-  size_t vertices_size = num_vertices * sizeof(Vertex*);
-  graph->adjacency_matrix = (bool*)calloc(num_vertices, sizeof(bool));
+  graph->adjacency_matrix = (bool*)calloc(num_vertices * num_vertices, sizeof(bool));
 
   // Create a map to lookup from ptr to index
   graph->vertices_ptr_to_index_map = (HASH_TABLE*)malloc(sizeof(HASH_TABLE));
@@ -379,6 +378,9 @@ SCC_COMPONENTS* scc_graph_components(SccGraph* graph) {
 
   // Free memory allocated via malloc
   scc_graph_destroy(reversed_graph);
+
+  // De-allocate the stack
+  stack_destroy(&stack);
 
   return result;
 }
