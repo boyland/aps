@@ -16,7 +16,7 @@ static int* new_hash_cons_integer(int n) {
 }
 
 /**
- * Validating consistency of hashcons by storing and retriving integers
+ * Validating consistency of hashcons by storing and retrieving integers
  */
 static void test_integer_table_consistency() {
   char buffer[256];

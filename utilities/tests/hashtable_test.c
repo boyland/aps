@@ -1,14 +1,9 @@
 #include "../hashtable.h"
 
-#include <assert.h>
-#include <stdbool.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include "common.h"
 
 /**
- * Validating consistency of hashtable by storing and retriving integers
+ * Validating consistency of hashtable by storing and retrieving integers
  */
 void test_hash_table_consistency() {
   HASH_TABLE table;

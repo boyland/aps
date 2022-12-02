@@ -1,7 +1,6 @@
 #include "stack.h"
 #include <malloc.h>
 #include <stdbool.h>
-#include <stdint.h>
 #include <string.h>
 
 /**

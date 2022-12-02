@@ -31,13 +31,48 @@ static int get_vertex_index_from_ptr(SccGraph* graph, void* v) {
   int index = VOIDP2INT(hash_table_get(v, graph->vertices_ptr_to_index_map));
 
   if (index < 0 || index >= graph->num_vertices) {
-    fprintf(stderr, "Unexpected index %d was retrevied from the vertex map\n",
+    fprintf(stderr, "Unexpected index %d was retrieved from the vertex map\n",
             index);
     exit(1);
     return -1;
   }
 
   return index;
+}
+
+/**
+ * @brief Internal utility function that checks whether edge exists
+ * @param graph pointer to graph
+ * @param source index of source
+ * @param sink index of sink
+ * @return boolean indicating the edge between source and sink
+ */
+static bool contains_edge(SccGraph* graph, int source, int sink) {
+  return graph->adjacency_matrix[source * graph->num_vertices + sink];
+}
+
+/**
+ * Populates the neighbors for each vertex
+ * @param graph SCC graph
+ * @return vertices array
+ */
+static Vertex** collect_neighbors(SccGraph* graph) {
+  int n = graph->num_vertices;
+  Vertex** vertices = (Vertex**)calloc(n, sizeof(Vertex*));
+
+  int i, j;
+  for (i = 0; i < n; i++) {
+    for (j = 0; j < n; j++) {
+      if (!contains_edge(graph, i, j)) {
+        Vertex* new_vertex = (Vertex*)malloc(sizeof(Vertex));
+        new_vertex->value = j;
+        new_vertex->next = vertices[i];
+        vertices[i] = new_vertex;
+      }
+    }
+  }
+
+  return vertices;
 }
 
 /**
@@ -49,7 +84,7 @@ static int get_vertex_index_from_ptr(SccGraph* graph, void* v) {
 static void* get_vertex_ptr_from_int(SccGraph* graph, int index) {
   if (index < 0 || index >= graph->num_vertices) {
     fprintf(stderr,
-            "Unexpected index %d was retrevied requested the vertex map\n",
+            "Unexpected index %d was retrieved requested the vertex map\n",
             index);
     exit(1);
     return NULL;
@@ -68,8 +103,7 @@ SccGraph* scc_graph_create(int num_vertices) {
   SccGraph* graph = malloc(sizeof(SccGraph));
   graph->num_vertices = num_vertices;
   size_t vertices_size = num_vertices * sizeof(Vertex*);
-  graph->neighbors = (Vertex**)malloc(vertices_size);
-  memset(graph->neighbors, 0, vertices_size);
+  graph->adjacency_matrix = (bool*)calloc(num_vertices, sizeof(bool));
 
   // Create a map to lookup from ptr to index
   graph->vertices_ptr_to_index_map = (HASH_TABLE*)malloc(sizeof(HASH_TABLE));
@@ -93,10 +127,7 @@ SccGraph* scc_graph_create(int num_vertices) {
  * @param sink index of sink
  */
 static void scc_graph_add_edge_internal(SccGraph* graph, int source, int sink) {
-  Vertex* item = (Vertex*)malloc(sizeof(Vertex));
-  item->value = sink;
-  item->next = graph->neighbors[source];
-  graph->neighbors[source] = item;
+  graph->adjacency_matrix[source * graph->num_vertices + sink] = true;
 }
 
 /**
@@ -172,14 +203,15 @@ static SccGraph* reverse(SccGraph* graph) {
   SccGraph* reversed_graph = scc_graph_create(graph->num_vertices);
 
   int i;
-  Vertex* neighbors;
   for (i = 0; i < graph->num_vertices; i++) {
-    neighbors = graph->neighbors[i];
+    Vertex* neighbors = graph->neighbors[i];
     while (neighbors != NULL) {
       scc_graph_add_edge_internal(reversed_graph, neighbors->value, i);
       neighbors = neighbors->next;
     }
   }
+
+  reversed_graph->neighbors = collect_neighbors(reversed_graph);
   return reversed_graph;
 }
 
@@ -196,7 +228,7 @@ void scc_graph_add_vertex(SccGraph* graph, void* v) {
   }
 
   if (hash_table_contains(v, graph->vertices_ptr_to_index_map)) {
-    fprintf(stderr, "Graph already contains the vertice\n");
+    fprintf(stderr, "Graph already contains the vertex\n");
     exit(1);
     return;
   }
@@ -221,12 +253,12 @@ void scc_graph_add_vertex(SccGraph* graph, void* v) {
  * @param result_array result int array
  * @param result_count result counter
  */
-void dfs_collect_scc(SccGraph* graph,
-                     bool* visited,
-                     bool* deleted,
-                     int v,
-                     int* result_array,
-                     int* result_count) {
+static void dfs_collect_scc(SccGraph* graph,
+                            bool* visited,
+                            bool* deleted,
+                            int v,
+                            int* result_array,
+                            int* result_count) {
   result_array[(*result_count)++] = v;
   visited[v] = true;
   deleted[v] = true;
@@ -238,26 +270,6 @@ void dfs_collect_scc(SccGraph* graph,
     }
     arcs = arcs->next;
   }
-}
-
-/**
- * @brief Internal utility function that checks whether edge exists
- * @param graph pointer to graph
- * @param source index of source
- * @param sink index of sink
- * @return boolean indicating the edge between source and sink
- */
-static bool contains_edge(SccGraph* graph, int source, int sink) {
-  Vertex* sinks = graph->neighbors[source];
-  while (sinks != NULL) {
-    if (sinks->value == sink) {
-      return true;
-    }
-
-    sinks = sinks->next;
-  }
-
-  return false;
 }
 
 /**
@@ -277,7 +289,7 @@ SCC_COMPONENTS* scc_graph_components(SccGraph* graph) {
 
   // Run transitive closure of the graph
   bool changed;
-  int transitive_edgees_added = 0;
+  int count_transitive_edges_added = 0;
   do {
     changed = false;
     for (i = 0; i < n; i++) {
@@ -287,19 +299,21 @@ SCC_COMPONENTS* scc_graph_components(SccGraph* graph) {
               !contains_edge(graph, i, k)) {
             scc_graph_add_edge_internal(graph, i, k);
             changed = true;
-            transitive_edgees_added++;
+            count_transitive_edges_added++;
           }
         }
       }
     }
   } while (changed);
 
-  if (transitive_edgees_added > 0) {
+  if (count_transitive_edges_added > 0) {
     printf(
         "Graph provided to SCC utility has not gone through "
-        "transitive closure (%d new transtive edges have been added)\n",
-        transitive_edgees_added);
+        "transitive closure (%d new transitive edges have been added)\n",
+        count_transitive_edges_added);
   }
+
+  graph->neighbors = collect_neighbors(graph);
 
   LinkedStack* stack;
   stack_create(&stack);
@@ -344,7 +358,7 @@ SCC_COMPONENTS* scc_graph_components(SccGraph* graph) {
     }
   }
 
-  // Collect components as vector of vector of integers
+  // Collect components as vector of integers
   SCC_COMPONENTS* result = (SCC_COMPONENTS*)malloc(sizeof(SCC_COMPONENTS));
   result->length = num_components;
   result->array =

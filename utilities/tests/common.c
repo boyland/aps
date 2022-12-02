@@ -2,8 +2,6 @@
 #include <assert.h>
 #include <stdio.h>
 #include <time.h>
-#include "assert.h"
-#include "common.h"
 
 void run_tests(char* testname, TEST tests[], int n) {
   printf("Found %d tests in %s:\n", n, testname);

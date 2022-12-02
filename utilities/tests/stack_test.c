@@ -1,5 +1,4 @@
 #include "../stack.h"
-#include <stdio.h>
 #include "../hashtable.h"
 #include "common.h"
 

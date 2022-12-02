@@ -24,13 +24,14 @@ struct vertex {
 typedef struct vertex Vertex;
 
 struct scc_graph {
-  int num_vertices;    // Number of vertices in the graph
-  Vertex** neighbors;  // adjacency list of the edges
+  int num_vertices;        // Number of vertices in the graph
+  bool* adjacency_matrix;  // adjacency list of the edges
 
   HASH_TABLE* vertices_ptr_to_index_map;  // Map of void* to int index
   void** vertices_index_to_ptr_map;       // Map of int index to void*
 
   int next_vertex_index;  // Index of the next vertex
+  Vertex** neighbors;     // O(1) way of getting neighbors
 };
 
 typedef struct scc_graph SccGraph;
