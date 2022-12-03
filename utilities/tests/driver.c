@@ -13,5 +13,5 @@ int main() {
   test_stack();
   test_scc();
 
-  printf("Finished running all tests\n");
+  printf("Finished running all tests successfully\n");
 }

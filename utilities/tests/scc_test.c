@@ -1,5 +1,6 @@
 #include "../scc.h"
 
+#include <math.h>
 #include "common.h"
 
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
@@ -126,9 +127,11 @@ static void test_n_connected_components() {
   int count_chunks = 7;
   int chunk_size = TOTAL_COUNT / count_chunks;
 
-  for (j = 0; j < count_chunks; j++) {
-    int start = j * chunk_size + chunk_size;
-    int end = MIN(TOTAL_COUNT, start + chunk_size);
+  int start = 0;
+  int end;
+  j = 0;
+  do {
+    end = MIN(TOTAL_COUNT, start + chunk_size);
 
     // Component j
     for (i = start; i <= end - 1; i++) {
@@ -136,18 +139,20 @@ static void test_n_connected_components() {
     }
 
     scc_graph_add_edge(graph, INT2VOIDP(end), INT2VOIDP(start));
-  }
+
+    j++;
+    start = end + 1;
+  } while (end < TOTAL_COUNT);
 
   SCC_COMPONENTS* components = scc_graph_components(graph);
 
-  assert_true("should have n large component",
-              components->length == count_chunks);
+  assert_true("should have n large component", components->length == j);
 
   for (j = 0; j < count_chunks; j++) {
     SCC_COMPONENT* component = components->array[j];
     assert_true(
         "component j should have at most CHUNK_SIZE number of elements in it",
-        component->length > chunk_size);
+        component->length <= ceil((1.0 * TOTAL_COUNT / count_chunks)));
   }
 
   scc_graph_destroy(graph);

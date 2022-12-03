@@ -63,7 +63,7 @@ static Vertex** collect_neighbors(SccGraph* graph) {
   int i, j;
   for (i = 0; i < n; i++) {
     for (j = 0; j < n; j++) {
-      if (!contains_edge(graph, i, j)) {
+      if (contains_edge(graph, i, j)) {
         Vertex* new_vertex = (Vertex*)malloc(sizeof(Vertex));
         new_vertex->value = j;
         new_vertex->next = vertices[i];
@@ -102,7 +102,8 @@ static void* get_vertex_ptr_from_int(SccGraph* graph, int index) {
 SccGraph* scc_graph_create(int num_vertices) {
   SccGraph* graph = malloc(sizeof(SccGraph));
   graph->num_vertices = num_vertices;
-  graph->adjacency_matrix = (bool*)calloc(num_vertices * num_vertices, sizeof(bool));
+  graph->adjacency_matrix =
+      (bool*)calloc(num_vertices * num_vertices, sizeof(bool));
 
   // Create a map to lookup from ptr to index
   graph->vertices_ptr_to_index_map = (HASH_TABLE*)malloc(sizeof(HASH_TABLE));
@@ -337,7 +338,7 @@ SCC_COMPONENTS* scc_graph_components(SccGraph* graph) {
   memset(components_count, 0, n * sizeof(int));
 
   // Integer pointer array to hold on to items in each component
-  int* components_array = (int*)alloca(n * n * sizeof(int*));
+  int* components_array = (int*)malloc(n * n * sizeof(int*));
   // Number of all component
   int num_components = 0;
 
@@ -375,6 +376,9 @@ SCC_COMPONENTS* scc_graph_components(SccGraph* graph) {
 
     result->array[i] = comp;
   }
+
+  // De-allocate the temp array
+  free(components_array);
 
   // Free memory allocated via malloc
   scc_graph_destroy(reversed_graph);

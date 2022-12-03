@@ -3,7 +3,7 @@
 
 #include "stdbool.h"
 
-#define TOTAL_COUNT ((int)100)
+#define TOTAL_COUNT ((int)1<<8)
 
 typedef void (*Test_Signature)();
 
