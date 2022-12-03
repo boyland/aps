@@ -3,7 +3,7 @@ LINTER_FLAGS=-Wno-int-to-pointer-cast -Wno-pointer-to-int-cast
 EXTERNAL_DEPENDENCIES=utilities.o
 CFLAGS=-g ${LINTER_FLAGS} -I. -I..
 LINKFLAGS=-lm
-TESTS=hashcons_test.o hashtable_test.o stack_test.o scc_test.o 
+TESTS=prime_test.o hashcons_test.o hashtable_test.o stack_test.o scc_test.o 
 
 all: build test clean
 build: ${TESTS} $(addprefix ../, ${EXTERNAL_DEPENDENCIES}) common.o driver.o
