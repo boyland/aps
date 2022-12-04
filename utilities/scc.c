@@ -21,14 +21,14 @@
  * @return int corresponding internal index of vertex
  */
 static int get_vertex_index_from_ptr(SccGraph* graph, void* v) {
-  if (!hash_table_contains(v, graph->vertices_ptr_to_index_map)) {
+  if (!hash_table_contains(graph->vertices_ptr_to_index_map, v)) {
     fprintf(stderr, "Failed to find vertex ptr %d in the vertex map\n",
             VOIDP2INT(v));
     exit(1);
     return -1;
   }
 
-  int index = VOIDP2INT(hash_table_get(v, graph->vertices_ptr_to_index_map));
+  int index = VOIDP2INT(hash_table_get(graph->vertices_ptr_to_index_map, v));
 
   if (index < 0 || index >= graph->num_vertices) {
     fprintf(stderr, "Unexpected index %d was retrieved from the vertex map\n",
@@ -99,16 +99,15 @@ static void* get_vertex_ptr_from_int(SccGraph* graph, int index) {
  * @brief Create graph given number of vertices implemented using adjacency
  * @return pointer to allocated graph
  */
-SccGraph* scc_graph_create(int num_vertices) {
-  SccGraph* graph = malloc(sizeof(SccGraph));
+void scc_graph_initialize(SccGraph* graph, int num_vertices) {
   graph->num_vertices = num_vertices;
   graph->adjacency_matrix =
       (bool*)calloc(num_vertices * num_vertices, sizeof(bool));
 
   // Create a map to lookup from ptr to index
   graph->vertices_ptr_to_index_map = (HASH_TABLE*)malloc(sizeof(HASH_TABLE));
-  hash_table_initialize(num_vertices, ptr_hashf, ptr_equalf,
-                        graph->vertices_ptr_to_index_map);
+  hash_table_initialize(graph->vertices_ptr_to_index_map, num_vertices,
+                        ptr_hashf, ptr_equalf);
 
   // Create a map to lookup from index to ptr
   graph->vertices_index_to_ptr_map =
@@ -116,8 +115,6 @@ SccGraph* scc_graph_create(int num_vertices) {
 
   // Index of vertex starts from 0
   graph->next_vertex_index = 0;
-
-  return graph;
 }
 
 /**
@@ -171,8 +168,6 @@ void scc_graph_destroy(SccGraph* graph) {
 
   free(graph->vertices_ptr_to_index_map);
   free(graph->vertices_index_to_ptr_map);
-
-  free(graph);
 }
 
 /**
@@ -199,8 +194,8 @@ static void dfs(SccGraph* graph, LinkedStack** stack, bool* visited, int v) {
  * @param graph pointer to graph
  * @return reversed graph
  */
-static SccGraph* reverse(SccGraph* graph) {
-  SccGraph* reversed_graph = scc_graph_create(graph->num_vertices);
+static SccGraph* transpose_graph(SccGraph* graph, SccGraph* reversed_graph) {
+  scc_graph_initialize(reversed_graph, graph->num_vertices);
 
   int i;
   for (i = 0; i < graph->num_vertices; i++) {
@@ -227,15 +222,15 @@ void scc_graph_add_vertex(SccGraph* graph, void* v) {
     return;
   }
 
-  if (hash_table_contains(v, graph->vertices_ptr_to_index_map)) {
+  if (hash_table_contains(graph->vertices_ptr_to_index_map, v)) {
     fprintf(stderr, "Graph already contains the vertex\n");
     exit(1);
     return;
   }
 
   // Associate ptr -> index
-  hash_table_add_or_update(v, INT2VOIDP(graph->next_vertex_index),
-                           graph->vertices_ptr_to_index_map);
+  hash_table_add_or_update(graph->vertices_ptr_to_index_map, v,
+                           INT2VOIDP(graph->next_vertex_index));
 
   // Associate index -> ptr
   graph->vertices_index_to_ptr_map[graph->next_vertex_index] = v;
@@ -327,7 +322,8 @@ SCC_COMPONENTS* scc_graph_components(SccGraph* graph) {
     }
   }
 
-  SccGraph* reversed_graph = reverse(graph);
+  SccGraph reversed_graph;
+  transpose_graph(graph, &reversed_graph);
 
   bool* deleted = (bool*)alloca(n * sizeof(bool));
   memset(deleted, false, n * sizeof(bool));
@@ -350,7 +346,7 @@ SCC_COMPONENTS* scc_graph_components(SccGraph* graph) {
       memset(visited, false,
              n * sizeof(bool));  // mark all vertices of reverse as not visited
 
-      dfs_collect_scc(reversed_graph, visited, deleted, v,
+      dfs_collect_scc(&reversed_graph, visited, deleted, v,
                       &components_array[num_components * n],
                       &components_count[num_components]);
 
@@ -381,7 +377,7 @@ SCC_COMPONENTS* scc_graph_components(SccGraph* graph) {
   free(components_array);
 
   // Free memory allocated via malloc
-  scc_graph_destroy(reversed_graph);
+  scc_graph_destroy(&reversed_graph);
 
   // De-allocate the stack
   stack_destroy(&stack);

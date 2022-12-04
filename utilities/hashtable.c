@@ -14,7 +14,7 @@
  * @param table hash table
  * @return candidate index to insert or search for hash entry
  */
-static int hash_table_candidate_index(void* key, HASH_TABLE* table) {
+static int hash_table_candidate_index(HASH_TABLE* table, void* key) {
   long hash = table->hashf(key) & LONG_MAX;
   int index = hash % table->capacity;
   int step_size = hash % (table->capacity - 2) + 1;
@@ -36,10 +36,10 @@ static int hash_table_candidate_index(void* key, HASH_TABLE* table) {
  * @param index index to insert the hash entry
  * @param item the item intended to get inserted into the table
  */
-static void hash_table_insert_at(void* key,
+static void hash_table_insert_at(HASH_TABLE* table,
+                                 void* key,
                                  void* value,
-                                 const int index,
-                                 HASH_TABLE* table) {
+                                 const int index) {
   table->table[index].key = key;
   table->table[index].value = value;
   table->size++;
@@ -50,8 +50,8 @@ static void hash_table_insert_at(void* key,
  * @param item the key of the hash entry
  * @return possible index of the hash entry
  */
-static int hash_table_search(void* key, HASH_TABLE* table) {
-  int index = hash_table_candidate_index(key, table);
+static int hash_table_search(HASH_TABLE* table, void* key) {
+  int index = hash_table_candidate_index(table, key);
 
   return index;
 }
@@ -61,15 +61,15 @@ static int hash_table_search(void* key, HASH_TABLE* table) {
  * @param capacity new capacity
  * @param table hash table
  */
-static void hash_table_resize(const int capacity, HASH_TABLE* table) {
+static void hash_table_resize(HASH_TABLE* table, const int capacity) {
   HASH_TABLE_ENTRY* old_table = table->table;
   int old_capacity = table->capacity;
-  hash_table_initialize(capacity, table->hashf, table->equalf, table);
+  hash_table_initialize(table, capacity, table->hashf, table->equalf);
 
   for (int i = 0; i < old_capacity; i++) {
     HASH_TABLE_ENTRY item = old_table[i];
     if (item.key != NULL) {
-      hash_table_add_or_update(item.key, item.value, table);
+      hash_table_add_or_update(table, item.key, item.value);
     }
   }
 
@@ -82,8 +82,8 @@ static void hash_table_resize(const int capacity, HASH_TABLE* table) {
  * @param table hash table
  * @return the value of the hash entry given the key or NULL
  */
-void* hash_table_get(void* key, HASH_TABLE* table) {
-  int candidate_index = hash_table_search(key, table);
+void* hash_table_get(HASH_TABLE* table, void* key) {
+  int candidate_index = hash_table_search(table, key);
 
   if (table->equalf(table->table[candidate_index].key, key)) {
     return table->table[candidate_index].value;
@@ -99,7 +99,7 @@ void* hash_table_get(void* key, HASH_TABLE* table) {
  * @param value hash entry value
  * @param table hash table
  */
-void hash_table_add_or_update(void* key, void* value, HASH_TABLE* table) {
+void hash_table_add_or_update(HASH_TABLE* table, void* key, void* value) {
   if (key == NULL) {
     fprintf(stdout, "NULL key is not allowed in hashtable.\n");
     exit(1);
@@ -108,17 +108,17 @@ void hash_table_add_or_update(void* key, void* value, HASH_TABLE* table) {
 
   if (table->size + 1 > table->capacity * MAX_DENSITY) {
     const int new_capacity = next_twin_prime(DOUBLE_SIZE(table->capacity));
-    hash_table_resize(new_capacity, table);
+    hash_table_resize(table, new_capacity);
   }
 
-  int candidate_index = hash_table_candidate_index(key, table);
+  int candidate_index = hash_table_candidate_index(table, key);
 
   if (table->equalf(table->table[candidate_index].key, key)) {
     table->table[candidate_index].value = value;
     return;
   }
 
-  hash_table_insert_at(key, value, candidate_index, table);
+  hash_table_insert_at(table, key, value, candidate_index);
 }
 
 /**
@@ -127,10 +127,10 @@ void hash_table_add_or_update(void* key, void* value, HASH_TABLE* table) {
  * @param hashf hash function to hash the key
  * @param equalf equality function
  */
-void hash_table_initialize(unsigned int initial_capacity,
+void hash_table_initialize(HASH_TABLE* table,
+                           unsigned int initial_capacity,
                            Hash_Table_Hash hashf,
-                           Hash_Table_Equal equalf,
-                           HASH_TABLE* table) {
+                           Hash_Table_Equal equalf) {
   table->capacity = next_twin_prime(initial_capacity);
   table->hashf = hashf;
   table->equalf = equalf;
@@ -146,8 +146,8 @@ void hash_table_initialize(unsigned int initial_capacity,
  * @return boolean indicating if updating the entry's value was successful or
  * not
  */
-bool hash_table_remove(void* key, HASH_TABLE* table) {
-  int candidate_index = hash_table_search(key, table);
+bool hash_table_remove(HASH_TABLE* table, void* key) {
+  int candidate_index = hash_table_search(table, key);
 
   if (table->equalf(table->table[candidate_index].key, key)) {
     table->table[candidate_index].key = NULL;
@@ -175,8 +175,8 @@ void hash_table_clear(HASH_TABLE* table) {
  * @param table hash table
  * @return boolean indicating whether entry with the value exists or not
  */
-bool hash_table_contains(void* key, HASH_TABLE* table) {
-  int candidate_index = hash_table_search(key, table);
+bool hash_table_contains(HASH_TABLE* table, void* key) {
+  int candidate_index = hash_table_search(table, key);
 
   if (table->equalf(table->table[candidate_index].key, key)) {
     return true;

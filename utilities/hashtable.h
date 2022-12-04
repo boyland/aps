@@ -31,10 +31,10 @@ typedef struct hash_table {
  * @param equalf equality function
  * @return new hashcons set that includes the item
  */
-void hash_table_initialize(unsigned int initial_capacity,
+void hash_table_initialize(HASH_TABLE* table,
+                           unsigned int initial_capacity,
                            Hash_Table_Hash hashf,
-                           Hash_Table_Equal equalf,
-                           HASH_TABLE* table);
+                           Hash_Table_Equal equalf);
 
 /**
  * Adds an entry to the hashtable if not exists or updates the value if entry
@@ -43,7 +43,7 @@ void hash_table_initialize(unsigned int initial_capacity,
  * @param value hash entry value
  * @param table hash table
  */
-void hash_table_add_or_update(void* key, void* value, HASH_TABLE* table);
+void hash_table_add_or_update(HASH_TABLE* table, void* key, void* value);
 
 /**
  * Get hash entry value if there is one otherwise returns NULL
@@ -51,7 +51,7 @@ void hash_table_add_or_update(void* key, void* value, HASH_TABLE* table);
  * @param table hash table
  * @return the value of the hash entry given the key or NULL
  */
-void* hash_table_get(void* key, HASH_TABLE* table);
+void* hash_table_get(HASH_TABLE* table, void* key);
 
 /**
  * Removes hash entry if there is one otherwise returns NULL
@@ -60,7 +60,7 @@ void* hash_table_get(void* key, HASH_TABLE* table);
  * @return boolean indicating if updating the entry's value was successful or
  * not
  */
-bool hash_table_remove(void* key, HASH_TABLE* table);
+bool hash_table_remove(HASH_TABLE* table, void* key);
 
 /**
  * Clears the hashtable and removes all the elements
@@ -75,7 +75,7 @@ void hash_table_clear(HASH_TABLE* table);
  * @param table hash table
  * @return boolean indicating whether entry with the value exists or not
  */
-bool hash_table_contains(void* key, HASH_TABLE* table);
+bool hash_table_contains(HASH_TABLE* table, void* key);
 
 /**
  * Generic function that maps void* ptr to hash value

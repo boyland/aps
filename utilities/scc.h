@@ -40,7 +40,7 @@ typedef struct scc_graph SccGraph;
  * @brief Create graph given number of vertices implemented using adjacency
  * @return ptr to allocated graph
  */
-SccGraph* scc_graph_create(int num_vertices);
+void scc_graph_initialize(SccGraph* graph, int num_vertices);
 
 /**
  * @brief Deallocate graph

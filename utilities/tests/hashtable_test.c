@@ -7,7 +7,7 @@
  */
 void test_hash_table_consistency() {
   HASH_TABLE table;
-  hash_table_initialize(10, ptr_hashf, ptr_equalf, &table);
+  hash_table_initialize(&table, 10, ptr_hashf, ptr_equalf);
 
   // Ensure size is initially zero
   assert_true("size of table should initially be zero", table.size == 0);
@@ -17,16 +17,16 @@ void test_hash_table_consistency() {
   for (i = 1; i <= TOTAL_COUNT; i++) {
     // Should be first time seeing this key
     assert_true("hashtable should not initially contain the number",
-                !hash_table_contains(INT2VOIDP(i), &table));
+                !hash_table_contains(&table, INT2VOIDP(i)));
 
     // Add entry (i,i+1) to the hash table
-    hash_table_add_or_update(INT2VOIDP(i), INT2VOIDP(i + 1), &table);
+    hash_table_add_or_update(&table, INT2VOIDP(i), INT2VOIDP(i + 1));
 
     // Ensure hash table now holds the (i,i+1)
     assert_true("hashtable should contain the number after adding",
-                hash_table_contains(INT2VOIDP(i), &table));
+                hash_table_contains(&table, INT2VOIDP(i)));
     assert_true("hashtable value should be as expected",
-                VOIDP2INT(hash_table_get(INT2VOIDP(i), &table)) == i + 1);
+                VOIDP2INT(hash_table_get(&table, INT2VOIDP(i))) == i + 1);
   }
 
   // Size should be TOTAL_COUNT
@@ -37,16 +37,16 @@ void test_hash_table_consistency() {
   for (i = 1; i <= TOTAL_COUNT; i++) {
     // Should not be first time seeing this key
     assert_true("hashtable should contain the number already added",
-                hash_table_contains(INT2VOIDP(i), &table));
+                hash_table_contains(&table, INT2VOIDP(i)));
 
     // Update entry (i,i+2) in the hash table
-    hash_table_add_or_update(INT2VOIDP(i), INT2VOIDP(i + 2), &table);
+    hash_table_add_or_update(&table, INT2VOIDP(i), INT2VOIDP(i + 2));
 
     // Ensure hash table now holds the (i,i+2)
     assert_true("after update entry given key should still be in table",
-                hash_table_contains(INT2VOIDP(i), &table));
+                hash_table_contains(&table, INT2VOIDP(i)));
     assert_true("updated value should be in table",
-                VOIDP2INT(hash_table_get(INT2VOIDP(i), &table)) == i + 2);
+                VOIDP2INT(hash_table_get(&table, INT2VOIDP(i))) == i + 2);
   }
 
   // Size should still be TOTAL_COUNT
@@ -58,24 +58,24 @@ void test_hash_table_consistency() {
     // Should not be first time seeing this key
     assert_true(
         "contains should return true for element expected to be in the table",
-        hash_table_contains(INT2VOIDP(i), &table));
+        hash_table_contains(&table, INT2VOIDP(i)));
 
     // Remove entry with key i from the hash table
     assert_true(
         "remove should return true because table should have contained this "
         "element",
-        hash_table_remove(INT2VOIDP(i), &table));
+        hash_table_remove(&table, INT2VOIDP(i)));
 
     // Remove -i key from the hash table
     assert_true(
         "remove should return false because table should not have contained "
         "this "
         "element",
-        !hash_table_remove(INT2VOIDP(-i), &table));
+        !hash_table_remove(&table, INT2VOIDP(-i)));
 
     // Ensure hash table now holds the (i, i+1)
     assert_true("hashtable should not contain element that was just removed",
-                !hash_table_contains(INT2VOIDP(i), &table));
+                !hash_table_contains(&table, INT2VOIDP(i)));
     assert_true("hashtable size should be correct after removing an element",
                 table.size == TOTAL_COUNT - i);
   }
@@ -89,7 +89,7 @@ void test_hash_table_consistency() {
   for (i = 1; i <= TOTAL_COUNT; i++) {
     // Ensure hash table doesn't hold -i key
     assert_true("hashtable should not contain value that has not been added",
-                !hash_table_contains(INT2VOIDP(-i), &table));
+                !hash_table_contains(&table, INT2VOIDP(-i)));
   }
 
   hash_table_clear(&table);
