@@ -1,6 +1,6 @@
 CC= gcc
 AR= ar
-CFLAGS= -shared -g
+CFLAGS= -g
 
 .PHONY: default all clean
 
