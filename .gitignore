@@ -3,3 +3,4 @@ lib
 *.o
 *.a
 *.class
+*.out

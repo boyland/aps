@@ -16,8 +16,7 @@
 #include "aps-oag.h"
 #include "aps-analyze.h"
 #include "aps-debug.h"
-#include "prime.h"
-#include "hashcons.h"
+#include "../utilities/utilities.h"
 #include "canonical-type.h"
 #include "canonical-signature.h"
 

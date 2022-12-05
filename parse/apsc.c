@@ -12,7 +12,7 @@ int aps_parse_error = 0;
 
 int info_size = 0;
 
-main(int argc,char **argv) {
+int main(int argc,char **argv) {
   extern FILE *aps_yyin;
   extern char *aps_yyfilename;
   if (argc != 2) usage();
@@ -41,6 +41,7 @@ main(int argc,char **argv) {
   dump_lisp_Program(the_tree);
   printf("\n");
   exit(0);
+  return 0;
 }
 
 int yywrap()

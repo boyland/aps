@@ -23,8 +23,6 @@ extern "C" {
 //    end;
 // It will say z is 4, when it should be zero.
 
-using namespace std;
-
 struct ContextRecordNode {
   Declaration context;
   void *extra; /* branch in context (if any) */

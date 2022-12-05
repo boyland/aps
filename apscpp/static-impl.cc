@@ -8,8 +8,6 @@ extern "C" {
 
 #define LOCAL_VALUE_FLAG (1<<28)
 
-using namespace std;
-
 /** Return phase (synthesized) or -phase (inherited)
  * for fibered attribute, given the phylum's summary dependence graph.
  */
