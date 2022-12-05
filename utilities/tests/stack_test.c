@@ -1,13 +1,14 @@
 #include "../stack.h"
 #include "../hashtable.h"
 #include "common.h"
+#include "assert.h"
 
 static void test_empty() {
   LinkedStack* stack;
   stack_create(&stack);
 
   void* temp;
-  assert_true("Stack should be empty", !stack_pop(&stack, &temp));
+  _ASSERT_EXPR("Stack should be empty", !stack_pop(&stack, &temp));
 }
 
 static void test_push_pop() {
@@ -23,8 +24,8 @@ static void test_push_pop() {
 
   for (i = 0; i < n; i++) {
     void* temp;
-    assert_true("Stack should be empty", stack_pop(&stack, &temp));
-    assert_true("Should contain the right valud", VOIDP2INT(temp) == i);
+    _ASSERT_EXPR("Stack should be empty", stack_pop(&stack, &temp));
+    _ASSERT_EXPR("Should contain the right valud", VOIDP2INT(temp) == i);
   }
 }
 
@@ -41,7 +42,7 @@ static void test_clear() {
 
   stack_destroy(&stack);
   void* temp;
-  assert_true("Stack should be empty", !stack_pop(&stack, &temp));
+  _ASSERT_EXPR("Stack should be empty", !stack_pop(&stack, &temp));
 }
 
 void test_stack() {

@@ -2,8 +2,11 @@
 #define COMMON_H
 
 #include "stdbool.h"
+#include "assert.h"
 
 #define TOTAL_COUNT ((int)1<<10)
+
+#define _ASSERT_EXPR(message, test) assert(((message), test))
 
 typedef void (*Test_Signature)();
 
@@ -13,7 +16,5 @@ typedef struct test {
 } TEST;
 
 void run_tests(char* testname, TEST tests[], int n);
-
-void assert_true(char* name, bool result);
 
 #endif

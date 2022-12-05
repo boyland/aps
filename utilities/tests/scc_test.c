@@ -3,6 +3,7 @@
 #include <math.h>
 #include <stdio.h>
 #include "common.h"
+#include "assert.h"
 
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
 
@@ -17,13 +18,13 @@ static void test_all_disjoints() {
 
   SCC_COMPONENTS* components = scc_graph_components(&graph);
 
-  assert_true("should have many disjoint components",
+  _ASSERT_EXPR("should have many disjoint components",
               components->length == TOTAL_COUNT);
 
   for (i = 0; i < components->length; i++) {
     SCC_COMPONENT* component = components->array[i];
 
-    assert_true("component should have one element in it", component->length);
+    _ASSERT_EXPR("component should have one element in it", component->length);
   }
 
   scc_graph_destroy(&graph);
@@ -44,13 +45,13 @@ static void test_all_disjoints2() {
 
   SCC_COMPONENTS* components = scc_graph_components(&graph);
 
-  assert_true("should have many disjoint components",
+  _ASSERT_EXPR("should have many disjoint components",
               components->length == TOTAL_COUNT);
 
   for (i = 0; i < components->length; i++) {
     SCC_COMPONENT* component = components->array[i];
 
-    assert_true("component should have one element in it", component->length);
+    _ASSERT_EXPR("component should have one element in it", component->length);
   }
 
   scc_graph_destroy(&graph);
@@ -73,10 +74,10 @@ static void test_all_connected() {
 
   SCC_COMPONENTS* components = scc_graph_components(&graph);
 
-  assert_true("should have one large component", components->length == 1);
+  _ASSERT_EXPR("should have one large component", components->length == 1);
 
   SCC_COMPONENT* component = components->array[0];
-  assert_true("component should have all elements in it",
+  _ASSERT_EXPR("component should have all elements in it",
               component->length == TOTAL_COUNT);
 
   scc_graph_destroy(&graph);
@@ -108,14 +109,14 @@ static void test_two_connected_components() {
 
   SCC_COMPONENTS* components = scc_graph_components(&graph);
 
-  assert_true("should have one large component", components->length == 2);
+  _ASSERT_EXPR("should have one large component", components->length == 2);
 
   SCC_COMPONENT* component1 = components->array[0];
-  assert_true("component 1 should have half of elements in it",
+  _ASSERT_EXPR("component 1 should have half of elements in it",
               component1->length == half_count);
 
   SCC_COMPONENT* component2 = components->array[2];
-  assert_true("component 2 should have other half of elements in it",
+  _ASSERT_EXPR("component 2 should have other half of elements in it",
               component1->length == (TOTAL_COUNT - half_count));
 
   scc_graph_destroy(&graph);
@@ -152,11 +153,11 @@ static void test_n_connected_components() {
 
   SCC_COMPONENTS* components = scc_graph_components(&graph);
 
-  assert_true("should have n large component", components->length == j);
+  _ASSERT_EXPR("should have n large component", components->length == j);
 
   for (j = 0; j < count_chunks; j++) {
     SCC_COMPONENT* component = components->array[j];
-    assert_true(
+    _ASSERT_EXPR(
         "component j should have at most CHUNK_SIZE number of elements in it",
         component->length <= ceil((1.0 * TOTAL_COUNT / count_chunks)));
   }
@@ -184,17 +185,17 @@ static void test_small_logical() {
 
   SCC_COMPONENTS* components = scc_graph_components(&graph);
 
-  assert_true("should have 3 component", components->length == 3);
+  _ASSERT_EXPR("should have 3 component", components->length == 3);
 
   int i;
   for (i = 0; i < components->length; i++) {
     SCC_COMPONENT* component = components->array[i];
 
     if (component->length > 1) {
-      assert_true("Component should contain 2 vertices",
+      _ASSERT_EXPR("Component should contain 2 vertices",
                   component->length == 2);
     } else {
-      assert_true("Component should have vertex 5",
+      _ASSERT_EXPR("Component should have vertex 5",
                   VOIDP2INT(component->array[0]) == 5);
     }
   }
