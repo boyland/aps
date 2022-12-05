@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "common.h"
+#include "assert.h"
 
 #define PRIME_MODULO 977
 
@@ -23,7 +24,7 @@ static void test_integer_table_consistency() {
   int i, j;
   for (i = 0, j = 0; i < TOTAL_COUNT; ++i, j = (j + 1) % PRIME_MODULO) {
     sprintf(buffer, "integer for %d", i);
-    assert_true(buffer, *new_hash_cons_integer(j) == j);
+    _ASSERT_EXPR(buffer, *new_hash_cons_integer(j) == j);
   }
 }
 
@@ -33,8 +34,8 @@ static void test_integer_table_consistency() {
 static void test_integer_set_empty_consistency() {
   HASH_CONS_SET set = get_hash_cons_empty_set();
 
-  assert_true("empty set should have size of 0", set->num_elements == 0);
-  assert_true("empty set should be unique", set == get_hash_cons_empty_set());
+  _ASSERT_EXPR("empty set should have size of 0", set->num_elements == 0);
+  _ASSERT_EXPR("empty set should be unique", set == get_hash_cons_empty_set());
 }
 
 /**
@@ -51,10 +52,10 @@ static void test_integer_set_add_consistency() {
 
     sprintf(buffer, "size should never go pass %d but it is %d", PRIME_MODULO,
             set->num_elements);
-    assert_true(buffer, set->num_elements <= PRIME_MODULO);
+    _ASSERT_EXPR(buffer, set->num_elements <= PRIME_MODULO);
 
     sprintf(buffer, "size contain the element %ld at correct index", j);
-    assert_true(buffer, (long)set->elements[j] == j);
+    _ASSERT_EXPR(buffer, (long)set->elements[j] == j);
   }
 }
 
@@ -80,11 +81,11 @@ static void test_integer_set_union_consistency() {
   HASH_CONS_SET result_set = union_hash_const_set(set1, set2);
 
   sprintf(buffer, "size contain the element %d at correct index", i);
-  assert_true(buffer, result_set->num_elements == size);
+  _ASSERT_EXPR(buffer, result_set->num_elements == size);
 
   for (i = 0; i < PRIME_MODULO; i++) {
     sprintf(buffer, "size contain the element %d at correct index", i);
-    assert_true(buffer, VOIDP2INT(result_set->elements[i]) == i);
+    _ASSERT_EXPR(buffer, VOIDP2INT(result_set->elements[i]) == i);
   }
 }
 
@@ -108,12 +109,12 @@ static void test_integer_set_new_consistency() {
   }
 
   HASH_CONS_SET sorted_set = new_hash_cons_set(set);
-  assert_true("size should be correct", sorted_set->num_elements == size);
+  _ASSERT_EXPR("size should be correct", sorted_set->num_elements == size);
 
   for (i = 0; i < size; i++) {
     sprintf(buffer, "elements should be in sorted order %d != %d",
             VOIDP2INT(sorted_set->elements[i]), i);
-    assert_true(buffer, VOIDP2INT(sorted_set->elements[i]) == i);
+    _ASSERT_EXPR(buffer, VOIDP2INT(sorted_set->elements[i]) == i);
   }
 }
 
@@ -158,7 +159,7 @@ static void test_dummy_table_consistency() {
   int i, j;
   for (i = 0, j = 0; i < TOTAL_COUNT; ++i, j = (j + 1) % PRIME_MODULO) {
     sprintf(buffer, "dummy for %d", i);
-    assert_true(buffer, new_hash_cons_dummy(j, buffer) ==
+    _ASSERT_EXPR(buffer, new_hash_cons_dummy(j, buffer) ==
                             new_hash_cons_dummy(j, buffer));
   }
 }

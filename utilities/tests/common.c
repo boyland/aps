@@ -25,7 +25,3 @@ void run_tests(char* testname, TEST tests[], int n) {
 
   printf("\n");
 }
-
-void assert_true(char* name, bool result) {
-  assert((name, result));
-}
