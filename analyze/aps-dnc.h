@@ -25,6 +25,9 @@ enum instance_direction {instance_local, instance_inward, instance_outward};
 enum instance_direction fibered_attr_direction(FIBERED_ATTRIBUTE *fa);
 enum instance_direction instance_direction(INSTANCE *);
 
+extern BOOL fiber_attr_circular(FIBERED_ATTRIBUTE* fiber_attr);
+extern BOOL instance_circular(INSTANCE* in);
+
 typedef unsigned DEPENDENCY;
 
 #define SOME_DEPENDENCY 1
@@ -132,6 +135,8 @@ extern void print_edge_helper(DEPENDENCY, CONDITION *, FILE*);
 extern void print_edgeset(EDGESET, FILE *);
 extern void print_analysis_state(STATE *, FILE *);
 extern void print_cycles(STATE *, FILE *);
+
+extern BOOL decl_is_circular(Declaration d);
 
 extern int analysis_debug;
 #define ADD_EDGE 16
