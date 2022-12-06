@@ -401,22 +401,6 @@ static void add_up_down_edge(int index1, int index2, int n, INSTANCE *array, DEP
 
 /**
  * Combines dependencies for edgeset
- * @param es edgeset
- * @return combined dependencies given an edgeset
- */
-DEPENDENCY get_edgeset_combine_dependencies(EDGESET es)
-{
-  DEPENDENCY acc_dependency = no_dependency;
-  for (; es != NULL; es = es->rest)
-  {
-    acc_dependency |= es->kind;
-  }
-
-  return acc_dependency;
-}
-
-/**
- * Combines dependencies for edgeset
  * @param es
  * @param acc_dependency
  * @param acc_cond
@@ -429,6 +413,20 @@ static void edgeset_combine_dependencies(EDGESET es, DEPENDENCY* acc_dependency,
     acc_cond->positive |= es->cond.positive;
     acc_cond->negative |= es->cond.negative;
   }
+}
+
+/**
+ * Combines dependencies for edgeset
+ * @param es edgeset
+ * @return combined dependencies given an edgeset
+ */
+DEPENDENCY get_edgeset_combine_dependencies(EDGESET es)
+{
+  DEPENDENCY acc_dependency = no_dependency;
+  CONDITION acc_cond = { 0, 0 };
+  edgeset_combine_dependencies(es, &acc_dependency, &acc_cond);
+
+  return acc_dependency;
 }
 
 #define UP_DOWN_DIRECTION(v, direction) (direction ? v : !v)
@@ -732,16 +730,13 @@ static void add_up_down_attributes(STATE *s, bool direction)
   }
 }
 
-
-
-
-
-
-
-
-
-
-
+/**
+ * Utility function that returns boolean indicating if decl is inside some function
+ * @param decl Declaration to test
+ * @param func Declaration function
+ * @return true if decl is inside function
+ * @return false otherwise
+ */
 static bool is_inside_some_function(Declaration decl, Declaration *func)
 {
   void *current = decl;
@@ -758,6 +753,8 @@ static bool is_inside_some_function(Declaration decl, Declaration *func)
         *func = current_decl;
         return some_function_decl_result(current_decl) == decl;
       }
+      default:
+        break;
     }
   }
 
@@ -770,7 +767,7 @@ static bool is_inside_some_function(Declaration decl, Declaration *func)
  * @return true if instance not is not: If, Match and some formal
  * @return false everything else
  */
-static bool instance_can_be_considered_for_circularity_check(INSTANCE *instance)
+static bool applicable_for_circularity_check(INSTANCE *instance)
 {
   // If and Match statements can show up in a cycle but are never declared circular or non-circular
   if (if_rule_p(instance->fibered_attr.attr))
@@ -795,6 +792,8 @@ static bool instance_can_be_considered_for_circularity_check(INSTANCE *instance)
     {
     case KEYformal:
       return false;
+    default:
+      break;
     }
   }
   }
@@ -820,7 +819,7 @@ static void assert_circular_declaration(STATE* s) {
       INSTANCE* instance = &array[j];
       Declaration node = instance->fibered_attr.attr;
 
-      if (!instance_can_be_considered_for_circularity_check(instance))
+      if (!applicable_for_circularity_check(instance))
         continue;
 
       bool any_cycle = false;
@@ -869,7 +868,7 @@ static void assert_circular_declaration(STATE* s) {
       INSTANCE* instance = &array[j];
       Declaration node = instance->fibered_attr.attr;
 
-      if (!instance_can_be_considered_for_circularity_check(instance))
+      if (!applicable_for_circularity_check(instance))
         continue;
 
       bool any_cycle = false;
@@ -914,11 +913,8 @@ void break_fiber_cycles(Declaration module,STATE *s,DEPENDENCY dep) {
   get_fiber_cycles(s);
   assert_circular_declaration(s);
 
-  // If there is just fiber cycles then we do up/down
-  if (!(dep & DEPENDENCY_NOT_JUST_FIBER))
-  {
-    add_up_down_attributes(s,UP_DOWN);
-  }
+  bool direction = !(dep & DEPENDENCY_NOT_JUST_FIBER) ? UP_DOWN : DOWN_UP;
+  add_up_down_attributes(s,direction);
   release(mark);
   {
     int saved_analysis_debug = analysis_debug;
