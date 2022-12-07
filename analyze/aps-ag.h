@@ -19,6 +19,7 @@
 #include "../utilities/utilities.h"
 #include "canonical-type.h"
 #include "canonical-signature.h"
+#include "aps-scc.h"
 
 extern char *aps_yyfilename;
 extern void aps_error(const void *tnode, const char *fmt, ...);
