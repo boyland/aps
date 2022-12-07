@@ -913,7 +913,7 @@ void break_fiber_cycles(Declaration module,STATE *s,DEPENDENCY dep) {
   get_fiber_cycles(s);
   assert_circular_declaration(s);
 
-  // Preserve UP-DOWN edges if there accumulated dependency is just fiber cycle,
+  // Preserve UP-DOWN edges if the accumulated dependency is just fiber cycle,
   // otherwise preserve DOWN-UP edges.
   bool direction = !(dep & DEPENDENCY_NOT_JUST_FIBER) ? UP_DOWN : DOWN_UP;
   add_up_down_attributes(s,direction);
