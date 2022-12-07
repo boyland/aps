@@ -752,6 +752,8 @@ static bool is_inside_some_function(Declaration decl, Declaration *func)
       case KEYsome_function_decl:
         *func = current_decl;
         return some_function_decl_result(current_decl) == decl;
+      default:
+        break;
       }
       default:
         break;
@@ -796,6 +798,8 @@ static bool applicable_for_circularity_check(INSTANCE *instance)
       break;
     }
   }
+  default:
+    break;
   }
 
   return true;
