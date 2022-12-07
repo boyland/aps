@@ -2,6 +2,7 @@
 #define APS_DNC_H
 
 #include "jbb-vector.h"
+#include "scc.h"
 
 typedef struct attrset {
   struct attrset *rest;
@@ -73,6 +74,8 @@ typedef struct augmented_dependency_graph {
   struct augmented_dependency_graph *next_in_aug_worklist;
   int *schedule; /* one-d array, indexed by instance number */
   struct cto_node *total_order;
+  SCC_COMPONENTS components;
+  bool* component_cycle;
 } AUG_GRAPH;
 extern const char *aug_graph_name(AUG_GRAPH *);
 
@@ -82,10 +85,12 @@ typedef struct summary_dependency_graph {
   VECTOR(INSTANCE) instances;
   DEPENDENCY *mingraph; /* two-d array, indexed by instance number */
   struct summary_dependency_graph *next_in_phy_worklist;
+  SCC_COMPONENTS components;
+  bool* component_cycle;
   int *summary_schedule; /* one-d array, indexed by instance number */
 } PHY_GRAPH;
 extern const char *phy_graph_name(PHY_GRAPH *);
-  
+
 typedef VECTOR(struct cycle_description) CYCLES;
 
 typedef struct analysis_state {
