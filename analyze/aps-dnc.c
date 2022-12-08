@@ -2094,7 +2094,7 @@ static void set_decl_flags_aug_graph(Declaration tlm, STATE* state) {
   }
 }
 
-static void set_decl_flags(STATE* s, Declaration module) {
+static void set_decl_flags_module(STATE* s, Declaration module) {
   int i;
   for (i = 0; i < s->match_rules.length; ++i) {
     set_decl_flags_aug_graph(s->match_rules.array[i], s);
@@ -2326,8 +2326,8 @@ static void init_analysis_state(STATE *s, Declaration module) {
   }
 
   // Ensure declaration flags are all set before fibering begins
-  set_decl_flags(s, module);
-  
+  set_decl_flags_module(s, module);
+
   /* perform fibering */
   fiber_module(s->module,s);
   add_fibers_to_state(s);
