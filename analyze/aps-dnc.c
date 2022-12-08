@@ -167,11 +167,65 @@ void remove_from_worklist(EDGESET node, AUG_GRAPH *aug_graph) {
 }
 
 static EDGESET edgeset_freelist = NULL;
+
+static VECTOR(EDGESET) private_check_vector;
+static int private_check_vector_used = 0;
+static Boolean check_all_edgesets__add(EDGESET e) {
+  int n = private_check_vector_used;
+  int i;
+  if (private_check_vector.array == 0) {
+    VECTORALLOC(private_check_vector,EDGESET,16);
+  }
+  for (i=0; i < n; ++i) {
+    if (private_check_vector.array[i] == e) return false;
+  }
+  if (n >= private_check_vector.length) {
+    EDGESET *oldarray = private_check_vector.array;
+    VECTORALLOC(private_check_vector,EDGESET,n*2);
+    for (i=0; i < n; ++i) {
+      private_check_vector.array[i] = oldarray[i];
+    }
+  }
+  private_check_vector.array[n] = e;
+  ++private_check_vector_used;
+  return true;
+}
+  
+void check_all_edgesets(AUG_GRAPH *aug_graph) {
+  int n = aug_graph->instances.length;
+  int m = n*n;
+  int i,j;
+  EDGESET f;
+
+  private_check_vector_used = 0;
+  
+  for (f = edgeset_freelist; f != NULL; f = f->rest) {
+    if (!check_all_edgesets__add(f)) {
+      fatal_error("Found duplicate edge set in free list\n");
+    }
+  }
+  for (i=0; i < n; ++i) {
+    for (j=0; j < n; ++j) {
+      EDGESET es = aug_graph->graph[i*n+j];
+      while (es != NULL) {
+	if (!check_all_edgesets__add(es)) {
+	  fatal_error("Found duplicate edge set %d -> %d\n",i,j);
+	}
+	es = es->rest;
+      }
+    }
+  }
+}
+
+
 EDGESET new_edgeset(INSTANCE *source,
 		    INSTANCE *sink,
 		    CONDITION *cond,
 		    DEPENDENCY kind) {
   EDGESET new_edge;
+  if (analysis_debug & EDGESET_ASSERTIONS) {
+    // can't do anything right now
+  }
   if (edgeset_freelist == NULL) {
     new_edge = (EDGESET)HALLOC(sizeof(struct edgeset));
   } else {
@@ -200,6 +254,9 @@ void free_edge(EDGESET old, AUG_GRAPH *aug_graph) {
   old->kind = no_dependency;
   remove_from_worklist(old,aug_graph);
   edgeset_freelist = old;
+  if (analysis_debug & EDGESET_ASSERTIONS) {
+    check_all_edgesets(aug_graph);
+  }
 }
 
 void free_edgeset(EDGESET es, AUG_GRAPH *aug_graph) {
@@ -258,6 +315,16 @@ EDGESET add_edge(INSTANCE *source,
 		 DEPENDENCY kind,
 		 EDGESET current,
 		 AUG_GRAPH *aug_graph) {
+  if (!kind) {
+    print_instance(source,stdout);
+    fputs("->",stdout);
+    print_instance(sink,stdout);
+    fputs(":",stdout);
+    print_edge_helper(kind,cond,stdout);
+    puts("\n");
+    fatal_error("Trying to add dependency with kind=0 %d->%d", source->index, sink->index);
+  }
+
   if (current == NULL) {
     EDGESET new_edge=new_edgeset(source,sink,cond,kind);
     add_to_worklist(new_edge,aug_graph);
@@ -306,9 +373,11 @@ void add_edge_to_graph(INSTANCE *source,
 		       DEPENDENCY kind,
 		       AUG_GRAPH *aug_graph) {
   int index = source->index*(aug_graph->instances.length)+sink->index;
+  EDGESET current = aug_graph->graph[index];
+  aug_graph->graph[index] = NULL;
 
   aug_graph->graph[index] =
-    add_edge(source,sink,cond,kind,aug_graph->graph[index],aug_graph);
+    add_edge(source,sink,cond,kind,current,aug_graph);
 }
 
 void add_transitive_edge_to_graph(INSTANCE *source,
@@ -2513,10 +2582,12 @@ void close_using_edge(AUG_GRAPH *aug_graph, EDGESET edge) {
 
   for (i=0; i < n; ++i) {
     EDGESET e;
+    EDGESET rest;
     /* first: instance[i]->source */
     for (e = aug_graph->graph[i*n+source_index];
 	 e != NULL;
-	 e = e->rest) {
+	 e = rest) {
+      rest = e->rest; /* may be modified in following: */
       add_transitive_edge_to_graph(e->source,edge->sink,
 				   &e->cond,&edge->cond,
 				   e->kind,edge->kind,
@@ -2525,7 +2596,8 @@ void close_using_edge(AUG_GRAPH *aug_graph, EDGESET edge) {
     /* then sink->instance[i] */
     for (e = aug_graph->graph[sink_index*n+i];
 	 e != NULL;
-	 e = e->rest) {
+	 e = rest) {
+      rest = e->rest;
       add_transitive_edge_to_graph(edge->source,e->sink,
 				   &edge->cond,&e->cond,
 				   edge->kind,e->kind,

@@ -24,7 +24,7 @@ module CYCLE_SERIES[T :: var TINY[]] extends T begin
   end;
 
   match ?l=leaf(?x) begin
-    circular collection c : IntegerSet;
+    circular collection c : IntegerSetLattice;
     c :> l.ins;
     for v in l.ins begin
       if (v < x) then

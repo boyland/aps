@@ -12,8 +12,6 @@ extern "C" {
 #include "implement.h"
 #include "version.h"
 
-using namespace std;
-
 extern "C" {
 
 int callset_AI(Declaration module, STATE *s) { return 0; }
@@ -89,7 +87,7 @@ int main(int argc,char **argv) {
       analyze_Program(p);
       aps_check_error("analysis");
       if (!impl) {
-	cerr << "Warning: static scheduling not implemented: reverting to dynamic..." << endl;
+	std::cerr << "Warning: static scheduling not implemented: reverting to dynamic..." << std::endl;
 	impl = dynamic_impl;
       }
     } else {
@@ -97,7 +95,7 @@ int main(int argc,char **argv) {
     }
     char* outfilename = str2cat(argv[i],".scala");
 
-    ofstream out(outfilename);
+    std::ofstream out(outfilename);
     dump_scala_Program(p,out);
   }
   exit(0);

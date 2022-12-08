@@ -94,7 +94,7 @@ extern Matches some_case_stmt_matchers(Declaration);
 
 /* for loop for accessing elements (only works in C++ with stl) */
 #define FOR_SEQUENCE(etype,id,stype,seq,body) \
-   { stack<stype> _st; _st.push(seq); \
+   { std::stack<stype> _st; _st.push(seq); \
      while (!_st.empty()) { \
        stype _t = _st.top(); _st.pop(); \
        switch(stype##_KEY(_t)) { \
