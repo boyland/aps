@@ -1,9 +1,6 @@
-#ifndef APS_DNC_H
-#define APS_DNC_H
-
 #include "jbb-vector.h"
 #include "scc.h"
-#include <stdbool.h>
+#include "topological-sort.h"
 
 typedef struct attrset {
   struct attrset *rest;
@@ -29,7 +26,6 @@ enum instance_direction instance_direction(INSTANCE *);
 
 extern BOOL fiber_attr_circular(FIBERED_ATTRIBUTE* fiber_attr);
 extern BOOL instance_circular(INSTANCE* in);
-extern BOOL decl_is_circular(Declaration d);
 
 typedef unsigned DEPENDENCY;
 
@@ -64,6 +60,8 @@ typedef struct edgeset {
 
 extern DEPENDENCY edgeset_kind(EDGESET);
 
+typedef VECTOR(struct cycle_description) CYCLES;
+
 typedef struct augmented_dependency_graph {
   Declaration match_rule;
   struct analysis_state *global_state;
@@ -73,10 +71,11 @@ typedef struct augmented_dependency_graph {
   EDGESET *graph; /* two-d array, indexed by instance number */
   EDGESET worklist_head, worklist_tail;
   struct augmented_dependency_graph *next_in_aug_worklist;
-  int *schedule; /* one-d array, indexed by instance number */
+  BOOL *schedule; /* one-d array, indexed by instance number */
   struct cto_node *total_order;
-  SCC_COMPONENTS* components; /* SCC components of instances in augmented dependency graph */
-  bool* component_cycle;      /* boolean indicating whether SCC component at index is circular */
+  SCC_COMPONENTS components;
+  BOOL* component_cycle;
+  TOPOLOGICAL_SORT_ORDER scc_order;
 } AUG_GRAPH;
 extern const char *aug_graph_name(AUG_GRAPH *);
 
@@ -86,13 +85,14 @@ typedef struct summary_dependency_graph {
   VECTOR(INSTANCE) instances;
   DEPENDENCY *mingraph; /* two-d array, indexed by instance number */
   struct summary_dependency_graph *next_in_phy_worklist;
-  SCC_COMPONENTS* components; /* SCC components of instances in phylum graph */
-  bool* component_cycle;      /* boolean indicating whether SCC component at index is circular */
+  SCC_COMPONENTS components;
+  BOOL* component_cycle;
   int *summary_schedule; /* one-d array, indexed by instance number */
+  BOOL* cyclic_flags; /* one-d array, indexed by phase number indicating whether phase is circular or not */
+  int max_phase;      /* integer denoting the maximum phase number for this phylum */
+  BOOL* empty_phase;  /* one-d array, indexed by phase number there is no attribute belonging to this phase */
 } PHY_GRAPH;
 extern const char *phy_graph_name(PHY_GRAPH *);
-
-typedef VECTOR(struct cycle_description) CYCLES;
 
 typedef struct analysis_state {
   Declaration module;
@@ -105,6 +105,10 @@ typedef struct analysis_state {
   AUG_GRAPH global_dependencies;
   VECTOR(FIBER) fibers;
   CYCLES cycles;
+  BOOL loop_required;
+  DEPENDENCY original_state_dependency;  // This is value of analysis_state_cycle
+                                         // before removing fiber cycle or
+                                         // linearization of phases in summary graph
 } STATE;
 
 extern PHY_GRAPH* summary_graph_for(STATE *, Declaration);
@@ -143,6 +147,8 @@ extern void print_edgeset(EDGESET, FILE *);
 extern void print_analysis_state(STATE *, FILE *);
 extern void print_cycles(STATE *, FILE *);
 
+extern BOOL decl_is_circular(Declaration d);
+
 extern int analysis_debug;
 #define ADD_EDGE 16
 #define SUMMARY_EDGE 32
@@ -154,6 +160,3 @@ extern int analysis_debug;
 #define DNC_ITERATE (1<<11)
 #define TWO_EDGE_CYCLE (1<<12)
 #define ASSERT_CLOSED (1<<13)
-#define EDGESET_ASSERTIONS (1<<14)
-
-#endif
