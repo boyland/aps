@@ -23,10 +23,10 @@ void set_phylum_graph_components(PHY_GRAPH* phy_graph) {
 
   phy_graph->components = scc_graph_components(graph);
   phy_graph->component_cycle =
-      (bool*)calloc(sizeof(bool), phy_graph->components.length);
+      (bool*)calloc(sizeof(bool), phy_graph->components->length);
 
-  for (i = 0; i < phy_graph->components.length; i++) {
-    SCC_COMPONENT* comp = &phy_graph->components.array[i];
+  for (i = 0; i < phy_graph->components->length; i++) {
+    SCC_COMPONENT* comp = phy_graph->components->array[i];
 
     for (j = 0; j < comp->length; j++) {
       INSTANCE* in = (INSTANCE*)comp->array[j];
@@ -39,8 +39,8 @@ void set_phylum_graph_components(PHY_GRAPH* phy_graph) {
 
   if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
     printf("Components of Phylum Graph: %s\n", phy_graph_name(phy_graph));
-    for (j = 0; j < phy_graph->components.length; j++) {
-      SCC_COMPONENT* comp = &phy_graph->components.array[j];
+    for (j = 0; j < phy_graph->components->length; j++) {
+      SCC_COMPONENT* comp = phy_graph->components->array[j];
       printf(" Component #%d [%s]\n", j,
              phy_graph->component_cycle[j] ? "circular" : "non-circular");
 
@@ -74,10 +74,10 @@ void set_aug_graph_components(AUG_GRAPH* aug_graph) {
 
   aug_graph->components = scc_graph_components(graph);
   aug_graph->component_cycle =
-      (bool*)calloc(sizeof(bool), aug_graph->components.length);
+      (bool*)calloc(sizeof(bool), aug_graph->components->length);
 
-  for (i = 0; i < aug_graph->components.length; i++) {
-    SCC_COMPONENT* comp = &aug_graph->components.array[i];
+  for (i = 0; i < aug_graph->components->length; i++) {
+    SCC_COMPONENT* comp = aug_graph->components->array[i];
 
     for (j = 0; j < comp->length; j++) {
       INSTANCE* source = (INSTANCE*)comp->array[j];
@@ -93,8 +93,8 @@ void set_aug_graph_components(AUG_GRAPH* aug_graph) {
 
   if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
     printf("Components of Augmented Graph: %s\n", aug_graph_name(aug_graph));
-    for (j = 0; j < aug_graph->components.length; j++) {
-      SCC_COMPONENT* comp = &aug_graph->components.array[j];
+    for (j = 0; j < aug_graph->components->length; j++) {
+      SCC_COMPONENT* comp = aug_graph->components->array[j];
       printf(" Component #%d [%s]\n", j,
              aug_graph->component_cycle[j] ? "circular" : "non-circular");
 

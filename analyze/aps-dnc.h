@@ -75,7 +75,7 @@ typedef struct augmented_dependency_graph {
   struct augmented_dependency_graph *next_in_aug_worklist;
   int *schedule; /* one-d array, indexed by instance number */
   struct cto_node *total_order;
-  SCC_COMPONENTS components;  /* SCC components of instances in augmented dependency graph */
+  SCC_COMPONENTS* components; /* SCC components of instances in augmented dependency graph */
   bool* component_cycle;      /* boolean indicating whether SCC component at index is circular */
 } AUG_GRAPH;
 extern const char *aug_graph_name(AUG_GRAPH *);
@@ -86,7 +86,7 @@ typedef struct summary_dependency_graph {
   VECTOR(INSTANCE) instances;
   DEPENDENCY *mingraph; /* two-d array, indexed by instance number */
   struct summary_dependency_graph *next_in_phy_worklist;
-  SCC_COMPONENTS components;  /* SCC components of instances in phylum graph */
+  SCC_COMPONENTS* components; /* SCC components of instances in phylum graph */
   bool* component_cycle;      /* boolean indicating whether SCC component at index is circular */
   int *summary_schedule; /* one-d array, indexed by instance number */
 } PHY_GRAPH;
