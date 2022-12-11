@@ -5,7 +5,7 @@
 #include "aps-ag.h"
 
 int type_debug = FALSE;
-int BUFFER_SIZE = 1000;
+static const int BUFFER_SIZE = 1000;
 
 static Type Boolean_Type;
 static Type Integer_Type;
