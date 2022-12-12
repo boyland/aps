@@ -65,8 +65,16 @@ void set_phylum_graph_components(PHY_GRAPH* phy_graph) {
 void set_aug_graph_components(AUG_GRAPH* aug_graph) {
   int i, j, k;
   int n = aug_graph->instances.length;
-  SccGraph* graph;
-  scc_graph_initialize(graph, n);
+  SccGraph graph;
+  scc_graph_initialize(&graph, n);
+
+  // Add vertices
+  for (i = 0; i < n; i++) {
+    INSTANCE* in = &aug_graph->instances.array[i];
+    scc_graph_add_vertex(&graph, (void*)in);
+  }
+
+  // Add edges
   for (i = 0; i < n; i++) {
     INSTANCE* source = &aug_graph->instances.array[i];
     for (j = 0; j < n; j++) {
@@ -74,13 +82,13 @@ void set_aug_graph_components(AUG_GRAPH* aug_graph) {
       if (edgeset_kind(aug_graph->graph[i * n + j])) {
         if (!MERGED_CONDITION_IS_IMPOSSIBLE(instance_condition(source),
                                             instance_condition(sink))) {
-          scc_graph_add_edge(graph, (void*)source, (void*)sink);
+          scc_graph_add_edge(&graph, (void*)source, (void*)sink);
         }
       }
     }
   }
 
-  aug_graph->components = scc_graph_components(graph);
+  aug_graph->components = scc_graph_components(&graph);
   aug_graph->component_cycle =
       (bool*)calloc(sizeof(bool), aug_graph->components->length);
 
