@@ -416,7 +416,39 @@ static void edgeset_combine_dependencies(EDGESET es, DEPENDENCY* acc_dependency,
   }
 }
 
-#define UP_DOWN_DIRECTION(v, direction) (direction ? v : !v)
+/**
+ * Utility function that determines whether an edge during UP/DOWN can br deleted or not
+ * @param index1 index of the first edge
+ * @param index2 index of the second edge
+ * @param array array of instances
+ * @param dep dependency between the edges
+ * @return true if edge can safely be deleted and it would not cause any scoping problem
+ * @return false if edge should be preserved
+ */
+static bool edge_can_be_deleted(int index1, int index2, INSTANCE *array, DEPENDENCY dep)
+{
+  INSTANCE *attr1 = (&array[index1]);
+  INSTANCE *attr2 = (&array[index2]);
+
+  if (index1 != index2 &&
+      (dep & DEPENDENCY_MAYBE_DIRECT) &&
+      (dep & DEPENDENCY_NOT_JUST_FIBER) &&
+      (fibered_attr_direction(&attr1->fibered_attr)) == instance_local)
+  {
+    if (cycle_debug & DEBUG_UP_DOWN)
+    {
+      printf(" preserved critical: ");
+      print_instance(attr1, stdout);
+      printf(" -> ");
+      print_instance(attr2, stdout);
+      printf("\n");
+    }
+    return false;
+  }
+
+  // Kill the edge
+  return true;
+}
 
 /**
  * In phylum graph (and in aug graph)
@@ -464,6 +496,16 @@ static void add_up_down_attributes(STATE *s, bool direction)
       for (k = 0; k < n; k++)
       {
         INSTANCE *instance = &array[k];
+
+        if (cycle_debug & DEBUG_UP_DOWN)
+        {
+          printf("> phylum node #%d (",k);
+          print_instance(&array[k],stdout);
+          printf(") %s\n",
+          parent_index[k + phylum_index] == cyc->internal_info ?
+          (instance_is_up(instance) ? "UP" : "DOWN") :
+          "not in cycle");
+        }
 
         // If instance is not in the cycle
         if (parent_index[k + phylum_index] != cyc->internal_info)
@@ -549,7 +591,7 @@ static void add_up_down_attributes(STATE *s, bool direction)
                 {
                   phy->mingraph[k * n + l] = acc_dependency;
                 }
-                else
+                else if (edge_can_be_deleted(k, l, array, phy->mingraph[k * n + l]))
                 {
                   phy->mingraph[k * n + l] = no_dependency;
                 }
@@ -565,8 +607,11 @@ static void add_up_down_attributes(STATE *s, bool direction)
               // Make sure it is in the cycle
               if (parent_index[l + phylum_index] == cyc->internal_info)
               {
-                // Remove edges between instance and all others in the same cycle
-                phy->mingraph[k * n + l] = no_dependency;
+                if (edge_can_be_deleted(k, l, array, phy->mingraph[k * n + l]))
+                {
+                  // Remove edges between instance and all others in the same cycle
+                  phy->mingraph[k * n + l] = no_dependency;
+                }
               }
             }
           }
@@ -679,6 +724,9 @@ static void add_up_down_attributes(STATE *s, bool direction)
             // Forall instances in the cycle
             for (l = 0; l < n; l++)
             {
+              DEPENDENCY dep = no_dependency;
+              CONDITION cond = {0, 0};
+              edgeset_combine_dependencies(aug_graph->graph[k * n + l], &dep, &cond);
               // Make sure it is in the cycle
               if (parent_index[l + constructor_index] == cyc->internal_info)
               {
@@ -688,7 +736,7 @@ static void add_up_down_attributes(STATE *s, bool direction)
                   // printf("k -> l Adding In cycle -> In Cycle: ");
                   add_up_down_edge(k, l, n, array, acc_dependency, &acc_cond, aug_graph);
                 }
-                else
+                else if (edge_can_be_deleted(k, l, array, dep))
                 {
                   // printf("k -> l Removing In cycle -> In Cycle: ");
                   remove_edgeset(k, l, n, array, aug_graph);
@@ -705,9 +753,15 @@ static void add_up_down_attributes(STATE *s, bool direction)
               // Make sure it is in the cycle
               if (parent_index[l + constructor_index] == cyc->internal_info)
               {
-                // Remove edges between instance and all others in the same cycle
-                // printf("k -> l Removing Down In cycle -> In Cycle: ");
-                remove_edgeset(k, l, n, array, aug_graph);
+                DEPENDENCY dep = no_dependency;
+                CONDITION cond = {0,0};
+                edgeset_combine_dependencies(aug_graph->graph[k * n + l], &dep, &cond);
+                if (edge_can_be_deleted(k, l, array, dep))
+                {
+                  // Remove edges between instance and all others in the same cycle
+                  // printf("k -> l Removing Down In cycle -> In Cycle: ");
+                  remove_edgeset(k, l, n, array, aug_graph);
+                }
               }
             }
           }
