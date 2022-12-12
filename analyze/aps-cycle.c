@@ -10,6 +10,7 @@
 #include "aps-ag.h"
 
 int cycle_debug = 0;
+static const int BUFFER_SIZE = 1000;
 
 /* We use a union-find algorithm to detect strongly connected components.
  * We use a dynamically allocated array to hold the pointers,
@@ -21,6 +22,12 @@ static int num_instances;
 static int *parent_index; /* initializes to pi[i] = i */
 static int *constructor_instance_start;
 static int *phylum_instance_start;
+
+
+#define UP_DOWN_DIRECTION(v, direction) (direction ? v : !v)
+#define IS_JUST_FIBER_DEPENDENCY(d) (((d) & DEPENDENCY_MAYBE_SIMPLE))
+#define UP_DOWN (true)
+#define DOWN_UP (false)
 
 static void init_indices(STATE *s) {
   int num = 0;
@@ -130,8 +137,7 @@ static void get_fiber_cycles(STATE *s) {
   }
 }
 
-
-/*** determing strongly connected sets of attributes ***/
+/*** determining strongly connected sets of attributes ***/
 
 static void make_augmented_cycles_for_node(AUG_GRAPH *aug_graph,
 					   int constructor_index,
@@ -711,14 +717,192 @@ static void add_up_down_attributes(STATE *s, bool direction)
   }
 }
 
+/**
+ * Utility function that returns boolean indicating if decl is inside some function
+ * @param decl Declaration to test
+ * @param func Declaration function
+ * @return true if decl is inside function
+ * @return false otherwise
+ */
+static bool is_inside_some_function(Declaration decl, Declaration *func)
+{
+  void *current = decl;
+  Declaration current_decl;
+  while (current != NULL && (current = tnode_parent(current)) != NULL)
+  {
+    switch (ABSTRACT_APS_tnode_phylum(current))
+    {
+    case KEYDeclaration:
+      current_decl = (Declaration)current;
+      switch (Declaration_KEY(current_decl))
+      {
+      case KEYsome_function_decl:
+        *func = current_decl;
+        return some_function_decl_result(current_decl) == decl;
+      default:
+        break;
+      }
+      default:
+        break;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * This function determines whether attribute instance should be considered for circularity check
+ * @param instance attribute instance
+ * @return true if instance not is not: If, Match and some formal
+ * @return false everything else
+ */
+static bool applicable_for_circularity_check(INSTANCE *instance)
+{
+  // If and Match statements can show up in a cycle but are never declared circular or non-circular
+  if (if_rule_p(instance->fibered_attr.attr))
+    return false;
+
+  Declaration node = instance->fibered_attr.attr;
+  Declaration func = NULL;
+
+  // The result in a function/procedure may show up in a cycle but are never declared circular or non-circular
+  if (is_inside_some_function(node, &func) && some_function_decl_result(func) == node)
+    return false;
+
+  if (instance->fibered_attr.fiber != NULL)
+    return false;
+
+  // Formals may show up in a cycle as well
+  switch (ABSTRACT_APS_tnode_phylum(node))
+  {
+  case KEYDeclaration:
+  {
+    switch (Declaration_KEY(node))
+    {
+    case KEYformal:
+      return false;
+    default:
+      break;
+    }
+  }
+  default:
+    break;
+  }
+
+  return true;
+}
+
+/**
+ * Ensure that attributes that participate in a cycle are defined circular
+ * @param s Analysis state
+ */
+static void assert_circular_declaration(STATE* s) {
+  int i, j, k;
+
+  // Forall phylum in the phylum_graph
+  for (i = 0; i < s->phyla.length; i++) {
+    PHY_GRAPH* phy = &s->phy_graphs[i];
+    int n = phy->instances.length;
+    int phylum_index = phylum_instance_start[i];
+    INSTANCE* array = phy->instances.array;
+
+    for (j = 0; j < n; j++) {
+      INSTANCE* instance = &array[j];
+      Declaration node = instance->fibered_attr.attr;
+
+      if (!applicable_for_circularity_check(instance))
+        continue;
+
+      bool any_cycle = false;
+      bool declared_circular = instance_circular(instance);
+
+      char instance_to_str[BUFFER_SIZE];
+      FILE* f = fmemopen(instance_to_str, sizeof(instance_to_str), "w");
+      print_instance(instance, f);
+      fclose(f);
+
+      for (k = 0; k < num_instances; k++) {
+        if (parent_index[k] == k) {
+          if (parent_index[phylum_index + j] == k) {
+            if (declared_circular) {
+              any_cycle = true;
+            } else {
+              aps_error(node,
+                        "Instance (%s) involves in a cycle but it is not "
+                        "declared circular.",
+                        instance_to_str);
+            }
+          }
+        }
+      }
+
+      if (declared_circular && !any_cycle) {
+        aps_warning(node,
+                    "Instance (%s) is declared circular but does not involve "
+                    "in any cycle.",
+                    instance_to_str);
+      }
+    }
+  }
+
+  // Forall edges in the augmented dependency graph
+  for (i = 0; i <= s->match_rules.length; i++) {
+    AUG_GRAPH* aug_graph = (i == s->match_rules.length)
+                               ? &s->global_dependencies
+                               : &s->aug_graphs[i];
+    int n = aug_graph->instances.length;
+    int constructor_index = constructor_instance_start[i];
+    INSTANCE* array = aug_graph->instances.array;
+    for (j = 0; j < n; j++) {
+      INSTANCE* instance = &array[j];
+      Declaration node = instance->fibered_attr.attr;
+
+      if (!applicable_for_circularity_check(instance))
+        continue;
+
+      bool any_cycle = false;
+      bool declared_circular = instance_circular(instance);
+
+      char instance_to_str[BUFFER_SIZE];
+      FILE* f = fmemopen(instance_to_str, sizeof(instance_to_str), "w");
+      print_instance(instance, f);
+      fclose(f);
+
+      // Forall cycles in the graph
+      for (k = 0; k < num_instances; k++) {
+        if (parent_index[k] == k) {
+          if (parent_index[constructor_index + j] == k) {
+            if (declared_circular) {
+              any_cycle = true;
+            } else {
+              aps_error(node,
+                        "Instance (%s) involves in a cycle but it is not "
+                        "declared circular.",
+                        instance_to_str);
+            }
+          }
+        }
+      }
+      if (declared_circular && !any_cycle) {
+        aps_warning(node,
+                    "Instance (%s) is declared circular but does not involve "
+                    "in any cycle.",
+                    instance_to_str);
+      }
+    }
+  }
+}
 
 void break_fiber_cycles(Declaration module,STATE *s,DEPENDENCY dep) {
   void *mark = SALLOC(0);
   init_indices(s);
   make_cycles(s);
   get_fiber_cycles(s);
+  assert_circular_declaration(s);
 
-  bool direction = !(dep & DEPENDENCY_NOT_JUST_FIBER);
+  // Preserve UP-DOWN edges if the accumulated dependency is just fiber cycle,
+  // otherwise preserve DOWN-UP edges.
+  bool direction = !(dep & DEPENDENCY_NOT_JUST_FIBER) ? UP_DOWN : DOWN_UP;
   add_up_down_attributes(s,direction);
   release(mark);
   {
@@ -742,7 +926,3 @@ void break_fiber_cycles(Declaration module,STATE *s,DEPENDENCY dep) {
     print_analysis_state(s,stdout);
   }
 }
-
-  
-
-

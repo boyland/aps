@@ -325,7 +325,11 @@ static bool is_some_result_decl(Declaration decl)
       {
       case KEYmodule_decl:
         return some_class_decl_result_type(current_decl) == decl;
+      default:
+        break;
       }
+    default:
+      break;
     }
   }
 
@@ -558,6 +562,8 @@ CanonicalType *canonical_type_base_type(CanonicalType *ctype)
           return canonical_type_join(new_canonical_type_use(decl), canonical_type_base_type(new_canonical_type_use(some_class_decl_result_type(mdecl))), true);
         }
       }
+      default:
+        break;
       }
     }
     default:
@@ -597,8 +603,12 @@ CanonicalType *canonical_type_base_type(CanonicalType *ctype)
           return canonical_type_join(ctype_qual->source, canonical_type_join(new_canonical_type_use(decl), canonical_type_base_type(new_canonical_type_use(some_class_decl_result_type(mdecl))), true), true);
         }
       }
+      default:
+        break;
       }
     }
+    default:
+      break;
     }
   }
   case KEY_CANONICAL_FUNC:
@@ -620,6 +630,7 @@ CanonicalType *canonical_type_base_type(CanonicalType *ctype)
   }
   default:
     fatal_error("canonical_type_base_type failed");
+    return NULL;
   }
 }
 
@@ -985,6 +996,7 @@ CanonicalType *canonical_type_join(CanonicalType *ctype_outer, CanonicalType *ct
     }
   default:
     fatal_error("canonical_type_join failed");
+    return NULL;
   }
 }
 

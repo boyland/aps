@@ -2,6 +2,8 @@
 #define APS_DNC_H
 
 #include "jbb-vector.h"
+#include "scc.h"
+#include <stdbool.h>
 
 typedef struct attrset {
   struct attrset *rest;
@@ -24,6 +26,10 @@ typedef struct attribute_instance {
 enum instance_direction {instance_local, instance_inward, instance_outward};
 enum instance_direction fibered_attr_direction(FIBERED_ATTRIBUTE *fa);
 enum instance_direction instance_direction(INSTANCE *);
+
+extern BOOL fiber_attr_circular(FIBERED_ATTRIBUTE* fiber_attr);
+extern BOOL instance_circular(INSTANCE* in);
+extern BOOL decl_is_circular(Declaration d);
 
 typedef unsigned DEPENDENCY;
 
@@ -69,6 +75,8 @@ typedef struct augmented_dependency_graph {
   struct augmented_dependency_graph *next_in_aug_worklist;
   int *schedule; /* one-d array, indexed by instance number */
   struct cto_node *total_order;
+  SCC_COMPONENTS* components; /* SCC components of instances in augmented dependency graph */
+  bool* component_cycle;      /* boolean indicating whether SCC component at index is circular */
 } AUG_GRAPH;
 extern const char *aug_graph_name(AUG_GRAPH *);
 
@@ -78,10 +86,12 @@ typedef struct summary_dependency_graph {
   VECTOR(INSTANCE) instances;
   DEPENDENCY *mingraph; /* two-d array, indexed by instance number */
   struct summary_dependency_graph *next_in_phy_worklist;
+  SCC_COMPONENTS* components; /* SCC components of instances in phylum graph */
+  bool* component_cycle;      /* boolean indicating whether SCC component at index is circular */
   int *summary_schedule; /* one-d array, indexed by instance number */
 } PHY_GRAPH;
 extern const char *phy_graph_name(PHY_GRAPH *);
-  
+
 typedef VECTOR(struct cycle_description) CYCLES;
 
 typedef struct analysis_state {

@@ -187,6 +187,8 @@ static void* do_typechecking(void* ignore, void*node) {
 	      }
 	    }
 	    break;
+    default:
+      break;
 	  }
 	}
 	/* FALL THROUGH */
@@ -299,6 +301,8 @@ static void* do_typechecking(void* ignore, void*node) {
 	  (void)check_actuals(type_inst_actuals(ty),fty,u);
 	}
 	return 0;
+      default:
+        break;
       }
     }
     break;
@@ -425,8 +429,12 @@ static void* validate_canonicals(void* ignore, void*node) {
         }
       }
     }
+    default:
+      break;
     }
   }
+  default:
+    break;
   }
   return node;
 }
@@ -456,8 +464,12 @@ static void* set_root_phylum(void *ignore, void *node)
 
       return NULL;
     }
+    default:
+      break;
     }
   }
+  default:
+    break;
   }
 
   return node;

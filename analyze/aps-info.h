@@ -69,6 +69,7 @@ struct Declaration_info {
 };
 extern struct Declaration_info *Declaration_info(Declaration);
 
+#define DECL_PHY_GRAPH(decl) (Declaration_info(decl)->node_phy_graph)
 #define DECL_NEXT(decl) (Declaration_info(decl)->next_decl)
 #define NEXT_FIELD(decl) (Declaration_info(decl)->next_field_decl)
 #define DUAL_DECL(decl) (Declaration_info(decl)->dual_decl)
