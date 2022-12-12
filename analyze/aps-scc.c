@@ -8,20 +8,28 @@
 void set_phylum_graph_components(PHY_GRAPH* phy_graph) {
   int i, j, k;
   int n = phy_graph->instances.length;
-  SccGraph* graph;
-  scc_graph_initialize(graph, n);
+  SccGraph graph;
+  scc_graph_initialize(&graph, n);
+
+  // Add vertices
+  for (i = 0; i < n; i++) {
+    INSTANCE* in = &phy_graph->instances.array[i];
+    scc_graph_add_vertex(&graph, (void*)in);
+  }
+
+  // Add edges
   for (i = 0; i < n; i++) {
     INSTANCE* source = &phy_graph->instances.array[i];
     for (j = 0; j < n; j++) {
       if (phy_graph->mingraph[i * n + j]) {
         INSTANCE* sink = &phy_graph->instances.array[j];
 
-        scc_graph_add_edge(graph, (void*)source, (void*)sink);
+        scc_graph_add_edge(&graph, (void*)source, (void*)sink);
       }
     }
   }
 
-  phy_graph->components = scc_graph_components(graph);
+  phy_graph->components = scc_graph_components(&graph);
   phy_graph->component_cycle =
       (bool*)calloc(sizeof(bool), phy_graph->components->length);
 
