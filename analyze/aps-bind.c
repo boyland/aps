@@ -142,6 +142,8 @@ static SCOPE add_env_item(SCOPE old, Declaration d) {
 	return new_entry;
       }
     }
+  default:
+    break;
   }
   return old;
 }
@@ -278,6 +280,8 @@ static SCOPE inst_services(TypeEnvironment use_type_env,
       services = inst_services(use_type_env, mdecl, td, tas, services);
       break;
     }
+    default:
+      break;
     }
   }
 
@@ -320,6 +324,8 @@ static SCOPE signature_services(Declaration tdecl, Signature sig, SCOPE services
 						 services));
   case KEYfixed_sig:
   case KEYno_sig:
+    break;
+  default:
     break;
   }
   return services;
@@ -411,6 +417,8 @@ static SCOPE type_services(Type t)
   case KEYfunction_type:
   case KEYno_type:
     break;
+  default:
+    break;
   }
   Type_info(t)->binding_temporary = services;
   return services;
@@ -456,6 +464,8 @@ static void bind_Use(Use u, int namespaces, SCOPE scope) {
       }
     }
     break;
+  default:
+    break;
   }
 }
 
@@ -483,8 +493,12 @@ static void *get_bindings(void *scopep, void *node) {
 	  bind_Program(p);
 	  traverse_Program(get_public_bindings,scopep,p);
 	}
+      default:
+        break;
       }
     }
+  default:
+    break;
   }
   return scopep;
 }
@@ -504,8 +518,12 @@ static void *get_public_bindings(void *scopep, void *node) {
 	  }
 	}
 	return NULL;
+      default:
+        break;
       }
     }
+  default:
+    break;
   }
   return scopep;
 }
@@ -570,10 +588,14 @@ static void *do_bind(void *vscope, void *node) {
 		      TYPE_FORMAL_EXTENSION_FLAG;
 		    new_scope=add_ext_sig(new_scope,rdecl,some_type_formal_sig(tf));
 		    break;
+      default:
+        break;
 		  }
 		}
 	      }
 	      break;
+      default:
+        break;
 	    }
 	  }
 	  traverse_Block(do_bind,new_scope,module_decl_contents(d)); }
@@ -628,18 +650,27 @@ static void *do_bind(void *vscope, void *node) {
     switch (Signature_KEY((Signature)node)) {
     case KEYsig_use:
       bind_Use(sig_use_use((Signature)node),NAME_SIGNATURE,scope);
+      break;
+    default:
+      break;
     }
     break;
   case KEYType:
     switch (Type_KEY((Type)node)) {
     case KEYtype_use:
       bind_Use(type_use_use((Type)node),NAME_TYPE,scope);
+      break;
+    default:
+      break;
     }
     break;
   case KEYPattern:
     switch (Pattern_KEY((Pattern)node)) {
     case KEYpattern_use:
       bind_Use(pattern_use_use((Pattern)node),NAME_PATTERN,scope);
+      break;
+    default:
+      break;
     }
     break;
   case KEYExpression:
@@ -655,6 +686,8 @@ static void *do_bind(void *vscope, void *node) {
 	new_scope = bind_Declaration(new_scope,controlled_formal(e));
 	traverse_Expression(do_bind,new_scope,controlled_expr(e));
 	return NULL;
+      default:
+        break;
       }
     }
     break;
@@ -667,6 +700,8 @@ static void *do_bind(void *vscope, void *node) {
 	aps_error(u,"no binding for %s",symbol_name(name));
       }
     }
+    break;
+  default:
     break;
   }
   return vscope;
@@ -739,6 +774,8 @@ static Expression actuals_set_next_actual(Actuals actuals, Expression next) {
       Actuals more = append_Actuals_l2(actuals);
       Expression middle = actuals_set_next_actual(more,next);
       return actuals_set_next_actual(some,middle); }
+  default:
+    break;
   }
   fatal_error("control reached end of actuals_set_next_actual");
   return NULL;
@@ -1067,6 +1104,8 @@ static void *activate_pragmas(void *ignore, void *node) {
 		  Declaration_info(d)->decl_flags |= FIELD_DECL_CYCLIC_FLAG;
 		}
 	      }
+      default:
+        break;
 	    }
 	    break;
 	  case KEYtype_value:
@@ -1085,12 +1124,16 @@ static void *activate_pragmas(void *ignore, void *node) {
 		  Declaration_info(d)->decl_flags |= SELF_MANAGED_FLAG;
 		}
 	      }
+      default:
+        break;
 	    }
 	    break;
 	  }
 	}
       }
       break; 
+    default:
+      break;
     }
   }
   return ignore;

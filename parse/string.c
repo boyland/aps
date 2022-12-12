@@ -26,7 +26,7 @@ struct special_string {
 
 #define AS_SPECIAL(p,x) struct special_string *p=(struct special_string *)(x)
 
-#define CONSTANT_STRING (128+'+')
+#define CONSTANT_STRING (((unsigned char)(128+(unsigned char)'+')))
 struct constant_string {
   struct special_string header;
   char *value;
@@ -34,7 +34,7 @@ struct constant_string {
 #define AS_CONSTANT(p,x) \
   struct constant_string *p=(struct constant_string *)(x)
 
-#define CONC_STRING (128+')')
+#define CONC_STRING (((unsigned char)(128+(unsigned char)')')))
 struct conc_string {
   struct special_string header;
   STRING str1, str2;

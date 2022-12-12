@@ -384,8 +384,6 @@ static CanonicalSignatureSet from_type(Type t)
 {
   switch (Type_KEY(t))
   {
-  case KEYtype_formal:
-    return get_hash_cons_empty_set();
   case KEYtype_use:
     return infer_canonical_signatures(canonical_type(t));
   case KEYtype_inst:
@@ -446,6 +444,8 @@ static CanonicalSignatureSet from_declaration(Declaration decl)
       re = substitute_canonical_signature_set_actuals(new_canonical_type_use(decl), re);
       break;
     }
+    default:
+      break;
     }
     break;
   }
@@ -520,6 +520,9 @@ static CanonicalSignature* join_canonical_signature_actuals(CanonicalType *sourc
 
     return new_canonical_signature(canonical_sig->is_input, canonical_sig->is_var, canonical_sig->source_class, canonical_sig->num_actuals, substituted_actuals);
   }
+  default:
+    fatal_error("Unexpected source canonical type with key of %d", source_ctype->key);
+    return NULL;
   }
 }
 
@@ -593,6 +596,9 @@ static CanonicalSignature *substitute_canonical_signature_actuals(CanonicalType 
 
     return new_canonical_signature(canonical_sig->is_input, canonical_sig->is_var, canonical_sig->source_class, canonical_sig->num_actuals, substituted_actuals);
   }
+  default:
+    fatal_error("Unexpected source canonical type with key of %d", source_ctype->key);
+    return NULL;
   }
 }
 
@@ -661,6 +667,8 @@ CanonicalSignatureSet infer_canonical_signatures(CanonicalType *ctype)
       flag = false;
       break;
     }
+    default:
+      break;
     }
 
     // TODO: lets revisit this 12/14/2020

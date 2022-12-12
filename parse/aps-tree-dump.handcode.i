@@ -1,5 +1,5 @@
 void dump_lisp_Symbol(Symbol s) {
-  char *name = symbol_name(s);
+  const char *name = symbol_name(s);
   printf(" aps-boot::|");
   while (*name != '\0') {
     switch (*name) {

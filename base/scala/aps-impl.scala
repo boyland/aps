@@ -514,5 +514,3 @@ class PatternSeqFunction[R,A](f : Any => Option[(R,Seq[A])]) {
 object P_AND {
   def unapply[T](x : T) : Option[(T,T)] = Some((x,x));
 }
-
-
