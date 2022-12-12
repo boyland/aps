@@ -443,10 +443,11 @@ static bool edge_can_be_deleted(int index1, int index2, INSTANCE *array, DEPENDE
       print_instance(attr2, stdout);
       printf("\n");
     }
+    // Preserve the edge
     return false;
   }
 
-  // Kill the edge
+  // Delete the edge
   return true;
 }
 
