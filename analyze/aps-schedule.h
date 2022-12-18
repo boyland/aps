@@ -1,5 +1,5 @@
-#ifndef AG_SCHEDULE_H
-#define AG_SCHEDULE_H
+#ifndef APS_SCHEDULE_H
+#define APS_SCHEDULE_H
 
 #include "aps-dnc.h"
 
