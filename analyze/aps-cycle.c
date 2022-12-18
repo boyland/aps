@@ -416,20 +416,6 @@ static void edgeset_combine_dependencies(EDGESET es, DEPENDENCY* acc_dependency,
   }
 }
 
-/**
- * Combines dependencies for edgeset
- * @param es edgeset
- * @return combined dependencies given an edgeset
- */
-DEPENDENCY get_edgeset_combine_dependencies(EDGESET es)
-{
-  DEPENDENCY acc_dependency = no_dependency;
-  CONDITION acc_cond = { 0, 0 };
-  edgeset_combine_dependencies(es, &acc_dependency, &acc_cond);
-
-  return acc_dependency;
-}
-
 #define UP_DOWN_DIRECTION(v, direction) (direction ? v : !v)
 
 /**

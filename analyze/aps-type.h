@@ -94,6 +94,4 @@ void print_Signature(Signature,FILE*);
 
 extern int type_debug;
 
-extern int BUFFER_SIZE;
-
 #endif
