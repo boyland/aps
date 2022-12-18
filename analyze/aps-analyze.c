@@ -32,9 +32,9 @@ static void *analyze_thing(void *ignore, void *node)
         // Do nothing; no cycle to remove
         s->loop_required = false;
       }
-      else
+      else if (!(d & DEPENDENCY_MAYBE_SIMPLE) || !(d & DEPENDENCY_NOT_JUST_FIBER))
       {
-        printf("Fiber cycle detected; cycle being removed\n");
+        printf("Fiber cycle detected (%d); cycle being removed\n", d);
 
         if (cycle_debug & PRINT_CYCLE)
         {
