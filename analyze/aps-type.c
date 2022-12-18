@@ -5,7 +5,6 @@
 #include "aps-ag.h"
 
 int type_debug = FALSE;
-int BUFFER_SIZE = 1000;
 
 static Type Boolean_Type;
 static Type Integer_Type;
@@ -377,6 +376,7 @@ static char* trim_string_const_token(char* p) {
 }
 
 static void* validate_canonicals(void* ignore, void*node) {
+  int BUFFER_SIZE = 1000;
   Symbol symb_test_canonical_type = intern_symbol("test_canonical_type");
   Symbol symb_test_canonical_base_type = intern_symbol("test_canonical_base_type");
   Symbol symb_test_canonical_signature = intern_symbol("test_canonical_signature");
