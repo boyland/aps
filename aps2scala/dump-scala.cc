@@ -707,6 +707,7 @@ void dump_some_attribute(Declaration d, string i,
       << "\"" << name << "\")"
       << (is_cir ? " with CircularEvaluation" + tmps.str() : "") 
       << (is_col ? " with CollectionEvaluation" + tmps.str() : "")
+      << (activate_static_circular && is_cir ? " with StaticCircularEvaluation" + tmps.str() : "")
       << " {\n";
   ++nesting_level;
 
@@ -1593,6 +1594,17 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
       oss << "]\n";
       oss << indent() << "{\n";
       ++nesting_level;
+
+      STATE *s = (STATE*)Declaration_info(decl)->analysis_state;
+      if (s != NULL)
+      {
+        activate_static_circular = s->loop_required;
+        // Avoid unnecessary dump of static circular trait
+        if (activate_static_circular)
+        {
+          dump_static_circular_trait(oss);
+        }
+      }
 
       if (result_typeval != "") {
 	oss << indent() << "type T_" << rname << " = "

@@ -12,6 +12,8 @@
 #define IS_VISIT_MARKER(node) (node->cto_instance == NULL)
 #define CHUNK_GUIDING_DEPENDENCY (indirect_control_dependency)
 
+static int BUFFER_SIZE = 1000;
+
 // Enum representing type of chunks
 enum ChunkTypeEnum {
   HalfLeft = 1,   // Parent inherited attribute
@@ -572,7 +574,7 @@ static void ensure_instances_are_in_one_visit(AUG_GRAPH* aug_graph,
           print_instance(cto_node->cto_instance, f);
           fclose(f);
 
-          fatal_error(
+          aps_warning(NULL,
               "Instance %s <%+d,%+d> of circular SCC involving parent should "
               "be contained in one parent visit. Expected them all to be in "
               "%d parent phase but saw instance in %d parent phase.",
@@ -2072,11 +2074,10 @@ static bool chunk_ready_to_go(AUG_GRAPH* aug_graph,
   if (chunk_graph->graph[sink_chunk->index * chunk_graph->instances.length +
                          sink_chunk->index] &
       DEPENDENCY_MAYBE_DIRECT) {
-    aps_warning(
-        sink_chunk,
-        "Scheduling chunk #%d of component #%d is not possible as it directly "
-        "depends on itself",
-        sink_chunk->index, sink_component_index);
+    aps_warning(sink_chunk,
+                "Scheduling chunk #%d of component #%d may not be possible as "
+                "it directly depends on itself.",
+                sink_chunk->index, sink_component_index);
   }
 
   // All instances in this chunk have already been scheduled

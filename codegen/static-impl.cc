@@ -22,44 +22,64 @@ extern "C" {
 #endif
 
 class OutputWriter {
+  struct Item {
+    std::function<void(std::ostream&)> function;
+    void* marker;
+  };
+
  private:
   std::ostream& _os;
-  std::queue<std::function<void(std::ostream&)>> _queue;
-  std::set<int> _markers;
+  std::vector<Item> _items;
 
   void dump_queue() {
-    while (!_queue.empty()) {
-      _queue.front()(this->_os);
-      _queue.pop();
+    for (std::vector<Item>::iterator it = _items.begin(); it != _items.end();
+         it++) {
+      it->function(_os);
     }
-    _markers.clear();
+
+    _items.clear();
+  }
+
+  bool contains_marker(void* marker) {
+    for (std::vector<Item>::iterator it = _items.begin(); it != _items.end();
+         it++) {
+      if (it->marker == marker) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
  public:
-  OutputWriter(std::ostream& os)
-      : _os(os),
-        _queue(std::queue<std::function<void(std::ostream&)>>()),
-        _markers(std::set<int>()) {}
+  OutputWriter(std::ostream& os) : _os(os), _items(std::vector<Item>()) {}
 
   std::ostream& get_outstream() {
     dump_queue();
     return _os;
   }
 
-  void tentatively_write(int marker,
-                         const std::function<void(std::ostream&)>& lambda) {
-    _queue.push(lambda);
-    _markers.insert(marker);
+  void queue_write(void* marker,
+                   const std::function<void(std::ostream&)>& lambda) {
+    if (!contains_marker(marker)) {
+      _items.push_back({lambda, marker});
+    } else {
+      fatal_error("Already enququed to write marker: %d", VOIDP2INT(marker));
+    }
   }
 
-  bool any_write_since(int marker) {
-    bool contains_marker = _markers.find(marker) != _markers.end();
-    return !contains_marker;
-  }
+  bool any_write_since(void* marker) { return !contains_marker(marker); }
 
-  void clear() {
-    std::queue<std::function<void(std::ostream&)>> empty_queue;
-    std::swap(_queue, empty_queue);
+  void clear_since(void* marker) {
+    bool found_marker = false;
+    for (std::vector<Item>::iterator it = _items.begin(); it != _items.end();) {
+      if (it->marker == marker || found_marker) {
+        it = _items.erase(it);
+        found_marker = true;
+      } else {
+        it++;
+      }
+    }
   }
 
   virtual ~OutputWriter() { dump_queue(); }
@@ -157,7 +177,7 @@ static void dump_loop_end(AUG_GRAPH* aug_graph,
                           int loop_id,
                           OutputWriter* ow) {
 #ifdef APS2SCALA
-  if (ow->any_write_since(loop_id)) {
+  if (ow->any_write_since(INT2VOIDP(loop_id))) {
     std::ostream& os = ow->get_outstream();
     string suffix = std::to_string(loop_id);
     std::replace(suffix.begin(), suffix.end(), '-', '_');
@@ -168,7 +188,7 @@ static void dump_loop_end(AUG_GRAPH* aug_graph,
     os << indent() << "changed = prevChanged_" << suffix << ";\n"
        << "\n";
   } else {
-    ow->clear();
+    ow->clear_since(INT2VOIDP(loop_id));
   }
 #endif /* APS2SCALA */
 }
@@ -179,8 +199,9 @@ static void dump_loop_start(AUG_GRAPH* aug_graph,
                             OutputWriter* ow) {
 #ifdef APS2SCALA
 
-  ow->tentatively_write(
-      loop_id, std::function<void(std::ostream&)>{[loop_id](std::ostream& os) {
+  ow->queue_write(
+      INT2VOIDP(loop_id),
+      std::function<void(std::ostream&)>{[loop_id](std::ostream& os) {
         // ABS value of component_index because initially it is -1
         string suffix = std::to_string(loop_id);
         std::replace(suffix.begin(), suffix.end(), '-', '_');
@@ -230,8 +251,8 @@ static bool implement_visit_function(
 
     if (!is_mod && chunk_changed) {
       if (include_comments) {
-        ow->get_outstream() << indent() << "// Finished with chunk #"
-                           << chunk_index << "\n";
+        ow->get_outstream()
+            << indent() << "// Finished with chunk #" << chunk_index << "\n";
       }
 
       // Need to close the loop if any
@@ -241,8 +262,8 @@ static bool implement_visit_function(
       }
 
       if (include_comments) {
-        ow->get_outstream() << indent() << "// Started working on chunk #" << cto->chunk_index
-           << "\n";
+        ow->get_outstream() << indent() << "// Started working on chunk #"
+                            << cto->chunk_index << "\n";
       }
 
       if (loop_allowed && cto->chunk_circular) {
@@ -251,8 +272,9 @@ static bool implement_visit_function(
           dump_loop_start(aug_graph, phase, loop_id, ow);
         } else {
           if (include_comments) {
-            ow->get_outstream() << indent() << "// Parent phase " << phase
-               << " is circular, fixed-point loop cannot be added here\n";
+            ow->get_outstream()
+                << indent() << "// Parent phase " << phase
+                << " is circular, fixed-point loop cannot be added here\n";
           }
         }
       }
@@ -288,11 +310,13 @@ static bool implement_visit_function(
 #ifdef APS2SCALA
         ow->get_outstream() << indent() << "for (root <- roots) {\n";
 #else  /* APS2SCALA */
-        ow->get_outstream() << indent() << "for (int i=0; i < n_roots; ++i) {\n";
+        ow->get_outstream()
+            << indent() << "for (int i=0; i < n_roots; ++i) {\n";
 #endif /* APS2SCALA */
         ++nesting_level;
 #ifndef APS2SCALA
-        ow->get_outstream() << indent() << "C_PHYLUM::Node *root = phylum->node(i);\n";
+        ow->get_outstream()
+            << indent() << "C_PHYLUM::Node *root = phylum->node(i);\n";
 #endif /* APS2SCALA */
 
         ow->get_outstream() << indent() << "visit_" << n << "_" << ph << "(";
@@ -311,8 +335,9 @@ static bool implement_visit_function(
       }
 
       if (include_comments) {
-        ow->get_outstream() << indent() << "// End of parent (" << aug_graph_name(aug_graph)
-           << ") phase visit marker for phase: " << ph << "\n";
+        ow->get_outstream()
+            << indent() << "// End of parent (" << aug_graph_name(aug_graph)
+            << ") phase visit marker for phase: " << ph << "\n";
       }
       if (!is_mod) {
         // Need to close the loop if any
@@ -337,21 +362,26 @@ static bool implement_visit_function(
       ow->get_outstream() << "\n";
 
       if (include_comments) {
-        ow->get_outstream() << indent() << "// aug_graph: " << aug_graph_name(aug_graph) << "\n";
-        ow->get_outstream() << indent() << "// visit marker(" << ph << "," << ch << ")\n";
+        ow->get_outstream()
+            << indent() << "// aug_graph: " << aug_graph_name(aug_graph)
+            << "\n";
+        ow->get_outstream()
+            << indent() << "// visit marker(" << ph << "," << ch << ")\n";
       }
 
       PHY_GRAPH* pg = Declaration_info(cto->child_decl)->node_phy_graph;
       int n = PHY_GRAPH_NUM(pg);
 
       if (include_comments) {
-        ow->get_outstream() << indent() << "// parent visit of " << decl_name(pg_parent->phylum)
-           << " at phase " << phase << " is "
-           << (pg_parent->cyclic_flags[phase] ? "circular" : "non-circular")
-           << "\n";
-        ow->get_outstream() << indent() << "// child visit of " << decl_name(pg->phylum)
-           << " at phase " << ph << " is "
-           << (pg->cyclic_flags[ph] ? "circular" : "non-circular") << "\n";
+        ow->get_outstream()
+            << indent() << "// parent visit of " << decl_name(pg_parent->phylum)
+            << " at phase " << phase << " is "
+            << (pg_parent->cyclic_flags[phase] ? "circular" : "non-circular")
+            << "\n";
+        ow->get_outstream()
+            << indent() << "// child visit of " << decl_name(pg->phylum)
+            << " at phase " << ph << " is "
+            << (pg->cyclic_flags[ph] ? "circular" : "non-circular") << "\n";
       }
 
       if (!pg_parent->cyclic_flags[phase] && pg->cyclic_flags[ph] &&
@@ -389,10 +419,11 @@ static bool implement_visit_function(
     CONDITION icond = instance_condition(in);
     if (MERGED_CONDITION_IS_IMPOSSIBLE(*cond, icond)) {
       if (include_comments) {
-        ow->get_outstream() << indent() << "// '" << in
-           << "' attribute instance is impossible because cond: (+"
-           << cond->positive << ",-" << cond->negative << ") icond: (+"
-           << icond.positive << ",-" << icond.negative << ")\n";
+        ow->get_outstream()
+            << indent() << "// '" << in
+            << "' attribute instance is impossible because cond: (+"
+            << cond->positive << ",-" << cond->negative << ") icond: (+"
+            << icond.positive << ",-" << icond.negative << ")\n";
       }
       continue;
     }
@@ -443,7 +474,8 @@ static bool implement_visit_function(
         }
       } else {
         // Symbol boolean_symbol = intern_symbol("Boolean");
-        ow->get_outstream() << indent() << "if (" << if_stmt_cond(ad) << ") {\n";
+        ow->get_outstream()
+            << indent() << "if (" << if_stmt_cond(ad) << ") {\n";
         ++nesting_level;
         if_true = if_stmt_if_true(ad);
         if_false = if_stmt_if_false(ad);
@@ -527,14 +559,16 @@ static bool implement_visit_function(
       if (in->node && Declaration_KEY(in->node) == KEYnormal_assign) {
         // parameter value will be filled in at call site
         if (include_comments) {
-          ow->get_outstream() << indent() << "// delaying " << in << " to call site.\n";
+          ow->get_outstream()
+              << indent() << "// delaying " << in << " to call site.\n";
         }
         continue;
       }
 
       if (in->node && Declaration_KEY(in->node) == KEYpragma_call) {
         if (include_comments) {
-          ow->get_outstream() << indent() << "// place holder for " << in << "\n";
+          ow->get_outstream()
+              << indent() << "// place holder for " << in << "\n";
         }
         continue;
       }
@@ -567,13 +601,16 @@ static bool implement_visit_function(
             ow->get_outstream() << "v_" << decl_name(field) << "=";
             switch (Default_KEY(value_decl_default(field))) {
               case KEYcomposite:
-                ow->get_outstream() << composite_combiner(value_decl_default(field));
+                ow->get_outstream()
+                    << composite_combiner(value_decl_default(field));
                 break;
               default:
-                ow->get_outstream() << as_val(value_decl_type(field)) << "->v_combine";
+                ow->get_outstream()
+                    << as_val(value_decl_type(field)) << "->v_combine";
                 break;
             }
-            ow->get_outstream() << "(v_" << decl_name(field) << "," << rhs << ");\n";
+            ow->get_outstream()
+                << "(v_" << decl_name(field) << "," << rhs << ");\n";
 #endif /* APS2SCALA */
             break;
           case KEYfuncall:
@@ -586,7 +623,8 @@ static bool implement_visit_function(
               ow->get_outstream() << "assign";
             else
               ow->get_outstream() << "set";
-            ow->get_outstream() << "(" << field_ref_object(lhs) << "," << rhs << ");\n";
+            ow->get_outstream()
+                << "(" << field_ref_object(lhs) << "," << rhs << ");\n";
             break;
           default:
             fatal_error("what sort of assignment lhs: %d",
@@ -595,12 +633,11 @@ static bool implement_visit_function(
         continue;
       }
 
-      // ow->get_outstream() << indent();
-
       if (in->node == 0 && ad != NULL) {
         if (rhs) {
           if (Declaration_info(ad)->decl_flags & LOCAL_ATTRIBUTE_FLAG) {
-            ow->get_outstream() << "a" << LOCAL_UNIQUE_PREFIX(ad) << "_" << asym << DEREF;
+            ow->get_outstream() << indent() << "a" << LOCAL_UNIQUE_PREFIX(ad)
+                                << "_" << asym << DEREF;
             if (debug)
               ow->get_outstream() << "assign";
             else
@@ -612,19 +649,23 @@ static bool implement_visit_function(
 #ifdef APS2SCALA
               if (!def_is_constant(value_decl_def(ad))) {
                 if (include_comments) {
-                  ow->get_outstream() << "// v_" << asym
-                     << " is assigned/initialized by default.\n";
+                  ow->get_outstream()
+                      << indent() << "// v_" << asym
+                      << " is assigned/initialized by default.\n";
                 }
               } else {
                 if (include_comments) {
-                  ow->get_outstream() << "// v_" << asym << " is initialized in module.\n";
+                  ow->get_outstream() << indent() << "// v_" << asym
+                                      << " is initialized in module.\n";
                 }
               }
 #else
-              ow->get_outstream() << "v_" << asym << " = " << rhs << ";\n";
+              ow->get_outstream()
+                  << indent() << "v_" << asym << " = " << rhs << ";\n";
 #endif
             } else {
-              ow->get_outstream() << "v" << i << "_" << asym << " = " << rhs << "; // local\n";
+              ow->get_outstream() << indent() << "v" << i << "_" << asym
+                                  << " = " << rhs << "; // local\n";
             }
           }
         } else {
@@ -634,69 +675,76 @@ static bool implement_visit_function(
                         decl_name(ad));
           }
           if (include_comments) {
-            ow->get_outstream() << "// " << in << " is ready now\n";
+            ow->get_outstream() << indent() << "// " << in << " is ready now\n";
           }
         }
         continue;
       } else if (node_is_syntax) {
         if (ATTR_DECL_IS_SHARED_INFO(ad) && ch < nch) {
           if (include_comments) {
-            ow->get_outstream() << "// shared info for " << decl_name(in->node)
-               << " is ready.\n";
+            ow->get_outstream() << indent() << "// shared info for "
+                                << decl_name(in->node) << " is ready.\n";
           }
         } else if (ATTR_DECL_IS_UP_DOWN(ad)) {
           if (include_comments) {
-            ow->get_outstream() << "// " << decl_name(in->node) << "." << decl_name(ad)
-               << " implicit.\n";
+            ow->get_outstream() << indent() << "// " << decl_name(in->node)
+                                << "." << decl_name(ad) << " implicit.\n";
           }
         } else if (rhs) {
           if (Declaration_KEY(in->node) == KEYfunction_decl) {
             if (direction_is_collection(value_decl_direction(ad))) {
               std::cout << "Not expecting collection here!\n";
-              ow->get_outstream() << "v_" << asym << " = somehow_combine(v_" << asym << ","
-                 << rhs << ");\n";
+              ow->get_outstream()
+                  << indent() << "v_" << asym << " = somehow_combine(v_" << asym
+                  << "," << rhs << ");\n";
             } else {
               int i = LOCAL_UNIQUE_PREFIX(ad);
               if (i == 0)
-                ow->get_outstream() << "v_" << asym << " = " << rhs << "; // function\n";
+                ow->get_outstream() << indent() << "v_" << asym << " = " << rhs
+                                    << "; // function\n";
               else
-                ow->get_outstream() << "v" << i << "_" << asym << " = " << rhs << ";\n";
+                ow->get_outstream() << indent() << "v" << i << "_" << asym
+                                    << " = " << rhs << ";\n";
             }
           } else {
-            ow->get_outstream() << "a_" << asym << DEREF;
+            ow->get_outstream() << indent() << "a_" << asym << DEREF;
             if (debug)
               ow->get_outstream() << "assign";
             else
               ow->get_outstream() << "set";
-            ow->get_outstream() << "(v_" << decl_name(in->node) << "," << rhs << ");\n";
+            ow->get_outstream()
+                << "(v_" << decl_name(in->node) << "," << rhs << ");\n";
           }
         } else {
           aps_warning(in->node, "Attribute %s.%s is apparently undefined",
                       decl_name(in->node), symbol_name(asym));
 
           if (include_comments) {
-            ow->get_outstream() << "// " << in << " is ready.\n";
+            ow->get_outstream() << indent() << "// " << in << " is ready.\n";
           }
         }
         continue;
       } else if (Declaration_KEY(in->node) == KEYvalue_decl) {
         if (rhs) {
           // assigning field of object
-          ow->get_outstream() << "a_" << asym << DEREF;
+          ow->get_outstream() << indent() << "a_" << asym << DEREF;
           if (debug)
             ow->get_outstream() << "assign";
           else
             ow->get_outstream() << "set";
-          ow->get_outstream() << "(v_" << decl_name(in->node) << "," << rhs << ");\n";
+          ow->get_outstream()
+              << "(v_" << decl_name(in->node) << "," << rhs << ");\n";
         } else {
           if (include_comments) {
-            ow->get_outstream() << "// " << in << " is ready now.\n";
+            ow->get_outstream()
+                << indent() << "// " << in << " is ready now.\n";
           }
         }
         continue;
       }
       std::cout << "Problem assigning " << in << "\n";
-      ow->get_outstream() << "// Not sure what to do for " << in << "\n";
+      ow->get_outstream() << indent() << "// Not sure what to do for " << in
+                          << "\n";
     }
   }
 
