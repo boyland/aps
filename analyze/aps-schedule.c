@@ -574,7 +574,8 @@ static void ensure_instances_are_in_one_visit(AUG_GRAPH* aug_graph,
           print_instance(cto_node->cto_instance, f);
           fclose(f);
 
-          aps_warning(NULL,
+          aps_warning(
+              NULL,
               "Instance %s <%+d,%+d> of circular SCC involving parent should "
               "be contained in one parent visit. Expected them all to be in "
               "%d parent phase but saw instance in %d parent phase.",
@@ -1202,6 +1203,12 @@ static bool child_phases_are_equal(CHILD_PHASE* group_key1,
   return group_key1->ph == group_key2->ph && group_key1->ch == group_key2->ch;
 }
 
+/**
+ * Returns the rank of a chunk (higher the rank equals the higher the priority).
+ * The rank will be used to schedule a chunk from list of ready-to-go chunks.
+ * @param chunk chunk instance
+ * @return int rank
+ */
 static int get_chunk_rank(Chunk* chunk) {
   switch (chunk->type) {
     case HalfLeft:
@@ -1590,6 +1597,11 @@ static CTO_NODE* group_schedule(AUG_GRAPH* aug_graph,
   return cto_node;
 }
 
+/**
+ * @brief local chunk scheduler.
+ * This function is similiar to group_schedule except it can handle IF
+ * conditionals which are locals too.
+ */
 static CTO_NODE* local_chunk_schedule(AUG_GRAPH* aug_graph,
                                       ChunkGraph* chunk_graph,
                                       SCC_COMPONENT* chunk_component,
@@ -1759,6 +1771,9 @@ static CTO_NODE* group_schedule_chunk(AUG_GRAPH* aug_graph,
   return NULL;
 }
 
+/**
+ * @brief Scheduler that finds the next chunk in a given SCC to schedule
+ */
 static CTO_NODE* chunk_schedule(AUG_GRAPH* aug_graph,
                                 ChunkGraph* chunk_graph,
                                 SCC_COMPONENT* chunk_component,
@@ -1798,6 +1813,7 @@ static CTO_NODE* chunk_schedule(AUG_GRAPH* aug_graph,
     }
   }
 
+  // Find out which chunk(s) are available to schedule and determine their rank
   PHY_GRAPH* parent_phy = DECL_PHY_GRAPH(aug_graph->lhs_decl);
   for (i = 0; i < chunk_component->length; i++) {
     Chunk* chunk = (Chunk*)chunk_component->array[i];
@@ -1849,6 +1865,7 @@ static CTO_NODE* chunk_schedule(AUG_GRAPH* aug_graph,
     }
   }
 
+  // If no chunk ready to go, then trigger component scheduler
   if (current_rank == 0) {
     if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
       printf(
@@ -1859,6 +1876,7 @@ static CTO_NODE* chunk_schedule(AUG_GRAPH* aug_graph,
                                     chunk_component_index, remaining,
                                     parent_ph);
   } else {
+    // Continue the group scheduler from the chunk
     Chunk* chunk_to_schedule_next = chunk_component->array[max_rank_index];
 
     if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
@@ -1946,6 +1964,9 @@ static int chunk_component_indexof(AUG_GRAPH* aug_graph,
   return -1;
 }
 
+/**
+ * @brief Returns the index of a chunk with given properties or -1
+ */
 static int chunk_lookup(AUG_GRAPH* aug_graph,
                         ChunkGraph* chunk_graph,
                         enum ChunkTypeEnum type,
