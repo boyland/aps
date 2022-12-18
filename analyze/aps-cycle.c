@@ -10,6 +10,7 @@
 #include "aps-ag.h"
 
 int cycle_debug = 0;
+static const int BUFFER_SIZE = 1000;
 
 /* We use a union-find algorithm to detect strongly connected components.
  * We use a dynamically allocated array to hold the pointers,
@@ -841,10 +842,9 @@ static void assert_circular_declaration(STATE* s) {
               any_cycle = true;
             } else {
               aps_error(node,
-                        "Phylum graph (%s) instance (%s) involves in a cycle "
-                        "but it is not "
+                        "Instance (%s) involves in a cycle but it is not "
                         "declared circular.",
-                        phy_graph_name(phy), instance_to_str);
+                        instance_to_str);
             }
           }
         }
@@ -852,10 +852,9 @@ static void assert_circular_declaration(STATE* s) {
 
       if (declared_circular && !any_cycle) {
         aps_warning(node,
-                    "Phylum graph (%s) instance (%s) is declared circular but "
-                    "does not involve "
+                    "Instance (%s) is declared circular but does not involve "
                     "in any cycle.",
-                    phy_graph_name(phy), instance_to_str);
+                    instance_to_str);
       }
     }
   }
@@ -891,20 +890,18 @@ static void assert_circular_declaration(STATE* s) {
               any_cycle = true;
             } else {
               aps_error(node,
-                        "Augmented graph (%s) instance (%s) involves in a "
-                        "cycle but it is not "
+                        "Instance (%s) involves in a cycle but it is not "
                         "declared circular.",
-                        aug_graph_name(aug_graph), instance_to_str);
+                        instance_to_str);
             }
           }
         }
       }
       if (declared_circular && !any_cycle) {
         aps_warning(node,
-                    "Augmented graph (%s) instance (%s) is declared circular "
-                    "but does not involve "
+                    "Instance (%s) is declared circular but does not involve "
                     "in any cycle.",
-                    aug_graph_name(aug_graph), instance_to_str);
+                    instance_to_str);
       }
     }
   }
