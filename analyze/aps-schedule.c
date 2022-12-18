@@ -5,22 +5,28 @@
 
 #include "aps-ag.h"
 #include "aps-debug.h"
+#include "aps-tree.h"
 #include "jbb-alloc.h"
-#include "jbb.h"
 
 #define MAX(x, y) (((x) > (y)) ? (x) : (y))
 #define IS_VISIT_MARKER(node) (node->cto_instance == NULL)
 #define CHUNK_GUIDING_DEPENDENCY (indirect_control_dependency)
 
-enum ChunkTypeEnum { HalfLeft = 1, HalfRight = 2, Local = 4, Visit = 8 };
+// Enum representing type of chunks
+enum ChunkTypeEnum {
+  HalfLeft = 1,   // Parent inherited attribute
+  HalfRight = 2,  // Parent synthesized attribute
+  Local = 4,      // Local
+  Visit = 8       // Child visit
+};
 
 struct chunk_type {
-  enum ChunkTypeEnum type;
-  int ph;
-  int ch;
-  int index;
-  bool circular;
-  VECTOR(INSTANCE) instances;
+  enum ChunkTypeEnum type;  // Type of chunk
+  int ph;                   // Phase
+  int ch;                   // Child number
+  int index;                // Index of the chunk in the array of chunks
+  bool circular;  // Boolean indicating whether chunk is circular or not
+  VECTOR(INSTANCE) instances;  // Array of instances in the chunk
 };
 
 typedef struct chunk_type Chunk;
@@ -29,7 +35,7 @@ struct chunk_graph_type {
   DEPENDENCY* graph;
   VECTOR(Chunk) instances;
   bool* schedule;
-  SCC_COMPONENTS chunk_components;
+  SCC_COMPONENTS* chunk_components;
 };
 
 typedef struct chunk_graph_type ChunkGraph;
@@ -39,9 +45,7 @@ typedef struct chunk_graph_type ChunkGraph;
 struct total_order_state {
   // Tuple <ph,ch> indexed by instance number
   CHILD_PHASE* instance_groups;
-  // Children Declaration array
-  VECTOR(Declaration)
-  children;
+  VECTOR(Declaration) children;
 };
 
 typedef struct total_order_state TOTAL_ORDER_STATE;
@@ -120,21 +124,6 @@ static int chunk_lookup(AUG_GRAPH* aug_graph,
                         short ph,
                         short ch);
 
-static bool is_there_more_to_schedule_in_scc(AUG_GRAPH* aug_graph,
-                                             TOTAL_ORDER_STATE* state,
-                                             SCC_COMPONENT* comp) {
-  int i;
-  for (i = 0; i < comp->length; i++) {
-    INSTANCE* in = (INSTANCE*)comp->array[i];
-
-    if (!aug_graph->schedule[in->index]) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
 /**
  * Utility function that checks whether instance belongs to any phylum cycle
  * or not
@@ -173,7 +162,7 @@ static bool instance_in_aug_cycle(AUG_GRAPH* aug_graph, INSTANCE* in) {
 static bool scc_involves_parent(AUG_GRAPH* aug_graph, SCC_COMPONENT* comp) {
   int i;
   for (i = 0; i < comp->length; i++) {
-    INSTANCE* in = &aug_graph->instances.array[comp->array[i]];
+    INSTANCE* in = (INSTANCE*)comp->array[i];
 
     if (aug_graph->lhs_decl == in->node) {
       return true;
@@ -182,29 +171,6 @@ static bool scc_involves_parent(AUG_GRAPH* aug_graph, SCC_COMPONENT* comp) {
 
   return false;
 }
-
-// static bool scc_count_of_chunks_of_type(AUG_GRAPH* aug_graph, ChunkGraph*
-// chunk_graph, SCC_COMPONENT* comp, enum ChunkTypeEnum type) {
-//   int i;
-//   for (i = 0; i < comp->length; i++) {
-//     Chunk* chunk = &chunk_graph->instances.array[]
-
-//     if (aug_graph->lhs_decl == in->node) {
-//       return true;
-//     }
-//   }
-
-//   return false;
-// }
-
-#include "aps-ag.h"
-#include <stdio.h>
-#include <jbb.h>
-
-#define MAX(x, y) (((x) > (y)) ? (x) : (y))
-#define IS_VISIT_MARKER(node) (node->cto_instance == NULL)
-#define CHUNK_GUIDING_DEPENDENCY (indirect_control_dependency)
-
 
 /**
  * Utility function to determine if instance group is local or not
@@ -284,15 +250,14 @@ static bool aug_graph_contains_phase(AUG_GRAPH* aug_graph,
   return false;
 }
 
-
 /**
  * Utility function used by assert_total_order to check sanity of total order
- *  1) After visit marker <ph,-1> there should be no attribute belonging to
- * <ph,-1> or <-ph,-1>
- *  2)  Immediately before visit marker <ph,ch> should be attribute
- * belonging to <-ph,ch>
+ *  1) After visit marker <ph,-1> there should be no attribute
+ *     belonging to <ph,-1> or <-ph,-1>
+ *  2) Immediately before visit marker <ph,ch> should be attribute
+ *     belonging to <-ph,ch>
  *  3) Or immediately after visit marker <ph,ch> should be attribute belonging
- * to <ph,ch>
+ *     to <ph,ch>
  * @param current CTO_NODE node
  * @param prev_group <ph,ch> group
  */
@@ -394,6 +359,8 @@ static void total_order_sanity_check(AUG_GRAPH* aug_graph,
     // Do not change the current group if instance is local
     current_group = prev_group;
 
+    // If instance is conditional then adjust the positive and negative
+    // conditions
     if (if_rule_p(current->cto_instance->fibered_attr.attr)) {
       int cmask =
           1 << (if_rule_index(current->cto_instance->fibered_attr.attr));
@@ -411,6 +378,7 @@ static void total_order_sanity_check(AUG_GRAPH* aug_graph,
     }
   }
 
+  // Continue the sanity check
   total_order_sanity_check(aug_graph, chunk_graph, current->cto_next, cond,
                            current_group, prev_parent, state);
 }
@@ -589,7 +557,7 @@ static void ensure_instances_are_in_one_visit(AUG_GRAPH* aug_graph,
   if (cto_node->cto_instance != NULL) {
     int i;
     for (i = 0; i < comp->length; i++) {
-      INSTANCE* in = &aug_graph->instances.array[comp->array[i]];
+      INSTANCE* in = (INSTANCE*)comp->array[i];
       CHILD_PHASE* group = &state->instance_groups[in->index];
 
       // Instance is in this SCC
@@ -628,8 +596,8 @@ static void check_circular_scc_scheduled_in_one_visit(AUG_GRAPH* aug_graph,
                                                       TOTAL_ORDER_STATE* state,
                                                       CTO_NODE* cto_node) {
   int i;
-  for (i = 0; i < aug_graph->components.length; i++) {
-    SCC_COMPONENT* comp = &aug_graph->components.array[i];
+  for (i = 0; i < aug_graph->components->length; i++) {
+    SCC_COMPONENT* comp = aug_graph->components->array[i];
 
     if (scc_involves_parent(aug_graph, comp)) {
       ensure_instances_are_in_one_visit(aug_graph, state, cto_node, comp, -1);
@@ -755,8 +723,8 @@ static int schedule_phase_circular(PHY_GRAPH* phy_graph, int phase) {
   int n = phy_graph->instances.length;
   int i, j, k;
 
-  for (i = 0; i < phy_graph->components.length; i++) {
-    SCC_COMPONENT* comp = &phy_graph->components.array[i];
+  for (i = 0; i < phy_graph->components->length; i++) {
+    SCC_COMPONENT* comp = phy_graph->components->array[i];
 
     // Not a circular SCC
     if (!phy_graph->component_cycle[i])
@@ -906,6 +874,7 @@ static void schedule_summary_dependency_graph(PHY_GRAPH* phy_graph) {
     printf("Scheduling order for %s\n", decl_name(phy_graph->phylum));
   }
 
+  // Find SCC components of instances given a phylum graph
   set_phylum_graph_components(phy_graph);
 
   // Nothing is scheduled
@@ -1156,8 +1125,8 @@ static void print_schedule_error_debug(AUG_GRAPH* aug_graph,
 
   fprintf(stderr, "\nNon-scheduled SCCs (%s):\n", aug_graph_name(aug_graph));
 
-  for (i = 0; i < aug_graph->components.length; i++) {
-    SCC_COMPONENT* comp = &aug_graph->components.array[i];
+  for (i = 0; i < aug_graph->components->length; i++) {
+    SCC_COMPONENT* comp = aug_graph->components->array[i];
 
     if (aug_graph->schedule[((INSTANCE*)comp->array[0])->index])
       continue;
@@ -1829,7 +1798,7 @@ static CTO_NODE* chunk_schedule(AUG_GRAPH* aug_graph,
 
   PHY_GRAPH* parent_phy = DECL_PHY_GRAPH(aug_graph->lhs_decl);
   for (i = 0; i < chunk_component->length; i++) {
-    Chunk* chunk = &chunk_graph->instances.array[chunk_component->array[i]];
+    Chunk* chunk = (Chunk*)chunk_component->array[i];
 
     if (chunk->type == Visit && !chunk->circular &&
         parent_phy->cyclic_flags[parent_ph]) {
@@ -1863,7 +1832,7 @@ static CTO_NODE* chunk_schedule(AUG_GRAPH* aug_graph,
   for (i = 0; i < chunk_component->length; i++) {
     if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
       if (rank_array[i] > 0) {
-        Chunk* chunk = &chunk_graph->instances.array[chunk_component->array[i]];
+        Chunk* chunk = (Chunk*)chunk_component->array[i];
 
         print_indent(2, stdout);
         printf("Rank=%d ", rank_array[i]);
@@ -1888,8 +1857,7 @@ static CTO_NODE* chunk_schedule(AUG_GRAPH* aug_graph,
                                     chunk_component_index, remaining,
                                     parent_ph);
   } else {
-    Chunk* chunk_to_schedule_next =
-        &chunk_graph->instances.array[chunk_component->array[max_rank_index]];
+    Chunk* chunk_to_schedule_next = chunk_component->array[max_rank_index];
 
     if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
       print_indent(1, stdout);
@@ -1956,11 +1924,11 @@ static int chunk_component_indexof(AUG_GRAPH* aug_graph,
                                    ChunkGraph* chunk_graph,
                                    Chunk* chunk) {
   int i, j;
-  for (i = 0; i < chunk_graph->chunk_components.length; i++) {
-    SCC_COMPONENT* component = &chunk_graph->chunk_components.array[i];
+  for (i = 0; i < chunk_graph->chunk_components->length; i++) {
+    SCC_COMPONENT* component = chunk_graph->chunk_components->array[i];
 
     for (j = 0; j < component->length; j++) {
-      Chunk* other_chunk = &chunk_graph->instances.array[component->array[j]];
+      Chunk* other_chunk = component->array[j];
 
       if (chunk->index == other_chunk->index) {
         return i;
@@ -2013,8 +1981,7 @@ static void debug_chunk_dependencies(ChunkGraph* chunk_graph,
   j = 0;
   while (true) {
     for (i = 0; i < sink_component->length; i++) {
-      Chunk* source_chunk =
-          &chunk_graph->instances.array[sink_component->array[i]];
+      Chunk* source_chunk = sink_component->array[i];
 
       if (source_chunk->index == current_sink_chunk->index)
         continue;
@@ -2121,8 +2088,7 @@ static bool chunk_ready_to_go(AUG_GRAPH* aug_graph,
   }
 
   for (i = 0; i < sink_component->length; i++) {
-    Chunk* source_chunk =
-        &chunk_graph->instances.array[sink_component->array[i]];
+    Chunk* source_chunk = (Chunk*)sink_component->array[i];
 
     // Check dependencies against myself
     if (source_chunk->index == sink_chunk->index)
@@ -2225,7 +2191,7 @@ static bool chunk_component_ready_to_go(AUG_GRAPH* aug_graph,
 
   // See if there is any instance in this chunk that has not been scheduled
   for (i = 0; i < sink_component->length; i++) {
-    Chunk* chunk = &chunk_graph->instances.array[sink_component->array[i]];
+    Chunk* chunk = (Chunk*)sink_component->array[i];
 
     if (!chunk_graph->schedule[chunk->index])
       break;
@@ -2236,24 +2202,22 @@ static bool chunk_component_ready_to_go(AUG_GRAPH* aug_graph,
   if (i == sink_component->length)
     return false;
 
-  for (i = 0; i < chunk_graph->chunk_components.length; i++) {
-    SCC_COMPONENT* source_component = &chunk_graph->chunk_components.array[i];
+  for (i = 0; i < chunk_graph->chunk_components->length; i++) {
+    SCC_COMPONENT* source_component = chunk_graph->chunk_components->array[i];
 
     // Check readiness against other chunk components, not itself
     if (i == sink_component_index)
       continue;
 
     for (j = 0; j < source_component->length; j++) {
-      Chunk* source_chunk =
-          &chunk_graph->instances.array[source_component->array[j]];
+      Chunk* source_chunk = (Chunk*)source_component->array[j];
 
       // This chunk is already scheduled
       if (chunk_graph->schedule[source_chunk->index])
         continue;
 
       for (k = 0; k < sink_component->length; k++) {
-        Chunk* sink_chunk =
-            &chunk_graph->instances.array[sink_component->array[k]];
+        Chunk* sink_chunk = (Chunk*)sink_component->array[k];
 
         if (chunk_graph
                 ->graph[source_chunk->index * chunk_graph->instances.length +
@@ -2287,13 +2251,13 @@ static CTO_NODE* chunk_component_schedule(AUG_GRAPH* aug_graph,
 
   int i, j;
 
-  size_t rank_array_size = chunk_graph->chunk_components.length * sizeof(int);
+  size_t rank_array_size = chunk_graph->chunk_components->length * sizeof(int);
   int* rank_array = (int*)alloca(rank_array_size);
   memset(rank_array, 0, rank_array_size);
 
   // Find SCC of chunk ready to be scheduled
-  for (i = 0; i < chunk_graph->chunk_components.length; i++) {
-    SCC_COMPONENT* chunk_component = &chunk_graph->chunk_components.array[i];
+  for (i = 0; i < chunk_graph->chunk_components->length; i++) {
+    SCC_COMPONENT* chunk_component = chunk_graph->chunk_components->array[i];
 
     // This is needed to avoid requesting to schedule the same SCC, not doing
     // this can cause infinite loop because it will keep retrying to schedule
@@ -2306,7 +2270,7 @@ static CTO_NODE* chunk_component_schedule(AUG_GRAPH* aug_graph,
                                     i)) {
       // Schedule a chunk within this SCC of chunk
       for (j = 0; j < chunk_component->length; j++) {
-        Chunk* chunk = &chunk_graph->instances.array[chunk_component->array[j]];
+        Chunk* chunk = (Chunk*)chunk_component->array[j];
 
         rank_array[i] |= get_chunk_rank(chunk);
       }
@@ -2315,7 +2279,7 @@ static CTO_NODE* chunk_component_schedule(AUG_GRAPH* aug_graph,
 
   int current_rank = 0;
   int max_rank_index = 0;
-  for (i = 0; i < chunk_graph->chunk_components.length; i++) {
+  for (i = 0; i < chunk_graph->chunk_components->length; i++) {
     if (rank_array[i] > current_rank) {
       max_rank_index = i;
       current_rank = rank_array[i];
@@ -2333,7 +2297,7 @@ static CTO_NODE* chunk_component_schedule(AUG_GRAPH* aug_graph,
   }
 
   return chunk_schedule(aug_graph, chunk_graph,
-                        &chunk_graph->chunk_components.array[max_rank_index],
+                        chunk_graph->chunk_components->array[max_rank_index],
                         max_rank_index, prev, cond, state, remaining,
                         parent_ph);
 }
@@ -2416,13 +2380,22 @@ static CTO_NODE* schedule_visit_start(AUG_GRAPH* aug_graph,
   }
 
   SCC_COMPONENT* chunk_component =
-      &chunk_graph->chunk_components.array[chunk_component_index];
+      chunk_graph->chunk_components->array[chunk_component_index];
 
   return group_schedule(aug_graph, chunk_graph, chunk_component,
                         chunk_component_index, chunk, prev, cond, state,
                         remaining, parent_inh, parent_ph);
 }
 
+/**
+ * 1) collects chunks using <ph,ch> already assigned to the instances
+ * 2) brings over dependencies from instances as chunk dependency
+ * 3) adds guiding dependencies between chunks
+ * 4) finds the SCC components of chunks
+ * @param aug_graph augmented dependency graph
+ * @param state scheduling state
+ * @return chunk graph
+ */
 static ChunkGraph* collect_aug_graph_chunks(AUG_GRAPH* aug_graph,
                                             TOTAL_ORDER_STATE* state) {
   PHY_GRAPH* parent_phy = DECL_PHY_GRAPH(aug_graph->lhs_decl);
@@ -2735,27 +2708,38 @@ static ChunkGraph* collect_aug_graph_chunks(AUG_GRAPH* aug_graph,
     }
   } while (changed);
 
-  SccGraph* scc_graph = scc_graph_create(chunk_graph->instances.length);
+  SccGraph scc_graph;
+  scc_graph_initialize(&scc_graph, chunk_graph->instances.length);
+
+  // Add vertices to SCC graph
   for (i = 0; i < chunk_graph->instances.length; i++) {
+    Chunk* chunk = &chunk_graph->instances.array[i];
+    scc_graph_add_vertex(&scc_graph, (void*)chunk);
+  }
+
+  // Add edges to SCC graph
+  for (i = 0; i < chunk_graph->instances.length; i++) {
+    Chunk* chunk_source = &chunk_graph->instances.array[i];
     for (j = 0; j < chunk_graph->instances.length; j++) {
+      Chunk* chunk_sink = &chunk_graph->instances.array[j];
       if (chunk_graph->graph[i * chunk_graph->instances.length + j]) {
-        scc_graph_add_edge(scc_graph, i, j);
+        scc_graph_add_edge(&scc_graph, (void*)chunk_source, (void*)chunk_sink);
       }
     }
   }
 
-  SCC_COMPONENTS components = scc_graph_components(scc_graph);
+  SCC_COMPONENTS* components = scc_graph_components(&scc_graph);
   if (oag_debug & DEBUG_ORDER) {
     printf("Components of chunks of aug_graph: %s\n",
            aug_graph_name(aug_graph));
 
-    for (i = 0; i < components.length; i++) {
-      SCC_COMPONENT comp = components.array[i];
+    for (i = 0; i < components->length; i++) {
+      SCC_COMPONENT* comp = components->array[i];
 
       printf("=> component #%d\n", i);
 
-      for (j = 0; j < comp.length; j++) {
-        Chunk* chunk = &chunk_graph->instances.array[comp.array[j]];
+      for (j = 0; j < comp->length; j++) {
+        Chunk* chunk = (Chunk*)comp->array[j];
 
         print_indent(4, stdout);
         printf("(%d) ", chunk->index);
@@ -2775,6 +2759,10 @@ static ChunkGraph* collect_aug_graph_chunks(AUG_GRAPH* aug_graph,
   return chunk_graph;
 }
 
+/**
+ * @brief utility function to free the memory allocated for chunk graph
+ * @param chunk_graph chunk graph struct
+ */
 static void free_chunk_graph(ChunkGraph* chunk_graph) {
   free(chunk_graph->graph);
   free(chunk_graph->schedule);
@@ -2795,9 +2783,10 @@ static void schedule_augmented_dependency_graph(
 
   (void)close_augmented_dependency_graph(aug_graph);
 
+  // Find SCC components of instances given a augmented dependency graph
   set_aug_graph_components(aug_graph);
 
-  for (i = 0; i < aug_graph->components.length; i++) {
+  for (i = 0; i < aug_graph->components->length; i++) {
     if (original_state_dependency == no_dependency &&
         aug_graph->component_cycle[i]) {
       fatal_error(
@@ -2879,20 +2868,6 @@ static void schedule_augmented_dependency_graph(
     }
   }
 
-  if (!strcmp(aug_graph_name(aug_graph), "branch")) {
-    for (i = 0; i < aug_graph->instances.length; i++) {
-      for (j = 0; j < aug_graph->instances.length; j++) {
-        EDGESET es = aug_graph->graph[i * aug_graph->instances.length + j];
-        if (edgeset_kind(es)) {
-          print_instance(&aug_graph->instances.array[i], stdout);
-          printf("->");
-          print_instance(&aug_graph->instances.array[j], stdout);
-          printf("\n");
-        }
-      }
-    }
-  }
-
   ChunkGraph* chunk_graph = collect_aug_graph_chunks(aug_graph, state);
 
   cond.negative = 0;
@@ -2912,6 +2887,9 @@ static void schedule_augmented_dependency_graph(
     print_total_order(aug_graph, aug_graph->total_order, -1, false, state, 0,
                       stdout);
   }
+
+  // Ensure generated total order is valid
+  assert_total_order(aug_graph, chunk_graph, state, aug_graph->total_order);
 
   free_chunk_graph(chunk_graph);
 }

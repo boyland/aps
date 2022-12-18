@@ -1,6 +1,9 @@
+#ifndef APS_DNC_H
+#define APS_DNC_H
+
+#include <stdbool.h>
 #include "jbb-vector.h"
 #include "scc.h"
-#include "topological-sort.h"
 
 typedef struct attrset {
   struct attrset *rest;
@@ -71,11 +74,10 @@ typedef struct augmented_dependency_graph {
   EDGESET *graph; /* two-d array, indexed by instance number */
   EDGESET worklist_head, worklist_tail;
   struct augmented_dependency_graph *next_in_aug_worklist;
-  BOOL *schedule; /* one-d array, indexed by instance number */
+  bool *schedule; /* one-d array, indexed by instance number */
   struct cto_node *total_order;
-  SCC_COMPONENTS components;
-  BOOL* component_cycle;
-  TOPOLOGICAL_SORT_ORDER scc_order;
+  SCC_COMPONENTS* components;
+  bool* component_cycle;
 } AUG_GRAPH;
 extern const char *aug_graph_name(AUG_GRAPH *);
 
@@ -85,12 +87,12 @@ typedef struct summary_dependency_graph {
   VECTOR(INSTANCE) instances;
   DEPENDENCY *mingraph; /* two-d array, indexed by instance number */
   struct summary_dependency_graph *next_in_phy_worklist;
-  SCC_COMPONENTS components;
-  BOOL* component_cycle;
+  SCC_COMPONENTS* components;
+  bool* component_cycle;
   int *summary_schedule; /* one-d array, indexed by instance number */
-  BOOL* cyclic_flags; /* one-d array, indexed by phase number indicating whether phase is circular or not */
+  bool* cyclic_flags; /* one-d array, indexed by phase number indicating whether phase is circular or not */
   int max_phase;      /* integer denoting the maximum phase number for this phylum */
-  BOOL* empty_phase;  /* one-d array, indexed by phase number there is no attribute belonging to this phase */
+  bool* empty_phase;  /* one-d array, indexed by phase number there is no attribute belonging to this phase */
 } PHY_GRAPH;
 extern const char *phy_graph_name(PHY_GRAPH *);
 
@@ -160,3 +162,5 @@ extern int analysis_debug;
 #define DNC_ITERATE (1<<11)
 #define TWO_EDGE_CYCLE (1<<12)
 #define ASSERT_CLOSED (1<<13)
+
+#endif

@@ -25,6 +25,8 @@ using std::string;
 
 extern int aps_yylineno;
 int nesting_level = 0;
+bool activate_static_circular = false;
+bool include_comments = false;
 
 ostream& operator<<(ostream&o,Symbol s)
 {
@@ -90,6 +92,35 @@ static string program_id(string name)
     else if (*it == '-' || *it == '_' || *it == '.') result += '_';
   }
   return result;
+}
+
+/**
+ * Utility function to dump static circular evaluation trait to
+ * by pass some of CircularEvaluation limitations
+ */
+void dump_static_circular_trait(std::ostream& oss)
+{
+  oss << "\n";
+  oss << indent(nesting_level) << "private var changed: Boolean = false;\n";
+  oss << indent(nesting_level) << "trait StaticCircularEvaluation[V_P, V_T] extends CircularEvaluation[V_P, V_T] {\n";
+  oss << indent(nesting_level + 1) << "override def set(newValue : ValueType) : Unit = {\n";
+  oss << indent(nesting_level + 2) << "val prevValue = value;\n";
+  oss << indent(nesting_level + 2) << "super.set(newValue);\n";
+  oss << indent(nesting_level + 2) << "changed |= prevValue != value;\n";
+  oss << indent(nesting_level + 1) << "}\n\n";
+  oss << indent(nesting_level + 1) << "override def check(newValue : ValueType) : Unit = {\n";
+  // value is null during the first check() invocation
+  oss << indent(nesting_level + 2) << "if (value != null) {\n";
+  oss << indent(nesting_level + 3) << "if (!lattice.v_equal(value, newValue)) {\n";
+  oss << indent(nesting_level + 4) << "if (!lattice.v_compare(value, newValue)) {\n";
+  oss << indent(nesting_level + 5) << "throw new Evaluation.CyclicAttributeException(\"non-monotonic \" + name);\n";
+  oss << indent(nesting_level + 4) << "}\n";
+  oss << indent(nesting_level + 3) << "}\n";
+  oss << indent(nesting_level + 2) << "}\n";
+  oss << indent(nesting_level + 1) << "}\n\n";
+  // Needed to prevent TooLateError
+  oss << indent(nesting_level + 1) << "checkForLateUpdate = false;\n";
+  oss << indent(nesting_level) << "}\n";
 }
 
 void dump_scala_Declaration_header(Declaration, std::ostream&);
@@ -2443,4 +2474,3 @@ string operator+(string s, int i)
 }
 
 string indent(int nl) { return string(indent_multiple*nl,' '); }
-

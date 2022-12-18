@@ -61,6 +61,7 @@ int main(int argc,char **argv) {
       continue;
     } else if (streq(argv[i],"-G") || streq(argv[i],"--debug")) {
       ++debug;
+      include_comments = true;
       continue;
     } else if (streq(argv[i],"-p") || streq(argv[i],"--apspath")) {
       set_aps_path(argv[++i]);
@@ -95,12 +96,17 @@ int main(int argc,char **argv) {
     }
     char* outfilename = str2cat(argv[i],".scala");
 
-    std::ofstream out(outfilename);
+    std::ofstream out;
+    out.open(outfilename);
+
+    if (out.fail())
+    {
+      std::cerr << "Failed to open output file " << outfilename << std::endl;
+      exit(1);
+    }
+
     dump_scala_Program(p,out);
+    out.close();
   }
   exit(0);
 }
-
-
-
-
