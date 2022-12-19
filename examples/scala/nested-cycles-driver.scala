@@ -1,6 +1,6 @@
-/* Driver to run classic driver code */
+/* Driver to run nested cycles driver code */
 
-object Classic extends App {
+object NestedCyclesDriver extends App {
   var simple_tree : M_SIMPLE = null;
   var p: Any = _;
   if (args.length == 0) {
@@ -27,7 +27,7 @@ object Classic extends App {
   }
   
   val m_simple = simple_tree;
-  val m_binding = new M_NAME_RESOLUTION[m_simple.T_Result]("Binding",m_simple.t_Result);
+  val m_binding = new M_NESTED_CYCLES[m_simple.T_Result]("NestedCycles",m_simple.t_Result);
   val t_binding = m_binding.t_Result;
 
   Debug.activate();
@@ -35,9 +35,7 @@ object Classic extends App {
   m_simple.finish();
   m_binding.finish();
   println("Messages:");
-
-  var program: t_binding.T_Program = p.asInstanceOf[t_binding.T_Program];
-  for (m <- t_binding.v_prog_msgs(program)) {
-    println(m);
+  for (i <- t_binding.v_msgs) {
+    println(i)
   }
 }
