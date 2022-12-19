@@ -95,8 +95,7 @@ int main(int argc,char **argv) {
     }
     char* outfilename = str2cat(argv[i],".scala");
 
-    std::ofstream out;
-    out.open(outfilename);
+    std::ofstream out(outfilename);
     if (out.fail())
     {
       std::cerr << "Failed to open output file " << outfilename << std::endl;
