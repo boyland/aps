@@ -65,8 +65,6 @@ typedef struct edgeset {
 
 extern DEPENDENCY edgeset_kind(EDGESET);
 
-typedef VECTOR(struct cycle_description) CYCLES;
-
 typedef struct augmented_dependency_graph {
   Declaration match_rule;
   struct analysis_state *global_state;
@@ -97,6 +95,8 @@ typedef struct summary_dependency_graph {
   bool* empty_phase;  /* one-d array, indexed by phase number there is no attribute belonging to this phase */
 } PHY_GRAPH;
 extern const char *phy_graph_name(PHY_GRAPH *);
+
+typedef VECTOR(struct cycle_description) CYCLES;
 
 typedef struct analysis_state {
   Declaration module;
