@@ -2016,6 +2016,8 @@ static void* set_rhs_decl_flag(void* vstate, void* node) {
         }
         break;
       }
+      default:
+        break;
     }
   }
   return vstate;
@@ -2054,9 +2056,11 @@ static void set_decl_flags_aug_graph(Declaration tlm, STATE* state) {
         case KEYand_pattern:
           switch (Pattern_KEY(and_pattern_p1(pat))) {
             case KEYpattern_var:
+            {
               Declaration lhs_decl = pattern_var_formal(and_pattern_p1(pat));
               Declaration_info(lhs_decl)->decl_flags |= DECL_LHS_FLAG;
               break;
+            }
             default:
               break;
           }
