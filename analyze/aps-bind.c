@@ -190,6 +190,17 @@ static SCOPE add_ext_sig(SCOPE old, Declaration tdecl, Signature sig) {
 		    tnode_line_number(cl));
       }
     }
+  /* FALLTHROUGH */
+  case KEYsig_use:
+  {
+    Declaration sig_use_decl = USE_DECL(sig_use_use(sig));
+    switch (Declaration_KEY(sig_use_decl))
+    {
+    case KEYsome_class_decl:
+      aps_error(sig, "Missing actuals for %s in the signature", decl_name(sig_use_decl));
+      break;
+    }
+  }
   default:
     fatal_error("%d: signature too complicated",tnode_line_number(sig));
   }
@@ -599,6 +610,27 @@ static void *do_bind(void *vscope, void *node) {
 	    }
 	  }
 	  traverse_Block(do_bind,new_scope,module_decl_contents(d)); }
+    {
+      Declaration type_formal = first_Declaration(module_decl_type_formals(d));
+      for (;type_formal != NULL; type_formal = DECL_NEXT(type_formal))
+      {
+        Signature sig = some_type_formal_sig(type_formal);
+        switch (Signature_KEY(sig))
+        {
+        case KEYsig_use:
+          {
+            Declaration use_decl = USE_DECL(sig_use_use(sig));
+            switch (Declaration_KEY(use_decl))
+            {
+            case KEYsome_class_decl:
+              aps_error(sig, "Missing actuals for %s in the signature", decl_name(use_decl));
+              break;
+            }
+            break;
+          }
+        }
+      }
+    }
 	break;
       case KEYattribute_decl:
 	{ Type ftype = attribute_decl_type(d);
