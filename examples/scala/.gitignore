@@ -1,6 +1,7 @@
 *.scala
 !*-driver.scala
 !*.handcode.scala
+!tests/
 !*.lex.scala
 !*.y.scala
 *.lex
