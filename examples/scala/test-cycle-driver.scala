@@ -10,7 +10,7 @@ object TestCycleDriver extends App
 
     m.finish();
 
-    val m2 = new M_TEST_COLL("Test Cycle",m);
+    val m2 = new M_TEST_CYCLE("Test Cycle",m);
     val w2 = w.asInstanceOf[m2.T_Root];
 
     m2.finish();
