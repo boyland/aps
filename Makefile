@@ -1,4 +1,6 @@
 SUBDIRS= utilities parse analyze aps2scala apscpp
+DOCKERTAG= boylanduwm/aps
+
 install:
 	-mkdir -p lib bin
 	for d in ${SUBDIRS}; do \
@@ -16,6 +18,12 @@ realclean:
 	for d in ${SUBDIRS}; do \
 	  (cd $$d; ${MAKE} realclean); \
 	done
+
+dockerbuild: install
+	sudo docker build . -t ${DOCKERTAG}
+
+dockerpush:
+	docker push ${DOCKERTAG}
 
 distclean: realclean
 	rm -rf bin lib
