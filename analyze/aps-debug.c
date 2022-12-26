@@ -32,7 +32,7 @@ void aps_warning(const void *tnode, const char *fmt, ...)
   fflush(stdout);
 
   (void)  fprintf(stderr, "%s.aps:%d:Warning: ",
-                  aps_yyfilename,tnode_line_number(tnode));
+                  aps_yyfilename,tnode == NULL ? -1 : tnode_line_number(tnode));
   (void) vfprintf(stderr, fmt, args);
   (void)  fprintf(stderr, "\n");
   (void)   fflush(stderr);
@@ -71,6 +71,7 @@ static void list_debug_flags() {
   fprintf(stderr,"\tw  WORKLIST_CHANGES\n");
   fprintf(stderr,"\tx  SUMMARY_EDGE_EXTRA\n");
   fprintf(stderr,"\t0  ASSERT_CLOSED\n");
+  fprintf(stderr,"\t@  EDGESET_ASSERTIONS\n");
   fprintf(stderr,"\tE  SUMMARY_EDGE\n");
   fprintf(stderr,"\t2  TWO_EDGE_CYCLE\n");
   fprintf(stderr,"\tD  DNC_FINAL\n");
@@ -112,11 +113,13 @@ void set_debug_flags(const char *options)
     case 'E': analysis_debug |= SUMMARY_EDGE; break;
     case 'D': analysis_debug |= DNC_FINAL; break;
     case 'I': analysis_debug |= DNC_ITERATE; break;
+    case '@': analysis_debug |= EDGESET_ASSERTIONS; break;
     case 'C': cycle_debug |= PRINT_CYCLE; break;
     case 'u': cycle_debug |= DEBUG_UP_DOWN; break;
     case 'U': cycle_debug |= PRINT_UP_DOWN; break;
     case 'o': oag_debug |= DEBUG_ORDER; break;
     case 'O': oag_debug |= TOTAL_ORDER; break;
+    case 'v': oag_debug |= DEBUG_ORDER_VERBOSE; break;
     case 'T': oag_debug |= PROD_ORDER; break;
     case '3': oag_debug |= TYPE_3_DEBUG; break;
     }

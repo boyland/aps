@@ -1,0 +1,151 @@
+with "simple";
+-- Example from fiber paper.
+-- using remote attributes rather than objects.
+module NAME_RESOLUTION[T :: var SIMPLE[]] extends T begin
+
+  --- the local object types and their
+  --- "fields" (attributes in APS).
+  
+  type Scope := remote Block;
+  type Entities := BAG[EntityRef];
+  collection attribute Block.entities : Entities;
+
+  pragma synthesized(entities);
+
+  -- entities: AKA declarations
+  type EntityRef := remote Decl;
+  collection attribute Decl.decl_used : OrLattice;
+
+  pragma synthesized(decl_used);
+
+  function entity_shape(e : EntityRef) : Shape begin
+    case e begin
+      match decl(?, ?ty) begin
+	result := ty.type_shape;
+      end;
+    end;
+  end;
+
+  -- shapes: used just for object identity
+  phylum ShapeStructure;
+  constructor shape(name : String) : ShapeStructure;
+  type Shape := remote ShapeStructure;
+  
+  --- the globals
+  type Messages := BAG[String];
+  var collection msgs : Messages;
+
+  root_scope : Scope := nil;
+  
+  not_found : EntityRef := nil;
+  
+  int_shape : Shape := shape("integer");
+  str_shape : Shape := shape("string");
+  no_shape : Shape := shape("<none>");
+
+
+  --- Attributes on "nonterminals" (i.e. imported and fixed phyla)
+  
+  -- don't use polymorphism:
+  attribute Block.block_scope : Scope;
+  attribute Decls.decls_scope : Scope;
+  attribute Decl.decl_scope : Scope;
+  attribute Stmts.stmts_scope : Scope;
+  attribute Stmt.stmt_scope : Scope;
+  attribute Expr.expr_scope : Scope;
+
+  attribute Type.type_shape : Shape;
+  attribute Expr.expr_shape : Shape;
+  
+  pragma inherited(block_scope,decls_scope,decl_scope,
+		   stmts_scope,stmt_scope,expr_scope);
+  pragma synthesized(type_shape,expr_shape);
+
+  match ?p:Program=program(?b:Block) begin
+    b.block_scope := root_scope;
+  end;
+  
+  match ?b:Block=block(?ds:Decls,?ss:Stmts) begin
+    ds.decls_scope := b;
+    ss.stmts_scope := b;
+  end;
+  
+  match ?:Decls=no_decls() begin
+  end;
+  
+  match ?ds0:Decls=xcons_decls(?ds1:Decls,?d:Decl) begin
+    ds1.decls_scope := ds0.decls_scope;
+    d.decl_scope := ds0.decls_scope;
+  end;
+  
+  match ?d:Decl=decl(?id:String,?ty:Type) begin
+    d.decl_scope.entities :> {d};
+    if not d.decl_used then
+      msgs :> {id ++ " is unused"};
+    endif;
+  end;
+  
+  match ?t:Type=integer_type() begin
+    t.type_shape := int_shape;
+  end;
+  
+  match ?t:Type=string_type() begin
+    t.type_shape := str_shape;
+  end;
+  
+  match ?:Stmts=no_stmts() begin
+  end;
+  
+  match ?ss0:Stmts=xcons_stmts(?ss1:Stmts,?s:Stmt) begin
+    ss1.stmts_scope := ss0.stmts_scope;
+    s.stmt_scope := ss0.stmts_scope;
+  end;
+  
+  match ?s:Stmt=block_stmt(?b:Block) begin
+    b.block_scope := s.stmt_scope;
+  end;
+  
+  match ?s:Stmt=assign_stmt(?e1:Expr,?e2:Expr) begin
+    e1.expr_scope := s.stmt_scope;
+    e2.expr_scope := s.stmt_scope;
+    if e1.expr_shape /= e2.expr_shape then
+      msgs :> {"type mismatch"};
+    endif;
+  end;
+  
+  match ?e:Expr=intconstant(?:Integer) begin
+    e.expr_shape := int_shape;
+  end;
+  
+  match ?e:Expr=strconstant(?:String) begin
+    e.expr_shape := str_shape;
+  end;
+  
+  match ?e:Expr=variable(?id:String) begin
+    decl : EntityRef;
+    decl := lookup(id,e.expr_scope);
+    if decl = not_found then
+      msgs :> {id ++ " not declared"};
+      e.expr_shape := no_shape;
+    else
+      decl.decl_used :> true;
+      e.expr_shape := decl.entity_shape;
+    endif;
+  end;
+  
+  function lookup(name : String; scope : Scope) : EntityRef begin
+    if scope = root_scope then
+      result := not_found;
+    else
+      case scope.entities begin
+	match {...,?e:EntityRef=decl(?n:String if n=name,?:Type),...} begin
+	  result := e;
+	end;
+      else
+	enc : Scope;
+	enc := scope.block_scope;
+	result := lookup(name,enc);
+      end;
+    endif;
+  end;
+end;

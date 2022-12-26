@@ -12,7 +12,7 @@ void usage() {
   exit(1);
 }
 
-main(int argc,char **argv) {
+int main(int argc,char **argv) {
   int i;
   argv0 = argv[0];
   for (i=1; i < argc; ++i) {

@@ -142,6 +142,8 @@ static SCOPE add_env_item(SCOPE old, Declaration d) {
 	return new_entry;
       }
     }
+  default:
+    break;
   }
   return old;
 }
@@ -188,6 +190,17 @@ static SCOPE add_ext_sig(SCOPE old, Declaration tdecl, Signature sig) {
 		    tnode_line_number(cl));
       }
     }
+  /* FALLTHROUGH */
+  case KEYsig_use:
+  {
+    Declaration sig_use_decl = USE_DECL(sig_use_use(sig));
+    switch (Declaration_KEY(sig_use_decl))
+    {
+    case KEYsome_class_decl:
+      aps_error(sig, "Missing actuals for %s in the signature", decl_name(sig_use_decl));
+      break;
+    }
+  }
   default:
     fatal_error("%d: signature too complicated",tnode_line_number(sig));
   }
@@ -262,6 +275,27 @@ static SCOPE inst_services(TypeEnvironment use_type_env,
    *
    * services = signature_services(tdecl,psig,services); 
    */
+  Declaration td = some_class_decl_result_type(class_decl);
+  if (Declaration_KEY(td) == KEYtype_decl) {
+    Type ty = type_decl_type(td);
+    switch (Type_KEY(ty))
+    {
+    case KEYtype_inst:
+    {
+      Module m = type_inst_module(ty);
+      Use u = module_use_use(m);
+      Declaration mdecl = USE_DECL(u);
+      // Cannot use type_inst_type_actuals(ty) here, we need to use
+      // tacts for the "actuals" to be replaced with real type_inst actuals.
+      TypeActuals tas = tacts;
+      services = inst_services(use_type_env, mdecl, td, tas, services);
+      break;
+    }
+    default:
+      break;
+    }
+  }
+
   traverse_Block(get_public_bindings,&services,
 		 some_class_decl_contents(class_decl));  
   pop_type_contour(); /* not actually necessary */
@@ -301,6 +335,8 @@ static SCOPE signature_services(Declaration tdecl, Signature sig, SCOPE services
 						 services));
   case KEYfixed_sig:
   case KEYno_sig:
+    break;
+  default:
     break;
   }
   return services;
@@ -392,6 +428,8 @@ static SCOPE type_services(Type t)
   case KEYfunction_type:
   case KEYno_type:
     break;
+  default:
+    break;
   }
   Type_info(t)->binding_temporary = services;
   return services;
@@ -437,6 +475,8 @@ static void bind_Use(Use u, int namespaces, SCOPE scope) {
       }
     }
     break;
+  default:
+    break;
   }
 }
 
@@ -464,8 +504,12 @@ static void *get_bindings(void *scopep, void *node) {
 	  bind_Program(p);
 	  traverse_Program(get_public_bindings,scopep,p);
 	}
+      default:
+        break;
       }
     }
+  default:
+    break;
   }
   return scopep;
 }
@@ -485,8 +529,12 @@ static void *get_public_bindings(void *scopep, void *node) {
 	  }
 	}
 	return NULL;
+      default:
+        break;
       }
     }
+  default:
+    break;
   }
   return scopep;
 }
@@ -551,13 +599,38 @@ static void *do_bind(void *vscope, void *node) {
 		      TYPE_FORMAL_EXTENSION_FLAG;
 		    new_scope=add_ext_sig(new_scope,rdecl,some_type_formal_sig(tf));
 		    break;
+      default:
+        break;
 		  }
 		}
 	      }
 	      break;
+      default:
+        break;
 	    }
 	  }
 	  traverse_Block(do_bind,new_scope,module_decl_contents(d)); }
+    {
+      Declaration type_formal = first_Declaration(module_decl_type_formals(d));
+      for (;type_formal != NULL; type_formal = DECL_NEXT(type_formal))
+      {
+        Signature sig = some_type_formal_sig(type_formal);
+        switch (Signature_KEY(sig))
+        {
+        case KEYsig_use:
+          {
+            Declaration use_decl = USE_DECL(sig_use_use(sig));
+            switch (Declaration_KEY(use_decl))
+            {
+            case KEYsome_class_decl:
+              aps_error(sig, "Missing actuals for %s in the signature", decl_name(use_decl));
+              break;
+            }
+            break;
+          }
+        }
+      }
+    }
 	break;
       case KEYattribute_decl:
 	{ Type ftype = attribute_decl_type(d);
@@ -609,18 +682,27 @@ static void *do_bind(void *vscope, void *node) {
     switch (Signature_KEY((Signature)node)) {
     case KEYsig_use:
       bind_Use(sig_use_use((Signature)node),NAME_SIGNATURE,scope);
+      break;
+    default:
+      break;
     }
     break;
   case KEYType:
     switch (Type_KEY((Type)node)) {
     case KEYtype_use:
       bind_Use(type_use_use((Type)node),NAME_TYPE,scope);
+      break;
+    default:
+      break;
     }
     break;
   case KEYPattern:
     switch (Pattern_KEY((Pattern)node)) {
     case KEYpattern_use:
       bind_Use(pattern_use_use((Pattern)node),NAME_PATTERN,scope);
+      break;
+    default:
+      break;
     }
     break;
   case KEYExpression:
@@ -636,6 +718,8 @@ static void *do_bind(void *vscope, void *node) {
 	new_scope = bind_Declaration(new_scope,controlled_formal(e));
 	traverse_Expression(do_bind,new_scope,controlled_expr(e));
 	return NULL;
+      default:
+        break;
       }
     }
     break;
@@ -648,6 +732,8 @@ static void *do_bind(void *vscope, void *node) {
 	aps_error(u,"no binding for %s",symbol_name(name));
       }
     }
+    break;
+  default:
     break;
   }
   return vscope;
@@ -720,6 +806,8 @@ static Expression actuals_set_next_actual(Actuals actuals, Expression next) {
       Actuals more = append_Actuals_l2(actuals);
       Expression middle = actuals_set_next_actual(more,next);
       return actuals_set_next_actual(some,middle); }
+  default:
+    break;
   }
   fatal_error("control reached end of actuals_set_next_actual");
   return NULL;
@@ -1048,6 +1136,8 @@ static void *activate_pragmas(void *ignore, void *node) {
 		  Declaration_info(d)->decl_flags |= FIELD_DECL_CYCLIC_FLAG;
 		}
 	      }
+      default:
+        break;
 	    }
 	    break;
 	  case KEYtype_value:
@@ -1066,12 +1156,16 @@ static void *activate_pragmas(void *ignore, void *node) {
 		  Declaration_info(d)->decl_flags |= SELF_MANAGED_FLAG;
 		}
 	      }
+      default:
+        break;
 	    }
 	    break;
 	  }
 	}
       }
       break; 
+    default:
+      break;
     }
   }
   return ignore;

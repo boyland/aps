@@ -167,11 +167,65 @@ void remove_from_worklist(EDGESET node, AUG_GRAPH *aug_graph) {
 }
 
 static EDGESET edgeset_freelist = NULL;
+
+static VECTOR(EDGESET) private_check_vector;
+static int private_check_vector_used = 0;
+static Boolean check_all_edgesets__add(EDGESET e) {
+  int n = private_check_vector_used;
+  int i;
+  if (private_check_vector.array == 0) {
+    VECTORALLOC(private_check_vector,EDGESET,16);
+  }
+  for (i=0; i < n; ++i) {
+    if (private_check_vector.array[i] == e) return false;
+  }
+  if (n >= private_check_vector.length) {
+    EDGESET *oldarray = private_check_vector.array;
+    VECTORALLOC(private_check_vector,EDGESET,n*2);
+    for (i=0; i < n; ++i) {
+      private_check_vector.array[i] = oldarray[i];
+    }
+  }
+  private_check_vector.array[n] = e;
+  ++private_check_vector_used;
+  return true;
+}
+  
+void check_all_edgesets(AUG_GRAPH *aug_graph) {
+  int n = aug_graph->instances.length;
+  int m = n*n;
+  int i,j;
+  EDGESET f;
+
+  private_check_vector_used = 0;
+  
+  for (f = edgeset_freelist; f != NULL; f = f->rest) {
+    if (!check_all_edgesets__add(f)) {
+      fatal_error("Found duplicate edge set in free list\n");
+    }
+  }
+  for (i=0; i < n; ++i) {
+    for (j=0; j < n; ++j) {
+      EDGESET es = aug_graph->graph[i*n+j];
+      while (es != NULL) {
+	if (!check_all_edgesets__add(es)) {
+	  fatal_error("Found duplicate edge set %d -> %d\n",i,j);
+	}
+	es = es->rest;
+      }
+    }
+  }
+}
+
+
 EDGESET new_edgeset(INSTANCE *source,
 		    INSTANCE *sink,
 		    CONDITION *cond,
 		    DEPENDENCY kind) {
   EDGESET new_edge;
+  if (analysis_debug & EDGESET_ASSERTIONS) {
+    // can't do anything right now
+  }
   if (edgeset_freelist == NULL) {
     new_edge = (EDGESET)HALLOC(sizeof(struct edgeset));
   } else {
@@ -200,6 +254,9 @@ void free_edge(EDGESET old, AUG_GRAPH *aug_graph) {
   old->kind = no_dependency;
   remove_from_worklist(old,aug_graph);
   edgeset_freelist = old;
+  if (analysis_debug & EDGESET_ASSERTIONS) {
+    check_all_edgesets(aug_graph);
+  }
 }
 
 void free_edgeset(EDGESET es, AUG_GRAPH *aug_graph) {
@@ -258,6 +315,16 @@ EDGESET add_edge(INSTANCE *source,
 		 DEPENDENCY kind,
 		 EDGESET current,
 		 AUG_GRAPH *aug_graph) {
+  if (!kind) {
+    print_instance(source,stdout);
+    fputs("->",stdout);
+    print_instance(sink,stdout);
+    fputs(":",stdout);
+    print_edge_helper(kind,cond,stdout);
+    puts("\n");
+    fatal_error("Trying to add dependency with kind=0 %d->%d", source->index, sink->index);
+  }
+
   if (current == NULL) {
     EDGESET new_edge=new_edgeset(source,sink,cond,kind);
     add_to_worklist(new_edge,aug_graph);
@@ -306,9 +373,11 @@ void add_edge_to_graph(INSTANCE *source,
 		       DEPENDENCY kind,
 		       AUG_GRAPH *aug_graph) {
   int index = source->index*(aug_graph->instances.length)+sink->index;
+  EDGESET current = aug_graph->graph[index];
+  aug_graph->graph[index] = NULL;
 
   aug_graph->graph[index] =
-    add_edge(source,sink,cond,kind,aug_graph->graph[index],aug_graph);
+    add_edge(source,sink,cond,kind,current,aug_graph);
 }
 
 void add_transitive_edge_to_graph(INSTANCE *source,
@@ -537,6 +606,25 @@ static void *init_decl_cond(void *vcond, void *node) {
 	traverse_Block(init_decl_cond,&new_cond,case_stmt_default(decl));
       }
       return NULL;
+    case KEYfor_stmt: /* almost same as case, but no negative conditions */
+      {
+	Matches ms = for_stmt_matchers(decl);
+	Expression testvar = for_stmt_expr(decl);
+	CONDITION new_cond = *cond;
+	Match m;
+
+	Expression_info(testvar)->next_expr = 0;
+	traverse_Matches(get_match_tests,&testvar,ms);
+	for (m = first_Match(ms); m; m=MATCH_NEXT(m)) {
+	  int index = Match_info(m)->if_index;
+	  Match_info(m)->match_cond = new_cond;
+	  new_cond.positive |= (1 << index); /* first set it */
+	  traverse_Block(init_decl_cond,&new_cond,matcher_body(m));
+	  new_cond.positive &= ~(1 << index); /* now clear it */
+	  /* do not do a negative test */
+	}
+      }
+      return NULL;
     default: break;
     }
   default:
@@ -740,7 +828,6 @@ static void *get_instances(void *vaug_graph, void *node) {
 	    STATE *s = aug_graph->global_state;
 	    int i;
 	    Declaration_info(decl)->instance_index = index;
-	    Declaration_info(decl)->decl_flags |= DECL_RHS_FLAG;
 	    for (i=0; i < s->phyla.length; ++i) {
 	      if (s->phyla.array[i] == pdecl) {
 		Declaration_info(decl)->node_phy_graph = &s->phy_graphs[i];
@@ -961,7 +1048,7 @@ static BOOL decl_is_collection(Declaration d) {
   }
 }
 
-static BOOL decl_is_circular(Declaration d)
+BOOL decl_is_circular(Declaration d)
 {
   if (!d) return FALSE;
   switch (Declaration_KEY(d)) {
@@ -1420,7 +1507,7 @@ static void *get_edges(void *vaug_graph, void *node) {
       case KEYformal:
 	{ Declaration case_stmt = formal_in_case_p(decl);
 	  if (case_stmt != NULL) {
-	    Expression expr = case_stmt_expr(case_stmt);
+	    Expression expr = some_case_stmt_expr(case_stmt);
 	    VERTEX f;
 	    f.node = 0;
 	    f.attr = decl;
@@ -1545,13 +1632,13 @@ static void *get_edges(void *vaug_graph, void *node) {
 					 NO_MODIFIER, test, aug_graph);
 	}
 	break;
-      case KEYcase_stmt:
+      case KEYsome_case_stmt:
 	{
 	  Match m;
 	  VERTEX sink;
 	  sink.node = 0;
 	  sink.modifier = NO_MODIFIER;
-	  for (m=first_Match(case_stmt_matchers(decl)); m; m=MATCH_NEXT(m)) {
+	  for (m=first_Match(some_case_stmt_matchers(decl)); m; m=MATCH_NEXT(m)) {
 	    Expression test = Match_info(m)->match_test;
 	    sink.attr = (Declaration)m;
 	    record_condition_dependencies(&sink,cond,aug_graph);
@@ -1563,6 +1650,18 @@ static void *get_edges(void *vaug_graph, void *node) {
 	  }
 	}
 	break;
+      case KEYfor_in_stmt:
+        { Declaration formal = for_in_stmt_formal(decl);
+          Expression expr = for_in_stmt_seq(decl);
+          VERTEX f;
+          f.node = 0;
+          f.attr = formal;
+          f.modifier = NO_MODIFIER;
+          record_condition_dependencies(&f,cond,aug_graph);
+          record_expression_dependencies(&f,cond,dependency,NO_MODIFIER,
+                                         expr,aug_graph);
+	}
+        break;
       default:
 	printf("%d: don't handle this kind yet\n",tnode_line_number(decl));
 	break;
@@ -1735,7 +1834,6 @@ static void init_augmented_dependency_graph(AUG_GRAPH *aug_graph,
 	fatal_error("%d: Cannot find start phylum summary graph",
 		    tnode_line_number(tlm));
       Declaration_info(tlm)->node_phy_graph = &state->phy_graphs[i];
-      Declaration_info(tlm)->decl_flags |= DECL_RHS_FLAG;
     }
     body = module_decl_contents(tlm);
     break;
@@ -1753,16 +1851,9 @@ static void init_augmented_dependency_graph(AUG_GRAPH *aug_graph,
       Declaration_info(tlm)->node_phy_graph = &state->phy_graphs[i];
     }
     body = some_function_decl_body(tlm);
-    Declaration_info(tlm)->decl_flags |= DECL_LHS_FLAG;
     { Type ftype=some_function_decl_type(tlm);
       Declaration formal=first_Declaration(function_type_formals(ftype));
       Declaration result=first_Declaration(function_type_return_values(ftype));
-      for (; formal != NULL; formal=Declaration_info(formal)->next_decl) {
-	Declaration_info(formal)->decl_flags |= ATTR_DECL_INH_FLAG;
-      }
-      for (; result != NULL; result=Declaration_info(result)->next_decl) {
-	Declaration_info(result)->decl_flags |= ATTR_DECL_SYN_FLAG;
-      }
     }
     break;
   case KEYtop_level_match:
@@ -1777,7 +1868,6 @@ static void init_augmented_dependency_graph(AUG_GRAPH *aug_graph,
 			     tnode_line_number(tlm));
 	case KEYpattern_var:
 	  aug_graph->lhs_decl = pattern_var_formal(and_pattern_p1(pat));
-	  Declaration_info(aug_graph->lhs_decl)->decl_flags |= DECL_LHS_FLAG;
 	  init_node_phy_graph(aug_graph->lhs_decl,state);
 	  break;
 	}
@@ -1808,7 +1898,6 @@ static void init_augmented_dependency_graph(AUG_GRAPH *aug_graph,
 	      break;
 	    case KEYpattern_var:
 	      { Declaration next_rhs = pattern_var_formal(next_pat);
-		Declaration_info(next_rhs)->decl_flags |= DECL_RHS_FLAG;
 		init_node_phy_graph(next_rhs,state);
 		if (last_rhs == NULL) {
 		  aug_graph->first_rhs_decl = next_rhs;
@@ -1916,6 +2005,141 @@ static void init_augmented_dependency_graph(AUG_GRAPH *aug_graph,
   aug_graph->schedule = (int *)HALLOC(aug_graph->instances.length*sizeof(int));
 }
 
+static void* set_rhs_decl_flag(void* vstate, void* node) {
+  if (ABSTRACT_APS_tnode_phylum(node) == KEYDeclaration) {
+    Declaration decl = (Declaration)node;
+    switch (Declaration_KEY(decl)) {
+      case KEYassign: {
+        Declaration pdecl = proc_call_p(assign_rhs(decl));
+        if (pdecl != NULL) {
+          Declaration_info(decl)->decl_flags |= DECL_RHS_FLAG;
+        }
+        break;
+      }
+      default:
+        break;
+    }
+  }
+  return vstate;
+}
+
+static void set_decl_flags_aug_graph(Declaration tlm, STATE* state) {
+  // Traverse the tlm and set RHS flags of assignments
+  traverse_Declaration(set_rhs_decl_flag, state, tlm);
+
+  switch (Declaration_KEY(tlm)) {
+    case KEYmodule_decl:
+    {
+      Declaration_info(tlm)->decl_flags |= DECL_RHS_FLAG;
+      break;
+    }
+    case KEYsome_function_decl:
+    {
+      Declaration_info(tlm)->decl_flags |= DECL_LHS_FLAG;
+      
+      Type ftype = some_function_decl_type(tlm);
+      Declaration formal = first_Declaration(function_type_formals(ftype));
+      Declaration result =
+          first_Declaration(function_type_return_values(ftype));
+      for (; formal != NULL; formal = Declaration_info(formal)->next_decl) {
+        Declaration_info(formal)->decl_flags |= ATTR_DECL_INH_FLAG;
+      }
+      for (; result != NULL; result = Declaration_info(result)->next_decl) {
+        Declaration_info(result)->decl_flags |= ATTR_DECL_SYN_FLAG;
+      }
+      break;
+    }
+    case KEYtop_level_match:
+    {
+      Pattern pat = matcher_pat(top_level_match_m(tlm));
+      switch (Pattern_KEY(pat)) {
+        case KEYand_pattern:
+          switch (Pattern_KEY(and_pattern_p1(pat))) {
+            case KEYpattern_var:
+            {
+              Declaration lhs_decl = pattern_var_formal(and_pattern_p1(pat));
+              Declaration_info(lhs_decl)->decl_flags |= DECL_LHS_FLAG;
+              break;
+            }
+            default:
+              break;
+          }
+          pat = and_pattern_p2(pat);
+          break;
+        default:
+          break;
+      }
+      switch (Pattern_KEY(pat)) {
+        case KEYpattern_call:
+        {
+          Pattern next_pat;
+          for (next_pat = first_PatternActual(pattern_call_actuals(pat));
+                next_pat != NULL;
+                next_pat = Pattern_info(next_pat)->next_pattern_actual) {
+            switch (Pattern_KEY(next_pat)) {
+              case KEYpattern_var: {
+                Declaration next_rhs = pattern_var_formal(next_pat);
+                Declaration_info(next_rhs)->decl_flags |= DECL_RHS_FLAG;
+                break;
+              }
+              default:
+                break;
+            }
+          }
+          break;
+        }
+        default:
+          break;
+      }
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+static void set_decl_flags_module(STATE* s, Declaration module) {
+  int i;
+  for (i = 0; i < s->match_rules.length; ++i) {
+    set_decl_flags_aug_graph(s->match_rules.array[i], s);
+  }
+  set_decl_flags_aug_graph(module, s);
+
+  Declarations decls = block_body(module_decl_contents(module));
+  /* initialize attribute kind of decls */
+  Declaration decl = first_Declaration(decls);
+  for (; decl != NULL; decl = Declaration_info(decl)->next_decl) {
+    switch (Declaration_KEY(decl)) {
+      case KEYattribute_decl:
+        if (!ATTR_DECL_IS_SYN(decl) && !ATTR_DECL_IS_INH(decl) &&
+            !FIELD_DECL_P(decl)) {
+          aps_warning(decl,
+                      "%s not declared either synthesized or inherited. "
+                      "Marking it as synthesized for now.",
+                      decl_name(decl));
+          Declaration_info(decl)->decl_flags |= ATTR_DECL_SYN_FLAG;
+        }
+        break;
+      case KEYsome_function_decl:
+      {
+        Type ftype = some_function_decl_type(decl);
+        Declaration d;
+        for (d = first_Declaration(function_type_formals(ftype)); d != NULL;
+              d = DECL_NEXT(d)) {
+          Declaration_info(d)->decl_flags |= ATTR_DECL_INH_FLAG;
+        }
+        for (d = first_Declaration(function_type_return_values(ftype));
+              d != NULL; d = DECL_NEXT(d)) {
+          Declaration_info(d)->decl_flags |= ATTR_DECL_SYN_FLAG;
+        }
+        break;
+      }
+      default:
+        break;
+    }
+  }
+}
+
 static void init_summary_dependency_graph(PHY_GRAPH *phy_graph,
 					  Declaration phylum,
 					  STATE *state)
@@ -2019,6 +2243,7 @@ static void init_analysis_state(STATE *s, Declaration module) {
 	/*DEBUG fprintf(stderr,"got an extension!\n"); */
 	for (; edecl != NULL; edecl = Declaration_info(edecl)->next_decl) {
 	  switch (Declaration_KEY(edecl)) {
+          default: break;
 	  case KEYphylum_decl:
 	    if (def_is_public(phylum_decl_def(edecl))) ++phyla_count;
 	    if (DECL_IS_START_PHYLUM(edecl)) s->start_phylum = edecl;
@@ -2034,6 +2259,7 @@ static void init_analysis_state(STATE *s, Declaration module) {
       { Declaration decl = first_Declaration(decls);
 	for (; decl != NULL; decl = DECL_NEXT(decl)) {
 	  switch (Declaration_KEY(decl)) {
+          default: break;
 	  case KEYsome_function_decl:
 	    ++phyla_count;
 	    break;
@@ -2047,6 +2273,7 @@ static void init_analysis_state(STATE *s, Declaration module) {
 	for (edecl = first_Declaration(edecls);
 	     edecl != NULL; edecl = Declaration_info(edecl)->next_decl) {
 	  switch (Declaration_KEY(edecl)) {
+          default: break;
 	  case KEYphylum_decl:
 	    if (def_is_public(phylum_decl_def(edecl)))  {
 	      s->phyla.array[phyla_count++] = edecl;
@@ -2058,6 +2285,7 @@ static void init_analysis_state(STATE *s, Declaration module) {
       { Declaration decl = first_Declaration(decls);
 	for (; decl != NULL; decl = DECL_NEXT(decl)) {
 	  switch (Declaration_KEY(decl)) {
+          default: break;
 	  case KEYsome_function_decl:
 	    s->phyla.array[phyla_count++] = decl;
 	    break;
@@ -2073,6 +2301,7 @@ static void init_analysis_state(STATE *s, Declaration module) {
     if (decl == NULL) aps_error(module,"empty module");
     for (; decl != NULL; decl = Declaration_info(decl)->next_decl) {
       switch (Declaration_KEY(decl)) {
+      default: break;
       case KEYsome_function_decl:
       case KEYtop_level_match: ++match_rule_count; break;
 	/*DEBUG
@@ -2091,6 +2320,7 @@ static void init_analysis_state(STATE *s, Declaration module) {
 	 decl != NULL;
 	 decl = Declaration_info(decl)->next_decl) {
       switch (Declaration_KEY(decl)) {
+      default: break;
       case KEYsome_function_decl:
       case KEYtop_level_match:
 	s->match_rules.array[match_rule_count++] = decl;
@@ -2098,7 +2328,10 @@ static void init_analysis_state(STATE *s, Declaration module) {
       }
     }
   }
-  
+
+  // Ensure declaration flags are all set before fibering begins
+  set_decl_flags_module(s, module);
+
   /* perform fibering */
   fiber_module(s->module,s);
   add_fibers_to_state(s);
@@ -2107,6 +2340,7 @@ static void init_analysis_state(STATE *s, Declaration module) {
   { Declaration decl = first_Declaration(decls);
     for (; decl != NULL; decl = Declaration_info(decl)->next_decl) {
       switch (Declaration_KEY(decl)) {
+      default: break;
       case KEYattribute_decl:
 	if (!ATTR_DECL_IS_SYN(decl) && !ATTR_DECL_IS_INH(decl) &&
 	    !FIELD_DECL_P(decl)) {
@@ -2118,6 +2352,7 @@ static void init_analysis_state(STATE *s, Declaration module) {
 	  Declaration formal = first_Declaration(function_type_formals(ftype));
 	  Type ntype = formal_type(formal);
 	  switch (Type_KEY(ntype)) {
+          default: break;
 	  case KEYtype_use:
 	    { Declaration phylum=Use_info(type_use_use(ntype))->use_decl;
 	      if (phylum == NULL)
@@ -2291,6 +2526,7 @@ void *augment_dependency_graph_func_calls(void *paug_graph, void *node) {
   case KEYDeclaration:
     { Declaration decl = (Declaration)node;
       switch (Declaration_KEY(decl)) {
+      default: break;
       case KEYsome_function_decl:
       case KEYtop_level_match:
 	/* don't look inside (unless its what we're doing the analysis for) */
@@ -2350,10 +2586,12 @@ void close_using_edge(AUG_GRAPH *aug_graph, EDGESET edge) {
 
   for (i=0; i < n; ++i) {
     EDGESET e;
+    EDGESET rest;
     /* first: instance[i]->source */
     for (e = aug_graph->graph[i*n+source_index];
 	 e != NULL;
-	 e = e->rest) {
+	 e = rest) {
+      rest = e->rest; /* may be modified in following: */
       add_transitive_edge_to_graph(e->source,edge->sink,
 				   &e->cond,&edge->cond,
 				   e->kind,edge->kind,
@@ -2362,7 +2600,8 @@ void close_using_edge(AUG_GRAPH *aug_graph, EDGESET edge) {
     /* then sink->instance[i] */
     for (e = aug_graph->graph[sink_index*n+i];
 	 e != NULL;
-	 e = e->rest) {
+	 e = rest) {
+      rest = e->rest;
       add_transitive_edge_to_graph(edge->source,e->sink,
 				   &edge->cond,&e->cond,
 				   edge->kind,e->kind,
@@ -2482,6 +2721,14 @@ DEPENDENCY analysis_state_cycle(STATE *s) {
   }
   for (i=0; i < s->match_rules.length; ++i) {
     AUG_GRAPH *aug_graph = &s->aug_graphs[i];
+    int n = aug_graph->instances.length;
+    for (j=0; j < n; ++j) {
+      DEPENDENCY k1 = edgeset_kind(aug_graph->graph[j*n+j]);
+      kind = dependency_join(kind,k1);
+    }
+  }
+  {
+    AUG_GRAPH *aug_graph = &s->global_dependencies;
     int n = aug_graph->instances.length;
     for (j=0; j < n; ++j) {
       DEPENDENCY k1 = edgeset_kind(aug_graph->graph[j*n+j]);
@@ -2676,6 +2923,7 @@ const char *aug_graph_name(AUG_GRAPH *aug_graph) {
   case KEYtop_level_match:
     { Pattern pat=matcher_pat(top_level_match_m(aug_graph->match_rule));
       switch (Pattern_KEY(pat)) {
+      default: break;
       case KEYand_pattern:
 	pat = and_pattern_p2(pat);
       }
@@ -2715,6 +2963,7 @@ void print_aug_graph(AUG_GRAPH *aug_graph, FILE *stream) {
   case KEYtop_level_match:
     { Pattern pat=matcher_pat(top_level_match_m(aug_graph->match_rule));
       switch (Pattern_KEY(pat)) {
+      default: break;
       case KEYand_pattern:
 	pat = and_pattern_p2(pat);
       }
@@ -2849,4 +3098,35 @@ void print_cycles(STATE *s, FILE *stream) {
       }
     }
   }
+}
+
+/**
+ * Utility function that determines whether fibered attribute is circular or not.
+ * if a fiber_attr is circular, which is true if the fiber is empty and the attribute
+ * (local or node attribute) is declared circular, OR (if the fiber is non-empty) if
+ * the last step in the fiber is circular.
+ * Note that a.b.c. is repsented as short = a.b, field = c 
+ * @param fiber_attr fibered attribute pointer
+ * @return boolean indicating the circularity 
+ */
+BOOL fiber_attr_circular(FIBERED_ATTRIBUTE* fiber_attr)
+{
+  // If fiber is empty
+  if (fiber_attr->fiber == base_fiber || fiber_attr->fiber == NULL)
+  {
+    return decl_is_circular(fiber_attr->attr);
+  }
+
+  FIBER fiber = fiber_attr->fiber;
+  return decl_is_circular(fiber->field);
+}
+
+/**
+ * Utility function indicating whether INSTANCE (attribute instance) is circular or not
+ * @param in attribute instance
+ * @return boolean indicating the circularity 
+ */
+BOOL instance_circular(INSTANCE* in)
+{
+  return fiber_attr_circular(&in->fibered_attr);
 }

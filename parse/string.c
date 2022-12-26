@@ -8,9 +8,9 @@
  * We store regular constant strings as
  * character pointers (unless they have high bits set)
  * Otherwise we use the first character as a type code:
- *   « (left european quote) for constant strings
- *   © (copyright sign) for concatenated strings
- *   ¥ (Yen sign) for integer strings
+ *   Â« (left european quote) for constant strings
+ *   Â© (copyright sign) for concatenated strings
+ *   Â¥ (Yen sign) for integer strings
  */
 
 struct jbb_string {
@@ -26,7 +26,7 @@ struct special_string {
 
 #define AS_SPECIAL(p,x) struct special_string *p=(struct special_string *)(x)
 
-#define CONSTANT_STRING (128+'+')
+#define CONSTANT_STRING (((unsigned char)(128+(unsigned char)'+')))
 struct constant_string {
   struct special_string header;
   char *value;
@@ -34,7 +34,7 @@ struct constant_string {
 #define AS_CONSTANT(p,x) \
   struct constant_string *p=(struct constant_string *)(x)
 
-#define CONC_STRING (128+')')
+#define CONC_STRING (((unsigned char)(128+(unsigned char)')')))
 struct conc_string {
   struct special_string header;
   STRING str1, str2;
@@ -91,7 +91,7 @@ STRING make_saved_string(char *s) {
   return make_string(strcpy((char *)HALLOC(strlen(s)+1),s));
 }
 
-static int digits(n,base) {
+static int digits(int n, int base) {
   int digits = 0;
   if (n < 0) {
     ++digits;

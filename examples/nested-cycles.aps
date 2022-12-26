@@ -30,7 +30,7 @@ module NESTED_CYCLES[T :: var SIMPLE[]] extends T begin
 		   decls_assigned_in,
 		   outer_names);
 
-  type Messages := BAG[String];
+  type Messages := SET[String];
   var collection msgs : Messages;
   
   match ?p:Program=program(?b:Block) begin
@@ -86,6 +86,7 @@ module NESTED_CYCLES[T :: var SIMPLE[]] extends T begin
     if e2.names_used <= s.stmt_assigned_in then
       out :> e1.names_used;
     endif;
+    s.stmt_assigned_out := out;
   end;
   
   match ?e:Expr=intconstant(?:Integer) begin

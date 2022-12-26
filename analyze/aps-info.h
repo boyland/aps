@@ -4,6 +4,9 @@
  * we need a new slot.
  */
 
+#ifndef APS_INFO_H
+#define APS_INFO_H
+
 struct Program_info {
   unsigned program_flags;
 #define PROGRAM_BOUND_FLAG 1
@@ -66,6 +69,7 @@ struct Declaration_info {
 };
 extern struct Declaration_info *Declaration_info(Declaration);
 
+#define DECL_PHY_GRAPH(decl) (Declaration_info(decl)->node_phy_graph)
 #define DECL_NEXT(decl) (Declaration_info(decl)->next_decl)
 #define NEXT_FIELD(decl) (Declaration_info(decl)->next_field_decl)
 #define DUAL_DECL(decl) (Declaration_info(decl)->dual_decl)
@@ -178,3 +182,5 @@ extern void set_tnode_parent(Program p);
 extern void *tnode_parent(void *);
 
 #define decl_name(decl) (char*)symbol_name(def_name(declaration_def(decl)))
+
+#endif

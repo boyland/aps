@@ -4,11 +4,15 @@
  * Routines for breaking cycles involving only fibers.
  */
 
+#ifndef APS_CYCLE_H
+#define APS_CYCLE_H
+
 extern void break_fiber_cycles(Declaration,STATE *,DEPENDENCY);
 extern int cycle_debug;
 
 typedef struct cycle_description {
   int internal_info;
+  DEPENDENCY kind;
   VECTOR(INSTANCE) instances;
 } CYCLE;
 
@@ -20,3 +24,5 @@ typedef struct cycle_description {
 #define CYC_ABOVE 1
 #define CYC_LOCAL 2
 #define CYC_BELOW 4
+
+#endif

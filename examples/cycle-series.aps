@@ -1,0 +1,37 @@
+with "tiny";
+module CYCLE_SERIES[T :: var TINY[]] extends T begin
+  type IntegerSet := SET[Integer];
+  type IntegerSetLattice := UNION_LATTICE[Integer,IntegerSet];
+
+  circular attribute Wood.ins : IntegerSetLattice;
+  circular attribute Wood.out : IntegerSetLattice;
+
+  attribute Root.answer : IntegerSet;
+
+  pragma synthesized(answer, out);
+  pragma inherited(ins);
+  
+  match ?r=root(?w) begin
+    w.ins := {0};
+    r.answer := w.out;
+  end;
+
+  match ?w=branch(?x,?y) begin
+    c : IntegerSet := y.out;
+    x.ins := y.out;
+    y.ins := x.out \/ { 0 };
+    w.out := w.ins /\~ c;
+  end;
+
+  match ?l=leaf(?x) begin
+    circular collection c : IntegerSetLattice;
+    c :> l.ins;
+    for v in l.ins begin
+      if (v < x) then
+	c :> {v+1};
+      endif;
+    end;
+    l.out := c;
+  end;
+  
+end;

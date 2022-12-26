@@ -16,8 +16,6 @@ String get_code_name(Symbol);
 #include "dump-cpp.h"
 #include "implement.h"
 
-using namespace std;
-
 using std::string;
 
 // extra decl_flags flags:
@@ -88,14 +86,14 @@ void dump_cpp_Program(Program p,std::ostream&hs,std::ostream&cpps)
   String name=program_name(p);
   inline_definitions = 0;
   aps_yyfilename = (char *)program_name(p);
-  hs << "#ifndef "; print_uppercase(name,hs); hs << "_H " << endl;
-  hs << "#define "; print_uppercase(name,hs); hs << "_H " << endl;
-  cpps << "#include \"aps-impl.h\"" << endl;
+  hs << "#ifndef "; print_uppercase(name,hs); hs << "_H " << std::endl;
+  hs << "#define "; print_uppercase(name,hs); hs << "_H " << std::endl;
+  cpps << "#include \"aps-impl.h\"" << std::endl;
   if (!streq(aps_yyfilename,"basic"))
-    cpps << "#include \"basic.h\"" << endl;
+    cpps << "#include \"basic.h\"" << std::endl;
   cpps << "#include \"" << name << ".h\"\n\n";
   dump_cpp_Units(program_units(p),hs,cpps);
-  hs << "#endif" << endl;
+  hs << "#endif" << std::endl;
 }
 
 void dump_cpp_Units(Units us,std::ostream&hs,std::ostream&cpps)
@@ -113,7 +111,7 @@ void dump_cpp_Units(Units us,std::ostream&hs,std::ostream&cpps)
 
 void dump_cpp_Unit(Unit u,std::ostream&hs,std::ostream&cpps)
 {
-  ostringstream is;
+  std::ostringstream is;
   switch(Unit_KEY(u)) {
   case KEYno_unit: break;
   case KEYwith_unit:
@@ -123,7 +121,7 @@ void dump_cpp_Unit(Unit u,std::ostream&hs,std::ostream&cpps)
       char buf[n+1];
       realize_string(buf,name);
       buf[n-1] = '\0'; // clear final quote
-      hs << "#include \"" << buf+1 << ".h\"" << endl;
+      hs << "#include \"" << buf+1 << ".h\"" << std::endl;
     }
     break;
   case KEYdecl_unit:
@@ -261,7 +259,7 @@ void dump_seq_Pattern_cond(Pattern pa, Type st, string node, ostream& os)
 	if (PAT_NEXT(next_pa)) {
 	  aps_error(next_pa,"Sequence pattern too complicated for now");
 	} else {
-	  ostringstream ns;
+	  std::ostringstream ns;
 	  dump_seq_function(infer_pattern_type(pa),st,"last",ns);
 	  ns << "(" << node << ")";	  
 	  dump_Pattern_cond(next_pa,ns.str(),os);
@@ -276,12 +274,12 @@ void dump_seq_Pattern_cond(Pattern pa, Type st, string node, ostream& os)
 	os << "!";
 	dump_seq_function(pat,st,"empty",os);
 	os << "(" << node << ")&&";
-	ostringstream ns;
+	std::ostringstream ns;
 	dump_seq_function(pat,st,"first",ns);
 	ns << "(" << node << ")";	
 	dump_Pattern_cond(pa,ns.str(),os);
 	os << "&&";
-	ostringstream rs;
+	std::ostringstream rs;
 	dump_seq_function(pat,st,"butfirst",rs);
 	rs << "(" << node << ")";
 	dump_seq_Pattern_cond(next_pa,st,rs.str(),os);
@@ -337,7 +335,7 @@ void dump_Pattern_cond(Pattern p, string node, ostream& os)
       os << node << "->cons==this->"; // added "this->" because of C++ compiler
       dump_Use(pfuse,"c_",os);
 
-      ostringstream ts;
+      std::ostringstream ts;
       ts << "((";
       dump_TypeEnvironment(USE_TYPE_ENV(pfuse),ts);
       ts << "V_" << decl_name(pfdecl) << "*)" << node << ")";
@@ -421,7 +419,7 @@ void dump_Pattern_bindings(Pattern p, ostream& os)
 string matcher_bindings(string node, Match m)
 {
   Pattern p = matcher_pat(m);
-  ostringstream os1, os2;
+  std::ostringstream os1, os2;
   dump_Pattern_cond(p,node,os1);
   dump_Pattern_bindings(p,os2);
   // ignore os1 contents
@@ -694,7 +692,7 @@ void dump_Type_superinit(bool is_phylum, Type ty, ostream& os)
 // Currently inheritances does the transfer of values,
 // but we need this to do the transfer of types:
 
-class ServiceRecord : public map<Symbol,int> {
+class ServiceRecord : public std::map<Symbol,int> {
 public:
   void add(Declaration d) {
     int namespaces = decl_namespaces(d);
@@ -985,7 +983,7 @@ void dump_local_attributes(Block b, Type at, Implementation::ModuleInfo* info,
       {
 	static int unique = 0;
 	LOCAL_UNIQUE_PREFIX(d) = ++unique;
-	ostringstream ns;
+	std::ostringstream ns;
 	ns << unique;
 	dump_some_attribute(d,ns.str(),at,value_decl_type(d),
 			    value_decl_direction(d),
@@ -1204,7 +1202,7 @@ void dump_cpp_Declaration(Declaration decl,const output_streams& oss)
       }
       hs << " public:\n";
 
-      ostringstream is;
+      std::ostringstream is;
 
       // The Result type as signature:
       hs << "  typedef C_" << name << " C_Result;\n";
@@ -1415,7 +1413,7 @@ void dump_cpp_Declaration(Declaration decl,const output_streams& oss)
 	    cpps << "C_" << name << " *t_" << name
 		 << " = new C_" << name << "();\n";
 	  }
-	  hs << endl;
+	  hs << std::endl;
 	}	  
 	break;
       default:
@@ -1439,7 +1437,7 @@ void dump_cpp_Declaration(Declaration decl,const output_streams& oss)
 		 << " = " << as_val(type) << ";\n"
 		 << "  return t_" << name << ";\n" << "}\n";
 	  }
-	  hs << endl;
+	  hs << std::endl;
 	}
 	break;
       }
@@ -1477,7 +1475,7 @@ void dump_cpp_Declaration(Declaration decl,const output_streams& oss)
       /* header file */
       hs << "  struct V_" << name << " : public "
 	 << (is_syntax ? "C_PHYLUM::Node" : "C_TYPE::Node")
-         << " {" << endl;
+         << " {" << std::endl;
       for (Declaration f = first_Declaration(formals); f; f = DECL_NEXT(f)) {
 	hs << "    "; dump_formal(f,"v_",hs); hs << ";\n";
       }
@@ -1591,14 +1589,14 @@ void dump_cpp_Declaration(Declaration decl,const output_streams& oss)
       else
 	hs << "extern ";
       dump_Typed_decl(value_decl_type(decl),decl,"v_",hs);
-      hs << ";\n" << endl;
+      hs << ";\n" << std::endl;
       if (context == 0) {
 	switch (Default_KEY(value_decl_default(decl))) {
 	case KEYsimple:
 	  dump_Typed_decl(value_decl_type(decl),decl,"v_",cpps);
 	  cpps << " = ";
 	  dump_Expression(simple_value(value_decl_default(decl)),cpps);
-	  cpps << ";\n" << endl;
+	  cpps << ";\n" << std::endl;
 	  break;
 	case KEYno_default:
 	  // native value
@@ -1626,7 +1624,7 @@ void dump_cpp_Declaration(Declaration decl,const output_streams& oss)
       if (context) hs << "  ";
       dump_function_prototype("",name,fty,hs);
       if (!inline_definitions) {
-	hs << ";\n" << endl;
+	hs << ";\n" << std::endl;
       }
       // three kinds of definitions:
       // 1. the whole thing: a non-empty body:
@@ -1641,7 +1639,7 @@ void dump_cpp_Declaration(Declaration decl,const output_streams& oss)
 	  dump_function_debug(name,fty,cpps);
 	impl->implement_function_body(decl,cpps);
 	--nesting_level;
-	cpps << indent() << "}\n" << endl;
+	cpps << indent() << "}\n" << std::endl;
 	return;
       } else if (rdecl) {
 	// 2. simple default
@@ -1694,7 +1692,7 @@ void dump_cpp_Declaration(Declaration decl,const output_streams& oss)
 	hs << "  C_" << decl_name(f);
 	hs << " *t_" << decl_name(f) << ";\n";
       }
-      ostringstream is;
+      std::ostringstream is;
       is << " ";
 
       for (Declaration d=first_Declaration(body); d; d=DECL_NEXT(d)) {
@@ -1748,18 +1746,18 @@ void dump_cpp_Declaration(Declaration decl,const output_streams& oss)
 	hs << " v_" << name;
 	if (context) {
 	  // initialization done by module:
-	  hs << ";\n" << endl;
+	  hs << ";\n" << std::endl;
 	  is << ",\n    v_" << name << "(";
 	  dump_Expression(old,is);
 	  is << ")";
 	} else {
 	  if (!inline_definitions) {
-	    hs << ";\n" << endl;	
+	    hs << ";\n" << std::endl;	
 	    dump_Type(ty,cpps);
 	    cpps << " v_" << name;
 	  }
 	  dump_Expression(old,cpps);
-	  cpps << ";\n" << endl;
+	  cpps << ";\n" << std::endl;
 	}
       }
     }
@@ -1794,7 +1792,7 @@ void dump_cpp_Declaration(Declaration decl,const output_streams& oss)
     //! patterns not implemented
     break;
   default:
-    cout << "Not handling declaration " << decl_name(decl) << endl;
+    std::cout << "Not handling declaration " << decl_name(decl) << std::endl;
   }
 }
 
@@ -2295,7 +2293,7 @@ void debug_Instance(INSTANCE *i, ostream& os) {
 
 string operator+(string s, int i)
 {
-  ostringstream os;
+  std::ostringstream os;
   os << s << i;
   return os.str();
 }
