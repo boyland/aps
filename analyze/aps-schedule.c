@@ -2830,8 +2830,8 @@ static void schedule_augmented_dependency_graph(
     if (original_state_dependency == no_dependency &&
         aug_graph->component_cycle[i]) {
       fatal_error(
-          "The scheduler cannot handle the AG (%s) since it has an "
-          "unconditional cycle.",
+          "The scheduler cannot handle the AG (%s) since it has a "
+          "conditional cycle.",
           aug_graph_name(aug_graph));
     }
   }
