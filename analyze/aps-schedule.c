@@ -864,8 +864,10 @@ static int schedule_phase_non_circular(PHY_GRAPH* phy_graph, int phase) {
 
 /**
  * Utility function that calculates ph (phase) for each attribute of a phylum
+ * - Note that phases always should start and end with non-circular and there should be
+ * empty non-circular between two circular phases.
+ * - By this point, fiber cycles have been broken by fiber cycle logic (up/down)
  * @param phy_graph phylum graph to schedule
- * they have been broken by fiber cycle logic (up./down)
  */
 static void schedule_summary_dependency_graph(PHY_GRAPH* phy_graph) {
   int n = phy_graph->instances.length;
@@ -946,6 +948,22 @@ static void schedule_summary_dependency_graph(PHY_GRAPH* phy_graph) {
       cycle_happened = false;
     }
   } while (count_non_circular || count_circular);
+
+  // Ensure there is a non-circular at the end if its done scheduling
+  if (done == n && cycle_happened)
+  {
+    if (oag_debug & TOTAL_ORDER) {
+      printf("^^^ empty non-circular phase: %d\n", phase);
+    }
+
+    // Add an empty phase between circular and non-circular
+    circular_phase[phase] = false;
+    // Mark this phase as empty
+    empty_phase[phase] = true;
+    phy_graph->max_phase = phase;
+    phase++;
+    cycle_happened = false;
+  }
 
   if (oag_debug & TOTAL_ORDER) {
     printf("\n");
