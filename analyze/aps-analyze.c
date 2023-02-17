@@ -15,6 +15,9 @@ Several phases:
   7> diagnostic output
 */
 
+// Boolean indicating whether to use SCC chunk scheduling
+bool static_scc_schedule = false;
+
 static void *analyze_thing(void *ignore, void *node)
 {
   STATE *s;
@@ -57,7 +60,17 @@ static void *analyze_thing(void *ignore, void *node)
         aps_error(decl, "Cycle detected (%d); Attribute grammar is not OAG", d);
       }
 
-      compute_static_schedule(s);  // calculate OAG if grammar is DNC
+      if (static_scc_schedule)
+      {
+        // SCC chunk scheduling supports CRAG without conditional cycles
+        compute_static_schedule(s);
+      }
+      else
+      {
+        // RAG scheduling with conditional cycles
+        compute_oag(decl, s);  // calculate OAG if grammar is DNC
+      }
+
       d = analysis_state_cycle(s); // check again for type-3 errors
 
       Declaration_info(decl)->analysis_state = s;

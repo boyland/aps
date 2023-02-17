@@ -37,7 +37,7 @@ extern int aps_yyparse(void);
 }
 
 Implementation* impl;
-bool static_schedule = 0;
+bool static_schedule = false;
 
 int main(int argc,char **argv) {
   argv0 = argv[0];
@@ -56,7 +56,11 @@ int main(int argc,char **argv) {
     } else if (streq(argv[i],"-S") || streq(argv[i],"--static")) {
       static_schedule = true;
       continue;
-    } else if (streq(argv[i],"-V") || streq(argv[i],"--verbose")) {
+    } else if (streq(argv[i],"-SCC") || streq(argv[i],"--static-scc")) {
+      static_schedule = true;
+      static_scc_schedule = true;
+      continue;
+    }  else if (streq(argv[i],"-V") || streq(argv[i],"--verbose")) {
       ++verbose;
       continue;
     } else if (streq(argv[i],"-G") || streq(argv[i],"--debug")) {
@@ -84,7 +88,7 @@ int main(int argc,char **argv) {
     type_Program(p);
     aps_check_error("type");
     if (static_schedule) {
-      impl = static_impl;
+      impl = static_scc_schedule ? static_scc_impl : static_impl;
       analyze_Program(p);
       aps_check_error("analysis");
       if (!impl) {

@@ -900,11 +900,22 @@ void break_fiber_cycles(Declaration module,STATE *s,DEPENDENCY dep) {
   get_fiber_cycles(s);
   assert_circular_declaration(s);
 
-  // Preserve UP-DOWN edges if the accumulated dependency is just fiber cycle,
-  if (!(dep & DEPENDENCY_NOT_JUST_FIBER))
+  // If SCC scheduling is in-progress
+  if (static_scc_schedule)
   {
-    add_up_down_attributes(s,UP_DOWN);
+    // Preserve UP-DOWN edges if the accumulated dependency is just fiber cycle,
+    if (!(dep & DEPENDENCY_NOT_JUST_FIBER))
+    {
+      add_up_down_attributes(s,UP_DOWN);
+    }
   }
+  else
+  {
+    // otherwise preserve DOWN-UP edges.
+    bool direction = !(dep & DEPENDENCY_NOT_JUST_FIBER) ? UP_DOWN : DOWN_UP;
+    add_up_down_attributes(s,direction);
+  }
+
   release(mark);
   {
     int saved_analysis_debug = analysis_debug;
