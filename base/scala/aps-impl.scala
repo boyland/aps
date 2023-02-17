@@ -253,7 +253,7 @@ class Evaluation[T_P, T_V](val anchor : T_P, val name : String)
 
   def set(v : ValueType) : Unit = {
     status match {
-    case EVALUATED => if (checkForLateUpdate) throw TooLateError;
+    case EVALUATED => if (checkForLateUpdate) throw TooLateError else ();
     case _ => ();
     }
     value = v;
