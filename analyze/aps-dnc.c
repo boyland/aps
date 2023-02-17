@@ -2003,7 +2003,7 @@ static void init_augmented_dependency_graph(AUG_GRAPH *aug_graph,
   }
   
   aug_graph->next_in_aug_worklist = NULL;
-  aug_graph->schedule = (bool*)HALLOC(aug_graph->instances.length*sizeof(bool));
+  aug_graph->schedule = (int*)HALLOC(aug_graph->instances.length*sizeof(bool));
 }
 
 static void* set_rhs_decl_flag(void* vstate, void* node) {

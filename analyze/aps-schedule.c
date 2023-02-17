@@ -2878,11 +2878,11 @@ static void schedule_augmented_dependency_graph(
   // visit calls
   set_aug_graph_children(aug_graph, state);
 
-  size_t schedule_size = n * sizeof(bool);
-  aug_graph->schedule = (bool*)alloca(schedule_size);
+  size_t schedule_size = n * sizeof(int);
+  aug_graph->schedule = (int*)alloca(schedule_size);
 
   // False here means nothing is scheduled yet
-  memset(aug_graph->schedule, false, schedule_size);
+  memset(aug_graph->schedule, 0, schedule_size);
 
   if (oag_debug & DEBUG_ORDER) {
     printf("\nInstances %s:\n", aug_graph_name(aug_graph));

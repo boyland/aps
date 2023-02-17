@@ -8,6 +8,7 @@ static char* argv0 = "apssched";
 void usage() {
   fprintf(stderr,"apsc: usage: %s [-DH] [-D...] [-p apspath] file...\n",argv0);
   fprintf(stderr,"             schedule APS files (omit '.aps' extension)\n");
+  fprintf(stderr,"   -S        SCC chunk scheduling\n");
   fprintf(stderr,"   -DH       print debug options\n");
   exit(1);
 }
@@ -23,7 +24,7 @@ int main(int argc,char **argv) {
 	set_debug_flags(options+1);
       } else if (*options == 'p') {
 	set_aps_path(argv[++i]);
-      } else if (*options == 's') {
+      } else if (*options == 'S') {
         static_scc_schedule = true;
       } else usage();
     } else {
