@@ -5,7 +5,6 @@
  * for productions until we reach a fixed point.
  */
 #include <stdio.h>
-#include <stdbool.h>
 #include "jbb-alloc.h"
 #include "aps-ag.h"
 

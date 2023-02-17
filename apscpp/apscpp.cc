@@ -27,7 +27,7 @@ void usage() {
   fprintf(stderr,"    -DH   list debugging flags\n");
   fprintf(stderr,"    -V    increase verbosity of generation code\n");
   fprintf(stderr,"    -G    add Debug calls for every function\n");
-  fprintf(stderr,"    -S    SCC chunk scheduling\n");
+  fprintf(stderr,"    -S    SCC chunk static scheduling\n");
   fprintf(stderr,"    -p path set the APSPATH (overriding env. variable)\n");
   exit(1);
 }

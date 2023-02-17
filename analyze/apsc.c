@@ -8,7 +8,7 @@ static char* argv0 = "apssched";
 void usage() {
   fprintf(stderr,"apsc: usage: %s [-DH] [-D...] [-p apspath] file...\n",argv0);
   fprintf(stderr,"             schedule APS files (omit '.aps' extension)\n");
-  fprintf(stderr,"   -S        SCC chunk scheduling\n");
+  fprintf(stderr,"   -S        SCC chunk static scheduling\n");
   fprintf(stderr,"   -DH       print debug options\n");
   exit(1);
 }
