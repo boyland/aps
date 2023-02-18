@@ -1599,7 +1599,7 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
       if (static_scc_schedule && s != NULL)
       {
         activate_static_circular = s->loop_required;
-        // Avoid unnecessary dump of static circular trait
+        // Avoid unnecessary dump of static circular trait definition
         if (activate_static_circular)
         {
           dump_static_circular_trait(oss);
