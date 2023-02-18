@@ -52,27 +52,30 @@ static void *analyze_thing(void *ignore, void *node)
         return NULL;
       }
 
-      // Pure fiber cycles should have been broken when reaching this step
-      if (d & DEPENDENCY_MAYBE_SIMPLE)
-      {
-        if (cycle_debug & PRINT_CYCLE)
-        {
-          print_cycles(s, stdout);
-        }
-
-        aps_error(decl, "Cycle detected (%d); Attribute grammar is not OAG", d);
-      }
-
       if (static_scc_schedule)
       {
+        // Pure fiber cycles should have been broken when reaching this step
+        if (d & DEPENDENCY_MAYBE_SIMPLE)
+        {
+          if (cycle_debug & PRINT_CYCLE)
+          {
+            print_cycles(s, stdout);
+          }
+
+          aps_error(decl, "Cycle detected (%d); Attribute grammar is not OAG", d);
+        }
+
         // SCC chunk scheduling supports CRAG without conditional cycles
         compute_static_schedule(s);
       }
       else
       {
-        // RAG scheduling with conditional cycles
-        compute_oag(decl, s);  // calculate OAG if grammar is DNC
-        d = analysis_state_cycle(s); // check again for type-3 errors
+        if (!d)
+        {
+          // RAG scheduling with conditional cycles
+          compute_oag(decl, s);  // calculate OAG if grammar is DNC
+          d = analysis_state_cycle(s); // check again for type-3 errors
+        }
 
         if (d)
         {
