@@ -46,8 +46,11 @@ static void *analyze_thing(void *ignore, void *node)
         s->loop_required = !(d & DEPENDENCY_MAYBE_SIMPLE);
         d = no_dependency;  // clear dependency
       }
-
-      d = analysis_state_cycle(s); // check again for type-3 errors
+      else
+      {
+        aps_error(decl, "Unable to handle dependency (%d); Attribute grammar is not DNC", d);
+        return NULL;
+      }
 
       // Pure fiber cycles should have been broken when reaching this step
       if (d & DEPENDENCY_MAYBE_SIMPLE)
@@ -69,9 +72,18 @@ static void *analyze_thing(void *ignore, void *node)
       {
         // RAG scheduling with conditional cycles
         compute_oag(decl, s);  // calculate OAG if grammar is DNC
-      }
+        d = analysis_state_cycle(s); // check again for type-3 errors
 
-      d = analysis_state_cycle(s); // check again for type-3 errors
+        if (d)
+        {
+          if (cycle_debug & PRINT_CYCLE)
+          {
+            print_cycles(s, stdout);
+          }
+
+          aps_error(decl, "Cycle detected (%d); Attribute grammar is not OAG", d);
+        }
+      }
 
       Declaration_info(decl)->analysis_state = s;
       break;
