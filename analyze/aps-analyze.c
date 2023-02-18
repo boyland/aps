@@ -52,6 +52,7 @@ static void *analyze_thing(void *ignore, void *node)
         return NULL;
       }
 
+      // If SCC scheduling is in-progress
       if (static_scc_schedule)
       {
         // Pure fiber cycles should have been broken when reaching this step
