@@ -903,8 +903,13 @@ void break_fiber_cycles(Declaration module,STATE *s,DEPENDENCY dep) {
   // If SCC scheduling is in-progress
   if (static_scc_schedule)
   {
-    // Preserve UP-DOWN edges if the accumulated dependency is just fiber cycle,
-    if (!(dep & DEPENDENCY_NOT_JUST_FIBER))
+    // If the accumulated dependency is NOT just fiber cycle, then
+    // there exist cycle(s) that carry value(s), so do not break fiber cycles.
+    if (dep & DEPENDENCY_NOT_JUST_FIBER)
+    {
+      printf("Skipped removing fiber cycles.\n");
+    }
+    else
     {
       add_up_down_attributes(s,UP_DOWN);
     }
