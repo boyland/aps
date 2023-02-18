@@ -55,6 +55,7 @@ static void *analyze_thing(void *ignore, void *node)
       if (static_scc_schedule)
       {
         // Pure fiber cycles should have been broken when reaching this step
+        // If there is a non-monotone cycle, then scheduling is no longer possible
         if (d & DEPENDENCY_MAYBE_SIMPLE)
         {
           if (cycle_debug & PRINT_CYCLE)
