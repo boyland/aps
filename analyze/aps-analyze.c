@@ -64,7 +64,8 @@ static void *analyze_thing(void *ignore, void *node)
             print_cycles(s, stdout);
           }
 
-          aps_error(decl, "Cycle detected (%d); Attribute grammar is not OAG", d);
+          aps_error(decl, "Non-monotone Cycle detected (%d); Attribute grammar is not OAG", d);
+          return NULL;
         }
 
         // SCC chunk scheduling supports CRAG without conditional cycles
@@ -87,6 +88,7 @@ static void *analyze_thing(void *ignore, void *node)
           }
 
           aps_error(decl, "Cycle detected (%d); Attribute grammar is not OAG", d);
+          return NULL;
         }
       }
 
