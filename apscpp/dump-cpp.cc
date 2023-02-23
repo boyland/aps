@@ -78,6 +78,7 @@ void impl_module(char *mname, char*type)
 bool incremental = false; //! unused
 int verbose = 0;
 int debug = 0;
+bool include_comments = false;
 
 int inline_definitions = 0;
 

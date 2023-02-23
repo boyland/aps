@@ -15,6 +15,8 @@ extern bool incremental;
 extern bool static_schedule;
 extern int verbose;
 extern int debug;
+extern bool include_comments;
+extern bool static_scc_schedule;
 
 class Implementation;
 
