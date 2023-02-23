@@ -27,6 +27,7 @@ void usage() {
   fprintf(stderr,"    -DH   list debugging flags\n");
   fprintf(stderr,"    -V    increase verbosity of generation code\n");
   fprintf(stderr,"    -G    add Debug calls for every function\n");
+  fprintf(stderr,"    -C    SCC chunk static scheduling\n");
   fprintf(stderr,"    -p path set the APSPATH (overriding env. variable)\n");
   exit(1);
 }
@@ -55,6 +56,10 @@ int main(int argc,char **argv) {
     } else if (streq(argv[i],"-S") || streq(argv[i],"--static")) {
       static_schedule = true;
       continue;
+    } else if (streq(argv[i],"-C") || streq(argv[i],"--static-scc")) {
+      static_schedule = true;
+      static_scc_schedule = true;
+      continue;
     } else if (streq(argv[i],"-V") || streq(argv[i],"--verbose")) {
       ++verbose;
       continue;
@@ -82,7 +87,7 @@ int main(int argc,char **argv) {
     type_Program(p);
     aps_check_error("type");
     if (static_schedule) {
-      impl = static_impl;
+      impl = static_scc_schedule ? static_scc_impl : static_impl;
       analyze_Program(p);
       aps_check_error("analysis");
       if (!impl) {

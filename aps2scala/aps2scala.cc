@@ -28,6 +28,7 @@ void usage() {
   fprintf(stderr,"    -DH   list debugging flags\n");
   fprintf(stderr,"    -V    increase verbosity of generation code\n");
   fprintf(stderr,"    -G    add Debug calls for every function\n");
+  fprintf(stderr,"    -C    SCC chunk static scheduling\n");
   fprintf(stderr,"    -p path set the APSPATH (overriding env. variable)\n");
   exit(1);
 }
@@ -37,7 +38,7 @@ extern int aps_yyparse(void);
 }
 
 Implementation* impl;
-bool static_schedule = 0;
+bool static_schedule = false;
 
 int main(int argc,char **argv) {
   argv0 = argv[0];
@@ -56,11 +57,16 @@ int main(int argc,char **argv) {
     } else if (streq(argv[i],"-S") || streq(argv[i],"--static")) {
       static_schedule = true;
       continue;
+    } else if (streq(argv[i],"-C") || streq(argv[i],"--static-scc")) {
+      static_schedule = true;
+      static_scc_schedule = true;
+      continue;
     } else if (streq(argv[i],"-V") || streq(argv[i],"--verbose")) {
       ++verbose;
       continue;
     } else if (streq(argv[i],"-G") || streq(argv[i],"--debug")) {
       ++debug;
+      include_comments = true;
       continue;
     } else if (streq(argv[i],"-p") || streq(argv[i],"--apspath")) {
       set_aps_path(argv[++i]);
@@ -83,7 +89,7 @@ int main(int argc,char **argv) {
     type_Program(p);
     aps_check_error("type");
     if (static_schedule) {
-      impl = static_impl;
+      impl = static_scc_schedule ? static_scc_impl : static_impl;
       analyze_Program(p);
       aps_check_error("analysis");
       if (!impl) {
@@ -96,11 +102,14 @@ int main(int argc,char **argv) {
     char* outfilename = str2cat(argv[i],".scala");
 
     std::ofstream out(outfilename);
+    if (out.fail())
+    {
+      std::cerr << "Failed to open output file " << outfilename << std::endl;
+      exit(1);
+    }
+
     dump_scala_Program(p,out);
+    out.close();
   }
   exit(0);
 }
-
-
-
-

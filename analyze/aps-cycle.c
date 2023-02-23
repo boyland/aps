@@ -900,10 +900,38 @@ void break_fiber_cycles(Declaration module,STATE *s,DEPENDENCY dep) {
   get_fiber_cycles(s);
   assert_circular_declaration(s);
 
-  // Preserve UP-DOWN edges if the accumulated dependency is just fiber cycle,
-  // otherwise preserve DOWN-UP edges.
-  bool direction = !(dep & DEPENDENCY_NOT_JUST_FIBER) ? UP_DOWN : DOWN_UP;
-  add_up_down_attributes(s,direction);
+  // If SCC scheduling is in-progress
+  if (static_scc_schedule)
+  {
+    // If the accumulated dependency is NOT just fiber cycle, then
+    // there exist cycle(s) that carry value(s), so do not break fiber cycles.
+    if (dep & DEPENDENCY_NOT_JUST_FIBER)
+    {
+      printf("Skipped removing fiber cycles.\n");
+    }
+    else
+    {
+      add_up_down_attributes(s,UP_DOWN);
+    }
+  }
+  else
+  {
+    // TODO: DOWN-UP is not a promising solution to handle CRAG. It naturally
+    // wants to remove edges that carry value (not just fiber dependency) and
+    // DOWN-UP ideally be should be removed in favor of UP-DOWN.
+    //
+    // The better as was demonstrated by SCC chunk scheduling is to not do fiber
+    // cycle breaking if there is DEPENDENCY_NOT_JUST_FIBER in accumulated dependency.
+    //
+    // However, we attempted to prevent direct edges from being affected by
+    // the fiber-cycle-breaking algorithm: https://github.com/boyland/aps/pull/87
+    //
+    // Preserve UP-DOWN edges if the accumulated dependency is just fiber cycle,
+    // otherwise preserve DOWN-UP edges.
+    bool direction = !(dep & DEPENDENCY_NOT_JUST_FIBER) ? UP_DOWN : DOWN_UP;
+    add_up_down_attributes(s,direction);
+  }
+
   release(mark);
   {
     int saved_analysis_debug = analysis_debug;

@@ -7,6 +7,9 @@ default:
 %.sched : %.aps
 	${APSSCHED} -DCOT -p ${BASE} $*
 
+%.scc.sched : %.aps
+	${APSSCHED} -C -DCOTo -p ${BASE} $*
+
 %.debug: %.aps
 	gdb --args "${APSSCHED}" "-DeFEfpa" "-p" "${BASE}" "$*"
 

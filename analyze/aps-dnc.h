@@ -89,6 +89,9 @@ typedef struct summary_dependency_graph {
   SCC_COMPONENTS* components; /* SCC components of instances in phylum graph */
   bool* component_cycle;      /* boolean indicating whether SCC component at index is circular */
   int *summary_schedule; /* one-d array, indexed by instance number */
+  bool* cyclic_flags; /* one-d array, indexed by phase number indicating whether phase is circular or not */
+  int max_phase;      /* integer denoting the maximum phase number for this phylum */
+  bool* empty_phase;  /* one-d array, indexed by phase number there is no attribute belonging to this phase */
 } PHY_GRAPH;
 extern const char *phy_graph_name(PHY_GRAPH *);
 
@@ -105,6 +108,10 @@ typedef struct analysis_state {
   AUG_GRAPH global_dependencies;
   VECTOR(FIBER) fibers;
   CYCLES cycles;
+  BOOL loop_required;
+  DEPENDENCY original_state_dependency;  // This is value of analysis_state_cycle
+                                         // before removing fiber cycle or
+                                         // linearization of phases in summary graph
 } STATE;
 
 extern PHY_GRAPH* summary_graph_for(STATE *, Declaration);

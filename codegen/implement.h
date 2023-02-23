@@ -72,6 +72,7 @@ class Implementation {
 
 extern Implementation *dynamic_impl;
 extern Implementation *static_impl;
+extern Implementation *static_scc_impl;
 
 #define IMPLEMENTATION_MARKS (127<<24)
 
