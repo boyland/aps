@@ -64,7 +64,7 @@ static void *analyze_thing(void *ignore, void *node)
             print_cycles(s, stdout);
           }
 
-          aps_error(decl, "Non-monotone Cycle detected (%d); Attribute grammar is not OAG", d);
+          aps_error(decl, "Non-monotone Cycle detected (%d); Attribute grammar is not COAG", d);
           return NULL;
         }
 

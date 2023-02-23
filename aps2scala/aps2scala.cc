@@ -28,7 +28,7 @@ void usage() {
   fprintf(stderr,"    -DH   list debugging flags\n");
   fprintf(stderr,"    -V    increase verbosity of generation code\n");
   fprintf(stderr,"    -G    add Debug calls for every function\n");
-  fprintf(stderr,"    -S    SCC chunk static scheduling\n");
+  fprintf(stderr,"    -C    SCC chunk static scheduling\n");
   fprintf(stderr,"    -p path set the APSPATH (overriding env. variable)\n");
   exit(1);
 }
@@ -57,11 +57,11 @@ int main(int argc,char **argv) {
     } else if (streq(argv[i],"-S") || streq(argv[i],"--static")) {
       static_schedule = true;
       continue;
-    } else if (streq(argv[i],"-SCC") || streq(argv[i],"--static-scc")) {
+    } else if (streq(argv[i],"-C") || streq(argv[i],"--static-scc")) {
       static_schedule = true;
       static_scc_schedule = true;
       continue;
-    }  else if (streq(argv[i],"-V") || streq(argv[i],"--verbose")) {
+    } else if (streq(argv[i],"-V") || streq(argv[i],"--verbose")) {
       ++verbose;
       continue;
     } else if (streq(argv[i],"-G") || streq(argv[i],"--debug")) {

@@ -1,7 +1,6 @@
 #ifndef APS_DNC_H
 #define APS_DNC_H
 
-#include <stdbool.h>
 #include "jbb-vector.h"
 #include "scc.h"
 #include <stdbool.h>

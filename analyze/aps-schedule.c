@@ -209,19 +209,14 @@ static void followed_by(CTO_NODE* current,
     return;
   }
 
-  bool if_true_any = false;
-  bool if_false_any = false;
-
   if (group_is_local(&current->child_phase) &&
       if_rule_p(current->cto_instance->fibered_attr.attr)) {
     followed_by(current->cto_if_true, ph, ch, immediate, visit_marker_only,
-                &if_true_any);
+                any);
   }
 
   followed_by(current->cto_next, ph, ch, immediate, visit_marker_only,
-              &if_false_any);
-
-  *any |= (if_true_any || if_false_any);
+              any);
 }
 
 /**
@@ -238,7 +233,6 @@ static bool aug_graph_contains_phase(AUG_GRAPH* aug_graph,
                                      const short ph,
                                      const short ch) {
   int i;
-  bool exist_parent_inherited_attr_previous_phase = false;
   for (i = 0; i < aug_graph->instances.length; i++) {
     INSTANCE* in = &aug_graph->instances.array[i];
     CHILD_PHASE* group = &state->instance_groups[in->index];
@@ -253,13 +247,13 @@ static bool aug_graph_contains_phase(AUG_GRAPH* aug_graph,
 }
 
 /**
- * Utility function used by assert_total_order to check sanity of total order
- *  1) After visit marker <ph,-1> there should be no attribute
- *     belonging to <ph,-1> or <-ph,-1>
- *  2) Immediately before visit marker <ph,ch> should be attribute
- *     belonging to <-ph,ch>
- *  3) Or immediately after visit marker <ph,ch> should be attribute belonging
- *     to <ph,ch>
+ * @brief Utility function used by assert_total_order to check sanity of total order
+ *  1) After end of phase visit marker <ph,-1> there should be no attribute
+ *     belonging to <ph,-1> or <-ph,-1> because parent phase has ended.
+ *  2) Immediately before child visit marker <ph,ch> there should be attribute
+ *     belonging to <-ph,ch> (if any)
+ *  3) Immediately after visit marker <ph,ch> should be attribute belonging
+ *     to <ph,ch> (if any)
  * @param current CTO_NODE node
  * @param prev_group <ph,ch> group
  */
@@ -276,11 +270,8 @@ static void total_order_sanity_check(AUG_GRAPH* aug_graph,
   CHILD_PHASE* current_group = &current->child_phase;
 
   if (IS_VISIT_MARKER(current)) {
+    // If end of parent phase visit marker
     if (current->child_phase.ch == -1) {
-      // End of total order
-      if (current->cto_next == NULL)
-        return;
-
       // Boolean indicating whether end of phase visit marker was preceded
       // by parent synthesized attributes <ph,-1> if any
       bool preceded_by_parent_synthesized_current_phase =
@@ -296,8 +287,13 @@ static void total_order_sanity_check(AUG_GRAPH* aug_graph,
             -1);
       }
 
+      // End of total order so no need to check if after <ph,-1>
+      // it is followed by <-(ph+1),-1> because this is the end
+      if (current->cto_next == NULL)
+        return;
+
       // Boolean indicating whether followed by inherited attribute of
-      // parent <-(ph+1),-1>
+      // parent for the next phase <-(ph+1),-1> if any
       bool followed_by_parent_inherited_next_phase = false;
       followed_by(current->cto_next, -(current->child_phase.ph + 1), -1,
                   false /* not immediate */, false /* not visit markers only*/,
@@ -312,11 +308,11 @@ static void total_order_sanity_check(AUG_GRAPH* aug_graph,
                     "followed by parent inherited attribute of next "
                     "phase <%+d,%+d>",
                     aug_graph_name(aug_graph), current_group->ph, -1,
-                    current_group->ph + 1, -1);
+                    -(current_group->ph + 1), -1);
       }
     } else {
-      // Boolean indicating whether visit marker was followed by child
-      // synthesized attribute(s) <ph,ch>
+      // Boolean indicating whether child visit marker was followed by child
+      // synthesized attribute(s) <ph,ch> if any
       bool followed_by_child_synthesized = false;
       followed_by(current->cto_next, current->child_phase.ph,
                   current->child_phase.ch, true /* immediate */,
@@ -328,6 +324,8 @@ static void total_order_sanity_check(AUG_GRAPH* aug_graph,
       bool preceded_by_child_inherited = prev_group->ph == -current_group->ph &&
                                          prev_group->ch == current_group->ch;
 
+      // If graph contains <ph,ch> then after visit should be group of <ph,ch>
+      // Similarly, if graph contains <-ph,ch>, before the visit should be group of <-ph,ch> 
       if (aug_graph_contains_phase(aug_graph, state, cond,
                                    current->child_phase.ph,
                                    current->child_phase.ch) &&

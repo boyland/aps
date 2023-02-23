@@ -95,8 +95,15 @@ static string program_id(string name)
 }
 
 /**
- * Utility function to dump static circular evaluation trait to
- * by pass some of CircularEvaluation limitations
+ * @brief function to dump static circular evaluation trait.
+ * 
+ * Introduces changed boolean variable (accessible globally) that is
+ *   ORed with its previous value if the attribute instance value has been changed.
+ * 
+ * By-pass CircularEvaluation limitation that prevents re-evaluation of
+ *   attribute instance, hence checkForLateUpdate=false and in aps-impl.scala
+ *   TooLateError is not thrown in case of re-evaluation if checkForLateUpdate
+ *   is set to false.
  */
 void dump_static_circular_trait(std::ostream& oss)
 {
