@@ -1615,7 +1615,7 @@ static CTO_NODE* group_schedule(AUG_GRAPH* aug_graph,
 
 /**
  * @brief local chunk scheduler.
- * This function is similiar to group_schedule except it can handle IF
+ * This function is similar to group_schedule except it can handle IF
  * conditionals which are locals too.
  */
 static CTO_NODE* local_chunk_schedule(AUG_GRAPH* aug_graph,
@@ -1857,7 +1857,7 @@ static CTO_NODE* chunk_schedule(AUG_GRAPH* aug_graph,
   if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
     printf(
         "Finding next chunk to schedule from list of available chunks in "
-        "component #%d of %s augmeneted dependency graph:\n",
+        "component #%d of %s augmented dependency graph:\n",
         chunk_component_index, aug_graph_name(aug_graph));
   }
 
@@ -2045,7 +2045,7 @@ static void debug_chunk_dependencies(ChunkGraph* chunk_graph,
     if (current_sink_chunk == sink_chunk)
       break;
 
-    // If we have visited all chunks inside the componet then we have found all
+    // If we have visited all chunks inside the component then we have found all
     // the sink_chunk dependencies, then stop
     if (i == sink_component->length)
       break;
@@ -2328,7 +2328,7 @@ static CTO_NODE* chunk_component_schedule(AUG_GRAPH* aug_graph,
     fatal_error(
         "Not sure what to do at this point of scheduling for %s augmented "
         "dependency graph because there is no component to schedule and "
-        "already tried scheduling componet #%d and none of its chunks were "
+        "already tried scheduling component #%d and none of its chunks were "
         "scheduled.",
         aug_graph_name(aug_graph), prev_chunk_component_index);
     return NULL;

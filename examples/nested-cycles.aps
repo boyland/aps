@@ -1,5 +1,5 @@
 with "simple";
--- Example to demonsrate the need for nested cyclic looping.
+-- Example to demonstrate the need for nested cyclic looping.
 -- This example doesn't have any real intuitive meaning.
 module NESTED_CYCLES[T :: var SIMPLE[]] extends T begin
 

@@ -25,7 +25,7 @@ static void test_push_pop() {
   for (i = 0; i < n; i++) {
     void* temp;
     _ASSERT_EXPR("Stack should be empty", stack_pop(&stack, &temp));
-    _ASSERT_EXPR("Should contain the right valud", VOIDP2INT(temp) == i);
+    _ASSERT_EXPR("Should contain the right value", VOIDP2INT(temp) == i);
   }
 }
 
