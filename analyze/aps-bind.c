@@ -180,7 +180,7 @@ static SCOPE add_ext_sig(SCOPE old, Declaration tdecl, Signature sig) {
 	      current_type_env = saved;
 	      return new_scope; }
 	  default:
-	    /*! eventually handle remaining */
+	    /*! eventually handle renaming */
 	    fatal_error("%d: complicated binding for class",
 			tnode_line_number(cl));
 	  }

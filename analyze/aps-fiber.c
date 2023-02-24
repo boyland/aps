@@ -755,7 +755,7 @@ void init_field_decls(Declaration module, STATE *s) {
       Use pu = use(def_name(declaration_def(p)));
       Declaration tr = type_renaming(def(intern_symbol("P"),TRUE,FALSE),
 				     type_use(pu));
-      /* shortcut use, I don't think my code handles remaining well */
+      /* shortcut use, I don't think my code handles renamings well */
       Use u = use(def_name(declaration_def(p)));
       Declaration formal = normal_formal(def(intern_symbol("_"),TRUE,FALSE),
 				       type_use(u));

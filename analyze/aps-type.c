@@ -1174,7 +1174,7 @@ Type check_pattern_actuals(PatternActuals args, Type ftype, Use type_envs)
   Pattern arg;
 
   switch (Type_KEY(ftype)) {
-    /*! change to handle remaining */
+    /*! change to handle renamings */
   case KEYfunction_type:
     formals = function_type_formals(ftype);
     rty = function_type_return_type(ftype);
