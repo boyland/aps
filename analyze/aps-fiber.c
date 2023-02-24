@@ -11,7 +11,7 @@
 int fiber_debug = 0;
 
 typedef struct edges {
-  struct edges *rest;   // rest of esges
+  struct edges *rest;   // rest of edges
   Declaration  edge;    // f or f. or empty(null).
   int from; // FSA from
 } *EDGES;           // list of edges
@@ -1259,7 +1259,7 @@ static void *add_fiberset_to_shared_use(void *fsp, void *node) {
 	  /* if we have a shared use, that use is equivalent to
 	   *   shared_info.sdecl
 	   * and the direction is correct,
-	   * then we apply the rules for field acess.
+	   * then we apply the rules for field access.
 	   */
 	  if (DECL_IS_SHARED(sdecl) &&
 	      Declaration_KEY(sdecl) == KEYvalue_decl &&
@@ -1826,7 +1826,7 @@ OSET doOU(Expression e, USET uset)
 	    RETURN get_oset(result);
            }
 	    
-	  } else	{	// primiive: how to get decl? don't need.
+	  } else	{	// primitive: how to get decl? don't need.
 	    OSET oset = EMPTY_OSET;
 	    Expression arg = first_Actual(funcall_actuals(e));
 	    for (; arg!= NULL; arg = Expression_info(arg)->next_expr){
@@ -2086,7 +2086,7 @@ void *compute_OU(void *u, void *node)
 	break;
       }	// case top_level_match
       
-      // value_decl: includes initilization precess
+      // value_decl: includes initialization precess
       case KEYvalue_decl: {
 	Default def = value_decl_default(decl) ;
 	switch (Default_KEY(def)){
@@ -3246,7 +3246,7 @@ void fiber_module(Declaration module, STATE *s) {
 	  print_fields(all_fields_list);
 	}
 
-	// initionlize the graph 
+	// initialize the graph
 //	FSA_graph = (EDGES)malloc(sizeof(struct edges)*index);
 
 	// printf("DEBUG: traverse declaration to build FSA.\n");

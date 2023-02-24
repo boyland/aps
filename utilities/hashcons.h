@@ -62,7 +62,7 @@ void *hash_cons_get(void *temp_item, size_t temp_size, HASH_CONS_TABLE table);
 /**
  * Hash string
  * @param string
- * @return intger hash value
+ * @return integer hash value
  */
 long hash_string(char *str);
 

@@ -46,7 +46,7 @@ static void hash_table_insert_at(HASH_TABLE* table,
 }
 
 /**
- * Searches for hash enrty index in the table
+ * Searches for hash entry index in the table
  * @param item the key of the hash entry
  * @return possible index of the hash entry
  */

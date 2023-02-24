@@ -65,7 +65,7 @@ int assign_sets(CALLSITE_SET site, void* node, CALLSITE_SET source) {
   return dirty;
 }
   
-/* go through all assigments iteratively */
+/* go through all assignments iteratively */
 void* traverser(void *changed, void *node) {
   int * dirty_sign = (int*)changed;
   switch (ABSTRACT_APS_tnode_phylum(node)) {
@@ -74,7 +74,7 @@ void* traverser(void *changed, void *node) {
       
       switch (Declaration_KEY(decl)) {
       default: break;
-      /* only inspect the assigments */
+      /* only inspect the assignments */
       case KEYassign:
 nothing();
         DEBUG_INFO("#%d", tnode_line_number(decl));
@@ -144,7 +144,7 @@ void* locater(void *node) {
   return NULL;
 }
 
-/* main interpetation function */
+/* main interpretation function */
 CALLSITE_SET interpret(void *node) {
   switch (ABSTRACT_APS_tnode_phylum(node)) {
   /* only inspect RHS expressions */
@@ -176,7 +176,7 @@ CALLSITE_SET interpret(void *node) {
 
         pSite = Declaration_info(udecl)->call_sites;
         if(pSite == NULL) {
-          DEBUG_INFO("\tValue use not decared locally: %s\n",
+          DEBUG_INFO("\tValue use not declared locally: %s\n",
                      decl_name(udecl));
           return NULL;
         }  
