@@ -622,7 +622,7 @@ static CanonicalSignatureSet substitute_canonical_signature_set_actuals(Canonica
 }
 
 /**
- * Should accumulate the signatures in a restrictive way not additive mannger
+ * Should accumulate the signatures in a restrictive way not additive manner
  * @param ctype canonical type
  * @return canonical signature set
  */

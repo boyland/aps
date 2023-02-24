@@ -64,7 +64,7 @@ class OutputWriter {
     if (!contains_marker(marker)) {
       _items.push_back({lambda, marker});
     } else {
-      fatal_error("Already enququed to write marker: %d", VOIDP2INT(marker));
+      fatal_error("Already enqueued to write marker: %d", VOIDP2INT(marker));
     }
   }
 

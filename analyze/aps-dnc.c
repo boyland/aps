@@ -1,7 +1,7 @@
 /* Testing DNC with fibering of conditional attribute grammars
  * written in APS syntax.  First we initialize the graphs for
- * every phylum and for every production.  Then we interate
- * computing summary graphs and then augmented depedency graphs
+ * every phylum and for every production.  Then we iterate
+ * computing summary graphs and then augmented dependency graphs
  * for productions until we reach a fixed point.
  */
 #include <stdio.h>

@@ -12,7 +12,7 @@ class Debug {
   ~Debug(); // decrease indentation
   // there are no private instance data members so we don't need to overload =
 
-  Debug(const std::string&); // increase indendation and print entry string
+  Debug(const std::string&); // increase indentation and print entry string
   void returns(const std::string&); // return value
 
   std::ostream& out(); // print a debugging comment

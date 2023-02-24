@@ -14,7 +14,7 @@ extern Type function_type_return_type(Type);
  * to the environment in the type. Hence, one cannot just use
  * the type of the use_decl + the TYPE_ENV stored in the Use:
  * you need to also check if the use is a qual use.  Implicit qualification
- * and polymorphic uses *will* have complete USE_TYPE_ENV informatio.
+ * and polymorphic uses *will* have complete USE_TYPE_ENV information.
  *
  * Thus instead of passing around TypeEnvironments, we will pass Use's
  * around which hold a chain of TypeEnvironment's, as in

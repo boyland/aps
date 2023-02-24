@@ -15,7 +15,7 @@ typedef struct CanonicalSignature_type CanonicalSignature;
 typedef HASH_CONS_SET CanonicalSignatureSet;
 
 /**
- * Should accumulate the signatures in a restrictive way not additive mannger
+ * Should accumulate the signatures in a restrictive way not additive manner
  * @param ctype canonical type
  * @return canonical signature set
  */

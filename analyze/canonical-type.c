@@ -9,7 +9,7 @@
  * @param ctype_outer outer canonical type
  * @param ctype_inner inner canonical type
  * @param is_base_type flag indicating if we are resolving base type
- * @return resuling canonical base type
+ * @return resulting canonical base type
  */
 CanonicalType *canonical_type_join(CanonicalType *ctype_outer, CanonicalType *ctype_inner, bool is_base_type);
 
@@ -668,7 +668,7 @@ static CanonicalType *canonical_type_left_refactor(CanonicalType *ctype_left, Ca
  * @param ctype_outer outer canonical type any
  * @param ctype_inner inner canonical type function
  * @param is_base_type
- * @return resuling canonical base type
+ * @return resulting canonical base type
  */
 static CanonicalType *canonical_type_any_function_join(CanonicalType *ctype_outer, struct Canonical_function_type *ctype_inner, bool is_base_type)
 {
@@ -966,7 +966,7 @@ static CanonicalType *canonical_type_qual_qual_join(struct Canonical_qual_type *
  * @param ctype_outer outer canonical type
  * @param ctype_inner inner canonical type
  * @param is_base_type true means base type requested, false is the opposite
- * @return resuling canonical base type
+ * @return resulting canonical base type
  */
 CanonicalType *canonical_type_join(CanonicalType *ctype_outer, CanonicalType *ctype_inner, bool is_base_type)
 {
@@ -1004,7 +1004,7 @@ CanonicalType *canonical_type_join(CanonicalType *ctype_outer, CanonicalType *ct
  * Comparator for two canonical types
  * @param ctype1 first canonical type
  * @param ctype2 second canonical type
- * @return integer value representing the comparaison
+ * @return integer value representing the comparison
  */
 int canonical_type_compare(CanonicalType *ctype1, CanonicalType *ctype2)
 {

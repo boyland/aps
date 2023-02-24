@@ -291,7 +291,7 @@ HASH_CONS_SET union_hash_const_set(HASH_CONS_SET set_a, HASH_CONS_SET set_b)
  * Hash string and returns a hash value
  * Source: http://www.cse.yorku.ca/~oz/hash.html
  * @param string
- * @return intger hash value
+ * @return integer hash value
  */
 long hash_string(char *str)
 {

@@ -419,7 +419,7 @@ inline bool C_SET<E>::v_member(T_ElemType x, T_Result s)
 template<class E>
 inline typename C_SET<E>::T_Result C_SET<E>::v_union(T_Result s1, T_Result s2) 
 {
-  // C++ can't handle this code without the followign repeated typedefs:
+  // C++ can't handle this code without the following repeated typedefs:
   typedef typename C_SET<E>::V_append V_append;
   typedef typename C_SET<E>::V_single V_single;
   typedef typename C_SET<E>::V_none V_none;
@@ -444,7 +444,7 @@ inline typename C_SET<E>::T_Result C_SET<E>::v_union(T_Result s1, T_Result s2)
 template<class E>
 inline typename C_SET<E>::T_Result C_SET<E>::v_intersect(T_Result s1, T_Result s2) 
 {
-  // C++ can't handle this code without the followign repeated typedefs:
+  // C++ can't handle this code without the following repeated typedefs:
   typedef typename C_SET<E>::V_append V_append;
   typedef typename C_SET<E>::V_single V_single;
   typedef typename C_SET<E>::V_none V_none;
@@ -469,7 +469,7 @@ inline typename C_SET<E>::T_Result C_SET<E>::v_intersect(T_Result s1, T_Result s
 template<class E>
 inline typename C_SET<E>::T_Result C_SET<E>::v_difference(T_Result s1, T_Result s2) 
 {
-  // C++ can't handle this code without the followign repeated typedefs:
+  // C++ can't handle this code without the following repeated typedefs:
   typedef typename C_SET<E>::V_append V_append;
   typedef typename C_SET<E>::V_single V_single;
   typedef typename C_SET<E>::V_none V_none;
