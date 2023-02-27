@@ -769,7 +769,7 @@ with C_BAG[List[T_ElemType],T_ElemType]
   val v_none = f_none _;
   def f_none():T_Result = Nil;
   def u_none(x:Any) : Option[T_Result] = x match {
-    case x@Nil => Some((x));
+    case x@Nil => Some((x).asInstanceOf[T_Result]);
     case _ => None };
   val p_none = new PatternFunction[T_Result](u_none);
   
@@ -1295,7 +1295,7 @@ with C_STRING[String]
   override def f_assert(v__88 : T_Result) : Unit = {};
   
   val v__op_AC = f__op_AC _;
-  def f__op_AC(v_l : Char*):T_Result = (v_l :\ "")((c,s) => c + s);
+  def f__op_AC(v_l : Char*):T_Result = (v_l foldRight "")((c,s) => c + s);
   
   val p__op_AC = new PatternSeqFunction[T_Result,Char](u__op_AC);
   def u__op_AC(x:Any) : Option[(T_Result,Seq[Char])] = x match {
