@@ -193,7 +193,24 @@ object Evaluation {
   case class CyclicAttributeException(w : String) extends APSException("cyclic attribute: " + w) {}
   object StubError extends APSException("stub error") {}
 
-  import scala.collection.mutable.Stack;
+  class Stack[A](private var elems: List[A] = List.empty[A]) extends Iterable[A] {
+    def push(v: A): Stack[A] = {
+      elems = v :: elems;
+      this;
+    }
+
+    def pop(): A = {
+      if (elems.isEmpty) {
+        throw new NoSuchElementException("Empty Stack");
+      } else {
+        val popped = elems.head;
+        elems = elems.tail;
+        popped;
+      }
+    }
+
+    override def iterator: Iterator[A] = elems.iterator
+  }
 
   val pending : Stack[Evaluation[_,_]] = new Stack();
 }
