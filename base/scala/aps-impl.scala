@@ -195,17 +195,17 @@ object Evaluation {
 
   class Stack[A](private var elems: List[A] = List.empty[A]) extends Iterable[A] {
     def push(v: A): Stack[A] = {
-      elems = v :: elems
-      this
+      elems = v :: elems;
+      this;
     }
 
     def pop(): A = {
       if (elems.isEmpty) {
-        throw new NoSuchElementException("Empty Stack")
+        throw new NoSuchElementException("Empty Stack");
       } else {
-        val popped = elems.head
-        elems = elems.tail
-        popped
+        val popped = elems.head;
+        elems = elems.tail;
+        popped;
       }
     }
 
