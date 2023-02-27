@@ -769,7 +769,7 @@ with C_BAG[List[T_ElemType],T_ElemType]
   val v_none = f_none _;
   def f_none():T_Result = Nil;
   def u_none(x:Any) : Option[T_Result] = x match {
-    case x@Nil => Some((x));
+    case x@Nil => Some((x).asInstanceOf[T_Result]);
     case _ => None };
   val p_none = new PatternFunction[T_Result](u_none);
   
