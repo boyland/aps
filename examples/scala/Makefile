@@ -10,7 +10,7 @@ APS2SCALAFLAGS = -p ..:${APSTOP}/base -G
 
 SCALAGEN = simple.scala classic-binding.scala tiny.scala \
 	test-coll.scala test-use-coll.scala test-cycle.scala use-global.scala \
-	grammar.scala first.scala follow.scala
+	grammar.scala first.static.scala follow.static.scala nullable.static.scala
 
 MISCGEN = nested-cycles.scala GrammarParser.scala SimpleParser.scala \
 	GrammarTokens.scala SimpleTokens.scala *.scala~ GrammarScanner.scala \
@@ -36,7 +36,7 @@ run: Classic.run TestCollDriver.run TestCycleDriver.run NestedCyclesDriver.run
 phony_explicit:
 
 %.static.scala : ../%.aps ${APS2SCALA}
-	${APS2SCALA} ${APS2SCALAFLAGS} -S $*
+	${APS2SCALA} ${APS2SCALAFLAGS} -S -C $*
 
 %.scala : ../%.aps ${APS2SCALA}
 	${APS2SCALA} ${APS2SCALAFLAGS} $*
