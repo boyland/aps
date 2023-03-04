@@ -17,7 +17,7 @@ clean:
 	scalac -cp ${SCALA_FLAGS} $<
 
 first.scala follow.scala nullable.scala:
-	${APS2SCALA} -S -C -DCOT -p ${EXAMPLES_PATH}:${ROOT_PATH}/base $(basename $(@F))
+	${APS2SCALA} -DCOT -p ${EXAMPLES_PATH}:${ROOT_PATH}/base -S $(basename $(@F))
 
 %.scala:
 	${APS2SCALA} -DCOT -p ${EXAMPLES_PATH}:${ROOT_PATH}/base $*
