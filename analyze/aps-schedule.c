@@ -128,6 +128,23 @@ static int chunk_lookup(AUG_GRAPH* aug_graph,
                         short ch);
 
 /**
+ * @brief Utility to checks whether SCC component contains target
+ * @param component SCC component pointer
+ * @param target pointer to search
+ * @return boolean indicating whether target exist or not
+ */
+static bool scc_component_contains(SCC_COMPONENT* component, void* target) {
+  int i;
+  for (i = 0; i < component->length; i++) {
+    if (component->array[i] == target) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
  * Utility function that checks whether instance belongs to any phylum cycle
  * or not
  * @param phy_graph phylum graph
@@ -2084,6 +2101,66 @@ static void debug_chunk_dependencies(ChunkGraph* chunk_graph,
 }
 
 /**
+ * Utility function that checks whether two chunks of a SCC component
+ * are in direct dependency cycle
+ * @param aug_graph augmented dependency graph
+ * @param chunk_graph chunk graph
+ * @param component SCC component to investigate
+ * @param chunk1 first chunk to check if it is in a direct dependency cycle
+ * @param chunk2 second chunk to check if it is in a direct dependency cycle
+ * @param state scheduling state
+ * @return boolean indicating whether chunk1 and chunk2 are in a direct dependency cycle
+ */
+static bool chunks_are_in_direct_cycle(AUG_GRAPH* aug_graph,
+                                       ChunkGraph* chunk_graph,
+                                       SCC_COMPONENT* component,
+                                       Chunk* chunk1,
+                                       Chunk* chunk2,
+                                       TOTAL_ORDER_STATE* state) {
+  int i, j;
+  int n = component->length;
+
+  SccGraph scc_graph;
+  scc_graph_initialize(&scc_graph, n);
+
+  // Add vertices to SCC graph
+  for (i = 0; i < n; i++) {
+    Chunk* chunk = (Chunk*)component->array[i];
+    scc_graph_add_vertex(&scc_graph, (void*)chunk);
+  }
+
+  // Add edges to SCC graph
+  for (i = 0; i < n; i++) {
+    Chunk* source_chunk = (Chunk*)component->array[i];
+    for (j = 0; j < n; j++) {
+      Chunk* sink_chunk = (Chunk*)component->array[j];
+      if (chunk_graph
+              ->graph[source_chunk->index * chunk_graph->instances.length +
+                      sink_chunk->index] &
+          DEPENDENCY_MAYBE_DIRECT) {
+        scc_graph_add_edge(&scc_graph, source_chunk, sink_chunk);
+      }
+    }
+  }
+
+  SCC_COMPONENTS* components = scc_graph_components(&scc_graph);
+
+  scc_graph_destroy(&scc_graph);
+
+  for (i = 0; i < components->length; i++) {
+    SCC_COMPONENT* comp = components->array[i];
+
+    if (comp->length > 1 &&
+        scc_component_contains(comp, chunk1) &&
+        scc_component_contains(comp, chunk2)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
  * @brief Utility function that return boolean indicating whether single chunk
  * is ready to go
  */
@@ -2154,6 +2231,18 @@ static bool chunk_ready_to_go(AUG_GRAPH* aug_graph,
         (backward_dep & DEPENDENCY_MAYBE_DIRECT)) {
       aps_warning(sink_chunk,
                   "Bi-directional direct dependency between chunk %d -> %d "
+                  "(forward_dep=%d, backward_dep=%d)",
+                  source_chunk->index, sink_chunk->index, forward_dep,
+                  backward_dep);
+      continue;
+    }
+
+    // If chunks are in a direct dependency cycle then we cannot check readiness
+    // using DEPENDENCY_MAYBE_DIRECT because it would result in a cycle.
+    if (chunks_are_in_direct_cycle(aug_graph, chunk_graph, sink_component,
+                                   source_chunk, sink_chunk, state)) {
+      aps_warning(sink_chunk,
+                  "Detected direct dependency cycle between chunk %d -> %d "
                   "(forward_dep=%d, backward_dep=%d)",
                   source_chunk->index, sink_chunk->index, forward_dep,
                   backward_dep);
