@@ -911,7 +911,8 @@ void break_fiber_cycles(Declaration module,STATE *s,DEPENDENCY dep) {
     }
     else
     {
-      add_up_down_attributes(s,UP_DOWN);
+      // Skip running UP/DOWN fiber cycle breaking altogether for SCC scheduling.
+      // add_up_down_attributes(s,UP_DOWN);
     }
   }
   else
