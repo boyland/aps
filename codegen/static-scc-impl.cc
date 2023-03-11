@@ -771,6 +771,7 @@ static void dump_visit_functions(PHY_GRAPH* phy_graph,
   Declaration tlm = aug_graph->match_rule;
   Match m = top_level_match_m(tlm);
   Block block = matcher_body(m);
+  STATE* s = phy_graph->global_state;
 
 #ifndef APS2SCALA
   ostream& hs = oss.hs;
@@ -831,7 +832,7 @@ static void dump_visit_functions(PHY_GRAPH* phy_graph,
 
     OutputWriter ow(os);
     implement_visit_function(aug_graph, phase, total_order, instance_assignment,
-                             nch, &cond, -1, true, -1, true, &ow);
+                             nch, &cond, -1, s->loop_required, -1, true, &ow);
 
     --nesting_level;
 #ifdef APS2SCALA
