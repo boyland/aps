@@ -1,4 +1,5 @@
 #include <limits.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -2767,6 +2768,8 @@ static ChunkGraph* collect_aug_graph_chunks(AUG_GRAPH* aug_graph,
   }
 
   SCC_COMPONENTS* components = scc_graph_components(&scc_graph);
+  scc_graph_destroy(&scc_graph);
+
   if (oag_debug & DEBUG_ORDER) {
     printf("Components of chunks of aug_graph: %s\n",
            aug_graph_name(aug_graph));
