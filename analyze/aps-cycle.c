@@ -907,11 +907,13 @@ void break_fiber_cycles(Declaration module,STATE *s,DEPENDENCY dep) {
     // there exist cycle(s) that carry value(s), so do not break fiber cycles.
     if (dep & DEPENDENCY_NOT_JUST_FIBER)
     {
-      printf("Skipped removing fiber cycles.\n");
+      printf("Skipped breaking fiber cycles because cycle has dependencies that carry value (not just fiber).\n");
     }
     else
     {
       // Skip running UP/DOWN fiber cycle breaking altogether for SCC scheduling.
+      printf("Skipped breaking fiber cycles even when dependencies are just fiber.\n");
+
       // add_up_down_attributes(s,UP_DOWN);
     }
   }
