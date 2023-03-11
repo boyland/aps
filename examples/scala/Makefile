@@ -10,7 +10,7 @@ APS2SCALAFLAGS = -p ..:${APSTOP}/base -G
 
 SCALAGEN = simple.scala classic-binding.scala tiny.scala \
 	test-coll.scala test-use-coll.scala test-cycle.scala use-global.scala \
-	grammar.scala first.static.scala follow.static.scala nullable.static.scala
+	grammar.scala first.scala follow.scala nullable.scala
 
 MISCGEN = nested-cycles.scala GrammarParser.scala SimpleParser.scala \
 	GrammarTokens.scala SimpleTokens.scala *.scala~ GrammarScanner.scala \
