@@ -12,7 +12,7 @@ module SIMPLE_OAG[T :: var SIMPLE[]] extends T begin
 
   pragma inherited(ai1,ai2,bi);
   pragma synthesized(as1,as2,bs,total);
-
+  
   match ?b:Block=block(?ds:Decls,?ss:Stmts) begin
     ds.ai1 := 12;
     ds.ai2 := ds.as1;
