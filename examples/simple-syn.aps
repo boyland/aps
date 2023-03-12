@@ -46,5 +46,4 @@ module SIMPLE_SYN[T :: var SIMPLE[]] extends T begin
 
   match ?e:Expr=variable(?id:String) begin
   end;
-
 end;
