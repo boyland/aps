@@ -1,0 +1,72 @@
+\documentclass[12pt]{article}
+  
+\usepackage{fullpage}
+\usepackage{pict2e}
+
+\unitlength 1mm
+
+\begin{document}
+
+\title{Quasi-Ordering for Dependency Scheduling}
+\author{John Boyland and Amir Hesamian}
+\date{DRAFT \today}
+
+\maketitle
+
+\begin{abstract}
+  Unlike many graphs, a dependency graph may have loops (edges from a vertex to itself).  The presence of a loop makes a difference to the graph, since it represents a self-dependency.  Thus representing (the transitive closure of) a dependency graph as a partial order over strongly connected components loses some information: are the single-element components involved in a self-dependency or not?  We propose a new algebraic structure: the \emph{quasi order}, for which we have partial and total versions.  Any transitive dependency relation can be represented as a quasi partial order, and any schedule of such a relation can be represented as a quasi total order. 
+\end{abstract}
+
+\section{Motivation}
+
+Consider the following dependency graph with vertices for A, B, C, D, E, F, G
+on the left of the following figure. On the right is a representation the quasi partial order for the dependency relation on the left.  Below, we have one possible quasi total order (schedule) for the dependency relation:
+
+\begin{quote}
+\begin{picture}(140,64)(0,-20)
+  \put(10,40){\makebox(0,0){A}}
+  \put(30,40){\makebox(0,0){B}}
+  \put(0,20){\makebox(0,0){C}}
+  \put(20,20){\makebox(0,0){D}}
+  \put(40,20){\makebox(0,0){E}}
+  \put(10,0){\makebox(0,0){F}}
+  \put(30,0){\makebox(0,0){G}}
+  \put(9,38){\vector(-1,-2){8}}
+  \put(11,38){\vector(1,-2){8}}
+  \put(12,40){\vector(1,0){16}}
+  \put(29,38){\vector(-1,-2){8}}
+  \put(31,38){\vector(1,-2){8}}
+  \put(2,20){\vector(1,0){16}}
+  \put(22,20){\vector(1,0){16}}
+  \put(19,18){\vector(-1,-2){8}}
+  \put(21,18){\vector(1,-2){8}}
+  \put(9,2){\vector(-1,2){8}}
+  \put(12,0){\vector(1,0){16}}
+  \qbezier(39,18)(35,10)(40,10)
+  \qbezier(40,10)(45,10)(41,18)
+  \put(41,18){\vector(-1,2){0}}
+  %
+  \put(80,20){\makebox(0,0){A}}
+  \put(100,20){\makebox(0,0){B}}
+  \put(120,20){\makebox(0,0){\{C,D,F\}}}
+  \put(140,40){\makebox(0,0){\{E\}}}
+  \put(140,0){\makebox(0,0){G}}
+  \put(82,20){\vector(1,0){16}}
+  \put(102,20){\vector(1,0){10}}
+  \put(124,24){\vector(1,1){13}}
+  \put(124,16){\vector(1,-1){14}}
+  %
+  \put(40,-20){\makebox(0,0){A}}
+  \put(60,-20){\makebox(0,0){B}}
+  \put(80,-20){\makebox(0,0){\{C,D,F\}}}
+  \put(100,-20){\makebox(0,0){\{E\}}}
+  \put(120,-20){\makebox(0,0){G}}
+  \put(42,-20){\vector(1,0){16}}
+  \put(62,-20){\vector(1,0){10}}
+  \put(88,-20){\vector(1,0){8}}
+  \put(104,-20){\vector(1,0){14}}
+\end{picture}
+\end{quote}
+\end{document}
+
+% LocalWords:  maketitle emph qbezier
