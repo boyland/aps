@@ -10,5 +10,40 @@ module SIMPLE_SYN[T :: var SIMPLE[]] extends T begin
   match ?ds0:Decls=xcons_decls(?ds1:Decls,?d:Decl) begin
     ds0.decl_count := ds1.decl_count + 1;
   end;
+
+  match ?b:Block=block(?ds:Decls,?ss:Stmts) begin
+  end;
+
+  match ?d:Decl=decl(?id:String,?ty:Type) begin
+  end;
+
+  match ?p:Program=program(?b:Block) begin
+  end;
+
+  match ?t:Type=integer_type() begin
+  end;
   
+  match ?t:Type=string_type() begin
+  end;
+
+  match ?:Stmts=no_stmts() begin
+  end;
+  
+  match ?ss0:Stmts=xcons_stmts(?ss1:Stmts,?s:Stmt) begin
+  end;
+
+  match ?s:Stmt=block_stmt(?b:Block) begin
+  end;
+  
+  match ?s:Stmt=assign_stmt(?e1:Expr,?e2:Expr) begin
+  end;
+
+  match ?e:Expr=intconstant(?:Integer) begin
+  end;
+  
+  match ?e:Expr=strconstant(?:String) begin
+  end;
+
+  match ?e:Expr=variable(?id:String) begin
+  end;
 end;
