@@ -21,8 +21,12 @@ extern "C" {
 #define DEREF "->"
 #endif
 
-#define SSTR( x ) static_cast< std::ostringstream & >( \
-        ( std::ostringstream() << std::dec << x ) ).str()
+template<typename T>
+static std::string any_to_string(const T & value) {
+    std::ostringstream oss;
+    oss << value;
+    return oss.str();
+}
 
 typedef void (*OutputWriterT)(int, std::ostream&);
 
@@ -187,7 +191,7 @@ static void dump_loop_end(AUG_GRAPH* aug_graph,
 #ifdef APS2SCALA
   if (ow->any_write_since(loop_id)) {
     std::ostream& os = ow->get_outstream();
-    string suffix = SSTR(loop_id);
+    string suffix = any_to_string(loop_id);
     std::replace(suffix.begin(), suffix.end(), '-', '_');
     --nesting_level;
     os << "\n";
@@ -204,7 +208,7 @@ static void dump_loop_end(AUG_GRAPH* aug_graph,
 static void dump_loop_start_helper(int loop_id, std::ostream& os)
 {
   // ABS value of component_index because initially it is -1
-  string suffix = SSTR(loop_id);
+  string suffix = any_to_string(loop_id);
   std::replace(suffix.begin(), suffix.end(), '-', '_');
 
   os << indent() << "val prevChanged_" << suffix << " = changed;\n";
