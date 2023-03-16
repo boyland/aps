@@ -21,10 +21,19 @@ extern "C" {
 #define DEREF "->"
 #endif
 
+template<typename T>
+static std::string any_to_string(const T & value) {
+    std::ostringstream oss;
+    oss << value;
+    return oss.str();
+}
+
+typedef void (*OutputWriterT)(int, std::ostream&);
+
 class OutputWriter {
   struct Item {
-    std::function<void(std::ostream&)> function;
-    void* marker;
+    OutputWriterT function;
+    int marker;
   };
 
  private:
@@ -34,13 +43,13 @@ class OutputWriter {
   void dump_queue() {
     for (std::vector<Item>::iterator it = _items.begin(); it != _items.end();
          it++) {
-      it->function(_os);
+      ((OutputWriterT)it->function)(it->marker, _os);
     }
 
     _items.clear();
   }
 
-  bool contains_marker(void* marker) {
+  bool contains_marker(int marker) {
     for (std::vector<Item>::iterator it = _items.begin(); it != _items.end();
          it++) {
       if (it->marker == marker) {
@@ -59,22 +68,21 @@ class OutputWriter {
     return _os;
   }
 
-  void queue_write(void* marker,
-                   const std::function<void(std::ostream&)>& lambda) {
+  void queue_write(int marker,
+                   OutputWriterT lambda) {
     if (!contains_marker(marker)) {
       struct Item* item = new Item;
       item->marker = marker;
       item->function = lambda;
-
       _items.push_back(*item);
     } else {
       fatal_error("Already enqueued to write marker: %d", VOIDP2INT(marker));
     }
   }
 
-  bool any_write_since(void* marker) { return !contains_marker(marker); }
+  bool any_write_since(int marker) { return !contains_marker(marker); }
 
-  void clear_since(void* marker) {
+  void clear_since(int marker) {
     bool found_marker = false;
     for (std::vector<Item>::iterator it = _items.begin(); it != _items.end();) {
       if (it->marker == marker || found_marker) {
@@ -104,12 +112,12 @@ static Expression default_init(Default def) {
  * If "from" is not NULL, then initialize the new array
  * with it.
  */
-static vector<std::set<Expression>> make_instance_assignment(
+static vector<std::set<Expression> > make_instance_assignment(
     AUG_GRAPH* aug_graph,
     Block block,
-    vector<std::set<Expression>> from) {
+    vector<std::set<Expression> > from) {
   int n = aug_graph->instances.length;
-  vector<std::set<Expression>> array(from);
+  vector<std::set<Expression> > array(from);
 
   for (int i = 0; i < n; ++i) {
     INSTANCE* in = &aug_graph->instances.array[i];
@@ -181,9 +189,9 @@ static void dump_loop_end(AUG_GRAPH* aug_graph,
                           int loop_id,
                           OutputWriter* ow) {
 #ifdef APS2SCALA
-  if (ow->any_write_since(INT2VOIDP(loop_id))) {
+  if (ow->any_write_since(loop_id)) {
     std::ostream& os = ow->get_outstream();
-    string suffix = std::to_string(loop_id);
+    string suffix = any_to_string(loop_id);
     std::replace(suffix.begin(), suffix.end(), '-', '_');
     --nesting_level;
     os << "\n";
@@ -192,9 +200,21 @@ static void dump_loop_end(AUG_GRAPH* aug_graph,
     os << indent() << "changed = prevChanged_" << suffix << ";\n"
        << "\n";
   } else {
-    ow->clear_since(INT2VOIDP(loop_id));
+    ow->clear_since(loop_id);
   }
 #endif /* APS2SCALA */
+}
+
+static void dump_loop_start_helper(int loop_id, std::ostream& os)
+{
+  // ABS value of component_index because initially it is -1
+  string suffix = any_to_string(loop_id);
+  std::replace(suffix.begin(), suffix.end(), '-', '_');
+
+  os << indent() << "val prevChanged_" << suffix << " = changed;\n";
+  os << indent() << "do {\n";
+  ++nesting_level;
+  os << indent() << "changed = false;\n";
 }
 
 static void dump_loop_start(AUG_GRAPH* aug_graph,
@@ -204,17 +224,8 @@ static void dump_loop_start(AUG_GRAPH* aug_graph,
 #ifdef APS2SCALA
 
   ow->queue_write(
-      INT2VOIDP(loop_id),
-      std::function<void(std::ostream&)>{[loop_id](std::ostream& os) {
-        // ABS value of component_index because initially it is -1
-        string suffix = std::to_string(loop_id);
-        std::replace(suffix.begin(), suffix.end(), '-', '_');
-
-        os << indent() << "val prevChanged_" << suffix << " = changed;\n";
-        os << indent() << "do {\n";
-        ++nesting_level;
-        os << indent() << "changed = false;\n";
-      }});
+      loop_id,
+      dump_loop_start_helper);
 
 #endif /* APS2SCALA */
 }
@@ -226,7 +237,7 @@ static bool implement_visit_function(
     AUG_GRAPH* aug_graph,
     int phase, /* phase to impl. */
     CTO_NODE* cto,
-    vector<std::set<Expression>> instance_assignment,
+    vector<std::set<Expression> > instance_assignment,
     int nch,
     CONDITION* cond,
     int chunk_index,
@@ -486,7 +497,7 @@ static bool implement_visit_function(
       }
 
       int cmask = 1 << (if_rule_index(ad));
-      vector<std::set<Expression>> true_assignment =
+      vector<std::set<Expression> > true_assignment =
           make_instance_assignment(aug_graph, if_true, instance_assignment);
 
       cond->positive |= cmask;
@@ -508,7 +519,7 @@ static bool implement_visit_function(
       ow->get_outstream() << indent() << "} else {\n";
 #endif /* APS2SCALA */
       ++nesting_level;
-      vector<std::set<Expression>> false_assignment =
+      vector<std::set<Expression> > false_assignment =
           if_false ? make_instance_assignment(aug_graph, if_false,
                                               instance_assignment)
                    : instance_assignment;
@@ -795,9 +806,9 @@ static void dump_visit_functions(PHY_GRAPH* phy_graph,
 
   int phase;
 
-  vector<std::set<Expression>> default_instance_assignments(
+  vector<std::set<Expression> > default_instance_assignments(
       aug_graph->instances.length, std::set<Expression>());
-  vector<std::set<Expression>> instance_assignment =
+  vector<std::set<Expression> > instance_assignment =
       make_instance_assignment(aug_graph, block, default_instance_assignments);
 
   // the following loop is controlled in two ways:
@@ -1053,9 +1064,9 @@ static void dump_visit_functions(STATE* s, output_streams& oss)
   // tnode_line_number(s->));
   int phase = Declaration_info(s->module)->node_phy_graph->max_phase;
 
-  vector<std::set<Expression>> default_instance_assignments(
+  vector<std::set<Expression> > default_instance_assignments(
       s->global_dependencies.instances.length, std::set<Expression>());
-  vector<std::set<Expression>> instance_assignment = make_instance_assignment(
+  vector<std::set<Expression> > instance_assignment = make_instance_assignment(
       &s->global_dependencies, module_decl_contents(s->module),
       default_instance_assignments);
 
@@ -1119,9 +1130,9 @@ static void dump_scheduled_function_body(Declaration fd, STATE* s, ostream& bs) 
   AUG_GRAPH* aug_graph = &s->aug_graphs[index];
   CTO_NODE* schedule = aug_graph->total_order;
 
-  vector<std::set<Expression>> default_instance_assignments(
+  vector<std::set<Expression> > default_instance_assignments(
       aug_graph->instances.length, std::set<Expression>());
-  vector<std::set<Expression>> instance_assignment = make_instance_assignment(
+  vector<std::set<Expression> > instance_assignment = make_instance_assignment(
       aug_graph, function_decl_body(fd), default_instance_assignments);
 
   CONDITION cond;
