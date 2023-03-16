@@ -199,6 +199,8 @@ static SCOPE add_ext_sig(SCOPE old, Declaration tdecl, Signature sig) {
     case KEYsome_class_decl:
       aps_error(sig, "Missing actuals for %s in the signature", decl_name(sig_use_decl));
       break;
+    default:
+      break;
     }
   }
   default:
@@ -625,9 +627,13 @@ static void *do_bind(void *vscope, void *node) {
             case KEYsome_class_decl:
               aps_error(sig, "Missing actuals for %s in the signature", decl_name(use_decl));
               break;
+            default:
+              break;
             }
             break;
           }
+        default:
+          break;
         }
       }
     }

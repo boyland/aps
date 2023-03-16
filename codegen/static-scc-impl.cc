@@ -62,7 +62,11 @@ class OutputWriter {
   void queue_write(void* marker,
                    const std::function<void(std::ostream&)>& lambda) {
     if (!contains_marker(marker)) {
-      _items.push_back({lambda, marker});
+      struct Item* item = new Item;
+      item->marker = marker;
+      item->function = lambda;
+
+      _items.push_back(*item);
     } else {
       fatal_error("Already enqueued to write marker: %d", VOIDP2INT(marker));
     }
