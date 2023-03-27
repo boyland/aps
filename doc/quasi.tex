@@ -2,22 +2,120 @@
   
 \usepackage{fullpage}
 \usepackage{pict2e}
+\usepackage{alltt}
 
 \unitlength 1mm
 
 \begin{document}
 
-\title{Quasi-Ordering for Dependency Scheduling}
+\title{Quasi Ordering for Dependency Scheduling in the Presence of Cycles}
 \author{John Boyland and Amir Hesamian}
 \date{DRAFT \today}
 
 \maketitle
 
 \begin{abstract}
-  Unlike many graphs, a dependency graph may have loops (edges from a vertex to itself).  The presence of a loop makes a difference to the graph, since it represents a self-dependency.  Thus representing (the transitive closure of) a dependency graph as a partial order over strongly connected components loses some information: are the single-element components involved in a self-dependency or not?  We propose a new algebraic structure: the \emph{quasi order}, for which we have partial and total versions.  Any transitive dependency relation can be represented as a quasi partial order, and any schedule of such a relation can be represented as a quasi total order. 
+  Unlike many graphs, a dependency graph may have loops (edges from a
+  vertex to itself).  The presence of a loop makes a difference to the
+  graph, since it represents a self-dependency.  Thus representing
+  (the transitive closure of) a dependency graph as a partial order
+  over strongly connected components loses some information: are the
+  single-element components involved in a self-dependency or not?
+  This information is needed for an evaluation (scheduling)
+  mechanism.  We propose a new algebraic structure: the \emph{quasi
+  order}, for which we propose partial and total versions.  Any
+  transitive dependency relation can be represented as a quasi partial
+  order, and any schedule of such a relation can used a quasi total order. 
 \end{abstract}
 
 \section{Motivation}
+
+Consider the following set of equations that should be mutually
+satisfied, and its dependency graph shown on the right:
+\begin{quote}
+  \begin{minipage}{2.75in}
+\begin{verbatim}
+A = m()
+B = n(A)
+C = p(A,F)
+D = q(A,B,C)
+E = r(B,D,E)
+F = s(D)
+G = t(D,F)
+\end{verbatim}
+  \end{minipage}\hfill
+  \begin{minipage}{2.75in}
+    \begin{picture}(40,44)(0,-4)
+      \put(10,40){\makebox(0,0){A}}
+      \put(30,40){\makebox(0,0){B}}
+      \put(0,20){\makebox(0,0){C}}
+      \put(20,20){\makebox(0,0){D}}
+      \put(40,20){\makebox(0,0){E}}
+      \put(10,0){\makebox(0,0){F}}
+      \put(30,0){\makebox(0,0){G}}
+      \put(9,38){\vector(-1,-2){8}}
+      \put(11,38){\vector(1,-2){8}}
+      \put(12,40){\vector(1,0){16}}
+      \put(29,38){\vector(-1,-2){8}}
+      \put(31,38){\vector(1,-2){8}}
+      \put(2,20){\vector(1,0){16}}
+      \put(22,20){\vector(1,0){16}}
+      \put(19,18){\vector(-1,-2){8}}
+      \put(21,18){\vector(1,-2){8}}
+      \put(9,2){\vector(-1,2){8}}
+      \put(12,0){\vector(1,0){16}}
+      \qbezier(39,18)(35,10)(40,10)
+      \qbezier(40,10)(45,10)(41,18)
+      \put(41,18){\vector(-1,2){0}}
+    \end{picture}
+  \end{minipage}
+\end{quote}
+\def\aset#1{\left\{{#1}\right\}}
+From rhe dependency graph and to a lesser extent from the original
+equations, it is clear that ``E'' depends upon itself.  There is also
+a cyclic dependency between ``C,'' ``D'' and ``F.''  Thus
+topologically sorting and then evaluating them in this order will not
+suffice to provide a solution.  No solution may exist.  But if the
+values of the variables involved in cycles (\(\aset{\textrm{C},
+  \textrm{D}, \textrm{E}, \textrm{F}}\)) are drawn from domains ordered
+in ``partial 
+orders'' and the
+function ``p'' is ``monotone'' in its second argument, `q'' is monotone in
+its third argument, ``r'' in its third argument and ``s'' in its
+(only) argument, and if the  respective domains have distinguish
+``bottom'' values and satisfy the
+``ascending chain'' condition, then the values can be computed
+according to the following schedule:
+\begin{quote}
+  \def\{{\char123}
+  \def\}{\char125}
+\begin{alltt}
+A := m();
+B := n(A);
+C' := \(\bot\); D' := \(\bot\); F' := \(\bot\);
+do \{ C := C'; D := D'; F := F';
+     C' := p(A,F);
+     D' := q(A,B,C);
+     F' := s(D);
+\} while (C \(\neq\) C' \(\vee\) D \(\neq\) D' \(\vee\) F \(\neq\) F');
+E' := \(\bot\);
+do \{ E := E';
+     E' := r(E);
+\} while (E \(\neq\) E')
+G := t(D,F);
+\end{alltt}
+\end{quote}
+In the evaluation, whenever we have a variable involve in a cyclic
+depenency, we evaluate repeatedly from the ``bottom'' value until a
+fixed point is reached.  For mutually dependent cyclic dependencies,
+all variables are evaluated together in a group (as with ``C,'' ``D''
+and ``F'').  Monotonicity ensures that the evaluation will not
+oscillate between vaues, and the ascending chain condition ensurs that
+the process will eventually terminate.
+
+The variables not involved in cyclic dependencies (e.g., ``A,'' ``B''
+and ``G'') are \emph{not} evaluated in a loop, and indeed it would
+waste evauation time to do so.
 
 Consider the following dependency graph with vertices for A, B, C, D, E, F, G
 on the left of the following figure. On the right is a representation the quasi partial order for the dependency relation on the left.  Below, we have one possible quasi total order (schedule) for the dependency relation:
