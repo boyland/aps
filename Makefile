@@ -28,5 +28,8 @@ dockerpush:
 distclean: realclean
 	rm -rf bin lib
 
+cs854.tgz : distclean
+	tar cvf - utilities parse analyze aps2scala codegen cool/cool-tree.aps cool/cool-symbol.aps Makefile README | gzip > $@
+
 .PHONY: install clean realclean distclean
 
