@@ -2,7 +2,20 @@
   
 \usepackage{fullpage}
 \usepackage{pict2e}
+
 \usepackage{alltt}
+\usepackage{amssymb}
+\usepackage{amsthm}
+
+\def\implies{\Rightarrow}
+
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}[section]
+
+\theoremstyle{theorem}
+\newtheorem{consequence}{Consequence}[section]
+
+\def\aset#1{\left\{{#1}\right\}}
 
 \unitlength 1mm
 
@@ -70,7 +83,6 @@ G = t(D,F)
     \end{picture}
   \end{minipage}
 \end{quote}
-\def\aset#1{\left\{{#1}\right\}}
 From rhe dependency graph and to a lesser extent from the original
 equations, it is clear that ``E'' depends upon itself.  There is also
 a cyclic dependency between ``C,'' ``D'' and ``F.''  Thus
@@ -165,6 +177,47 @@ on the left of the following figure. On the right is a representation the quasi 
   \put(104,-20){\vector(1,0){14}}
 \end{picture}
 \end{quote}
+
+\section{Formalities}
+
+\subsection{Premilinaries}
+
+First, let's recall some basic definitions:
+\begin{itemize}
+\item A relation $R$ over a set $S$ \(\left(R=(\sqsubseteq,S)\right)\) is
+  \begin{itemize}
+  \item \emph{reflexive} if \(\forall_{x\in S}\:  x \sqsubseteq x\)
+  \item \emph{irreflexive} if \(\forall_{x\in S}\:  x \not\sqsubseteq x\)
+  \item \emph{symmetric} if \(\forall_{x,y \in S}\: x \sqsubseteq y \implies y \sqsubseteq x \).
+  \item \emph{anti-symmetric} if \(\forall_{x,y \in S}\: x \sqsubseteq y \wedge y \sqsubseteq x \implies x = y\).
+    \item \emph{total} \(\forall_{x,y \in S}\: x \sqsubseteq y \vee y \sqsubseteq x\).
+  \item \emph{transitive} if \( \forall_{x,y,z \in S}\: x \sqsubseteq y \wedge y \sqsubseteq z \implies x \sqsubseteq z\).
+  \end{itemize}
+\item A relation $R$ is a (strict) \emph{partial order} if it is both irreflexive and transitive.
+  Note, as a consequence, a partial order is anti-symmetric, indeed has no symmeries at all.
+  \item A relation $R$ is a \emph{preorder} if it is both reflexive and transitive.
+  \item A relation $R$ is a \emph{total order} if it is a partial order and additionally total.  Analogously, a \emph{total preorder} is a preorder that is total.
+\end{itemize}
+
+We will use a variety of infix operators (e.g. \( <, \leq, \sim, \lesssim \)) as relations. 
+
+\subsection{Definitions}
+
+\def\SimHat#1{\stackrel{\sim}{#1}}
+\def\NotSimHat#1{\stackrel{\not\sim}{#1}}
+
+\begin{definition}
+  A \emph{quasi (partial) order} is any relation $Q=(S, \lesssim)$ that is transitive.
+  A \emph{quasi total order} is a quasi order that is total.
+  Respective to the quasi order $Q$, we write \( x \sim y \) if and only if \( x \lesssim x \wedge y \lesssim x \), we write \( x \lnsim y \) if and only if \( x \lesssim y \wedge y \not\lesssim x \).  We define:
+  \[ \SimHat{S} = \aset{x \mid x \sim x} \]
+  \[ \NotSimHat{S} = \aset{x \mid x \not\sim x } \]
+\end{definition}
+\begin{consequence}
+  For a quasi order $Q=(S, \lesssim)$, \((\SimHat{S},\sim)\) is an equivalence relation and 
+  \((\NotSimHat{S},\lesssim)\) is a (strict) partial order.
+\end{consequence}
+
 \end{document}
 
 % LocalWords:  maketitle emph qbezier
