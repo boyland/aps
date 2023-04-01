@@ -14,6 +14,7 @@
 
 \theoremstyle{theorem}
 \newtheorem{consequence}{Consequence}[section]
+\newtheorem{theorem}{Theorem}[section]
 
 \def\aset#1{\left\{{#1}\right\}}
 
@@ -184,7 +185,7 @@ on the left of the following figure. On the right is a representation the quasi 
 
 First, let's recall some basic definitions:
 \begin{itemize}
-\item A relation $R$ over a set $S$ \(\left(R=(\sqsubseteq,S)\right)\) is
+\item A (binary) relation $R$ over a set $S$ \(\left(R=(\sqsubseteq,S)\right)\) is
   \begin{itemize}
   \item \emph{reflexive} if \(\forall_{x\in S}\:  x \sqsubseteq x\)
   \item \emph{irreflexive} if \(\forall_{x\in S}\:  x \not\sqsubseteq x\)
@@ -197,7 +198,30 @@ First, let's recall some basic definitions:
   Note, as a consequence, a partial order is anti-symmetric, indeed has no symmeries at all.
   \item A relation $R$ is a \emph{preorder} if it is both reflexive and transitive.
   \item A relation $R$ is a \emph{total order} if it is a partial order and additionally total.  Analogously, a \emph{total preorder} is a preorder that is total.
+  \item We define $R_1 \subseteq R_2$ for \( R_i = (\sqsubseteq_i,S_i)\) as
+    \[
+    \forall_{a,b \in S_1} a \sqsubseteq_1 b \implies \left( a,b \in S_2 \wedge
+    a \sqsubseteq_2 b \right)
+    \]
+  \item We define the union of a family of relations: \( R = \bigcup_i R_i
+    \) where \( R_i = (\sqsubseteq_i, S_i) \) as \( (\sqsubseteq,S) \)
+    where
+    \begin{eqnarray*}
+      S &=& \bigcup_i S_i \\
+      a \sqsubseteq b &\textrm{iff}& \exists_i\: a,b \in S_i \wedge a
+      \sqsubseteq_i b
+    \end{eqnarray*}
 \end{itemize}
+
+\begin{definition}
+    A \emph{transitive closure} of a relation $R$ over a set $S$ is a
+    smallest transitive relation $R'$ over the same set $S$ such that
+    $R \subseteq R'$.
+\end{definition}
+\begin{theorem}
+  A transitive closure is always defined and is unique.  Therefore, we
+  speak of \emph{the} transitive closure of a relation.
+\end{theorem}
 
 We will use a variety of infix operators (e.g. \( <, \leq, \sim, \lesssim \)) as relations. 
 
@@ -207,16 +231,45 @@ We will use a variety of infix operators (e.g. \( <, \leq, \sim, \lesssim \)) as
 \def\NotSimHat#1{\stackrel{\not\sim}{#1}}
 
 \begin{definition}
-  A \emph{quasi (partial) order} is any relation $Q=(S, \lesssim)$ that is transitive.
+  A \emph{quasi (partial) order} is any relation $Q=(\lesssim,S)$ that is transitive.
   A \emph{quasi total order} is a quasi order that is total.
   Respective to the quasi order $Q$, we write \( x \sim y \) if and only if \( x \lesssim x \wedge y \lesssim x \), we write \( x \lnsim y \) if and only if \( x \lesssim y \wedge y \not\lesssim x \).  We define:
   \[ \SimHat{S} = \aset{x \mid x \sim x} \]
   \[ \NotSimHat{S} = \aset{x \mid x \not\sim x } \]
 \end{definition}
-\begin{consequence}
-  For a quasi order $Q=(S, \lesssim)$, \((\SimHat{S},\sim)\) is an equivalence relation and 
-  \((\NotSimHat{S},\lesssim)\) is a (strict) partial order.
-\end{consequence}
+\begin{theorem}
+  For a quasi order $Q=(\lesssim,S)$, \((\sim,\SimHat{S})\) is an equivalence relation and 
+  \((\lesssim,\NotSimHat{S})\) is a (strict) partial order.
+\end{theorem}
+\begin{proof}
+  
+  \verb| |
+  
+  \begin{enumerate}
+    \item
+      From its definition, $\sim$ is symmetric.  It is transitive since if
+      \( x \sim y \wedge y \sim z \), we have \( x \lesssim y \wedge y
+      \lesssim x \wedge y \lesssim z \wedge z \lesssim y \), from which
+      by transitivity of $\lesssim$, we have \( x \lesssim z \wedge z
+      \lesssim x \) from which \( x \sim z \).  Finally, $\sim$ is
+      reflexive over \(\SimHat{S}\) by definition.
+    \item
+      By definiton $\lesssim$ is transitive and it is irreflexive over
+      $\NotSimHat{S}$ by definition of that set.
+  \end{enumerate}
+\end{proof}
+
+\begin{theorem}
+  The transitive closure of a non-empty union of total orders over the
+  same set $S$ is a
+  quasi total order over $S$.
+\end{theorem}
+\begin{proof}
+  Let \( Q \) be the transitive closure of \(R = \bigcup_i R_i\).  Clearly
+  $Q$ is transitive (by definition of transitive closure).  And it is
+  total since all two elements of $S$ are related in every one of the
+  (non-zero) total orders.  Thus it is a quasi total order.
+\end{proof}
 
 \end{document}
 
