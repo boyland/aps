@@ -285,7 +285,7 @@ static void* do_typechecking(void* ignore, void*node) {
             FILE* f = fmemopen(value_decl_type_str, sizeof(value_decl_type_str), "w");
             print_Type(some_value_decl_type(tdecl), f);
             fclose(f);
-            aps_error(tdecl,"Expected use of a type declaration, not a type construction (%s).", value_decl_type_str);
+            aps_error(tdecl, "Expected use of a type declaration, not a type construction (%s).", value_decl_type_str);
             break;
           }
           default:
