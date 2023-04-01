@@ -276,6 +276,22 @@ static void* do_typechecking(void* ignore, void*node) {
 
 	  while (ABSTRACT_APS_tnode_phylum(tdecl) != KEYDeclaration)
 	    tdecl = (Declaration)tnode_parent(tdecl);
+
+          switch (Declaration_KEY(tdecl))
+          {
+          case KEYsome_value_decl:
+          {
+            char value_decl_type_str[BUFFER_SIZE];
+            FILE* f = fmemopen(value_decl_type_str, sizeof(value_decl_type_str), "w");
+            print_Type(some_value_decl_type(tdecl), f);
+            fclose(f);
+            aps_error(tdecl,"Expected type_decl but got value_decl %s", value_decl_type_str);
+            break;
+          }
+          default:
+            break;
+          }
+
 	  tu = use(def_name(some_type_decl_def(tdecl)));
 	  te->outer = USE_TYPE_ENV(mu);
 	  te->source = mdecl;
