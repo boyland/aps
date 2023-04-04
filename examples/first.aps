@@ -16,7 +16,7 @@ module FIRST[T :: var GRAMMAR[]] extends T begin
   circular attribute Items.items_first : SymbolLattice;
   pragma synthesized(items_first);
 
-  attribute Grammar.grammar_first : DeclarationTable;
+  circular attribute Grammar.grammar_first : DeclarationTable;
   pragma synthesized(grammar_first);
 
   epsilon : Symbol := make_symbol("epsilon");
@@ -67,11 +67,11 @@ module FIRST[T :: var GRAMMAR[]] extends T begin
 
   end;
 
-  var function contains_epsilon(s_set: Symbols) :Boolean begin
+  var function contains_epsilon(s_set: SymbolLattice) : OrLattice begin
     result := Symbols$member(epsilon, s_set);
   end;
 
-  var function black_dot(s1 :Symbols; s2 :Symbols) : Symbols begin
+  var function black_dot(s1 :SymbolLattice; s2 :SymbolLattice) : SymbolLattice begin
     if contains_epsilon(s1) then
       result := (s1 /\~ { epsilon }) \/ s2;
     else

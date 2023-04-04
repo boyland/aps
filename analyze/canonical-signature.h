@@ -1,6 +1,9 @@
 #ifndef CANONICAL_SIGNATURE_H
 #define CANONICAL_SIGNATURE_H
 
+#include <stdbool.h>
+#include "canonical-type.h"
+
 struct CanonicalSignature_type
 {
   bool is_input;

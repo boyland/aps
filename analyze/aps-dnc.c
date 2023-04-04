@@ -5,6 +5,7 @@
  * for productions until we reach a fixed point.
  */
 #include <stdio.h>
+#include <string.h>
 #include "jbb-alloc.h"
 #include "aps-ag.h"
 
@@ -80,7 +81,7 @@ DEPENDENCY dependency_trans(DEPENDENCY k1, DEPENDENCY k2)
 	   (k2 & DEPENDENCY_NOT_JUST_FIBER)) |
 	  ((k1 & DEPENDENCY_MAYBE_CARRYING)&
 	   (k2 & DEPENDENCY_MAYBE_CARRYING)) |
-	  ((k1 & DEPENDENCY_MAYBE_SIMPLE)&
+	  ((k1 & DEPENDENCY_MAYBE_SIMPLE) |
 	   (k2 & DEPENDENCY_MAYBE_SIMPLE)) | 
 	  SOME_DEPENDENCY);
 }
@@ -1048,16 +1049,132 @@ static BOOL decl_is_collection(Declaration d) {
   }
 }
 
+static MONOTONICITY expr_monotonicity(Expression);
+static BOOL formal_is_circular(Declaration);
+static BOOL function_decl_is_circular(Declaration);
+
 BOOL decl_is_circular(Declaration d)
 {
   if (!d) return FALSE;
   switch (Declaration_KEY(d)) {
+  case KEYfunction_decl:
+    return function_decl_is_circular(d);
+  case KEYnormal_formal:
+    return formal_is_circular(d);
   case KEYvalue_decl: 
     return direction_is_circular(value_decl_direction(d));
   case KEYattribute_decl: 
     return direction_is_circular(attribute_decl_direction(d));
   default:
     return FALSE;
+  }
+}
+
+/**
+ * Utility function that detects if canonical type is circular
+ * by checking if its inferred signature set includes any of the
+ * LATTICE types.
+ * 
+ * @param ctype canonical type
+ * @return BOOL indicating whether canonical type can be considered circular
+ */
+static BOOL canonical_type_is_circular(CanonicalType* ctype) {
+  CanonicalSignatureSet set = infer_canonical_signatures(ctype);
+  int i;
+  for (i = 0; i < set->num_elements; i++) {
+    CanonicalSignature* csig = (CanonicalSignature*)set->elements[i];
+
+    if (strstr(decl_name(csig->source_class), "LATTICE") != NULL) {
+      return TRUE;
+    }
+  }
+
+  return FALSE;
+}
+
+/**
+ * Utility function that detects if function declaration is circular
+ * if its parameter type(s) and return type are circular.
+ * 
+ * @param fdecl Declaration
+ * @return BOOL indicating whether function declaration can be considered circular
+ */
+static BOOL function_decl_is_circular(Declaration fdecl) {
+  switch (Declaration_KEY(fdecl)) {
+    case KEYfunction_decl: {
+      struct Canonical_function_type* cfunc_type =
+          (struct Canonical_function_type*)canonical_type(
+              function_decl_type(fdecl));
+
+      BOOL return_type_circular =
+          canonical_type_is_circular(cfunc_type->return_type);
+      BOOL formals_circular = TRUE;
+
+      int i;
+      for (i = 0; i < cfunc_type->num_formals; i++) {
+        formals_circular &=
+            canonical_type_is_circular(cfunc_type->param_types[i]);
+      }
+
+      return return_type_circular && formals_circular;
+    }
+    default:
+      return FALSE;
+  }
+}
+
+/**
+ * Utility function that returns the monotonicity of an expression
+ * 
+ * @param expr Expression
+ * @return MONOTONICITY of an expression
+ */
+static MONOTONICITY expr_monotonicity(Expression expr) {
+  switch (Expression_KEY(expr)) {
+    case KEYvalue_use: {
+      Declaration udecl = USE_DECL(value_use_use(expr));
+      if (DECL_IS_SYNTAX(udecl)) {
+        return NO_USE;
+      } else {
+        return decl_is_circular(udecl) ? MONOTONE_USE : SIMPLE_USE;
+      }
+    }
+    case KEYfuncall: {
+      MONOTONICITY result = NO_USE;
+      Expression actual = first_Actual(funcall_actuals(expr));
+      while (actual != NULL) {
+        result |= expr_monotonicity(actual);
+
+        actual = Expression_info(actual)->next_actual;
+      }
+
+      return result;
+    }
+    default:
+      return NO_USE;
+  }
+}
+
+/**
+ * Utility function that detects if formal is circular if
+ * its inside case statement that uses only circular defined things.
+ * 
+ * @param decl Declaration
+ * @return BOOL indicating whether formal can be considered circular
+ */
+static BOOL formal_is_circular(Declaration decl) {
+  switch (Declaration_KEY(decl)) {
+    case KEYnormal_formal: {
+      Declaration target = formal_in_case_p(decl);
+      // If formal is bound to a case statement, then check its case stmt's expression
+      if (target != NULL && Declaration_KEY(target) == KEYcase_stmt) {
+        MONOTONICITY re = expr_monotonicity(case_stmt_expr(target));
+        return !(re & SIMPLE_USE);
+      }
+      return TRUE;
+    }
+    default:
+      return FALSE;
   }
 }
 
