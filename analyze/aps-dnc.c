@@ -1084,6 +1084,8 @@ static BOOL canonical_type_is_circular(CanonicalType* ctype) {
   for (i = 0; i < set->num_elements; i++) {
     CanonicalSignature* csig = (CanonicalSignature*)set->elements[i];
 
+    // If class declaration extends any of the LATTICE types (UNION_LATTICE, MAKE_LATTICE and etc.)
+    // Check if class declaration name contains the name LATTICE
     if (strstr(decl_name(csig->source_class), "LATTICE") != NULL) {
       return TRUE;
     }
