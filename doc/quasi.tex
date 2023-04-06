@@ -270,6 +270,33 @@ We will use a variety of infix operators (e.g. \( <, \leq, \sim, \lesssim \)) as
   \end{enumerate}
 \end{proof}
 
+Total orders are incompatible: they serve as the bottom (incomparable)
+elements in a (semi-)lattice of partial orders.  But every partial order is a
+quasi order, and when we form the lattice of quasi orders, we can
+combine total orders into a quasi-order.  The lattice has a proper
+bottom element: the ``complete'' binary relation which is a quasi
+total order.  The following result demonstrates the ability of quasi
+total orders to encompass multiple total orders:
+
+\begin{theorem}
+  The transitive closure of a non-empty union of total orders over the
+  same set $S$ is a
+  quasi total order over $S$.
+\end{theorem}
+\begin{proof}
+  Let \( Q \) be the transitive closure of \(R = \bigcup_i R_i\).  Clearly
+  $Q$ is transitive (by definition of transitive closure).  And it is
+  total since all two elements of $S$ are related in every one of the
+  (non-zero) total orders.  Thus it is a quasi total order.
+\end{proof}
+
+\subsection{The Cycle-Free Representation}
+
+It is convenient to distill a quasi order down to a partial order
+using the equivalence classes.  This construction is similar to the
+strongly-connected component representation of a preorder, but
+distinguishes elements that have self-edges from those that do not.
+
 \begin{definition}
   The \emph{cycle-free} representation of a quasi-order
   $Q=(\lesssim,S)$ (written $[Q]$) is the relation \( [Q] = \left(<,
@@ -285,11 +312,11 @@ We will use a variety of infix operators (e.g. \( <, \leq, \sim, \lesssim \)) as
   \end{eqnarray*}
 \end{definition}
 \begin{theorem}
-  The cycle-free representation of $Q$ is well-defined and is a
+  The cycle-free representation of $Q$ is well-defined, unique and is a
   partial order, and additionally is total if and only if $Q$ is total.
 \end{theorem}
 \begin{proof}
-  We prove the three claims sequentially:
+  We prove the four claims sequentially:
   \begin{itemize}
   \item $[Q]$ is well defined.\par
     To be well defined, we need the representation element used to
@@ -309,7 +336,27 @@ We will use a variety of infix operators (e.g. \( <, \leq, \sim, \lesssim \)) as
     assumption.  Therefore $x \lnsim v'$.
 
     The reverse property is proved analogously.
-    
+
+  \item $[Q]$ is unique.  In other words,
+    if $[Q] = [Q']$ then $Q = Q'$.
+
+    Suppose $[Q] = [Q']$ for quasi orders $Q$ and $Q'$,
+    and further suppose $x \lesssim y$.  We will prove that
+    $x \lesssim' y$ and thus since no generality was lost, we have $Q = Q'$.
+
+    If $x \sim y$, then $x,y \in E$ where $E$ is an equivalence class.
+    This equivalence class is an element of $[Q]$ and thus must also be
+    in $[Q']$ and thus $x \sim' y$ and the result is proved.
+
+    If on the other hand, we have $x \lnsim y$, then consider whether
+    each is in $\SimHat{S}$ (for $Q$).  Suppose $x \in E_1$,
+    $y \in E_2$ equivalence classes of $\sim$.  Then these equivalence
+    classes are in $[Q]$ with $E_1 < E_2$, and thus in $[Q']$ (with
+    $E_1 <' E_2$) and we have (by our previous result) that
+    $x \lnsim' y$.   Then if $x \in \NotSimHat{S}$ and $y \in E$, we
+    have $x < E$ and thus $x <' E$ and thus $x \lnsim' y$.  The other
+    cases are analogous.
+
   \item $[Q]$ is a partial order.
 
     $[Q]$ must be irreflexive.  Otherwise we would have $x \lnsim x$
@@ -336,7 +383,7 @@ We will use a variety of infix operators (e.g. \( <, \leq, \sim, \lesssim \)) as
       class $E$, then for a representative $y \in E$, we can make the
       same argument as above to show we have totality.
 
-      Finally if we are considering \( x \neq y\) boith in \(
+      Finally if we are considering \( x \neq y\) both in \(
       \NotSimHat{S} \), then
       we can again make the same argument.
 
@@ -364,7 +411,8 @@ We will use a variety of infix operators (e.g. \( <, \leq, \sim, \lesssim \)) as
   \end{itemize}
 \end{proof}
 
-Indeed the construction can be carried out in the other direction too:
+Indeed the construction can be carried out in the other direction too.
+To do so, we define an ungainly term for the result:
 \begin{definition}
   For a set $S$, a \emph{semi partition partial order} is a partial
   order over a set \(S^{\sharp} = S_0 \cup \aset{S_1,\ldots}\), where  \(S =
@@ -379,22 +427,41 @@ Indeed the construction can be carried out in the other direction too:
   S to the set of semi partition partial orders.
 \end{theorem}
 \begin{proof}
-  {[Lots of work]}
+  For a partial order $Q=(\lesssim,S)$, $[Q]$ is a semi partition
+  partial order for $S$ where the partition is $\NotSimHat{S}$ plus
+  the equivalence classes of $\SimHat{S}$. And we have shown that the
+  construction is unique (one-to-one).  It remains to show that is
+  ``onto'' (surjective).
+
+  Let $P=(<,S^{\sharp})$ be a semi partition partial order for
+  $S = S_0 \cup S_1 \cup \ldots$ .  We
+  construct a quasi order $Q=(\lesssim,S)$ such that $P = [Q]$.
+  The relation $\lesssim$ is defined as follows:
+  \[
+  x \lesssim y \textrm{ iff }
+  \left\{
+  \begin{array}{cl}
+    \textrm{true}& \textrm{if } x,y \in S_i, i > 0 \\
+    S_i < S_j & \textrm{if } x \in S_i, i > 0, y \in S_j, i \neq j > 0 \\
+    x < S_j   & \textrm{if } x \in S_0, y \in S_j, j > 0 \\     
+    S_i < y   & \textrm{if } x \in S_i, i > 0, y \in S_0 \\
+    x < y     & \textrm{if } x, y \in S_0
+  \end{array}\right.
+  \]
+  The transitivity of $Q$ follows from the transitivity of $P$, and
+  clearly $[Q] = P$.
 \end{proof}
 
-\begin{theorem}
-  The transitive closure of a non-empty union of total orders over the
-  same set $S$ is a
-  quasi total order over $S$.
-\end{theorem}
-\begin{proof}
-  Let \( Q \) be the transitive closure of \(R = \bigcup_i R_i\).  Clearly
-  $Q$ is transitive (by definition of transitive closure).  And it is
-  total since all two elements of $S$ are related in every one of the
-  (non-zero) total orders.  Thus it is a quasi total order.
-\end{proof}
+As a consequence of this construction, we can linearize a quasi order
+to a quasi total order without disturbing the equivalence classes: we
+convert to the cycle-free representation, topologically sort that and
+then convert back to a quasi (now total) order.
+
+We can actually do this in a topological sort of the original
+dependency relation (which $Q$ would be the transitive closure of).
 
 \end{document}
 
 % LocalWords:  maketitle emph qbezier Boyland Amir Hesamian preorder
-% LocalWords:  Monotonicity irreflexive iff
+% LocalWords:  Monotonicity irreflexive iff bijection surjective
+% LocalWords:  linearize
