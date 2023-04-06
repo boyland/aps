@@ -84,7 +84,7 @@ G = t(D,F)
     \end{picture}
   \end{minipage}
 \end{quote}
-From rhe dependency graph and to a lesser extent from the original
+From the dependency graph and to a lesser extent from the original
 equations, it is clear that ``E'' depends upon itself.  There is also
 a cyclic dependency between ``C,'' ``D'' and ``F.''  Thus
 topologically sorting and then evaluating them in this order will not
@@ -119,16 +119,16 @@ G := t(D,F);
 \end{alltt}
 \end{quote}
 In the evaluation, whenever we have a variable involve in a cyclic
-depenency, we evaluate repeatedly from the ``bottom'' value until a
+dependency, we evaluate repeatedly from the ``bottom'' value until a
 fixed point is reached.  For mutually dependent cyclic dependencies,
 all variables are evaluated together in a group (as with ``C,'' ``D''
 and ``F'').  Monotonicity ensures that the evaluation will not
-oscillate between vaues, and the ascending chain condition ensurs that
+oscillate between values, and the ascending chain condition ensures that
 the process will eventually terminate.
 
 The variables not involved in cyclic dependencies (e.g., ``A,'' ``B''
 and ``G'') are \emph{not} evaluated in a loop, and indeed it would
-waste evauation time to do so.
+waste evaluation time to do so.
 
 Consider the following dependency graph with vertices for A, B, C, D, E, F, G
 on the left of the following figure. On the right is a representation the quasi partial order for the dependency relation on the left.  Below, we have one possible quasi total order (schedule) for the dependency relation:
@@ -181,7 +181,7 @@ on the left of the following figure. On the right is a representation the quasi 
 
 \section{Formalities}
 
-\subsection{Premilinaries}
+\subsection{Preliminaries}
 
 First, let's recall some basic definitions:
 \begin{itemize}
@@ -191,11 +191,11 @@ First, let's recall some basic definitions:
   \item \emph{irreflexive} if \(\forall_{x\in S}\:  x \not\sqsubseteq x\)
   \item \emph{symmetric} if \(\forall_{x,y \in S}\: x \sqsubseteq y \implies y \sqsubseteq x \).
   \item \emph{anti-symmetric} if \(\forall_{x,y \in S}\: x \sqsubseteq y \wedge y \sqsubseteq x \implies x = y\).
-    \item \emph{total} \(\forall_{x,y \in S}\: x \sqsubseteq y \vee y \sqsubseteq x\).
+    \item \emph{total} \(\forall_{x \neq y \in S}\: x \sqsubseteq y \vee y \sqsubseteq x\).
   \item \emph{transitive} if \( \forall_{x,y,z \in S}\: x \sqsubseteq y \wedge y \sqsubseteq z \implies x \sqsubseteq z\).
   \end{itemize}
 \item A relation $R$ is a (strict) \emph{partial order} if it is both irreflexive and transitive.
-  Note, as a consequence, a partial order is anti-symmetric, indeed has no symmeries at all.
+  Note, as a consequence, a partial order is anti-symmetric, indeed has no symmetries at all.
   \item A relation $R$ is a \emph{preorder} if it is both reflexive and transitive.
   \item A relation $R$ is a \emph{total order} if it is a partial order and additionally total.  Analogously, a \emph{total preorder} is a preorder that is total.
   \item We define $R_1 \subseteq R_2$ for \( R_i = (\sqsubseteq_i,S_i)\) as
@@ -247,7 +247,8 @@ We will use a variety of infix operators (e.g. \( <, \leq, \sim, \lesssim \)) as
 \end{definition}
 \begin{theorem}
   For a quasi order $Q=(\lesssim,S)$, \((\sim,\SimHat{S})\) is an equivalence relation and 
-  \((\lesssim,\NotSimHat{S})\) is a (strict) partial order.
+  \((\lesssim,\NotSimHat{S})\) is a (strict) partial order, and total
+  if $Q$ is total.
 \end{theorem}
 \begin{proof}
   
@@ -262,9 +263,123 @@ We will use a variety of infix operators (e.g. \( <, \leq, \sim, \lesssim \)) as
       \lesssim x \) from which \( x \sim z \).  Finally, $\sim$ is
       reflexive over \(\SimHat{S}\) by definition.
     \item
-      By definiton $\lesssim$ is transitive and it is irreflexive over
-      $\NotSimHat{S}$ by definition of that set.
+      By definition $\lesssim$ is transitive and it is irreflexive over
+      $\NotSimHat{S}$ by definition of that set.  Thus it is a partial
+      order over $\NotSimHat{S}$.  Furthermore, if $Q$ is total, then
+      so is \((\lesssim,\NotSimHat{S})\).
   \end{enumerate}
+\end{proof}
+
+\begin{definition}
+  The \emph{cycle-free} representation of a quasi-order
+  $Q=(\lesssim,S)$ (written $[Q]$) is the relation \( [Q] = \left(<,
+  \NotSimHat{S} \cup \SimHat{S}\!\!/{\mathord\sim}\right) \) over the irreflexive
+  subset of the base set together with the quotient set of the
+  reflexive set where
+  \begin{eqnarray*}
+    x < y &\textrm{iff}& x \lnsim y \\
+    {[\aset{u,\ldots}]} < y &\textrm{iff}& u \lnsim y \\
+    x < [\aset{v,\ldots}] & \textrm{iff}& x \lnsim v \\
+    {[\aset{u,\ldots}]} < [\aset{v,\ldots}] & \textrm{iff} & u \lnsim
+    v
+  \end{eqnarray*}
+\end{definition}
+\begin{theorem}
+  The cycle-free representation of $Q$ is well-defined and is a
+  partial order, and additionally is total if and only if $Q$ is total.
+\end{theorem}
+\begin{proof}
+  We prove the three claims sequentially:
+  \begin{itemize}
+  \item $[Q]$ is well defined.\par
+    To be well defined, we need the representation element used to
+    define $<$ to be unimportant: all members of the set yield the
+    same result.  In particular, we need that for any element $x \in
+    S$ and any equivalence class
+    $E \in {\SimHat{S}\!\!/{\mathord\sim}}$, then $\exists v\in E: x \lnsim v$
+    then $\forall v \in E: x \lnsim v$ and also the reverse property
+    $\exists u\in E: u \lnsim x$ implies
+    $\forall u\in E: u \lnsim x$.
+
+    To prove the first, let $x \in S$ and $v \in E$ where
+    $x \lnsim v$.  Suppose we have an arbitrary $v' \sim v$, then
+    $v \lesssim v'$ and thus by transitivity, $x \lesssim v'$.
+    Suppose, contrary-wise, $v' \lesssim x$, then by equivalence and
+    transitivity, we have $v \lesssim x$ which contradicts our
+    assumption.  Therefore $x \lnsim v'$.
+
+    The reverse property is proved analogously.
+    
+  \item $[Q]$ is a partial order.
+
+    $[Q]$ must be irreflexive.  Otherwise we would have $x \lnsim x$
+    for some $x \in S$ which is a contradiction.
+    
+    Furthermore $[Q]$ is transitive, since $\lnsim$ is transitive.
+
+  \item $[Q]$ is total if and only if $Q$ is total.
+    \begin{description}
+    \item[if]  Suppose $Q$ is total.  Then consider two elements of
+      the base set of $[Q]$.
+
+      If we have two equivalence classes, then if they are the same,
+      we have nothing to prove for totality.  If they are different,
+      then by the totality of $Q$, for some representatives $x$ and
+      $y$ of the respective equivalence classes,
+      we must have $x \lesssim y$ or $y \lesssim x$.  We cannot have
+      both because otherwise we would have $x \sim y$ and they would
+      be in the same equivalence class.  Thus we have $x \lnsim y$ or
+      $y \lnsim x$ which shows that the two equivalence classes are
+      related in $[Q]$.
+
+      If we have an element $x \in \NotSimHat{S}$ and an equivalence
+      class $E$, then for a representative $y \in E$, we can make the
+      same argument as above to show we have totality.
+
+      Finally if we are considering \( x \neq y\) boith in \(
+      \NotSimHat{S} \), then
+      we can again make the same argument.
+
+    \item[only if]  Suppose $[Q]$ is total, then consider $x\neq y$.
+
+      Suppose $x$ and $y$ are in equivalence classes $E_1$ and $E_2$
+      respectively.  If $E_1 = E_2$, then $x \lesssim y$
+      (and $y \lesssim x$).  Otherwise, since $[Q]$ is total, we must
+      have either $E_1 < E_2$ or $E_2 < E_1$.  In the first case, this
+      means $x \lnsim y$, and in the second case $y \lnsim x$.
+      In either case, $x$
+      and $y$ are related.
+
+      Suppose $x$ is in an equivalence class $E$ and $y$ is not.
+      Then by the totality of $[Q]$, either $E < y$ or
+      $y < E$.  By the definition of $<$, this means either $x \lnsim
+      y$ or \( y \lnsim x\).
+      
+      The case of $x$ not being in an equivalence class while $y$
+      is in an equivalence class $E$ is analogously proved.
+
+      Finally suppose that neither $x$ nor $y$ is in an equivalence
+      class.  Then by totality of $[Q]$, they must be related by $Q$.
+    \end{description}
+  \end{itemize}
+\end{proof}
+
+Indeed the construction can be carried out in the other direction too:
+\begin{definition}
+  For a set $S$, a \emph{semi partition partial order} is a partial
+  order over a set \(S^{\sharp} = S_0 \cup \aset{S_1,\ldots}\), where  \(S =
+  S_0 \cup S_1 \cup \ldots \) ($S_i\neq \emptyset$ for all
+  positive $i$) is a partition of $S$ where only the first subset can
+  be empty. The elements of
+  \(S^{\sharp}\) are the elements of $S_0$ (which may be empty) plus
+  the remaining sets of the partition (which may have no further sets).
+\end{definition}
+\begin{theorem}
+  For any set S, there is a bijection from the set of quasi-orders of
+  S to the set of semi partition partial orders.
+\end{theorem}
+\begin{proof}
+  {[Lots of work]}
 \end{proof}
 
 \begin{theorem}
@@ -281,4 +396,5 @@ We will use a variety of infix operators (e.g. \( <, \leq, \sim, \lesssim \)) as
 
 \end{document}
 
-% LocalWords:  maketitle emph qbezier
+% LocalWords:  maketitle emph qbezier Boyland Amir Hesamian preorder
+% LocalWords:  Monotonicity irreflexive iff
