@@ -1253,6 +1253,9 @@ void add_edges_to_graph(VERTEX* v1,
 
   // if carrying, then we add fiber dependencies.
   kind &= ~DEPENDENCY_NOT_JUST_FIBER;
+
+  // Fiber dependencies are always monotone.
+  kind &= ~DEPENDENCY_MAYBE_SIMPLE;
   
   for (i=0; i < s->fibers.length; ++i) {
     FIBER f = s->fibers.array[i];
