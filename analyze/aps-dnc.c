@@ -1358,6 +1358,16 @@ static void record_expression_dependencies(VERTEX *sink, CONDITION *cond,
 	source.node = NULL;
 	source.attr = decl;
 	source.modifier = mod;
+
+  // TODO: what if mod.next is not NULL?
+  if (mod != NULL && mod->field != NULL) {
+    if (decl_is_circular(mod->field)) {
+      new_kind &= ~DEPENDENCY_MAYBE_SIMPLE;
+    } else {
+      new_kind |= DEPENDENCY_MAYBE_SIMPLE;
+    }
+  }
+  
 	if (vertex_is_output(&source)) aps_warning(e,"Dependence on output value");
 	add_edges_to_graph(&source,sink,cond,new_kind,aug_graph);
       }
