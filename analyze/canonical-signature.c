@@ -693,3 +693,41 @@ void initialize_canonical_signature(Declaration module_TYPE_decl, Declaration mo
 
   initialized = true;
 }
+
+/**
+ * Given a signature, it returns whether it contains module declaration
+ * @param sig signature
+ * @param mdecl module declaration
+ * @return boolean indicating if module is in the type hierarchy of signature
+ */
+bool signature_hierarchy_contains(Signature sig, Declaration mdecl)
+{
+  switch (Signature_KEY(sig))
+  {
+  case KEYsig_inst:
+    Declaration some_mdecl = USE_DECL(class_use_use(sig_inst_class(sig)));
+    return some_mdecl == mdecl ||
+           signature_hierarchy_contains(some_class_decl_parent(some_mdecl), mdecl);
+  case KEYmult_sig:
+    return signature_hierarchy_contains(mult_sig_sig1(sig), mdecl) ||
+           signature_hierarchy_contains(mult_sig_sig2(sig), mdecl);
+  case KEYsig_use:
+    return USE_DECL(sig_use_use(sig)) == mdecl;
+  case KEYno_sig:
+  case KEYfixed_sig:
+    return false;
+  }
+}
+
+/**
+ * Given a canonical signature, it returns whether it contains module declaration
+ * @param csig canonical signature
+ * @param mdecl module declaration
+ * @return boolean indicating if module is in the type hierarchy of signature
+ */
+bool canonical_signature_hierarchy_contains(CanonicalSignature* csig, Declaration mdecl)
+{
+  if (csig->source_class == mdecl) return true;
+
+  return signature_hierarchy_contains(some_class_decl_parent(csig->source_class), mdecl);
+}
