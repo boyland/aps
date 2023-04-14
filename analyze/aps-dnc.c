@@ -1048,6 +1048,11 @@ static BOOL decl_is_collection(Declaration d) {
   }
 }
 
+typedef unsigned MONOTONICITY;
+#define NO_USE 0
+#define SIMPLE_USE 1
+#define MONOTONE_USE 2
+
 static MONOTONICITY expr_monotonicity(Expression);
 static BOOL formal_is_circular(Declaration);
 static BOOL function_decl_is_circular(Declaration);

@@ -163,9 +163,4 @@ extern int analysis_debug;
 #define ASSERT_CLOSED (1<<13)
 #define EDGESET_ASSERTIONS (1<<14)
 
-typedef unsigned MONOTONICITY;
-#define NO_USE 0
-#define SIMPLE_USE 1
-#define MONOTONE_USE 2
-
 #endif
