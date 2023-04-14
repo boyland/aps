@@ -2,7 +2,7 @@
 #define APS_TYPE_H
 
 // Lattice module declaration.
-Declaration module_lattice;
+extern Declaration module_lattice;
 
 extern Type function_type_return_type(Type);
 

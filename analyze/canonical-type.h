@@ -66,6 +66,14 @@ CanonicalType *canonical_type_join(CanonicalType *ctype_outer, CanonicalType *ct
 CanonicalType *new_canonical_type_use(Declaration decl);
 
 /**
+ * Creates an instance of Canonical_qual_type
+ * @param from
+ * @param decl
+ * @return Canonical_qual_type
+ */
+CanonicalType *new_canonical_type_qual(CanonicalType *from, Declaration decl);
+
+/**
  * Compares two canonical types
  * @param ctype1 Canonical type A
  * @param ctype2 Canonical type B
