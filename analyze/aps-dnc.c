@@ -1079,10 +1079,11 @@ BOOL decl_is_circular(Declaration d)
  * @return BOOL indicating whether canonical type can be considered circular
  */
 static BOOL canonical_type_is_circular(CanonicalType* ctype) {
-  CanonicalSignatureSet set = infer_canonical_signatures(ctype);
+  CanonicalSignatureSet cset = infer_canonical_signatures(ctype);
+
   int i;
-  for (i = 0; i < set->num_elements; i++) {
-    CanonicalSignature* csig = (CanonicalSignature*)set->elements[i];
+  for (i = 0; i < cset->num_elements; i++) {
+    CanonicalSignature* csig = (CanonicalSignature*)cset->elements[i];
 
     // If class declaration extends any of the LATTICE types (UNION_LATTICE, MAKE_LATTICE and etc.)
     if (canonical_signature_hierarchy_contains(csig, module_lattice)) {
@@ -1126,7 +1127,7 @@ static BOOL function_decl_is_circular(Declaration fdecl) {
 
 /**
  * Utility function that returns the monotonicity of an expression
- * 
+ *
  * @param expr Expression
  * @return MONOTONICITY of an expression
  */
@@ -1143,16 +1144,24 @@ static MONOTONICITY expr_monotonicity(Expression expr) {
     case KEYfuncall: {
       MONOTONICITY result = NO_USE;
       Expression actual = first_Actual(funcall_actuals(expr));
+      
+      // Return type should be circular
+      result |= canonical_type_is_circular(canonical_type(infer_expr_type(expr))) ? MONOTONE_USE : SIMPLE_USE;
+
+      // Actual types(s) should be circular
       while (actual != NULL) {
+        Type actual_ty = infer_expr_type(actual);
+        CanonicalType* actual_ctype = canonical_type(actual_ty);
+
         result |= expr_monotonicity(actual);
 
-        actual = Expression_info(actual)->next_actual;
+        actual = EXPR_NEXT(actual);
       }
 
       return result;
     }
     default:
-      return NO_USE;
+      return SIMPLE_USE;
   }
 }
 
@@ -1358,7 +1367,6 @@ static void record_expression_dependencies(VERTEX *sink, CONDITION *cond,
 	source.attr = decl;
 	source.modifier = mod;
 
-  // TODO: what if mod.next is not NULL?
   if (mod != NULL && mod->field != NULL) {
     if (decl_is_circular(mod->field)) {
       new_kind &= ~DEPENDENCY_MAYBE_SIMPLE;
