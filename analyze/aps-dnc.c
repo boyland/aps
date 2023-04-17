@@ -1048,11 +1048,6 @@ static BOOL decl_is_collection(Declaration d) {
   }
 }
 
-typedef unsigned MONOTONICITY;
-#define NO_USE 0
-#define SIMPLE_USE 1
-#define MONOTONE_USE 2
-
 BOOL decl_is_circular(Declaration d)
 {
   if (!d) return FALSE;
@@ -1061,7 +1056,10 @@ BOOL decl_is_circular(Declaration d)
     return direction_is_circular(value_decl_direction(d));
   case KEYattribute_decl: 
     return direction_is_circular(attribute_decl_direction(d));
+  case KEYformal:
+    return TRUE;
   default:
+    aps_warning(d, "Not sure how to detect circularity of declaration key %d", Declaration_KEY(d));
     return FALSE;
   }
 }
