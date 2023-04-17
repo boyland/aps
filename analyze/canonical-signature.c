@@ -487,6 +487,9 @@ static CanonicalSignature* join_canonical_signature_actuals(CanonicalType *sourc
     case KEYsome_type_decl:
       break;
     default:
+      // short-circuit.
+      // only when the source declaration of canonical type is some kind of
+      // type declaration then "join" would be possible.
       return canonical_sig;
     }
 

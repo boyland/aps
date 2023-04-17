@@ -1496,7 +1496,6 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
     {
       Use use = value_use_use(lhs);
       Type sink_type = type_subst(use, infer_expr_type(lhs));
-      Declaration decl = USE_DECL(use);
       VERTEX sink;
       MODIFIER new_mod;
 	
