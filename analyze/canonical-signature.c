@@ -482,6 +482,14 @@ static CanonicalSignature* join_canonical_signature_actuals(CanonicalType *sourc
     struct Canonical_use_type *ctype_use = (struct Canonical_use_type *)source_ctype;
 
     Declaration tdecl = ctype_use->decl;
+    switch (Declaration_KEY(tdecl))
+    {
+    case KEYsome_type_decl:
+      break;
+    default:
+      return canonical_sig;
+    }
+
     Declaration mdecl = USE_DECL(module_use_use(type_inst_module(some_type_decl_type(tdecl))));
 
     CanonicalType **substituted_actuals = (CanonicalType **)alloca(canonical_sig->num_actuals);

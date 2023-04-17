@@ -1053,18 +1053,10 @@ typedef unsigned MONOTONICITY;
 #define SIMPLE_USE 1
 #define MONOTONE_USE 2
 
-static MONOTONICITY expr_monotonicity(Expression);
-static BOOL formal_is_circular(Declaration);
-static BOOL function_decl_is_circular(Declaration);
-
 BOOL decl_is_circular(Declaration d)
 {
   if (!d) return FALSE;
   switch (Declaration_KEY(d)) {
-  case KEYfunction_decl:
-    return function_decl_is_circular(d);
-  case KEYnormal_formal:
-    return formal_is_circular(d);
   case KEYvalue_decl: 
     return direction_is_circular(value_decl_direction(d));
   case KEYattribute_decl: 
@@ -1105,21 +1097,24 @@ static BOOL canonical_type_is_circular(CanonicalType* ctype) {
  * @param fdecl Declaration
  * @return BOOL indicating whether function declaration can be considered circular
  */
-static BOOL function_decl_is_circular(Declaration fdecl) {
+static BOOL function_decl_is_circular(Type sink_type, Declaration fdecl) {
   switch (Declaration_KEY(fdecl)) {
     case KEYfunction_decl: {
-      struct Canonical_function_type* cfunc_type =
-          (struct Canonical_function_type*)canonical_type(
-              function_decl_type(fdecl));
+      struct Canonical_function_type* cfunc_type = (struct Canonical_function_type*) canonical_type(function_decl_type(fdecl));
 
-      BOOL return_type_circular =
-          canonical_type_is_circular(cfunc_type->return_type);
+      if (analysis_debug & ADD_EDGE) {
+        printf("fdecl %s (lineno %d)\n", decl_name(fdecl), tnode_line_number(fdecl));
+        printf("sink type: ");
+        print_Type(sink_type, stdout);
+        printf("\n");
+      }
+
+      BOOL return_type_circular = canonical_type_is_circular(cfunc_type->return_type);
       BOOL formals_circular = TRUE;
 
       int i;
       for (i = 0; i < cfunc_type->num_formals; i++) {
-        formals_circular &=
-            canonical_type_is_circular(cfunc_type->param_types[i]);
+        formals_circular &= canonical_type_is_circular(cfunc_type->param_types[i]);
       }
 
       return return_type_circular && formals_circular;
@@ -1129,67 +1124,86 @@ static BOOL function_decl_is_circular(Declaration fdecl) {
   }
 }
 
-/**
- * Utility function that returns the monotonicity of an expression
- *
- * @param expr Expression
- * @return MONOTONICITY of an expression
- */
-static MONOTONICITY expr_monotonicity(Expression expr) {
-  switch (Expression_KEY(expr)) {
-    case KEYvalue_use: {
-      Declaration udecl = USE_DECL(value_use_use(expr));
-      if (DECL_IS_SYNTAX(udecl)) {
-        return NO_USE;
-      } else {
-        return decl_is_circular(udecl) ? MONOTONE_USE : SIMPLE_USE;
-      }
-    }
-    case KEYfuncall: {
-      MONOTONICITY result = NO_USE;
-      Expression actual = first_Actual(funcall_actuals(expr));
-      
-      // Return type should be circular
-      result |= canonical_type_is_circular(canonical_type(infer_expr_type(expr))) ? MONOTONE_USE : SIMPLE_USE;
+static BOOL funcall_result_is_circular(Type sink_type, Expression expr, Declaration fdecl) {
+  Use use = value_use_use(funcall_f(expr));
+  TypeEnvironment te = USE_TYPE_ENV(use);
 
-      // Actual types(s) should be circular
-      while (actual != NULL) {
-        Type actual_ty = infer_expr_type(actual);
-        CanonicalType* actual_ctype = canonical_type(actual_ty);
-
-        result |= expr_monotonicity(actual);
-
-        actual = EXPR_NEXT(actual);
-      }
-
-      return result;
-    }
-    default:
-      return SIMPLE_USE;
+  if (analysis_debug & ADD_EDGE) {
+    printf("fdecl: %s (lineno %d)\n", decl_name(fdecl), tnode_line_number(expr));
+    printf("type environment: ");
+    print_TypeEnvironment(te, stdout);
+    printf("\n");
   }
+
+  Type fdecl_type = some_function_decl_type(fdecl);
+
+  Declaration formal = first_Declaration(function_type_formals(fdecl_type));
+  Expression actual = first_Actual(funcall_actuals(expr));
+
+  // return type should be equal to sink type and be circular
+  Type fdecl_return_type = type_subst(use, function_type_return_type(fdecl_type));
+
+  if (analysis_debug & ADD_EDGE) {
+    printf(" return type: ");
+    print_Type(fdecl_return_type, stdout);
+    printf("\n");
+    printf(" sink type: ");
+    print_Type(sink_type, stdout);
+    printf("\n");
+  }
+
+  CanonicalType* fdecl_return_ctype = canonical_type(fdecl_return_type);
+  CanonicalType* sink_ctype = canonical_type(sink_type);
+
+  return fdecl_return_ctype == sink_ctype && canonical_type_is_circular(fdecl_return_ctype);
 }
 
-/**
- * Utility function that detects if formal is circular if
- * its inside case statement that uses only circular defined things.
- * 
- * @param decl Declaration
- * @return BOOL indicating whether formal can be considered circular
- */
-static BOOL formal_is_circular(Declaration decl) {
-  switch (Declaration_KEY(decl)) {
-    case KEYnormal_formal: {
-      Declaration target = formal_in_case_p(decl);
-      // If formal is bound to a case statement, then check its case stmt's expression
-      if (target != NULL && Declaration_KEY(target) == KEYcase_stmt) {
-        MONOTONICITY re = expr_monotonicity(case_stmt_expr(target));
-        return !(re & SIMPLE_USE);
-      }
-      return TRUE;
-    }
-    default:
-      return FALSE;
+static BOOL funcall_actual_is_circular(Expression expr, int actual_index, Declaration fdecl) {
+  Use use = value_use_use(funcall_f(expr));
+  TypeEnvironment te = USE_TYPE_ENV(use);
+
+  if (analysis_debug & ADD_EDGE) {
+    printf("fdecl: %s (lineno %d)\n", decl_name(fdecl), tnode_line_number(expr));
+    printf("type environment: ");
+    print_TypeEnvironment(te, stdout);
+    printf("\n");
   }
+
+  Type fdecl_type = some_function_decl_type(fdecl);
+
+  Declaration formal = first_Declaration(function_type_formals(fdecl_type));
+  Expression actual = first_Actual(funcall_actuals(expr));
+
+  int index = 0;
+
+  // formal and actual should be equal and be circular
+  while (formal != NULL && actual != NULL) {
+    Type formal_ty = type_subst(use, formal_type(formal));
+    Type actual_ty = infer_expr_type(actual);
+
+    if (analysis_debug & ADD_EDGE) {
+      printf(" (%d) formal type: ", index);
+      print_Type(formal_ty, stdout);
+      printf("\n");
+      printf(" (%d) actual type: ", index);
+      print_Type(actual_ty, stdout);
+      printf("\n");
+    }
+
+    CanonicalType* formal_ctype = canonical_type(formal_ty);
+    CanonicalType* actual_ctype = canonical_type(actual_ty);
+
+    if (index == actual_index) {
+      return formal_ctype == actual_ctype && canonical_type_is_circular(formal_ctype);
+    }
+
+    formal = DECL_NEXT(formal);
+    actual = EXPR_NEXT(actual);
+    index++;
+  }
+
+  fatal_error("Failed to find actual at index %d", actual_index);
+  return FALSE;
 }
 
 // return true if we are sure this vertex represents an input dependency
@@ -1238,7 +1252,7 @@ void add_edges_to_graph(VERTEX* v1,
   STATE *s = aug_graph->global_state;
   int i;
 
-  if (analysis_debug & ADD_EDGE) {
+  if (analysis_debug & ADD_EDGE && kind & DEPENDENCY_MAYBE_SIMPLE) {
     print_dep_vertex(v1,stdout);
     fputs("->",stdout);
     print_dep_vertex(v2,stdout);
@@ -1302,7 +1316,7 @@ Declaration attr_ref_node_decl(Expression e)
  * @param mod modifier to apply to instances found
  * @param kind whether carrying/non-fiber etc.
  */
-static void record_expression_dependencies(VERTEX *sink, CONDITION *cond,
+static void record_expression_dependencies(VERTEX *sink, Type sink_type, CONDITION *cond,
 					   DEPENDENCY kind, MODIFIER *mod,
 					   Expression e, AUG_GRAPH *aug_graph)
 {
@@ -1329,7 +1343,7 @@ static void record_expression_dependencies(VERTEX *sink, CONDITION *cond,
     /* nothing to do */
     break;
   case KEYrepeat:
-    record_expression_dependencies(sink,cond,kind,mod,
+    record_expression_dependencies(sink,sink_type,cond,kind,mod,
 				   repeat_expr(e),aug_graph);
     break;
   case KEYvalue_use:
@@ -1400,22 +1414,31 @@ static void record_expression_dependencies(VERTEX *sink, CONDITION *cond,
 	new_mod.field = decl;
 	new_mod.next = mod;
 	// first the dependency on the pointer itself (NOT carrying)
-	record_expression_dependencies(sink,cond,
+	record_expression_dependencies(sink,sink_type,cond,
 				       new_kind&~DEPENDENCY_MAYBE_CARRYING,
 				       NO_MODIFIER,object,aug_graph);
 	// then the dependency on the field (possibly carrying)
-	record_expression_dependencies(sink,cond,new_kind,&new_mod,object,
+	record_expression_dependencies(sink,sink_type,cond,new_kind,&new_mod,object,
 				       aug_graph);
       } else if ((decl = local_call_p(e)) != NULL) {
-  if (!decl_is_circular(decl)) new_kind |= DEPENDENCY_MAYBE_SIMPLE; else new_kind = kind;
 	Declaration result = some_function_decl_result(decl);
 	Expression actual = first_Actual(funcall_actuals(e));
 	/* first depend on the arguments (not carrying, no fibers) */
 	if (mod == NO_MODIFIER) {
+    int actual_index = 0;
 	  for (;actual!=NULL; actual=Expression_info(actual)->next_actual) {
-	    record_expression_dependencies(sink,cond,
+
+      if (funcall_actual_is_circular(e, actual_index, decl)) {
+        new_kind &= ~DEPENDENCY_MAYBE_SIMPLE;
+      } else {
+        new_kind |= DEPENDENCY_MAYBE_SIMPLE;
+      }
+
+	    record_expression_dependencies(sink,sink_type,cond,
 					   new_kind&~DEPENDENCY_MAYBE_CARRYING,
 					   NO_MODIFIER,actual,aug_graph);
+      new_kind = kind; // restore new_kind
+      actual_index++;
 	  }
 	}
 
@@ -1424,18 +1447,24 @@ static void record_expression_dependencies(VERTEX *sink, CONDITION *cond,
 	 *	 tnode_line_number(e),decl_name(decl));
 	 */
 	{
+    if (funcall_result_is_circular(sink_type, e, decl)) {
+      new_kind &= ~DEPENDENCY_MAYBE_SIMPLE;
+    } else {
+      new_kind |= DEPENDENCY_MAYBE_SIMPLE;
+    }
+
 	  Declaration proxy = Expression_info(e)->funcall_proxy;
 	  source.node = proxy;
 	  source.attr = result;
 	  source.modifier = mod;
 	  if (vertex_is_output(&source)) aps_warning(e,"Dependence on output value");
-	  add_edges_to_graph(&source,sink,cond,kind,aug_graph);
+	  add_edges_to_graph(&source,sink,cond,new_kind,aug_graph);
 	}
       } else {
 	/* some random (external) function call */
 	Expression actual = first_Actual(funcall_actuals(e));
 	for (; actual != NULL; actual=Expression_info(actual)->next_actual) {
-	  record_expression_dependencies(sink,cond,kind,mod,
+	  record_expression_dependencies(sink,sink_type,cond,kind,mod,
 					 actual,aug_graph);
 	}
       }
@@ -1501,7 +1530,9 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
     break;
   case KEYvalue_use:
     {
-      Declaration decl = USE_DECL(value_use_use(lhs));
+      Use use = value_use_use(lhs);
+      Type sink_type = type_subst(use, infer_expr_type(lhs));
+      Declaration decl = USE_DECL(use);
       VERTEX sink;
       MODIFIER new_mod;
 	
@@ -1548,12 +1579,15 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
       set_value_for(&sink,rhs,aug_graph);
       if (vertex_is_input(&sink)) aps_error(lhs,"Assignment of input value");
       // don't make error even if not output: local attributes!
-      record_expression_dependencies(&sink,cond,kind,NULL,rhs,aug_graph);
+      record_expression_dependencies(&sink,sink_type,cond,kind,NULL,rhs,aug_graph);
       record_condition_dependencies(&sink,cond,aug_graph);
     }
     break;
   case KEYfuncall:
     {
+      Use use = value_use_use(funcall_f(lhs));
+      Type sink_type = type_subst(use, infer_expr_type(lhs));
+
       int new_kind = kind;
       Declaration field, attr, fdecl, decl;
       VERTEX sink;
@@ -1578,7 +1612,7 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
 	sink.modifier = mod;
 	set_value_for(&sink,rhs,aug_graph);
 	if (vertex_is_input(&sink)) aps_error(lhs,"Assignment of input value");
-	record_expression_dependencies(&sink,cond,kind,NULL,rhs,aug_graph);
+	record_expression_dependencies(&sink,sink_type,cond,kind,NULL,rhs,aug_graph);
 	record_condition_dependencies(&sink,cond,aug_graph);
       } else if ((fdecl = local_call_p(lhs)) != NULL) {     
 	if (!decl_is_circular(fdecl)) new_kind |= DEPENDENCY_MAYBE_SIMPLE; else new_kind = kind;
@@ -1592,7 +1626,7 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
 	sink.modifier = mod;
 	set_value_for(&sink,rhs,aug_graph);
 	if (vertex_is_input(&sink)) aps_error(lhs,"Assignment of input value");
-	record_expression_dependencies(&sink,cond,new_kind,NULL,rhs,aug_graph);
+	record_expression_dependencies(&sink,sink_type,cond,new_kind,NULL,rhs,aug_graph);
 	record_condition_dependencies(&sink,cond,aug_graph);
       } else {
 	Expression actual = first_Actual(funcall_actuals(lhs));
@@ -1649,6 +1683,7 @@ static void *get_edges(void *vaug_graph, void *node) {
 	return NULL;
       case KEYformal:
 	{ Declaration case_stmt = formal_in_case_p(decl);
+    Type sink_type = formal_type(decl);
 	  if (case_stmt != NULL) {
 	    Expression expr = some_case_stmt_expr(case_stmt);
 	    VERTEX f;
@@ -1656,7 +1691,7 @@ static void *get_edges(void *vaug_graph, void *node) {
 	    f.attr = decl;
 	    f.modifier = NO_MODIFIER;
 	    record_condition_dependencies(&f,cond,aug_graph);
-	    record_expression_dependencies(&f,cond,dependency,NO_MODIFIER,
+	    record_expression_dependencies(&f,sink_type,cond,dependency,NO_MODIFIER,
 					   expr,aug_graph);
 	  }
 	}
@@ -1675,10 +1710,10 @@ static void *get_edges(void *vaug_graph, void *node) {
 	  case KEYsimple:
 	    /* XXX: I don't know I have to do it both ways.
 	     */
-	    record_expression_dependencies(&sink,cond,dependency,NO_MODIFIER,
+	    record_expression_dependencies(&sink,no_type(),cond,dependency,NO_MODIFIER,
 					   simple_value(def),aug_graph);
 	    sink.node = 0;
-	    record_expression_dependencies(&sink,cond,dependency,NO_MODIFIER,
+	    record_expression_dependencies(&sink,no_type(),cond,dependency,NO_MODIFIER,
 					   simple_value(def),aug_graph);
 	    if ((cdecl = constructor_call_p(simple_value(def))) != NULL) {
 	      FIBERSET fs = fiberset_for(decl,FIBERSET_NORMAL_FINAL);
@@ -1721,7 +1756,7 @@ static void *get_edges(void *vaug_graph, void *node) {
 	    }
 	    break;
 	  case KEYcomposite:
-	    record_expression_dependencies(&sink,cond,dependency,NO_MODIFIER,
+	    record_expression_dependencies(&sink,no_type(),cond,dependency,NO_MODIFIER,
 					   composite_initial(def),aug_graph);
 	    break;
 	  }
@@ -1765,13 +1800,14 @@ static void *get_edges(void *vaug_graph, void *node) {
       case KEYif_stmt:
 	{
 	  Expression test = if_stmt_cond(decl);
+    Type sink_type = infer_expr_type(test);
 	  VERTEX sink;
 	  sink.node = 0;
 	  sink.attr = decl;
 	  sink.modifier = NO_MODIFIER;
 	  record_condition_dependencies(&sink,cond,aug_graph);
 
-	  record_expression_dependencies(&sink,cond,control_dependency,
+	  record_expression_dependencies(&sink,sink_type,cond,control_dependency,
 					 NO_MODIFIER, test, aug_graph);
 	}
 	break;
@@ -1784,10 +1820,11 @@ static void *get_edges(void *vaug_graph, void *node) {
 	  for (m=first_Match(some_case_stmt_matchers(decl)); m; m=MATCH_NEXT(m)) {
 	    Expression test = Match_info(m)->match_test;
 	    sink.attr = (Declaration)m;
+      Type sink_type = infer_expr_type(test);
 	    record_condition_dependencies(&sink,cond,aug_graph);
 
 	    for (; test != 0; test = Expression_info(test)->next_expr) {
-	      record_expression_dependencies(&sink,cond,control_dependency,
+	      record_expression_dependencies(&sink,sink_type,cond,control_dependency,
 					     NO_MODIFIER, test, aug_graph);
 	    }
 	  }
@@ -1796,12 +1833,13 @@ static void *get_edges(void *vaug_graph, void *node) {
       case KEYfor_in_stmt:
         { Declaration formal = for_in_stmt_formal(decl);
           Expression expr = for_in_stmt_seq(decl);
+          Type formal_type = infer_formal_type(formal);
           VERTEX f;
           f.node = 0;
           f.attr = formal;
           f.modifier = NO_MODIFIER;
           record_condition_dependencies(&f,cond,aug_graph);
-          record_expression_dependencies(&f,cond,dependency,NO_MODIFIER,
+          record_expression_dependencies(&f,formal_type,cond,dependency,NO_MODIFIER,
                                          expr,aug_graph);
 	}
         break;
@@ -1840,13 +1878,14 @@ static void *get_edges(void *vaug_graph, void *node) {
 	{
 	  Type ft = some_function_decl_type(fdecl);
 	  Declaration f = first_Declaration(function_type_formals(ft));
+    Type formal_type = infer_formal_type(f);
 	  Expression a = first_Actual(funcall_actuals(e));
 	  for (; f != NULL; f = DECL_NEXT(f), a = EXPR_NEXT(a)) {
 	    VERTEX sink;
 	    sink.node = proxy;
 	    sink.attr = f;
 	    sink.modifier = NO_MODIFIER;
-	    record_expression_dependencies(&sink,cond,dependency,
+	    record_expression_dependencies(&sink,formal_type,cond,dependency,
 					   NO_MODIFIER,a,aug_graph);
 	    record_condition_dependencies(&sink,cond,aug_graph);
 	  }
