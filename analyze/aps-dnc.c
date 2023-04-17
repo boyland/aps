@@ -1216,7 +1216,7 @@ void add_edges_to_graph(VERTEX* v1,
   STATE *s = aug_graph->global_state;
   int i;
 
-  if (analysis_debug & ADD_EDGE && kind & DEPENDENCY_MAYBE_SIMPLE) {
+  if (kind & DEPENDENCY_MAYBE_SIMPLE) {
     print_dep_vertex(v1,stdout);
     fputs("->",stdout);
     print_dep_vertex(v2,stdout);
