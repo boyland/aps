@@ -1064,6 +1064,32 @@ BOOL decl_is_circular(Declaration d)
   }
 }
 
+
+Declaration is_in_function_p(void* node) {
+  while (node != NULL)
+  {
+    switch (ABSTRACT_APS_tnode_phylum(node))
+    {
+    case KEYDeclaration:
+      Declaration decl = (Declaration)node;
+      switch (Declaration_KEY(decl))
+      {
+      case KEYsome_function_decl:
+        return decl;
+      default:
+        break;
+      }
+      break;
+    default:
+      break;
+    }
+
+    node = tnode_parent(node);
+  }
+
+  return NULL;
+}
+
 /**
  * Utility function that detects if canonical type is circular
  * by checking if its inferred signature set includes any of the
@@ -1142,22 +1168,22 @@ static BOOL funcall_actual_is_circular(Expression expr, int actual_index, Declar
 
   // formal and actual should be equal and be circular
   while (formal != NULL && actual != NULL) {
-    Type formal_ty = type_subst(use, formal_type(formal));
-    Type actual_ty = infer_expr_type(actual);
-
-    if (analysis_debug & ADD_EDGE) {
-      printf(" (%d) formal type: ", index);
-      print_Type(formal_ty, stdout);
-      printf("\n");
-      printf(" (%d) actual type: ", index);
-      print_Type(actual_ty, stdout);
-      printf("\n");
-    }
-
-    CanonicalType* formal_ctype = canonical_type(formal_ty);
-    CanonicalType* actual_ctype = canonical_type(actual_ty);
-
     if (index == actual_index) {
+      Type formal_ty = type_subst(use, formal_type(formal));
+      Type actual_ty = infer_expr_type(actual);
+
+      if (analysis_debug & ADD_EDGE) {
+        printf(" (%d) formal type: ", index);
+        print_Type(formal_ty, stdout);
+        printf("\n");
+        printf(" (%d) actual type: ", index);
+        print_Type(actual_ty, stdout);
+        printf("\n");
+      }
+
+      CanonicalType* formal_ctype = canonical_type(formal_ty);
+      CanonicalType* actual_ctype = canonical_type(actual_ty);
+
       return formal_ctype == actual_ctype && canonical_type_is_circular(formal_ctype);
     }
 
@@ -1392,7 +1418,7 @@ static void record_expression_dependencies(VERTEX *sink, Type sink_type, CONDITI
     int actual_index = 0;
 	  for (;actual!=NULL; actual=Expression_info(actual)->next_actual) {
 
-      if (funcall_actual_is_circular(e, actual_index, decl)) {
+      if (is_in_function_p(e) || funcall_actual_is_circular(e, actual_index, decl)) {
         new_kind &= ~DEPENDENCY_MAYBE_SIMPLE;
       } else {
         new_kind |= DEPENDENCY_MAYBE_SIMPLE;
@@ -1411,7 +1437,7 @@ static void record_expression_dependencies(VERTEX *sink, Type sink_type, CONDITI
 	 *	 tnode_line_number(e),decl_name(decl));
 	 */
 	{
-    if (funcall_result_is_circular(sink_type, e, decl)) {
+    if (is_in_function_p(e) || funcall_result_is_circular(sink_type, e, decl)) {
       new_kind &= ~DEPENDENCY_MAYBE_SIMPLE;
     } else {
       new_kind |= DEPENDENCY_MAYBE_SIMPLE;
