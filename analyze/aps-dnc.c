@@ -1494,6 +1494,7 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
     break;
   case KEYvalue_use:
     {
+      Declaration decl = USE_DECL(value_use_use(lhs));
       Use use = value_use_use(lhs);
       Type sink_type = type_subst(use, infer_expr_type(lhs));
       VERTEX sink;
