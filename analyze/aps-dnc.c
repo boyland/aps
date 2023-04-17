@@ -1090,40 +1090,6 @@ static BOOL canonical_type_is_circular(CanonicalType* ctype) {
   return FALSE;
 }
 
-/**
- * Utility function that detects if function declaration is circular
- * if its parameter type(s) and return type are circular.
- * 
- * @param fdecl Declaration
- * @return BOOL indicating whether function declaration can be considered circular
- */
-static BOOL function_decl_is_circular(Type sink_type, Declaration fdecl) {
-  switch (Declaration_KEY(fdecl)) {
-    case KEYfunction_decl: {
-      struct Canonical_function_type* cfunc_type = (struct Canonical_function_type*) canonical_type(function_decl_type(fdecl));
-
-      if (analysis_debug & ADD_EDGE) {
-        printf("fdecl %s (lineno %d)\n", decl_name(fdecl), tnode_line_number(fdecl));
-        printf("sink type: ");
-        print_Type(sink_type, stdout);
-        printf("\n");
-      }
-
-      BOOL return_type_circular = canonical_type_is_circular(cfunc_type->return_type);
-      BOOL formals_circular = TRUE;
-
-      int i;
-      for (i = 0; i < cfunc_type->num_formals; i++) {
-        formals_circular &= canonical_type_is_circular(cfunc_type->param_types[i]);
-      }
-
-      return return_type_circular && formals_circular;
-    }
-    default:
-      return FALSE;
-  }
-}
-
 static BOOL funcall_result_is_circular(Type sink_type, Expression expr, Declaration fdecl) {
   Use use = value_use_use(funcall_f(expr));
   TypeEnvironment te = USE_TYPE_ENV(use);
