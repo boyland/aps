@@ -48,9 +48,9 @@ void print_canonical_signature_set(void *untyped, FILE *f);
 /**
  * Given a canonical signature, it returns whether it contains module declaration
  * @param csig canonical signature
- * @param mdecl module declaration
+ * @param module_or_class_decl module or class declaration
  * @return boolean indicating if module is in the type hierarchy of signature
  */
-bool canonical_signature_hierarchy_contains(CanonicalSignature* csig, Declaration mdecl);
+bool canonical_signature_hierarchy_contains(CanonicalSignature* csig, Declaration module_or_class_decl);
 
 #endif

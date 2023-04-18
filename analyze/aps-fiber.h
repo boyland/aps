@@ -103,7 +103,6 @@ extern Declaration responsible_node_shared_info(void *,
 extern Declaration formal_in_case_p(Declaration);
 
 
-
 typedef struct oset {
   struct oset *rest;
   Declaration o;

@@ -517,8 +517,8 @@ CanonicalType *canonical_type(Type t)
   case KEYfunction_type:
     return canonical_type_function(t);
   case KEYno_type:
-    // canonical type representation of no-type is NULL.
-    return NULL;
+    // canonical type representation of no-type is itself.
+    return (CanonicalType*)t;
   default:
     aps_error(t, "Case of type %d is not implemented in canonical_type()", (int)Type_KEY(t));
     return NULL;
@@ -729,7 +729,7 @@ static CanonicalType *canonical_type_use_use_join(struct Canonical_use_type *cty
     break;
   }
   default:
-    fatal_error("Not sure what type of canonical type it is");
+    return new_canonical_type_qual((CanonicalType *)ctype_outer, ctype_inner->decl);
   }
 
   Declaration decl = ctype_inner->decl;
