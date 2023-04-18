@@ -101,7 +101,9 @@ extern Declaration shared_use_p(Expression);
 extern Declaration responsible_node_shared_info(void *,
 						struct analysis_state *);
 extern Declaration formal_in_case_p(Declaration);
-
+Declaration function_actual_formal(Declaration func,
+				   Expression actual,
+				   Expression call);
 
 
 typedef struct oset {

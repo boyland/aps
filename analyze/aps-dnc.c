@@ -1057,37 +1057,11 @@ BOOL decl_is_circular(Declaration d)
   case KEYattribute_decl: 
     return direction_is_circular(attribute_decl_direction(d));
   case KEYformal:
-    return TRUE;
+    return Declaration_info(d)->is_circular;
   default:
     aps_warning(d, "Not sure how to detect circularity of declaration key %d", Declaration_KEY(d));
     return FALSE;
   }
-}
-
-
-Declaration is_in_function_p(void* node) {
-  while (node != NULL)
-  {
-    switch (ABSTRACT_APS_tnode_phylum(node))
-    {
-    case KEYDeclaration:
-      Declaration decl = (Declaration)node;
-      switch (Declaration_KEY(decl))
-      {
-      case KEYsome_function_decl:
-        return decl;
-      default:
-        break;
-      }
-      break;
-    default:
-      break;
-    }
-
-    node = tnode_parent(node);
-  }
-
-  return NULL;
 }
 
 /**
@@ -1098,7 +1072,7 @@ Declaration is_in_function_p(void* node) {
  * @param ctype canonical type
  * @return BOOL indicating whether canonical type can be considered circular
  */
-static BOOL canonical_type_is_circular(CanonicalType* ctype) {
+static BOOL canonical_type_is_lattice_type(CanonicalType* ctype) {
   CanonicalSignatureSet cset = infer_canonical_signatures(ctype);
 
   int i;
@@ -1114,8 +1088,7 @@ static BOOL canonical_type_is_circular(CanonicalType* ctype) {
   return FALSE;
 }
 
-static BOOL funcall_result_is_circular(Type sink_type, Expression expr, Declaration fdecl) {
-  Use use = value_use_use(funcall_f(expr));
+static BOOL funcall_result_is_monotone_use(Type sink_type, Expression expr, Use use, Declaration fdecl) {
   TypeEnvironment te = USE_TYPE_ENV(use);
 
   if (analysis_debug & ADD_EDGE) {
@@ -1145,11 +1118,10 @@ static BOOL funcall_result_is_circular(Type sink_type, Expression expr, Declarat
   CanonicalType* fdecl_return_ctype = canonical_type(fdecl_return_type);
   CanonicalType* sink_ctype = canonical_type(sink_type);
 
-  return fdecl_return_ctype == sink_ctype && canonical_type_is_circular(fdecl_return_ctype);
+  return fdecl_return_ctype == sink_ctype && canonical_type_is_lattice_type(fdecl_return_ctype);
 }
 
-static BOOL funcall_actual_is_circular(Expression expr, int actual_index, Declaration fdecl) {
-  Use use = value_use_use(funcall_f(expr));
+static BOOL funcall_actual_is_monotone_use(Expression expr, Expression actual, Use use, Declaration fdecl) {
   TypeEnvironment te = USE_TYPE_ENV(use);
 
   if (analysis_debug & ADD_EDGE) {
@@ -1159,41 +1131,50 @@ static BOOL funcall_actual_is_circular(Expression expr, int actual_index, Declar
     printf("\n");
   }
 
-  Type fdecl_type = some_function_decl_type(fdecl);
+  Declaration formal = function_actual_formal(fdecl, actual, expr);
 
-  Declaration formal = first_Declaration(function_type_formals(fdecl_type));
-  Expression actual = first_Actual(funcall_actuals(expr));
+  Type formal_ty = type_subst(use, formal_type(formal));
+  Type actual_ty = infer_expr_type(actual);
 
-  int index = 0;
-
-  // formal and actual should be equal and be circular
-  while (formal != NULL && actual != NULL) {
-    if (index == actual_index) {
-      Type formal_ty = type_subst(use, formal_type(formal));
-      Type actual_ty = infer_expr_type(actual);
-
-      if (analysis_debug & ADD_EDGE) {
-        printf(" (%d) formal type: ", index);
-        print_Type(formal_ty, stdout);
-        printf("\n");
-        printf(" (%d) actual type: ", index);
-        print_Type(actual_ty, stdout);
-        printf("\n");
-      }
-
-      CanonicalType* formal_ctype = canonical_type(formal_ty);
-      CanonicalType* actual_ctype = canonical_type(actual_ty);
-
-      return formal_ctype == actual_ctype && canonical_type_is_circular(formal_ctype);
-    }
-
-    formal = DECL_NEXT(formal);
-    actual = EXPR_NEXT(actual);
-    index++;
+  if (analysis_debug & ADD_EDGE) {
+    printf(" formal type: ");
+    print_Type(formal_ty, stdout);
+    printf("\n");
+    printf(" actual type: ");
+    print_Type(actual_ty, stdout);
+    printf("\n");
   }
 
-  fatal_error("Failed to find actual at index %d", actual_index);
-  return FALSE;
+  CanonicalType* formal_ctype = canonical_type(formal_ty);
+  CanonicalType* actual_ctype = canonical_type(actual_ty);
+
+  // formal and actual should be equal and be circular
+  return formal_ctype == actual_ctype && canonical_type_is_lattice_type(formal_ctype);
+}
+
+Declaration funcall_f_decl(Expression e, Use* use) {
+  switch (Expression_KEY(e))
+  {
+  case KEYfuncall:
+    return funcall_f_decl(funcall_f(e), use);
+  case KEYvalue_use:
+    *use = value_use_use(e);
+    Declaration func = USE_DECL(*use);
+    switch (Declaration_KEY(func))
+    {
+    case KEYsome_function_decl:
+      return func;
+    case KEYvalue_renaming:
+      return funcall_f_decl(value_renaming_old(func), use);
+    default:
+      return NULL;
+    }
+    break;
+  default:
+    break;
+  }
+
+  return NULL;
 }
 
 // return true if we are sure this vertex represents an input dependency
@@ -1411,16 +1392,14 @@ static void record_expression_dependencies(VERTEX *sink, Type sink_type, CONDITI
 	record_expression_dependencies(sink,sink_type,cond,new_kind,&new_mod,object,
 				       aug_graph);
       } else if ((decl = local_call_p(e)) != NULL) {
+  Use use = value_use_use(funcall_f(e));
 	Declaration result = some_function_decl_result(decl);
 	Expression actual = first_Actual(funcall_actuals(e));
 	/* first depend on the arguments (not carrying, no fibers) */
 	if (mod == NO_MODIFIER) {
-    int actual_index = 0;
 	  for (;actual!=NULL; actual=Expression_info(actual)->next_actual) {
 
-      if (is_in_function_p(e) || funcall_actual_is_circular(e, actual_index, decl)) {
-        new_kind &= ~DEPENDENCY_MAYBE_SIMPLE;
-      } else {
+      if (!funcall_actual_is_monotone_use(e, actual, use, decl)) {
         new_kind |= DEPENDENCY_MAYBE_SIMPLE;
       }
 
@@ -1428,7 +1407,6 @@ static void record_expression_dependencies(VERTEX *sink, Type sink_type, CONDITI
 					   new_kind&~DEPENDENCY_MAYBE_CARRYING,
 					   NO_MODIFIER,actual,aug_graph);
       new_kind = kind; // restore new_kind
-      actual_index++;
 	  }
 	}
 
@@ -1437,9 +1415,7 @@ static void record_expression_dependencies(VERTEX *sink, Type sink_type, CONDITI
 	 *	 tnode_line_number(e),decl_name(decl));
 	 */
 	{
-    if (is_in_function_p(e) || funcall_result_is_circular(sink_type, e, decl)) {
-      new_kind &= ~DEPENDENCY_MAYBE_SIMPLE;
-    } else {
+    if (!funcall_result_is_monotone_use(sink_type, e, use, decl)) {
       new_kind |= DEPENDENCY_MAYBE_SIMPLE;
     }
 
@@ -1451,10 +1427,16 @@ static void record_expression_dependencies(VERTEX *sink, Type sink_type, CONDITI
 	  add_edges_to_graph(&source,sink,cond,new_kind,aug_graph);
 	}
       } else {
+        Use use = NULL;
+        Declaration fdecl = funcall_f_decl(e, &use);
+
 	/* some random (external) function call */
 	Expression actual = first_Actual(funcall_actuals(e));
 	for (; actual != NULL; actual=Expression_info(actual)->next_actual) {
-	  record_expression_dependencies(sink,sink_type,cond,kind,mod,
+        Declaration formal = function_actual_formal(fdecl, actual, e);
+        Declaration_info(formal)->is_circular = funcall_actual_is_monotone_use(e, actual, use, fdecl);
+
+	  record_expression_dependencies(sink,sink_type,cond,new_kind,mod,
 					 actual,aug_graph);
 	}
       }

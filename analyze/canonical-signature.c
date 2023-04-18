@@ -708,22 +708,22 @@ void initialize_canonical_signature(Declaration module_TYPE_decl, Declaration mo
 /**
  * Given a signature, it returns whether it contains module declaration
  * @param sig signature
- * @param mdecl module declaration
+ * @param module_or_class_decl module or class declaration
  * @return boolean indicating if module is in the type hierarchy of signature
  */
-bool signature_hierarchy_contains(Signature sig, Declaration mdecl)
+bool signature_hierarchy_contains(Signature sig, Declaration module_or_class_decl)
 {
   switch (Signature_KEY(sig))
   {
   case KEYsig_inst:
     Declaration some_mdecl = USE_DECL(class_use_use(sig_inst_class(sig)));
-    return some_mdecl == mdecl ||
-           signature_hierarchy_contains(some_class_decl_parent(some_mdecl), mdecl);
+    return some_mdecl == module_or_class_decl ||
+           signature_hierarchy_contains(some_class_decl_parent(some_mdecl), module_or_class_decl);
   case KEYmult_sig:
-    return signature_hierarchy_contains(mult_sig_sig1(sig), mdecl) ||
-           signature_hierarchy_contains(mult_sig_sig2(sig), mdecl);
+    return signature_hierarchy_contains(mult_sig_sig1(sig), module_or_class_decl) ||
+           signature_hierarchy_contains(mult_sig_sig2(sig), module_or_class_decl);
   case KEYsig_use:
-    return USE_DECL(sig_use_use(sig)) == mdecl;
+    return USE_DECL(sig_use_use(sig)) == module_or_class_decl;
   case KEYno_sig:
   case KEYfixed_sig:
     return false;
@@ -733,12 +733,12 @@ bool signature_hierarchy_contains(Signature sig, Declaration mdecl)
 /**
  * Given a canonical signature, it returns whether it contains module declaration
  * @param csig canonical signature
- * @param mdecl module declaration
+ * @param module_or_class_decl module or class declaration
  * @return boolean indicating if module is in the type hierarchy of signature
  */
-bool canonical_signature_hierarchy_contains(CanonicalSignature* csig, Declaration mdecl)
+bool canonical_signature_hierarchy_contains(CanonicalSignature* csig, Declaration module_or_class_decl)
 {
-  if (csig->source_class == mdecl) return true;
+  if (csig->source_class == module_or_class_decl) return true;
 
-  return signature_hierarchy_contains(some_class_decl_parent(csig->source_class), mdecl);
+  return signature_hierarchy_contains(some_class_decl_parent(csig->source_class), module_or_class_decl);
 }
