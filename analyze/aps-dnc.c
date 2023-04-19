@@ -1059,7 +1059,6 @@ BOOL decl_is_circular(Declaration d)
   case KEYformal:
     return Declaration_info(d)->is_circular;
   default:
-    aps_error(d, "Not sure how to detect circularity of declaration key %d", Declaration_KEY(d));
     return FALSE;
   }
 }
@@ -1368,15 +1367,6 @@ static void record_expression_dependencies(VERTEX *sink, Type sink_type, CONDITI
 	source.node = NULL;
 	source.attr = decl;
 	source.modifier = mod;
-
-  if (mod != NULL && mod->field != NULL) {
-    if (decl_is_circular(mod->field)) {
-      new_kind &= ~DEPENDENCY_MAYBE_SIMPLE;
-    } else {
-      new_kind |= DEPENDENCY_MAYBE_SIMPLE;
-    }
-  }
-  
 	if (vertex_is_output(&source)) aps_warning(e,"Dependence on output value");
 	add_edges_to_graph(&source,sink,cond,new_kind,aug_graph);
       }
@@ -1688,7 +1678,7 @@ static void *get_edges(void *vaug_graph, void *node) {
 	return NULL;
       case KEYformal:
 	{ Declaration case_stmt = formal_in_case_p(decl);
-    Type sink_type = formal_type(decl);
+    Type sink_type = infer_formal_type(decl);
 	  if (case_stmt != NULL) {
 	    Expression expr = some_case_stmt_expr(case_stmt);
 	    VERTEX f;
