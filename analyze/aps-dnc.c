@@ -1087,7 +1087,8 @@ static BOOL canonical_type_is_lattice_type(CanonicalType* ctype) {
   return FALSE;
 }
 
-static BOOL funcall_result_is_monotone_use(Type sink_type, Expression expr, Use use, Declaration fdecl) {
+static BOOL funcall_result_is_monotone_use(Type sink_type, Expression expr, Declaration fdecl) {
+  Use use = value_use_use(funcall_f(expr));
   TypeEnvironment te = USE_TYPE_ENV(use);
 
   if (analysis_debug & ADD_EDGE) {
@@ -1119,7 +1120,8 @@ static BOOL funcall_result_is_monotone_use(Type sink_type, Expression expr, Use 
   return fdecl_return_ctype == sink_ctype && canonical_type_is_lattice_type(fdecl_return_ctype);
 }
 
-static BOOL funcall_actual_is_monotone_use(Expression expr, Expression actual, Use use, Declaration fdecl) {
+static BOOL funcall_actual_is_monotone_use(Expression expr, Expression actual, Declaration fdecl) {
+  Use use = value_use_use(funcall_f(expr));
   TypeEnvironment te = USE_TYPE_ENV(use);
 
   if (analysis_debug & ADD_EDGE) {
@@ -1356,14 +1358,13 @@ static void record_expression_dependencies(VERTEX *sink, Type sink_type, CONDITI
 	record_expression_dependencies(sink,sink_type,cond,new_kind,&new_mod,object,
 				       aug_graph);
       } else if ((decl = local_call_p(e)) != NULL) {
-  Use use = value_use_use(funcall_f(e));
 	Declaration result = some_function_decl_result(decl);
 	Expression actual = first_Actual(funcall_actuals(e));
 	/* first depend on the arguments (not carrying, no fibers) */
 	if (mod == NO_MODIFIER) {
 	  for (;actual!=NULL; actual=Expression_info(actual)->next_actual) {
 
-      if (!funcall_actual_is_monotone_use(e, actual, use, decl)) {
+      if (!funcall_actual_is_monotone_use(e, actual, decl)) {
         new_kind |= DEPENDENCY_MAYBE_SIMPLE;
       }
 
@@ -1379,7 +1380,7 @@ static void record_expression_dependencies(VERTEX *sink, Type sink_type, CONDITI
 	 *	 tnode_line_number(e),decl_name(decl));
 	 */
 	{
-    if (!funcall_result_is_monotone_use(sink_type, e, use, decl)) {
+    if (!funcall_result_is_monotone_use(sink_type, e, decl)) {
       new_kind |= DEPENDENCY_MAYBE_SIMPLE;
     }
 
