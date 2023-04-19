@@ -1146,7 +1146,7 @@ static BOOL funcall_actual_is_monotone_use(Expression expr, Expression actual, U
 
   Declaration formal = function_type_actual_formal(func_type, actual, expr);
 
-  Type formal_ty = type_subst(use, formal_type(formal));
+  Type formal_ty = type_subst(use, infer_formal_type(formal));
   Type actual_ty = infer_expr_type(actual);
 
   if (analysis_debug & ADD_EDGE) {
@@ -1437,16 +1437,23 @@ static void record_expression_dependencies(VERTEX *sink, Type sink_type, CONDITI
 	  source.attr = result;
 	  source.modifier = mod;
 	  if (vertex_is_output(&source)) aps_warning(e,"Dependence on output value");
-	  add_edges_to_graph(&source,sink,cond,new_kind,aug_graph);
+
+    if (Declaration_KEY(decl) == KEYfunction_decl && some_function_decl_result(decl) == result) {
+      if (analysis_debug & ADD_EDGE) {
+        printf("skipped adding an edge between: ");
+        print_dep_vertex(&source, stdout);
+        printf("->");
+        print_dep_vertex(sink, stdout);
+        printf("\n");
+      }
+    } else {
+      add_edges_to_graph(&source,sink,cond,new_kind,aug_graph);
+    }
 	}
       } else {
         Use use = NULL;
         Declaration fdecl = funcall_f_decl(e, &use);
         Type fdecl_type = NULL;
-        
-        printf("=> funcall lineno %d\n", tnode_line_number(e));
-        dump_lisp_Expression(e);
-        printf("\n");
 
         if (Declaration_KEY(fdecl) == KEYconstructor_decl) {
           fdecl_type = constructor_decl_type(fdecl);
@@ -1456,21 +1463,9 @@ static void record_expression_dependencies(VERTEX *sink, Type sink_type, CONDITI
           fdecl_type = some_function_decl_type(fdecl);
         }
 
-        printf("use: ");
-        print_Use(use, stdout);
-        printf("\n");
-
-        printf("=> sink: ");
-        print_dep_vertex(sink, stdout);
-        printf("\n");
-
 	/* some random (external) function call */
 	Expression actual = first_Actual(funcall_actuals(e));
 	for (; actual != NULL; actual=Expression_info(actual)->next_actual) {
-        printf("=> actual lineno %d\n", tnode_line_number(e));
-        dump_lisp_Expression(actual);
-        printf("\n");
-
         Declaration formal = function_type_actual_formal(fdecl_type, actual, e);
         Declaration_info(formal)->is_circular = funcall_actual_is_monotone_use(e, actual, use, fdecl, fdecl_type);
 
@@ -1827,7 +1822,23 @@ static void *get_edges(void *vaug_graph, void *node) {
 	  VERTEX sink;
 	  sink.node = 0;
 	  sink.modifier = NO_MODIFIER;
+
+      Expression case_expr = some_case_stmt_expr(decl);
+      BOOL case_expr_is_circular = canonical_type_is_lattice_type(canonical_type(infer_expr_type(case_expr)));
+
 	  for (m=first_Match(some_case_stmt_matchers(decl)); m; m=MATCH_NEXT(m)) {
+
+      if (case_expr_is_circular) {
+          Declaration match_formal = match_first_rhs_decl(m);
+          while (match_formal != NULL) {
+            if (canonical_type_is_lattice_type(canonical_type(infer_formal_type(match_formal)))) {
+              Declaration_info(match_formal)->is_circular = true;
+            }
+
+            match_formal = next_rhs_decl(match_formal);
+          }
+      }
+
 	    Expression test = Match_info(m)->match_test;
 	    sink.attr = (Declaration)m;
       Type sink_type = infer_expr_type(test);
