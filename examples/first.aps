@@ -16,7 +16,7 @@ module FIRST[T :: var GRAMMAR[]] extends T begin
   circular attribute Items.items_first : SymbolLattice;
   pragma synthesized(items_first);
 
-  circular attribute Grammar.grammar_first : DeclarationTable;
+  attribute Grammar.grammar_first : DeclarationTable;
   pragma synthesized(grammar_first);
 
   epsilon : Symbol := make_symbol("epsilon");
