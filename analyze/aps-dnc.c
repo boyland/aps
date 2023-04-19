@@ -1164,31 +1164,6 @@ static BOOL funcall_actual_is_monotone_use(Expression expr, Expression actual, U
   return formal_ctype == actual_ctype && canonical_type_is_lattice_type(formal_ctype);
 }
 
-static Declaration funcall_f_decl(Expression e, Use* use) {
-  switch (Expression_KEY(e))
-  {
-  case KEYfuncall:
-    return funcall_f_decl(funcall_f(e), use);
-  case KEYvalue_use:
-    *use = value_use_use(e);
-    Declaration func = USE_DECL(*use);
-    switch (Declaration_KEY(func))
-    {
-    case KEYsome_value_decl:
-      return func;
-    case KEYvalue_renaming:
-      return funcall_f_decl(value_renaming_old(func), use);
-    default:
-      return NULL;
-    }
-    break;
-  default:
-    break;
-  }
-
-  return NULL;
-}
-
 // return true if we are sure this vertex represents an input dependency
 static BOOL vertex_is_input(VERTEX* v) 
 {
@@ -1441,24 +1416,9 @@ static void record_expression_dependencies(VERTEX *sink, Type sink_type, CONDITI
     }
 	}
       } else {
-        Use use = NULL;
-        Declaration fdecl = funcall_f_decl(e, &use);
-        Type fdecl_type = NULL;
-
-        if (Declaration_KEY(fdecl) == KEYconstructor_decl) {
-          fdecl_type = constructor_decl_type(fdecl);
-        } else if (Declaration_KEY(fdecl) == KEYattribute_decl) {
-          fdecl_type = attribute_decl_type(fdecl);
-        } else {
-          fdecl_type = some_function_decl_type(fdecl);
-        }
-
 	/* some random (external) function call */
 	Expression actual = first_Actual(funcall_actuals(e));
 	for (; actual != NULL; actual=Expression_info(actual)->next_actual) {
-        Declaration formal = function_type_actual_formal(fdecl_type, actual, e);
-        Declaration_info(formal)->is_circular = funcall_actual_is_monotone_use(e, actual, use, fdecl, fdecl_type);
-
 	  record_expression_dependencies(sink,sink_type,cond,new_kind,mod,
 					 actual,aug_graph);
 	}
@@ -1822,7 +1782,7 @@ static void *get_edges(void *vaug_graph, void *node) {
           Declaration match_formal = match_first_rhs_decl(m);
           while (match_formal != NULL) {
             if (canonical_type_is_lattice_type(canonical_type(infer_formal_type(match_formal)))) {
-              Declaration_info(match_formal)->is_circular = true;
+              Declaration_info(match_formal)->is_circular = TRUE;
             }
 
             match_formal = next_rhs_decl(match_formal);
