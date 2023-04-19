@@ -729,7 +729,7 @@ static CanonicalType *canonical_type_use_use_join(struct Canonical_use_type *cty
     break;
   }
   default:
-    return new_canonical_type_qual((CanonicalType *)ctype_outer, ctype_inner->decl);
+    fatal_error("Not sure what type of canonical type it is");
   }
 
   Declaration decl = ctype_inner->decl;
