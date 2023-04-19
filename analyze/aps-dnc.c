@@ -1087,22 +1087,7 @@ static BOOL canonical_type_is_lattice_type(CanonicalType* ctype) {
   return FALSE;
 }
 
-static Declaration function_type_actual_formal(Type func_type, Expression actual, Expression call) {
-  Expression expr;
-  Declaration f;
-  Declarations formals = function_type_formals(func_type);
-  Actuals actuals = funcall_actuals(call);
-  for (expr = first_Actual(actuals), f = first_Declaration(formals);
-       expr != NULL && f != NULL && expr != actual;
-       expr = Expression_info(expr)->next_expr, f = DECL_NEXT(f)) {
-    /* nothing */
-  }
-  if (expr == NULL || f == NULL)
-    fatal_error("%d: cannot find formal",tnode_line_number(actuals));
-  return f;
-}
-
-static BOOL funcall_result_is_monotone_use(Type sink_type, Expression expr, Use use, Declaration fdecl, Type fdecl_type) {
+static BOOL funcall_result_is_monotone_use(Type sink_type, Expression expr, Use use, Declaration fdecl) {
   TypeEnvironment te = USE_TYPE_ENV(use);
 
   if (analysis_debug & ADD_EDGE) {
@@ -1112,6 +1097,7 @@ static BOOL funcall_result_is_monotone_use(Type sink_type, Expression expr, Use 
     printf("\n");
   }
 
+  Type fdecl_type = some_function_decl_type(fdecl);
   Declaration formal = first_Declaration(function_type_formals(fdecl_type));
   Expression actual = first_Actual(funcall_actuals(expr));
 
@@ -1133,7 +1119,7 @@ static BOOL funcall_result_is_monotone_use(Type sink_type, Expression expr, Use 
   return fdecl_return_ctype == sink_ctype && canonical_type_is_lattice_type(fdecl_return_ctype);
 }
 
-static BOOL funcall_actual_is_monotone_use(Expression expr, Expression actual, Use use, Declaration fdecl, Type func_type) {
+static BOOL funcall_actual_is_monotone_use(Expression expr, Expression actual, Use use, Declaration fdecl) {
   TypeEnvironment te = USE_TYPE_ENV(use);
 
   if (analysis_debug & ADD_EDGE) {
@@ -1143,7 +1129,7 @@ static BOOL funcall_actual_is_monotone_use(Expression expr, Expression actual, U
     printf("\n");
   }
 
-  Declaration formal = function_type_actual_formal(func_type, actual, expr);
+  Declaration formal = function_actual_formal(fdecl, actual, expr);
 
   Type formal_ty = type_subst(use, infer_formal_type(formal));
   Type actual_ty = infer_expr_type(actual);
@@ -1377,7 +1363,7 @@ static void record_expression_dependencies(VERTEX *sink, Type sink_type, CONDITI
 	if (mod == NO_MODIFIER) {
 	  for (;actual!=NULL; actual=Expression_info(actual)->next_actual) {
 
-      if (!funcall_actual_is_monotone_use(e, actual, use, decl, some_function_decl_type(decl))) {
+      if (!funcall_actual_is_monotone_use(e, actual, use, decl)) {
         new_kind |= DEPENDENCY_MAYBE_SIMPLE;
       }
 
@@ -1393,7 +1379,7 @@ static void record_expression_dependencies(VERTEX *sink, Type sink_type, CONDITI
 	 *	 tnode_line_number(e),decl_name(decl));
 	 */
 	{
-    if (!funcall_result_is_monotone_use(sink_type, e, use, decl, some_function_decl_type(decl))) {
+    if (!funcall_result_is_monotone_use(sink_type, e, use, decl)) {
       new_kind |= DEPENDENCY_MAYBE_SIMPLE;
     }
 
