@@ -1087,6 +1087,16 @@ static BOOL canonical_type_is_lattice_type(CanonicalType* ctype) {
   return FALSE;
 }
 
+/**
+ * Utility function that detects if use of result of some function call is monotone
+ * by checking if the result of function call equals the LHS type and is extending
+ * lattice.
+ * 
+ * @param sink_type LHS type
+ * @param expr function call expression
+ * @param fdecl function declaration
+ * @return BOOL indicating whether result of some function call is monotone
+ */
 static BOOL funcall_result_is_monotone_use(Type sink_type, Expression expr, Declaration fdecl) {
   Use use = value_use_use(funcall_f(expr));
   TypeEnvironment te = USE_TYPE_ENV(use);
@@ -1099,8 +1109,6 @@ static BOOL funcall_result_is_monotone_use(Type sink_type, Expression expr, Decl
   }
 
   Type fdecl_type = some_function_decl_type(fdecl);
-  Declaration formal = first_Declaration(function_type_formals(fdecl_type));
-  Expression actual = first_Actual(funcall_actuals(expr));
 
   // return type should be equal to sink type and be circular
   Type fdecl_return_type = type_subst(use, function_type_return_type(fdecl_type));
@@ -1120,6 +1128,15 @@ static BOOL funcall_result_is_monotone_use(Type sink_type, Expression expr, Decl
   return fdecl_return_ctype == sink_ctype && canonical_type_is_lattice_type(fdecl_return_ctype);
 }
 
+/**
+ * Utility function that detects if use of actual of some function call is monotone
+ * by checking if formal and actual type are equal and is extending lattice.
+ * 
+ * @param expr function call expression
+ * @param actual function call actual expression
+ * @param fdecl function declaration
+ * @return BOOL indicating whether use of actual of some function call is monotone
+ */
 static BOOL funcall_actual_is_monotone_use(Expression expr, Expression actual, Declaration fdecl) {
   Use use = value_use_use(funcall_f(expr));
   TypeEnvironment te = USE_TYPE_ENV(use);

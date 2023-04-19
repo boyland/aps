@@ -29,7 +29,7 @@ enum instance_direction instance_direction(INSTANCE *);
 
 extern BOOL fiber_attr_circular(FIBERED_ATTRIBUTE* fiber_attr);
 extern BOOL instance_circular(INSTANCE* in);
-extern BOOL decl_is_circular(Declaration);
+extern BOOL decl_is_circular(Declaration d);
 
 typedef unsigned DEPENDENCY;
 
