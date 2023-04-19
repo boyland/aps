@@ -67,7 +67,7 @@ module FIRST[T :: var GRAMMAR[]] extends T begin
 
   end;
 
-  var function contains_epsilon(s_set: SymbolLattice) : OrLattice begin
+  var function contains_epsilon(s_set: Symbols) : Boolean begin
     result := Symbols$member(epsilon, s_set);
   end;
 
