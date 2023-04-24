@@ -1418,7 +1418,7 @@ static void record_expression_dependencies(VERTEX *sink, Type sink_type, CONDITI
       
       new_kind &= ~DEPENDENCY_MAYBE_SIMPLE;
     }
-      add_edges_to_graph(&source,sink,cond,new_kind,aug_graph);
+	  add_edges_to_graph(&source,sink,cond,new_kind,aug_graph);
 	}
       } else {
 	/* some random (external) function call */
