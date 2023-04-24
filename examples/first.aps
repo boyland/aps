@@ -67,11 +67,11 @@ module FIRST[T :: var GRAMMAR[]] extends T begin
 
   end;
 
-  var function contains_epsilon(s_set: Symbols) :Boolean begin
+  function contains_epsilon(s_set: Symbols) :Boolean begin
     result := Symbols$member(epsilon, s_set);
   end;
 
-  var function black_dot(s1 :SymbolLattice; s2 :SymbolLattice) : SymbolLattice begin
+  function black_dot(s1 :SymbolLattice; s2 :SymbolLattice) : SymbolLattice begin
     if contains_epsilon(s1) then
       result := (s1 /\~ { epsilon }) \/ s2;
     else

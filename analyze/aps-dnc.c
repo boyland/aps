@@ -1313,7 +1313,9 @@ static void record_expression_dependencies(VERTEX *sink, Type sink_type, CONDITI
     { Declaration decl=Use_info(value_use_use(e))->use_decl;
       Declaration rdecl;
       int new_kind = kind;
-      if (!decl_is_circular(mod != NULL && mod->field != NULL ? mod->field : decl))
+      if (!decl_is_circular(decl) && mod == NO_MODIFIER) {
+         new_kind |= DEPENDENCY_MAYBE_SIMPLE;
+      }
       if (decl == NULL)
 	fatal_error("%d: unbound expression",tnode_line_number(e));
       if (DECL_IS_LOCAL(decl) &&
@@ -1364,7 +1366,7 @@ static void record_expression_dependencies(VERTEX *sink, Type sink_type, CONDITI
 	if (vertex_is_output(&source)) aps_warning(e,"Dependence on output value");
 	add_edges_to_graph(&source,sink,cond,new_kind,aug_graph);
       } else if ((decl = field_ref_p(e)) != NULL) {
-  if (!decl_is_circular(decl)) new_kind |= DEPENDENCY_MAYBE_SIMPLE; else new_kind = kind;
+  if (!decl_is_circular(decl) && mod == NO_MODIFIER) new_kind |= DEPENDENCY_MAYBE_SIMPLE; else new_kind = kind;
 	Expression object = field_ref_object(e);
 	new_mod.field = decl;
 	new_mod.next = mod;
@@ -1408,6 +1410,7 @@ static void record_expression_dependencies(VERTEX *sink, Type sink_type, CONDITI
 	  source.modifier = mod;
 	  if (vertex_is_output(&source)) aps_warning(e,"Dependence on output value");
 
+    // XXX: If we have procedure, this code needs to be revisted.
     if (Declaration_KEY(decl) == KEYfunction_decl && some_function_decl_result(decl) == result) {
       if (analysis_debug & ADD_EDGE) {
         printf("skipped adding a SIMPLE edge between: ");
@@ -1787,6 +1790,7 @@ static void *get_edges(void *vaug_graph, void *node) {
       if (case_expr_is_circular) {
           Declaration match_formal = match_first_rhs_decl(m);
           while (match_formal != NULL) {
+            // XXX: strictly should look at the parent calls in-between
             if (canonical_type_is_lattice_type(canonical_type(infer_formal_type(match_formal)))) {
               Declaration_info(match_formal)->is_circular = TRUE;
             }
