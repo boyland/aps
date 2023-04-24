@@ -1733,6 +1733,9 @@ OSET doOU(Expression e, USET uset)
 		  add_to_uset(sdecl,uset);
 		  RETURN get_oset(sdecl);
 		} else {
+		  //XXX: FIx this warning
+	          // DECL_IS_RHS is set for pattern variables that are not syntax
+		  // And it's OK to read "lineno" or other phylum/syntax things
 		  aps_warning(e,"using a syntax decl");
 		  add_to_uset(sdecl,uset);
 		  RETURN get_oset(sdecl);
