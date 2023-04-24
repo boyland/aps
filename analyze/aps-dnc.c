@@ -1342,6 +1342,7 @@ static void record_expression_dependencies(VERTEX *sink, Type sink_type, CONDITI
 	source.attr = decl;
 	source.modifier = mod;
 	if (vertex_is_output(&source)) aps_warning(e,"Dependence on output value");
+	new_kind &= ~DEPENDENCY_MAYBE_SIMPLE;
 	add_edges_to_graph(&source,sink,cond,new_kind,aug_graph);
       } else {
 	source.node = NULL;
