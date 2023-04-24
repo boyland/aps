@@ -1313,7 +1313,9 @@ static void record_expression_dependencies(VERTEX *sink, Type sink_type, CONDITI
     { Declaration decl=Use_info(value_use_use(e))->use_decl;
       Declaration rdecl;
       int new_kind = kind;
-      if (!decl_is_circular(mod != NULL && mod->field != NULL ? mod->field : decl))
+      if (!decl_is_circular(mod != NULL && mod->field != NULL ? mod->field : decl)) {
+         new_kind |= DEPENDENCY_MAYBE_SIMPLE;
+      }
       if (decl == NULL)
 	fatal_error("%d: unbound expression",tnode_line_number(e));
       if (DECL_IS_LOCAL(decl) &&
