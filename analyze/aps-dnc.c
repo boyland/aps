@@ -1409,15 +1409,16 @@ static void record_expression_dependencies(VERTEX *sink, Type sink_type, CONDITI
 
     if (Declaration_KEY(decl) == KEYfunction_decl && some_function_decl_result(decl) == result) {
       if (analysis_debug & ADD_EDGE) {
-        printf("skipped adding an edge between: ");
+        printf("skipped adding a SIMPLE edge between: ");
         print_dep_vertex(&source, stdout);
         printf("->");
         print_dep_vertex(sink, stdout);
         printf("\n");
       }
-    } else {
-      add_edges_to_graph(&source,sink,cond,new_kind,aug_graph);
+      
+      new_kind &= ~DEPENDENCY_MAYBE_SIMPLE;
     }
+      add_edges_to_graph(&source,sink,cond,new_kind,aug_graph);
 	}
       } else {
 	/* some random (external) function call */
