@@ -1360,7 +1360,7 @@ static void record_expression_dependencies(VERTEX *sink, Type sink_type, CONDITI
     { Declaration decl;
       int new_kind = kind;
       if ((decl = attr_ref_p(e)) != NULL) {
-  if (!decl_is_circular(decl)) new_kind |= DEPENDENCY_MAYBE_SIMPLE; else new_kind = kind;
+  if (!decl_is_circular(decl) && mod == NO_MODIFIER) new_kind |= DEPENDENCY_MAYBE_SIMPLE; else new_kind = kind;
 	source.node = attr_ref_node_decl(e);
 	source.attr = decl;
 	source.modifier = mod;
@@ -1557,7 +1557,7 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
       Declaration field, attr, fdecl, decl;
       VERTEX sink;
       if ((field = field_ref_p(lhs)) != NULL) {
-  if (!decl_is_circular(field)) new_kind |= DEPENDENCY_MAYBE_SIMPLE; else new_kind = kind;
+  if (!decl_is_circular(field) && mod == NO_MODIFIER) new_kind |= DEPENDENCY_MAYBE_SIMPLE; else new_kind = kind;
 	/* Assignment of a field, or a field of a field */
 	Expression object = field_ref_object(lhs);
 	MODIFIER new_mod;
@@ -1571,7 +1571,7 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
 	record_lhs_dependencies(object,cond,control_dependency,
 				&new_mod,object,aug_graph);
       } else if ((attr = attr_ref_p(lhs)) != NULL) {
-  if (!decl_is_circular(attr)) new_kind |= DEPENDENCY_MAYBE_SIMPLE; else new_kind = kind;
+  if (!decl_is_circular(attr) && mod == NO_MODIFIER) new_kind |= DEPENDENCY_MAYBE_SIMPLE; else new_kind = kind;
 	sink.node = attr_ref_node_decl(lhs);
 	sink.attr = attr;
 	sink.modifier = mod;
@@ -1580,7 +1580,7 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
 	record_expression_dependencies(&sink,sink_type,cond,kind,NULL,rhs,aug_graph);
 	record_condition_dependencies(&sink,cond,aug_graph);
       } else if ((fdecl = local_call_p(lhs)) != NULL) {     
-	if (!decl_is_circular(fdecl)) new_kind |= DEPENDENCY_MAYBE_SIMPLE; else new_kind = kind;
+	if (!decl_is_circular(fdecl) && mod == NO_MODIFIER) new_kind |= DEPENDENCY_MAYBE_SIMPLE; else new_kind = kind;
 	Declaration result = some_function_decl_result(decl);
 	Declaration proxy = Expression_info(lhs)->funcall_proxy;
 	if (mod == NO_MODIFIER) {
