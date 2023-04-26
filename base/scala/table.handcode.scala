@@ -92,8 +92,8 @@ class M_TABLE_LATTICE[T_KeyType, T_ValueType] (
   extends M_TABLE[T_KeyType, T_ValueType](_name, _t_KeyType, _t_ValueType)
   with C_TABLE_LATTICE[T_TABLE[T_KeyType,T_ValueType],T_KeyType,T_ValueType] {
 
-  override val v_join = v_combine
-  override val v_meet = f_meet
+  override val v_join: (T_TABLE[T_KeyType, T_ValueType], T_TABLE[T_KeyType, T_ValueType]) => T_TABLE[T_KeyType, T_ValueType] = v_combine
+  override val v_meet: (T_TABLE[T_KeyType, T_ValueType], T_TABLE[T_KeyType, T_ValueType]) => T_TABLE[T_KeyType, T_ValueType] = f_meet
 
   def f_meet(v_t1 :T_Result, v_t2 :T_Result) :T_Result = {
     var result :Table = v_empty_table
@@ -105,10 +105,10 @@ class M_TABLE_LATTICE[T_KeyType, T_ValueType] (
     result
   };
 
-  override def v_bottom = v_empty_table
+  override def v_bottom: T_TABLE[T_KeyType, T_ValueType] = v_empty_table
 
   // v1 != v2 && v1 <= v2 --> v1 < v2
-  override val v_compare = (x, y) => v_compare_equal(x, y) && !v_equal(x, y)
+  override val v_compare: (T_TABLE[T_KeyType, T_ValueType], T_TABLE[T_KeyType, T_ValueType]) => T_Boolean = (x, y) => v_compare_equal(x, y) && !v_equal(x, y)
 
-  override val v_compare_equal = (x, y) => (x.keySet subsetOf y.keySet) && (x.keySet & y.keySet).forall(key => _t_ValueType.v_compare_equal(x(key), y(key)))
+  override val v_compare_equal: (T_TABLE[T_KeyType, T_ValueType], T_TABLE[T_KeyType, T_ValueType]) => T_Boolean = (x, y) => (x.keySet subsetOf y.keySet) && (x.keySet & y.keySet).forall(key => _t_ValueType.v_compare_equal(x(key), y(key)))
 }
