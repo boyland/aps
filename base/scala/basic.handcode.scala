@@ -1,14 +1,16 @@
 import Evaluation._;
 
 object basic_implicit {
+  private def eager[T](f: (=>T, =>T) => T): (T, T) => T = (a: T, b: T) => f(a, b);
+
   val t_Boolean = new M_BOOLEAN("Boolean");
   type T_Boolean = Boolean;
   val v_true:T_Boolean = true;
   val v_false:T_Boolean = false;
   val v_and = f_and _;
-  def f_and(v__23 : T_Boolean, v__24 : T_Boolean):T_Boolean = v__23 && v__24;
+  def f_and(v__23: => T_Boolean, v__24: => T_Boolean): T_Boolean = v__23 && v__24;
   val v_or = f_or _;
-  def f_or(v__25 : T_Boolean, v__26 : T_Boolean):T_Boolean = v__25 || v__26;
+  def f_or(v__25: => T_Boolean, v__26: => T_Boolean): T_Boolean = v__25 || v__26;
   val v_not = f_not _;
   def f_not(v__27 : T_Boolean):T_Boolean = !v__27;
 
@@ -51,7 +53,7 @@ object basic_implicit {
 
   type T_MAKE_LATTICE[L] = L;
 
-  val t_OrLattice = new M_MAKE_LATTICE[T_Boolean]("OrLattice",t_Boolean,v_false,v_cand,v_implies,v_or,v_and)
+  val t_OrLattice = new M_MAKE_LATTICE[T_Boolean]("OrLattice",t_Boolean,v_false,v_cand,v_implies,eager(v_or),eager(v_and))
     with C_TYPE[Boolean]
     with C_COMBINABLE[Boolean]
     with C_LATTICE[Boolean] {
@@ -61,7 +63,7 @@ object basic_implicit {
   }
   type T_OrLattice = T_Boolean;
 
-  val t_AndLattice = new M_MAKE_LATTICE[T_Boolean]("AndLattice",t_Boolean,v_true,v_andc,v_revimplies,v_and,v_or)
+  val t_AndLattice = new M_MAKE_LATTICE[T_Boolean]("AndLattice",t_Boolean,v_true,v_andc,v_revimplies,eager(v_and),eager(v_or))
     with C_TYPE[Boolean]
     with C_COMBINABLE[Boolean]
     with C_LATTICE[Boolean] {
