@@ -286,7 +286,7 @@ static void* do_typechecking(void* ignore, void*node) {
             print_Type(some_value_decl_type(tdecl), f);
             fclose(f);
             aps_error(tdecl, "Expected use of a type declaration, not a type construction (%s).", value_decl_type_str);
-            break;
+            return 0;
           }
           default:
             break;
