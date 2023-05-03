@@ -130,9 +130,24 @@ The variables not involved in cyclic dependencies (e.g., ``A,'' ``B''
 and ``G'') are \emph{not} evaluated in a loop, and indeed it would
 waste evaluation time to do so.
 
-Consider the following dependency graph with vertices for A, B, C, D, E, F, G
-on the left of the following figure. On the right is a representation the quasi partial order for the dependency relation on the left.  Below, we have one possible quasi total order (schedule) for the dependency relation:
+The conventional way to handle possibly cyclic dependencies is to use
+a strongly-connected subcomments analysis of the dependency graph.
+This analysis does not however distinguish the case of ``E'' (a vertex
+that depends on itself, but is not involved in a ayclce with any other
+vertex) from ``B'' (a vertex that is involved in no cycles at all).
 
+This paper provides a foundation for a practice that distinguishes the
+case of non-cyclic vertices from vertices involved cyclicly only with
+itself.
+It defines a ``quasi order'' to cover the transitive closure of a
+depednency graph and a ``quasi total order'' to handle the linearization
+of a quasi order.
+
+\section{Example}
+
+If we perform transitive closure on the dependency graoh  (repeated
+for convenience on the left), and then display the resulting relation
+in transitively reduced form, we have the relation on the right:
 \begin{quote}
 \begin{picture}(140,64)(0,-20)
   \put(10,40){\makebox(0,0){A}}
@@ -166,18 +181,72 @@ on the left of the following figure. On the right is a representation the quasi 
   \put(102,20){\vector(1,0){10}}
   \put(124,24){\vector(1,1){13}}
   \put(124,16){\vector(1,-1){14}}
-  %
-  \put(40,-20){\makebox(0,0){A}}
-  \put(60,-20){\makebox(0,0){B}}
-  \put(80,-20){\makebox(0,0){\{C,D,F\}}}
-  \put(100,-20){\makebox(0,0){\{E\}}}
-  \put(120,-20){\makebox(0,0){G}}
-  \put(42,-20){\vector(1,0){16}}
-  \put(62,-20){\vector(1,0){10}}
-  \put(88,-20){\vector(1,0){8}}
-  \put(104,-20){\vector(1,0){14}}
 \end{picture}
 \end{quote}
+The right-hand side is a picture of a ``quasi order.''
+
+While any transitive relation is a quasi order, 
+the pictures shows our purpose: cyclic-dependent vertices are grouped
+in sets, while vertices not so involved are not placed in sets.  As we
+prove in the formal part of this paper, a quasi order is isomorphic
+to a partial order over the union of the non-cyclic vertices with the
+set of strongly connected sets of cyclic vertices.
+
+It is well known (order-extension theorem) that any partial order can
+be linearized into a total order.\footnote{%
+  This proof of this result depends on the axiom of choice, and so may
+  not hold for certain infinite partial orders, but in this paper we
+  are only interested in finite orders.}
+The same concept applies for quasi orders except that we do not want
+the linearizatin to combine vertices together that were not already
+combined.  Rather we end up with a quasi order such as the following:
+\begin{quote}
+  \begin{picture}(80,10)(40,-25)  
+    \put(40,-20){\makebox(0,0){A}}
+    \put(60,-20){\makebox(0,0){B}}
+    \put(80,-20){\makebox(0,0){\{C,D,F\}}}
+    \put(100,-20){\makebox(0,0){\{E\}}}
+    \put(120,-20){\makebox(0,0){G}}
+    \put(42,-20){\vector(1,0){16}}
+    \put(62,-20){\vector(1,0){10}}
+    \put(88,-20){\vector(1,0){8}}
+    \put(104,-20){\vector(1,0){14}}
+  \end{picture}
+\end{quote} 
+Such a quasi order is called a ``quasi total order.''  As with partial
+orders, there may be multiple linearizations.  The other possible
+linearization is:
+\begin{quote}
+  \begin{picture}(80,10)(40,-25) 
+    \put(40,-20){\makebox(0,0){A}}
+    \put(60,-20){\makebox(0,0){B}}
+    \put(80,-20){\makebox(0,0){\{C,D,F\}}}
+    \put(100,-20){\makebox(0,0){G}}
+    \put(120,-20){\makebox(0,0){\{E\}}}
+    \put(42,-20){\vector(1,0){16}}
+    \put(62,-20){\vector(1,0){10}}
+    \put(88,-20){\vector(1,0){10}}
+    \put(102,-20){\vector(1,0){14}}
+  \end{picture}
+\end{quote} 
+But we do not want to change the cyclic natrue of the original quasi
+order, and thus our linearization will not produce a quasi total order
+such as the following:
+\begin{quote}
+  \begin{picture}(80,10)(40,-25) 
+    \put(40,-20){\makebox(0,0){A}}
+    \put(60,-20){\makebox(0,0){B}}
+    \put(80,-20){\makebox(0,0){\{C,D,F\}}}
+    \put(100,-20){\makebox(0,0){\{E,G\}}}
+    \put(42,-20){\vector(1,0){16}}
+    \put(62,-20){\vector(1,0){10}}
+    \put(88,-20){\vector(1,0){6}}
+  \end{picture}
+\end{quote}
+
+
+The following section provides a solid foundation to the intutive
+concepts described so far.
 
 \section{Formalities}
 
@@ -452,6 +521,8 @@ To do so, we define an ungainly term for the result:
   clearly $[Q] = P$.
 \end{proof}
 
+\subsection{Linearizing a Quasi-Total Order}
+
 As a consequence of this construction, we can linearize a quasi order
 to a quasi total order without disturbing the equivalence classes: we
 convert to the cycle-free representation, topologically sort that and
@@ -460,8 +531,14 @@ then convert back to a quasi (now total) order.
 We can actually do this in a topological sort of the original
 dependency relation (which $Q$ would be the transitive closure of).
 
+\subsection{Reducing a Quasi-Total Order}
+
+
 \end{document}
 
 % LocalWords:  maketitle emph qbezier Boyland Amir Hesamian preorder
-% LocalWords:  Monotonicity irreflexive iff bijection surjective
-% LocalWords:  linearize
+% LocalWords:  Monotonicity irreflexive iff bijection surjective a,b
+% LocalWords:  linearize hfill alltt subseteq forall_ sqsubseteq_1
+%  LocalWords:  a,b sqsubseteq_2 eqnarray bigcup_i sqsubseteq textrm
+%  LocalWords:  stackrel lesssim,S lesssim lnsim ldots forall x,y neq
+%  LocalWords:  emptyset
