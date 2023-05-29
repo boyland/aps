@@ -1140,79 +1140,6 @@ static void print_total_order(AUG_GRAPH* aug_graph,
 }
 
 /**
- * Utility function to print debug info before raising fatal error
- * @param prev CTO node
- * @param stream output stream
- */
-static void print_schedule_error_debug(AUG_GRAPH* aug_graph,
-                                       TOTAL_ORDER_STATE* state,
-                                       CTO_NODE* prev,
-                                       CONDITION cond,
-                                       FILE* stream) {
-  fprintf(stderr, "Instances (%s):\n", aug_graph_name(aug_graph));
-
-  int i, j, k;
-  int n = aug_graph->instances.length;
-  for (i = 0; i < n; i++) {
-    print_instance(&aug_graph->instances.array[i], stream);
-    fprintf(stream, " <%+d,%+d> (%s)\n", state->instance_groups[i].ph,
-            state->instance_groups[i].ch,
-            aug_graph->schedule[i] ? "scheduled" : "not-scheduled");
-  }
-
-  fprintf(stderr, "\nNon-scheduled SCCs (%s):\n", aug_graph_name(aug_graph));
-
-  for (i = 0; i < aug_graph->components->length; i++) {
-    SCC_COMPONENT* comp = aug_graph->components->array[i];
-
-    if (aug_graph->schedule[((INSTANCE*)comp->array[0])->index])
-      continue;
-
-    printf("Starting SCC #%d\n", i);
-    for (j = 0; j < comp->length; j++) {
-      INSTANCE* in = (INSTANCE*)comp->array[j];
-      print_instance(&aug_graph->instances.array[in->index], stream);
-      fprintf(stream, " <%+d,%+d>\n", state->instance_groups[in->index].ph,
-              state->instance_groups[i].ch);
-    }
-    printf("Finished SCC #%d\n\n", i);
-  }
-
-  fprintf(stream, "\nSchedule so far for %s:\n", aug_graph_name(aug_graph));
-  // For debugging purposes, traverse all the way back
-  while (prev != NULL && prev->cto_prev != NULL) {
-    prev = prev->cto_prev;
-  }
-
-  print_total_order(aug_graph, prev, -1, false, state, 0, stream);
-
-  printf("Relevant dependencies from non-scheduled instances: \n");
-  for (i = 0; i < n; i++) {
-    if (aug_graph->schedule[i])
-      continue;
-
-    for (j = 0; j < n; j++) {
-      if (aug_graph->schedule[j])
-        continue;
-
-      if (i == j)
-        continue;
-
-      EDGESET es = aug_graph->graph[j * n + i];
-
-      if (es != NULL) {
-        printf("Investigating why ");
-        print_instance(&aug_graph->instances.array[i], stdout);
-        printf(" has not been scheduled: \n");
-
-        print_edgeset(aug_graph->graph[j * n + i], stdout);
-        printf("\n");
-      }
-    }
-  }
-}
-
-/**
  * Utility function to determine if instance is local or not
  * @param aug_graph Augmented dependency graph
  * @param instance_groups array of <ph,ch>
@@ -1257,69 +1184,6 @@ static int get_chunk_rank(Chunk* chunk) {
       return 0;
     }
   }
-}
-
-/**
- * Utility function to check if there is more to schedule in the group
- * @param aug_graph Augmented dependency graph
- * @param state state
- * @param parent_group parent group key
- * @return boolean indicating if there is more in this group that needs to be
- * scheduled
- */
-static bool is_there_more_to_schedule_in_group(AUG_GRAPH* aug_graph,
-                                               TOTAL_ORDER_STATE* state,
-                                               CHILD_PHASE* parent_group) {
-  int n = aug_graph->instances.length;
-  int i;
-  for (i = 0; i < n; i++) {
-    INSTANCE* in = &aug_graph->instances.array[i];
-
-    // Instance in the same group but cannot be considered
-    CHILD_PHASE* group_key = &state->instance_groups[in->index];
-
-    // Check if in the same group
-    if (child_phases_are_equal(parent_group, group_key)) {
-      if (!aug_graph->schedule[in->index]) {
-        return true;
-      }
-    }
-  }
-
-  return false;
-}
-
-/**
- * Utility function to check if there is more to schedule in the group of
- * scc
- * @param aug_graph Augmented dependency graph
- * @param comp SCC component
- * @param state state
- * @param parent_group parent group key
- * @return boolean indicating if there is more in this group that needs to be
- * scheduled
- */
-static bool is_there_more_to_schedule_in_scc_group(AUG_GRAPH* aug_graph,
-                                                   SCC_COMPONENT* comp,
-                                                   TOTAL_ORDER_STATE* state,
-                                                   CHILD_PHASE* parent_group) {
-  int n = aug_graph->instances.length;
-  int i;
-  for (i = 0; i < comp->length; i++) {
-    INSTANCE* in = (INSTANCE*)comp->array[i];
-
-    // Instance in the same group but cannot be considered
-    CHILD_PHASE* group_key = &state->instance_groups[in->index];
-
-    // Check if in the same group
-    if (child_phases_are_equal(parent_group, group_key)) {
-      if (!aug_graph->schedule[in->index]) {
-        return true;
-      }
-    }
-  }
-
-  return false;
 }
 
 /**
@@ -1474,46 +1338,6 @@ static CTO_NODE* schedule_transition_end_of_group(
   return chunk_schedule(aug_graph, chunk_graph, chunk_component,
                         chunk_component_index, prev, cond, state,
                         remaining /* no change */, parent_ph);
-}
-
-/**
- * Utility function to handle start of scheduling of groups
- * @param aug_graph Augmented dependency graph
- * @param comp SCC component
- * @param comp_index component index
- * @param prev previous CTO node
- * @param cond current CONDITION
- * @param instance_groups array of <ph,ch> indexed by INSTANCE index
- * @param remaining count of remaining instances to schedule
- * @param group parent group key
- * @return head of linked list
- */
-static CTO_NODE* schedule_transition_start_of_group(
-    AUG_GRAPH* aug_graph,
-    ChunkGraph* chunk_graph,
-    SCC_COMPONENT* chunk_component,
-    const int chunk_component_index,
-    Chunk* chunk,
-    CTO_NODE* prev,
-    CONDITION cond,
-    TOTAL_ORDER_STATE* state,
-    const int remaining,
-    CHILD_PHASE* group,
-    const short parent_ph) {
-  CTO_NODE* cto_node;
-
-  if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
-    printf(
-        "Starting schedule_transition_start_of_group (%s) with "
-        "(remaining: %d, group: "
-        "<%+d,%+d>, parent_ph: %d)\n",
-        aug_graph_name(aug_graph), remaining, group->ph, group->ch, parent_ph);
-  }
-
-  // Continue with group scheduler
-  return group_schedule(aug_graph, chunk_graph, chunk_component,
-                        chunk_component_index, chunk, prev, cond, state,
-                        remaining, group, parent_ph);
 }
 
 /**
