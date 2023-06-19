@@ -12,7 +12,7 @@
 %type <Items> items
 %type <Item> item
 %type <ItemsMany> items_many
-%type <Productions> productions production_alt
+%type <Productions> productions production
 %%
 
 grammar : productions
@@ -21,11 +21,11 @@ grammar : productions
 
 productions : /* NOTHING */
    { $$ = productions_none(); }
-      | production_alt SEMICOLON productions
-   { $$ = productions_append($1, $3); }
+      | productions production
+   { $$ = productions_append($1, $2); }
       ;
 
-production_alt : NONTERMINAL COLON items_many
+production : NONTERMINAL COLON items_many SEMICOLON
    { $$ = prods($1, $3); }
       ;
 
@@ -37,8 +37,8 @@ items_many : items
 
 items :  /* NOTHING */
    { $$ = items_none(); }
-      | item items
-   { $$ = items_append(items_single($1), $2); }
+      | items item
+   { $$ = items_append($1, items_single($2)); }
       ;
 
 item : TERMINAL
