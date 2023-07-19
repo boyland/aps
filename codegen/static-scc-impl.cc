@@ -255,6 +255,12 @@ static bool implement_visit_function(
 
     bool is_conditional = in != NULL && if_rule_p(in->fibered_attr.attr);
 
+    Declaration ad = in != NULL ? in->fibered_attr.attr : NULL;
+    void* ad_parent = ad != NULL ? tnode_parent(ad) : NULL;
+    bool node_is_for_in_stmt = ad_parent != NULL &&
+                               ABSTRACT_APS_tnode_phylum(ad_parent) == KEYDeclaration &&
+                               Declaration_KEY((Declaration)ad_parent) == KEYfor_in_stmt;
+
     bool is_mod = false;
     switch (Declaration_KEY(aug_graph->syntax_decl)) {
       case KEYsome_class_decl:
@@ -298,13 +304,15 @@ static bool implement_visit_function(
     // Code generate if:
     // - CTO_NODE belongs to this visit
     // - OR CTO_NODE is conditional
-    if (skip_previous_visit_code && !is_conditional) {
+    // - OR CTO_NODE is for-in-stmt
+    if (skip_previous_visit_code && !is_conditional && !node_is_for_in_stmt) {
       // CTO_NODE belongs to this visit
       if (cto->visit != phase) {
         chunk_index = cto->chunk_index;
         continue;
       }
     }
+
 
     // Update chunk index
     chunk_index = cto->chunk_index;
@@ -426,14 +434,8 @@ static bool implement_visit_function(
           "marker CTO nodes.");
     }
 
-    Declaration ad = in->fibered_attr.attr;
-    void* ad_parent = ad != NULL ? tnode_parent(ad) : NULL;
-
     bool node_is_lhs = in->node == aug_graph->lhs_decl;
     bool node_is_syntax = ch < nch || node_is_lhs;
-    bool node_is_for_in_stmt = ad_parent != NULL &&
-                               ABSTRACT_APS_tnode_phylum(ad_parent) == KEYDeclaration &&
-                               Declaration_KEY((Declaration)ad_parent) == KEYfor_in_stmt;
 
     CONDITION icond = instance_condition(in);
     if (MERGED_CONDITION_IS_IMPOSSIBLE(*cond, icond)) {
