@@ -2578,36 +2578,97 @@ void close_using_edge(AUG_GRAPH *aug_graph, EDGESET edge) {
   int source_index = edge->source->index;
   int sink_index = edge->sink->index;
   int n=aug_graph->instances.length;
+  bool structure_change = false;
 
   if (analysis_debug & CLOSE_EDGE) {
     printf("Closing with ");
     print_edge(edge,stdout);
   }
 
-  for (i=0; i < n; ++i) {
-    EDGESET e;
-    EDGESET rest;
-    /* first: instance[i]->source */
-    for (e = aug_graph->graph[i*n+source_index];
-	 e != NULL;
-	 e = rest) {
-      rest = e->rest; /* may be modified in following: */
-      add_transitive_edge_to_graph(e->source,edge->sink,
-				   &e->cond,&edge->cond,
-				   e->kind,edge->kind,
-				   aug_graph);
+  do
+  {
+    structure_change = false;
+
+    for (i=0; i < n; ++i) {
+      EDGESET e;
+      EDGESET rest;
+      EDGESET* es_clone;
+      int es_clone_count, new_clone_count;
+
+      /* first: instance[i]->source */
+
+      // count the edgeset linkedlist
+      for (e = aug_graph->graph[i*n+source_index], es_clone_count = 0;
+           e != NULL;
+           e = e->rest, es_clone_count++);
+      // allocate a pointer array
+      es_clone = (EDGESET*) malloc(es_clone_count * sizeof(EDGESET));
+      // copy over the edges into an array
+      for (e = aug_graph->graph[i*n+source_index], j = 0;
+           e != NULL;
+           e = e->rest) es_clone[j++] = e;
+
+      for (j = 0; j < es_clone_count; j++) {
+        e = es_clone[j];
+        add_transitive_edge_to_graph(e->source,edge->sink,
+            &e->cond,&edge->cond,
+            e->kind,edge->kind,
+            aug_graph);
+
+        // detect length change (shortening always because of possible consolidation of edges) of the edgeset linked-list
+        for (e = aug_graph->graph[i*n+source_index], new_clone_count = 0;
+             e != NULL;
+             e = e->rest, new_clone_count++);
+
+        if (es_clone_count != new_clone_count) {
+          structure_change = true;
+          break;  // stop the loop as its not safe to continue
+        }
+      }
+
+      free(es_clone);
+
+      /* then sink->instance[i] */
+
+      // count the edgeset linkedlist
+      for (e = aug_graph->graph[sink_index*n+i], es_clone_count = 0;
+           e != NULL;
+           e = e->rest, es_clone_count++);
+      // allocate a pointer array
+      es_clone = (EDGESET*) malloc(es_clone_count * sizeof(EDGESET));
+      // copy over the edges into an array
+      for (e = aug_graph->graph[sink_index*n+i], j = 0;
+           e != NULL;
+           e = e->rest) es_clone[j++] = e;
+
+      for (j = 0; j < es_clone_count; j++) {
+        e = es_clone[j];
+        add_transitive_edge_to_graph(edge->source,e->sink,
+            &edge->cond,&e->cond,
+            edge->kind,e->kind,
+            aug_graph);
+        
+        // detect length change (shortening always because of possible consolidation of edges) of the edgeset linked-list
+        for (e = aug_graph->graph[sink_index*n+i], new_clone_count = 0;
+             e != NULL;
+             e = e->rest, new_clone_count++);
+
+        if (es_clone_count != new_clone_count) {
+          structure_change = true;
+          break;  // stop the loop as its not safe to continue
+        }
+      }
+
+      free(es_clone);
     }
-    /* then sink->instance[i] */
-    for (e = aug_graph->graph[sink_index*n+i];
-	 e != NULL;
-	 e = rest) {
-      rest = e->rest;
-      add_transitive_edge_to_graph(edge->source,e->sink,
-				   &edge->cond,&e->cond,
-				   edge->kind,e->kind,
-				   aug_graph);
+
+    if (structure_change) {
+      if (analysis_debug & CLOSE_EDGE) {
+        printf("Stopping and re-running the transitive closure for %s because of structural change.\n", aug_graph_name(aug_graph));
+      }
     }
-  }
+    // repeat the loop while there is a structural change in any of edgeset linked-list
+  } while (structure_change);
 }
 
 /* A very slow check, hence optional.
