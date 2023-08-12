@@ -313,7 +313,6 @@ static bool implement_visit_function(
       }
     }
 
-
     // Update chunk index
     chunk_index = cto->chunk_index;
 
