@@ -82,19 +82,10 @@ static void dump_context_open(void *c, ostream& os) {
 	return;
       case KEYfor_in_stmt:
 	{
-	  aps_error(decl,"Still generating C++ here...");
-	  Declaration f = for_in_stmt_formal(decl);
-	  Type ty = infer_formal_type(f);
-	  os << indent() << "for (CollectionIterator<";
-	  dump_Type(ty,os);
-	  os << "> ci = CollectionIterator<";
-	  dump_Type(ty,os);
-	  os << ">(";
-	  dump_Expression(for_in_stmt_seq(decl),os);
-	  os << "); ci.has_item(); ci.advance()) {";
+	  os << indent() << "for (" << "v_" << decl_name(for_in_stmt_formal(decl)) << " <- ";
+	  dump_Expression(for_in_stmt_seq(decl), os);
+	  os << ") {\n";
 	  ++nesting_level;
-	  os << indent() << ty
-	     << " v_" << decl_name(f) << " = ci.item();\n";
 	}
 	return;
       case KEYtop_level_match:
@@ -176,7 +167,11 @@ static void activate_attr_context(ostream& os)
 static void dump_context_close(void *c, ostream& os) {
   switch (ABSTRACT_APS_tnode_phylum(c)) {
   case KEYDeclaration:
-    switch (Declaration_KEY((Declaration)c)) {      
+    switch (Declaration_KEY((Declaration)c)) {   
+    case KEYfor_in_stmt:
+      --nesting_level;
+      os << indent() << "}\n";
+      break; 
     case KEYtop_level_match:
       os << indent() << "case _ => {}\n";
       /*FALLTHROUGH*/
@@ -348,6 +343,11 @@ void dump_Block(Block b,ASSIGNFUNC f,void*arg,ostream&os)
 	 dump_local_decl(arg,d,os);
        }
        break;
+    case KEYfor_in_stmt:
+      push_attr_context(d);
+      dump_Block(for_in_stmt_body(d),f,arg,os);
+      pop_attr_context(os);
+      break;
      default:
        aps_error(d,"cannot handle this kind of statement");
        os << "0";

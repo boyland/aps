@@ -801,6 +801,8 @@ void dump_local_attributes(Block b, Type at, Implementation::ModuleInfo* info,
     default:
       aps_error(d,"Cannot handle this kind of statement");
       break;
+    case KEYfor_in_stmt:
+      break;
     case KEYvalue_decl:
       {
         static int unique = 0;
