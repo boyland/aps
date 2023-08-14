@@ -255,6 +255,12 @@ static bool implement_visit_function(
 
     bool is_conditional = in != NULL && if_rule_p(in->fibered_attr.attr);
 
+    Declaration ad = in != NULL ? in->fibered_attr.attr : NULL;
+    void* ad_parent = ad != NULL ? tnode_parent(ad) : NULL;
+    bool node_is_for_in_stmt = ad_parent != NULL &&
+                               ABSTRACT_APS_tnode_phylum(ad_parent) == KEYDeclaration &&
+                               Declaration_KEY((Declaration)ad_parent) == KEYfor_in_stmt;
+
     bool is_mod = false;
     switch (Declaration_KEY(aug_graph->syntax_decl)) {
       case KEYsome_class_decl:
@@ -298,7 +304,8 @@ static bool implement_visit_function(
     // Code generate if:
     // - CTO_NODE belongs to this visit
     // - OR CTO_NODE is conditional
-    if (skip_previous_visit_code && !is_conditional) {
+    // - OR CTO_NODE is for-in-stmt
+    if (skip_previous_visit_code && !is_conditional && !node_is_for_in_stmt) {
       // CTO_NODE belongs to this visit
       if (cto->visit != phase) {
         chunk_index = cto->chunk_index;
@@ -426,8 +433,6 @@ static bool implement_visit_function(
           "marker CTO nodes.");
     }
 
-    Declaration ad = in->fibered_attr.attr;
-
     bool node_is_lhs = in->node == aug_graph->lhs_decl;
     bool node_is_syntax = ch < nch || node_is_lhs;
 
@@ -441,6 +446,49 @@ static bool implement_visit_function(
             << icond.positive << ",-" << icond.negative << ")\n";
       }
       continue;
+    }
+
+    if (node_is_for_in_stmt) {
+      Declaration for_in_stmt_decl = (Declaration)ad_parent;
+      Block body = for_in_stmt_body(for_in_stmt_decl);
+      Declaration formal = for_in_stmt_formal(for_in_stmt_decl);
+      Expression sequence = for_in_stmt_seq(for_in_stmt_decl);
+
+      bool prev_loop_allowed = loop_allowed;
+      if (loop_allowed) {
+        // If loop is allowed, and we are not in the loop already then allow
+        // loops inside the for-in-stmt.
+        loop_allowed = loop_id == -1;
+      }
+
+#ifdef APS2SCALA
+        ow->get_outstream() << indent() << "for (v_" << decl_name(formal) << " <- " << sequence << ") {\n";
+        ++nesting_level;
+#endif /* APS2SCALA */
+
+      vector<std::set<Expression> > assignment =
+          make_instance_assignment(aug_graph, body, instance_assignment);
+
+      bool cont = implement_visit_function(aug_graph, phase, cto->cto_next,
+                               assignment, nch, cond, cto->chunk_index,
+                               loop_allowed, loop_id, skip_previous_visit_code,
+                               ow);
+
+#ifdef APS2SCALA
+      --nesting_level;
+      ow->get_outstream() << indent() << "}\n";
+
+
+      // Restore previous value of loop allowed.
+      loop_allowed = prev_loop_allowed;
+
+      // Closing of the loop now that for-in-stmt is finished
+      if (loop_allowed && loop_id != -1) {
+        dump_loop_end(aug_graph, phase, loop_id, ow);
+        loop_id = -1;
+      }
+#endif /* APS2SCALA */
+      return cont;
     }
 
     if (if_rule_p(ad)) {
