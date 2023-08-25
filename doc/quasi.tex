@@ -39,7 +39,7 @@
   mechanism.  We propose a new algebraic structure: the \emph{quasi
   order}, for which we propose partial and total versions.  Any
   transitive dependency relation can be represented as a quasi partial
-  order, and any schedule of such a relation can used a quasi total order. 
+  order, and any schedule of such a relation can be represented as a \emph{quasi total order}. 
 \end{abstract}
 
 \section{Motivation}
@@ -131,21 +131,21 @@ and ``G'') are \emph{not} evaluated in a loop, and indeed it would
 waste evaluation time to do so.
 
 The conventional way to handle possibly cyclic dependencies is to use
-a strongly-connected subcomments analysis of the dependency graph.
+a strongly-connected subcomponents analysis of the dependency graph.
 This analysis does not however distinguish the case of ``E'' (a vertex
-that depends on itself, but is not involved in a ayclce with any other
+that depends on itself, but is not involved in a cycle with any other
 vertex) from ``B'' (a vertex that is involved in no cycles at all).
 
 This paper provides a foundation for a practice that distinguishes the
 case of non-cyclic vertices from vertices involved cyclicly only with
 itself.
 It defines a ``quasi order'' to cover the transitive closure of a
-depednency graph and a ``quasi total order'' to handle the linearization
+dependency graph and a ``quasi total order'' to handle the linearization
 of a quasi order.
 
 \section{Example}
 
-If we perform transitive closure on the dependency graoh  (repeated
+If we perform transitive closure on the dependency graph  (repeated
 for convenience on the left), and then display the resulting relation
 in transitively reduced form, we have the relation on the right:
 \begin{quote}
@@ -194,11 +194,11 @@ set of strongly connected sets of cyclic vertices.
 
 It is well known (order-extension theorem) that any partial order can
 be linearized into a total order.\footnote{%
-  This proof of this result depends on the axiom of choice, and so may
+  The proof of this result depends on the axiom of choice, and so may
   not hold for certain infinite partial orders, but in this paper we
   are only interested in finite orders.}
 The same concept applies for quasi orders except that we do not want
-the linearizatin to combine vertices together that were not already
+the linearization to combine vertices together that were not already
 combined.  Rather we end up with a quasi order such as the following:
 \begin{quote}
   \begin{picture}(80,10)(40,-25)  
@@ -229,7 +229,7 @@ linearization is:
     \put(102,-20){\vector(1,0){14}}
   \end{picture}
 \end{quote} 
-But we do not want to change the cyclic natrue of the original quasi
+But we do not want to change the cyclic nature of the original quasi
 order, and thus our linearization will not produce a quasi total order
 such as the following:
 \begin{quote}
@@ -245,7 +245,7 @@ such as the following:
 \end{quote}
 
 
-The following section provides a solid foundation to the intutive
+The following section provides a solid foundation to the intuitive
 concepts described so far.
 
 \section{Formalities}
@@ -342,7 +342,7 @@ We will use a variety of infix operators (e.g. \( <, \leq, \sim, \lesssim \)) as
 Total orders are incompatible: they serve as the bottom (incomparable)
 elements in a (semi-)lattice of partial orders.  But every partial order is a
 quasi order, and when we form the lattice of quasi orders, we can
-combine total orders into a quasi-order.  The lattice has a proper
+combine total orders into quasi-orders.  The lattice has a proper
 bottom element: the ``complete'' binary relation which is a quasi
 total order.  The following result demonstrates the ability of quasi
 total orders to encompass multiple total orders:
@@ -362,7 +362,7 @@ total orders to encompass multiple total orders:
 \subsection{The Cycle-Free Representation}
 
 It is convenient to distill a quasi order down to a partial order
-using the equivalence classes.  This construction is similar to the
+using equivalence classes.  This construction is similar to the
 strongly-connected component representation of a preorder, but
 distinguishes elements that have self-edges from those that do not.
 
@@ -537,8 +537,8 @@ dependency relation (which $Q$ would be the transitive closure of).
 \end{document}
 
 % LocalWords:  maketitle emph qbezier Boyland Amir Hesamian preorder
-% LocalWords:  Monotonicity irreflexive iff bijection surjective a,b
-% LocalWords:  linearize hfill alltt subseteq forall_ sqsubseteq_1
-%  LocalWords:  a,b sqsubseteq_2 eqnarray bigcup_i sqsubseteq textrm
-%  LocalWords:  stackrel lesssim,S lesssim lnsim ldots forall x,y neq
+% LocalWords:  Monotonicity irreflexive iff bijection surjective
+% LocalWords:  linearize hfill alltt subseteq 
+%  LocalWords:  sqsubseteq eqnarray sqsubseteq textrm
+%  LocalWords:  stackrel lesssim lesssim lnsim ldots forall neq
 %  LocalWords:  emptyset
