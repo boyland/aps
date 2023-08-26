@@ -2573,6 +2573,70 @@ void augment_dependency_graph(AUG_GRAPH *aug_graph) {
 		       aug_graph,aug_graph->match_rule);
 }
 
+static int edgeset_length(EDGESET es) {
+  int n = 0;
+  while (es != 0) {
+    ++n;
+    es = es->rest;
+  }
+  return n;
+}
+
+/**
+ * Loop over all the elements in the set and add transitive edges to the graph.
+ * This cannot be done as a regular for-loop because adding edges can result
+ * in changes to the graph, including the edge set we are looping over.
+ * The edges a and b are the ones that will be sent to transitive addition
+ * routine: one of them should be null: it will be replaced with the 
+ * each edge in the set.
+ */
+void add_transitive_edges_to_graph(AUG_GRAPH *aug_graph, EDGESET set, EDGESET a, EDGESET b)
+{
+  int i, n;
+  EDGESET e;
+  BOOL seta = a == NULL;
+  CONDITION *cv;
+  DEPENDENCY *dv;
+  struct edgeset tmp;
+
+  if (set == NULL) return;
+  if (set->rest == NULL) { /* special case the one element set */
+    if (seta) a = set; else b = set;
+    add_transitive_edge_to_graph(a->source,b->sink,
+				 &a->cond,&b->cond,
+				 a->kind,b->kind,
+				 aug_graph);
+    return;
+  }
+
+  n = edgeset_length(set);
+  cv = (CONDITION *)SALLOC(n * sizeof(CONDITION));
+  dv = (DEPENDENCY *)SALLOC(n * sizeof(DEPENDENCY));
+  for (e = set, i = 0; e != NULL && i < n; e = e->rest, ++i) {
+    cv[i] = e->cond;
+    dv[i] = e->kind;
+  }
+
+  /* This code dpdends on all teh elements of an edge set having the same 
+   * sources and sinks.
+   */
+  tmp.rest = NULL;
+  tmp.source = set->source;
+  tmp.sink = set->sink;
+  tmp.next_in_edge_worklist = NULL;
+  
+  for (i = 0; i < n; ++i) {
+    tmp.cond = cv[i];
+    tmp.kind = dv[i];
+    if (seta) a = &tmp; else b = &tmp;
+    add_transitive_edge_to_graph(a->source,b->sink,
+				 &a->cond,&b->cond,
+				 a->kind,b->kind,
+				 aug_graph);
+  }
+  release(cv);
+}
+
 void close_using_edge(AUG_GRAPH *aug_graph, EDGESET edge) {
   int i,j;
   int source_index = edge->source->index;
@@ -2585,6 +2649,14 @@ void close_using_edge(AUG_GRAPH *aug_graph, EDGESET edge) {
   }
 
   for (i=0; i < n; ++i) {
+    /* first: instance[i]->source */
+    add_transitive_edges_to_graph(aug_graph, aug_graph->graph[i*n+source_index],
+				  NULL, edge);
+    /* then sink->instance[i] */
+    add_transitive_edges_to_graph(aug_graph, aug_graph->graph[sink_index*n+i],
+				  edge, NULL);
+    /* remove the following once the replacement seems to be working. */
+#ifdef UNDEF
     EDGESET e;
     EDGESET rest;
     /* first: instance[i]->source */
@@ -2607,6 +2679,7 @@ void close_using_edge(AUG_GRAPH *aug_graph, EDGESET edge) {
 				   edge->kind,e->kind,
 				   aug_graph);
     }
+#endif
   }
 }
 
