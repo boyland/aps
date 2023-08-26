@@ -7,6 +7,8 @@
 \usepackage{amssymb}
 \usepackage{amsthm}
 
+\usepackage{hyperref}
+
 \def\implies{\Rightarrow}
 
 \theoremstyle{definition}
@@ -87,7 +89,8 @@ G = t(D,F)
 From the dependency graph and to a lesser extent from the original
 equations, it is clear that ``E'' depends upon itself.  There is also
 a cyclic dependency between ``C,'' ``D'' and ``F.''  Thus
-topologically sorting and then evaluating them in this order will not
+topologically sorting the strongly connected components
+and then evaluating them in this order will not
 suffice to provide a solution.  No solution may exist.  But if the
 values of the variables involved in cycles (\(\aset{\textrm{C},
   \textrm{D}, \textrm{E}, \textrm{F}}\)) are drawn from domains ordered
@@ -525,14 +528,35 @@ To do so, we define an ungainly term for the result:
 
 As a consequence of this construction, we can linearize a quasi order
 to a quasi total order without disturbing the equivalence classes: we
-convert to the cycle-free representation, topologically sort that and
+convert to the cycle-free representation, topologically sort the strongly-connect that and
 then convert back to a quasi (now total) order.
 
-We can actually do this in a topological sort of the original
+We can actually do this directly using a minor variant of Tarjan's
+strongly-connected components algorithm\footnote{%
+\url{https://en.wikipedia.org/wiki/Tarjan\%27s_strongly_connected_components_algorithm}
+}
+on the original
 dependency relation (which $Q$ would be the transitive closure of).
+The variation is that in the original algorithm loops are effectively
+ignored, but in the variant, we record the existence of a loop.
+Tarjan's algorithm produces the topological sorting of
+the strongly-connected components in reverse order; the variant
+produces the semi-partition total order by just returning an
+unpartitioned vertex if its SCC consists of only itself and it has no
+loop (self edge), and otherwise returning a partition (set of
+vertices) as in the original algorithm.
 
-\subsection{Reducing a Quasi-Total Order}
+\section{Conclusion}
 
+The concept of a ``quasi order'' described here provides a variation
+on partial orders useful for handling possible cyclic dependencies.
+Unlike partial orders, it can handle cyclic dependencies, and unlike
+preorders, it can distinguish elements that depend on themselves from
+those that do not.
+
+A ``quasi-total order'' similarly usefully characterizes a schedule
+that may distinguish segments that require repetition from those that do
+not.
 
 \end{document}
 
