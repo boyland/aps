@@ -1,0 +1,33 @@
+with "tiny";
+
+module TINY_TUPLE_LATTICE[T :: var TINY[]] extends T begin
+
+  type IntegerSet := SET[Integer];
+  type IntegerCircularSet := UNION_LATTICE[Integer, IntegerSet];
+  type IntegerCircularSetList := LIST[IntegerCircularSet];
+  type NTupleLattice := TUPLE_LATTICE[IntegerCircularSet, IntegerCircularSetList];
+
+  attribute Wood.wood_syn : NTupleLattice;
+  attribute Root.root_syn : NTupleLattice;
+
+  attribute Wood.wood_inh : NTupleLattice;
+
+  pragma inherited(wood_inh);
+  pragma synthesized(wood_syn, root_syn);
+
+  match ?self=root(?w) begin
+    w.wood_inh := IntegerCircularSetList${ IntegerSet${} };
+    self.root_syn := w.wood_syn;
+  end;
+
+  match ?self=branch(?w1,?w2) begin
+    w1.wood_inh := self.wood_inh;
+    w2.wood_inh := self.wood_inh;
+    self.wood_syn := NTupleLattice$join(w1.wood_syn, w2.wood_syn);
+  end;
+
+  match ?self=leaf(?value) begin
+    self.wood_syn := NTupleLattice$meet(IntegerCircularSetList${ IntegerSet${ value } }, self.wood_inh);
+  end;
+
+end;
