@@ -20,9 +20,9 @@ object NTupleLatticeSpec extends Spec {
     val module = new M_TINY_TUPLE_LATTICE("ntuple-lattice", tree);
     module.finish()
 
-    val attr = module.v_root_syn(module.t_Root.nodes(0))
+    val attr = module.v_root_syn(module.t_Root.nodes(0));
 
     // Assert
-    assertEquals(List(Set(1, 2)), attr, "flattened tree")
+    assertEquals(List(Set(1, 2)), attr, "flattened tree");
   }
 }
