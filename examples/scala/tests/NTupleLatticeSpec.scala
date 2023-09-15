@@ -18,7 +18,7 @@ object NTupleLatticeSpec extends Spec {
 
     // Act
     val module = new M_TINY_TUPLE_LATTICE("ntuple-lattice", tree);
-    module.finish()
+    module.finish();
 
     val attr = module.v_root_syn(module.t_Root.nodes(0));
 
