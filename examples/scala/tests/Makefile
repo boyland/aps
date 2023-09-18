@@ -1,4 +1,4 @@
-SPECS=FirstSpec FollowSpec NullableSpec
+SPECS=FirstSpec FollowSpec NullableSpec NTupleLatticeSpec
 EXAMPLES_PATH=../..
 ROOT_PATH=../${EXAMPLES_PATH}
 SCALAV=2.12
@@ -11,13 +11,13 @@ all: $(addsuffix .run, $(SPECS))
 
 .PHONY: clean
 clean:
-	rm -f *.class grammar.scala first.scala follow.scala
+	rm -f *.class grammar.scala first.scala follow.scala tiny.scala ntuple-lattice.scala
 
 %.class: %.scala
 	scalac -cp ${SCALA_FLAGS} $<
 
-first.scala follow.scala nullable.scala:
-	${APS2SCALA} -DCOT -p ${EXAMPLES_PATH}:${ROOT_PATH}/base -S $(basename $(@F))
+first.scala follow.scala nullable.scala ntuple-lattice.scala:
+	${APS2SCALA} -DCOT -C -p ${EXAMPLES_PATH}:${ROOT_PATH}/base -S $(basename $(@F))
 
 %.scala:
 	${APS2SCALA} -DCOT -p ${EXAMPLES_PATH}:${ROOT_PATH}/base $*
@@ -36,3 +36,6 @@ FollowSpec.class: Spec.class GrammarUtil.class follow.class
 
 NullableSpec.class: Spec.class GrammarUtil.class nullable.class
 	scalac -cp ${SCALA_FLAGS} NullableSpec.scala
+
+NTupleLatticeSpec.class: Spec.class tiny.class ntuple-lattice.class
+	scalac -cp ${SCALA_FLAGS} NTupleLatticeSpec.scala

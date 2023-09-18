@@ -88,7 +88,9 @@ object basic_implicit {
 
   type T_UNION_LATTICE[T_E,T_T] = T_T;
   type T_INTERSECTION_LATTICE[T_E,T_T] = T_T;
-  
+
+  type T_TUPLE_LATTICE[T_ElemType, T_ST] = List[T_ElemType];
+
   val t_String = new M_STRING("String");
   type T_String = String;
 
@@ -1402,3 +1404,81 @@ class M__basic_24[T_Node <: Node](t_Node:C_PHYLUM[T_Node]) {
     v_x.asInstanceOf[Node].lineNumber;
 };
 
+trait C_TUPLE_LATTICE[T_Result, T_ElemType, T_ST]
+  extends C_MAKE_LATTICE[T_Result, T_ST]
+    with C_LIST[T_Result, T_ElemType];
+
+class M_TUPLE_LATTICE[T_ElemType, T_ST](val name: String,
+                                        val t_ElemType: C_TYPE[T_ElemType] with C_LATTICE[T_ElemType],
+                                        val t_ST: C_TYPE[T_ST] with C_LIST[T_ST, T_ElemType])
+  extends Module(name)
+    with C_TUPLE_LATTICE[T_ST, T_ElemType, T_ST] {
+
+  override val v_concatenate = t_ST.v_concatenate;
+  override val p__op_AC = t_ST.p__op_AC;
+  override val p_append = t_ST.p_append;
+  override val p_single = t_ST.p_single;
+  override val p_none = t_ST.p_none;
+  override val v_member = t_ST.v_member;
+  override val v_nth_from_end = t_ST.v_nth_from_end;
+  override val v_position = t_ST.v_position;
+  override val v_position_from_end = t_ST.v_position_from_end;
+  override val v_append = t_ST.v_append;
+  override val v_single = t_ST.v_single;
+  override val v_none = t_ST.v_none;
+  override val v_subseq = t_ST.v_subseq;
+  override val v_subseq_from_end = t_ST.v_subseq_from_end;
+  override val v_butsubseq = t_ST.v_butsubseq;
+  override val v_butsubseq_from_end = t_ST.v_butsubseq_from_end;
+  override val v_cons = t_ST.v_cons;
+  override val v_bottom = t_ST.v_none();
+  override val v__op_AC = t_ST.v__op_AC;
+  override val v_nth = t_ST.v_nth;
+  override val v_equal = t_ST.v_equal;
+  override val v_assert = t_ST.v_assert;
+  override val v_node_equivalent = t_ST.v_node_equivalent;
+  override val v_string = t_ST.v_string;
+
+  override def v_initial: T_ST = v_bottom;
+  override val v_join = f_combine;
+  override val v_meet = f_meet;
+  override val v_combine = f_combine;
+
+  def f_combine(v_t1: T_ST, v_t2: T_ST): T_ST = {
+    v_t1 match {
+      case t_ST.p_none(_) => v_t2
+      case t_ST.p_single(_, x) => v_t2 match {
+        case t_ST.p_none(_) => v_t1
+        case t_ST.p_single(_, y) => t_ST.v__op_AC(Seq(t_ElemType.v_join(x, y)))
+        case t_ST.p_append(_, ly1, ly2) => v_append(f_combine(v_t1, ly1), ly2)
+      }
+      case t_ST.p_append(_, lx1, lx2) => v_t2 match {
+        case t_ST.p_none(_) => v_t1
+        case t_ST.p_single(_, y) => v_append(f_combine(lx1, v_t2), lx2)
+        case t_ST.p_append(_, ly1, ly2) => v_append(f_combine(lx1, ly1), f_combine(lx2, ly2))
+      }
+    }
+  };
+
+  def f_meet(v_t1: T_ST, v_t2: T_ST): T_ST = {
+    v_t1 match {
+      case t_ST.p_none(_) => v_t1
+      case t_ST.p_single(_, x) => v_t2 match {
+        case t_ST.p_none(_) => v_t2
+        case t_ST.p_single(_, y) => t_ST.v__op_AC(Seq(t_ElemType.v_meet(x, y)))
+        case t_ST.p_append(_, ly1, ly2) => f_meet(v_t1, ly1)
+      }
+      case t_ST.p_append(_, lx1, lx2) => v_t2 match {
+        case t_ST.p_none(_) => v_t2
+        case t_ST.p_single(_, y) => f_meet(lx1, v_t2)
+        case t_ST.p_append(_, ly1, ly2) => v_append(f_meet(lx1, ly1), f_meet(lx2, ly2))
+      }
+    }
+  };
+
+  // x < y iff x <= y and x != y
+  override val v_compare: (T_ST, T_ST) => T_Boolean = (x, y) => v_compare_equal(x, y) && !v_equal(x, y)
+
+  // x <= y iff x \/ y == y
+  override val v_compare_equal: (T_ST, T_ST) => T_Boolean = (x, y) => v_equal(f_combine(x, y), y)
+}
