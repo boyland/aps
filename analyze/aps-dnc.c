@@ -1770,7 +1770,7 @@ static void *mark_local(void *ignore, void *node) {
   return node;
 }
 
-static void *mark_obj(void *ignore, void *node) {
+static void *mark_object_flag(void *ignore, void *node) {
   if (ABSTRACT_APS_tnode_phylum(node) == KEYDeclaration) {
     Declaration decl = (Declaration)node;
     if (Declaration_KEY(decl) == KEYvalue_decl && type_is_phylum(value_decl_type(decl))) {
@@ -2206,7 +2206,7 @@ static void init_analysis_state(STATE *s, Declaration module) {
   traverse_Declaration(mark_local,module,module);
 
   /* mark obj decls */
-  traverse_Declaration(mark_obj,module,module);
+  traverse_Declaration(mark_object_flag,module,module);
 
   /* get phyla (imported only) */
   { Declaration tf=first_Declaration(type_formals);
