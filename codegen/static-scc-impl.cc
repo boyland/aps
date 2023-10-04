@@ -230,6 +230,230 @@ static void dump_loop_start(AUG_GRAPH* aug_graph,
 #endif /* APS2SCALA */
 }
 
+static void dump_assignments(
+  AUG_GRAPH* aug_graph,
+  CTO_NODE* cto,
+  vector<std::set<Expression> > instance_assignment,
+  int nch,
+  OutputWriter* ow) {
+
+  INSTANCE* in = cto->cto_instance;
+  int ch = cto->child_phase.ch;
+  int ph = cto->child_phase.ph;
+
+  Declaration ad = in != NULL ? in->fibered_attr.attr : NULL;
+
+  bool node_is_lhs = in->node == aug_graph->lhs_decl;
+  bool node_is_syntax = ch < nch || node_is_lhs;
+  Symbol asym = ad ? def_name(declaration_def(ad)) : NULL;
+
+  if (instance_direction(in) == instance_inward) {
+    if (include_comments) {
+      ow->get_outstream() << indent() << "// " << in << " is ready now.\n";
+    }
+    return;
+  }
+
+  for (std::set<Expression>::iterator rhs_it =
+            instance_assignment[in->index].begin();
+        rhs_it != instance_assignment[in->index].end(); rhs_it++) {
+    Expression rhs = *rhs_it;
+
+    if (rhs == NULL)
+      continue;
+
+    if (in->node && Declaration_KEY(in->node) == KEYnormal_assign) {
+      // parameter value will be filled in at call site
+      if (include_comments) {
+        ow->get_outstream()
+            << indent() << "// delaying " << in << " to call site.\n";
+      }
+      continue;
+    }
+
+    if (in->node && Declaration_KEY(in->node) == KEYpragma_call) {
+      if (include_comments) {
+        ow->get_outstream()
+            << indent() << "// place holder for " << in << "\n";
+      }
+      continue;
+    }
+
+    if (in->fibered_attr.fiber != NULL) {
+      if (rhs == NULL) {
+        if (include_comments) {
+          ow->get_outstream() << indent() << "// " << in << "\n";
+        }
+        continue;
+      }
+
+      Declaration assign = (Declaration)tnode_parent(rhs);
+      Expression lhs = assign_lhs(assign);
+      Declaration field = 0;
+      ow->get_outstream() << indent();
+      // dump the object containing the field
+      switch (Expression_KEY(lhs)) {
+        case KEYvalue_use:
+          // shared global collection
+          field = USE_DECL(value_use_use(lhs));
+#ifdef APS2SCALA
+          ow->get_outstream() << "a_" << decl_name(field) << ".";
+          if (debug)
+            ow->get_outstream() << "assign";
+          else
+            ow->get_outstream() << "set";
+          ow->get_outstream() << "(" << rhs << ");\n";
+#else  /* APS2SCALA */
+          ow->get_outstream() << "v_" << decl_name(field) << "=";
+          switch (Default_KEY(value_decl_default(field))) {
+            case KEYcomposite:
+              ow->get_outstream()
+                  << composite_combiner(value_decl_default(field));
+              break;
+            default:
+              ow->get_outstream()
+                  << as_val(value_decl_type(field)) << "->v_combine";
+              break;
+          }
+          ow->get_outstream()
+              << "(v_" << decl_name(field) << "," << rhs << ");\n";
+#endif /* APS2SCALA */
+          break;
+        case KEYfuncall:
+          field = field_ref_p(lhs);
+          if (field == 0)
+            fatal_error("what sort of assignment lhs: %d",
+                        tnode_line_number(assign));
+          ow->get_outstream() << "a_" << decl_name(field) << DEREF;
+          if (debug)
+            ow->get_outstream() << "assign";
+          else
+            ow->get_outstream() << "set";
+          ow->get_outstream()
+              << "(" << field_ref_object(lhs) << "," << rhs << ");\n";
+          break;
+        default:
+          fatal_error("what sort of assignment lhs: %d",
+                      tnode_line_number(assign));
+      }
+      continue;
+    }
+
+    if (in->node == 0 && ad != NULL) {
+      if (rhs) {
+        if (Declaration_info(ad)->decl_flags & LOCAL_ATTRIBUTE_FLAG) {
+          ow->get_outstream() << indent() << "a" << LOCAL_UNIQUE_PREFIX(ad)
+                              << "_" << asym << DEREF;
+          if (debug)
+            ow->get_outstream() << "assign";
+          else
+            ow->get_outstream() << "set";
+          ow->get_outstream() << "(anchor," << rhs << ");\n";
+        } else {
+          int i = LOCAL_UNIQUE_PREFIX(ad);
+          if (i == 0) {
+#ifdef APS2SCALA
+            if (!def_is_constant(value_decl_def(ad))) {
+              if (include_comments) {
+                ow->get_outstream()
+                    << indent() << "// v_" << asym
+                    << " is assigned/initialized by default.\n";
+              }
+            } else {
+              if (include_comments) {
+                ow->get_outstream() << indent() << "// v_" << asym
+                                    << " is initialized in module.\n";
+              }
+            }
+#else
+            ow->get_outstream()
+                << indent() << "v_" << asym << " = " << rhs << ";\n";
+#endif
+          } else {
+            ow->get_outstream() << indent() << "v" << i << "_" << asym
+                                << " = " << rhs << "; // local\n";
+          }
+        }
+      } else {
+        if (Declaration_KEY(ad) == KEYvalue_decl &&
+            !direction_is_collection(value_decl_direction(ad))) {
+          aps_warning(ad, "Local attribute %s is apparently undefined",
+                      decl_name(ad));
+        }
+        if (include_comments) {
+          ow->get_outstream() << indent() << "// " << in << " is ready now\n";
+        }
+      }
+      continue;
+    } else if (node_is_syntax) {
+      if (ATTR_DECL_IS_SHARED_INFO(ad) && ch < nch) {
+        if (include_comments) {
+          ow->get_outstream() << indent() << "// shared info for "
+                              << decl_name(in->node) << " is ready.\n";
+        }
+      } else if (ATTR_DECL_IS_UP_DOWN(ad)) {
+        if (include_comments) {
+          ow->get_outstream() << indent() << "// " << decl_name(in->node)
+                              << "." << decl_name(ad) << " implicit.\n";
+        }
+      } else if (rhs) {
+        if (Declaration_KEY(in->node) == KEYfunction_decl) {
+          if (direction_is_collection(value_decl_direction(ad))) {
+            std::cout << "Not expecting collection here!\n";
+            ow->get_outstream()
+                << indent() << "v_" << asym << " = somehow_combine(v_" << asym
+                << "," << rhs << ");\n";
+          } else {
+            int i = LOCAL_UNIQUE_PREFIX(ad);
+            if (i == 0)
+              ow->get_outstream() << indent() << "v_" << asym << " = " << rhs
+                                  << "; // function\n";
+            else
+              ow->get_outstream() << indent() << "v" << i << "_" << asym
+                                  << " = " << rhs << ";\n";
+          }
+        } else {
+          ow->get_outstream() << indent() << "a_" << asym << DEREF;
+          if (debug)
+            ow->get_outstream() << "assign";
+          else
+            ow->get_outstream() << "set";
+          ow->get_outstream()
+              << "(v_" << decl_name(in->node) << "," << rhs << ");\n";
+        }
+      } else {
+        aps_warning(in->node, "Attribute %s.%s is apparently undefined",
+                    decl_name(in->node), symbol_name(asym));
+
+        if (include_comments) {
+          ow->get_outstream() << indent() << "// " << in << " is ready.\n";
+        }
+      }
+      continue;
+    } else if (Declaration_KEY(in->node) == KEYvalue_decl) {
+      if (rhs) {
+        // assigning field of object
+        ow->get_outstream() << indent() << "a_" << asym << DEREF;
+        if (debug)
+          ow->get_outstream() << "assign";
+        else
+          ow->get_outstream() << "set";
+        ow->get_outstream()
+            << "(v_" << decl_name(in->node) << "," << rhs << ");\n";
+      } else {
+        if (include_comments) {
+          ow->get_outstream()
+              << indent() << "// " << in << " is ready now.\n";
+        }
+      }
+      continue;
+    }
+    std::cout << "Problem assigning " << in << "\n";
+    ow->get_outstream() << indent() << "// Not sure what to do for " << in
+                        << "\n";
+  }
+}
+
 // phase is what we are generating code for,
 // current is the current value of ph
 // return true if there are still more instances after this phase:
@@ -469,10 +693,8 @@ static bool implement_visit_function(
       vector<std::set<Expression> > assignment =
           make_instance_assignment(aug_graph, body, instance_assignment);
 
-      bool cont = implement_visit_function(aug_graph, phase, cto->cto_next,
-                               assignment, nch, cond, cto->chunk_index,
-                               loop_allowed, loop_id, skip_previous_visit_code,
-                               ow);
+      // dump assignments inside the for-in block body
+      dump_assignments(aug_graph, cto, assignment, nch, ow);
 
 #ifdef APS2SCALA
       --nesting_level;
@@ -488,7 +710,9 @@ static bool implement_visit_function(
         loop_id = -1;
       }
 #endif /* APS2SCALA */
-      return cont;
+
+      // continue the code generation for the next CTO node after for-in
+      continue;
     }
 
     if (if_rule_p(ad)) {
@@ -602,213 +826,7 @@ static bool implement_visit_function(
       return cont;
     }
 
-    Symbol asym = ad ? def_name(declaration_def(ad)) : 0;
-
-    if (instance_direction(in) == instance_inward) {
-      if (include_comments) {
-        ow->get_outstream() << indent() << "// " << in << " is ready now.\n";
-      }
-      continue;
-    }
-
-    for (std::set<Expression>::iterator rhs_it =
-             instance_assignment[in->index].begin();
-         rhs_it != instance_assignment[in->index].end(); rhs_it++) {
-      Expression rhs = *rhs_it;
-
-      if (rhs == NULL)
-        continue;
-
-      if (in->node && Declaration_KEY(in->node) == KEYnormal_assign) {
-        // parameter value will be filled in at call site
-        if (include_comments) {
-          ow->get_outstream()
-              << indent() << "// delaying " << in << " to call site.\n";
-        }
-        continue;
-      }
-
-      if (in->node && Declaration_KEY(in->node) == KEYpragma_call) {
-        if (include_comments) {
-          ow->get_outstream()
-              << indent() << "// place holder for " << in << "\n";
-        }
-        continue;
-      }
-
-      if (in->fibered_attr.fiber != NULL) {
-        if (rhs == NULL) {
-          if (include_comments) {
-            ow->get_outstream() << indent() << "// " << in << "\n";
-          }
-          continue;
-        }
-
-        Declaration assign = (Declaration)tnode_parent(rhs);
-        Expression lhs = assign_lhs(assign);
-        Declaration field = 0;
-        ow->get_outstream() << indent();
-        // dump the object containing the field
-        switch (Expression_KEY(lhs)) {
-          case KEYvalue_use:
-            // shared global collection
-            field = USE_DECL(value_use_use(lhs));
-#ifdef APS2SCALA
-            ow->get_outstream() << "a_" << decl_name(field) << ".";
-            if (debug)
-              ow->get_outstream() << "assign";
-            else
-              ow->get_outstream() << "set";
-            ow->get_outstream() << "(" << rhs << ");\n";
-#else  /* APS2SCALA */
-            ow->get_outstream() << "v_" << decl_name(field) << "=";
-            switch (Default_KEY(value_decl_default(field))) {
-              case KEYcomposite:
-                ow->get_outstream()
-                    << composite_combiner(value_decl_default(field));
-                break;
-              default:
-                ow->get_outstream()
-                    << as_val(value_decl_type(field)) << "->v_combine";
-                break;
-            }
-            ow->get_outstream()
-                << "(v_" << decl_name(field) << "," << rhs << ");\n";
-#endif /* APS2SCALA */
-            break;
-          case KEYfuncall:
-            field = field_ref_p(lhs);
-            if (field == 0)
-              fatal_error("what sort of assignment lhs: %d",
-                          tnode_line_number(assign));
-            ow->get_outstream() << "a_" << decl_name(field) << DEREF;
-            if (debug)
-              ow->get_outstream() << "assign";
-            else
-              ow->get_outstream() << "set";
-            ow->get_outstream()
-                << "(" << field_ref_object(lhs) << "," << rhs << ");\n";
-            break;
-          default:
-            fatal_error("what sort of assignment lhs: %d",
-                        tnode_line_number(assign));
-        }
-        continue;
-      }
-
-      if (in->node == 0 && ad != NULL) {
-        if (rhs) {
-          if (Declaration_info(ad)->decl_flags & LOCAL_ATTRIBUTE_FLAG) {
-            ow->get_outstream() << indent() << "a" << LOCAL_UNIQUE_PREFIX(ad)
-                                << "_" << asym << DEREF;
-            if (debug)
-              ow->get_outstream() << "assign";
-            else
-              ow->get_outstream() << "set";
-            ow->get_outstream() << "(anchor," << rhs << ");\n";
-          } else {
-            int i = LOCAL_UNIQUE_PREFIX(ad);
-            if (i == 0) {
-#ifdef APS2SCALA
-              if (!def_is_constant(value_decl_def(ad))) {
-                if (include_comments) {
-                  ow->get_outstream()
-                      << indent() << "// v_" << asym
-                      << " is assigned/initialized by default.\n";
-                }
-              } else {
-                if (include_comments) {
-                  ow->get_outstream() << indent() << "// v_" << asym
-                                      << " is initialized in module.\n";
-                }
-              }
-#else
-              ow->get_outstream()
-                  << indent() << "v_" << asym << " = " << rhs << ";\n";
-#endif
-            } else {
-              ow->get_outstream() << indent() << "v" << i << "_" << asym
-                                  << " = " << rhs << "; // local\n";
-            }
-          }
-        } else {
-          if (Declaration_KEY(ad) == KEYvalue_decl &&
-              !direction_is_collection(value_decl_direction(ad))) {
-            aps_warning(ad, "Local attribute %s is apparently undefined",
-                        decl_name(ad));
-          }
-          if (include_comments) {
-            ow->get_outstream() << indent() << "// " << in << " is ready now\n";
-          }
-        }
-        continue;
-      } else if (node_is_syntax) {
-        if (ATTR_DECL_IS_SHARED_INFO(ad) && ch < nch) {
-          if (include_comments) {
-            ow->get_outstream() << indent() << "// shared info for "
-                                << decl_name(in->node) << " is ready.\n";
-          }
-        } else if (ATTR_DECL_IS_UP_DOWN(ad)) {
-          if (include_comments) {
-            ow->get_outstream() << indent() << "// " << decl_name(in->node)
-                                << "." << decl_name(ad) << " implicit.\n";
-          }
-        } else if (rhs) {
-          if (Declaration_KEY(in->node) == KEYfunction_decl) {
-            if (direction_is_collection(value_decl_direction(ad))) {
-              std::cout << "Not expecting collection here!\n";
-              ow->get_outstream()
-                  << indent() << "v_" << asym << " = somehow_combine(v_" << asym
-                  << "," << rhs << ");\n";
-            } else {
-              int i = LOCAL_UNIQUE_PREFIX(ad);
-              if (i == 0)
-                ow->get_outstream() << indent() << "v_" << asym << " = " << rhs
-                                    << "; // function\n";
-              else
-                ow->get_outstream() << indent() << "v" << i << "_" << asym
-                                    << " = " << rhs << ";\n";
-            }
-          } else {
-            ow->get_outstream() << indent() << "a_" << asym << DEREF;
-            if (debug)
-              ow->get_outstream() << "assign";
-            else
-              ow->get_outstream() << "set";
-            ow->get_outstream()
-                << "(v_" << decl_name(in->node) << "," << rhs << ");\n";
-          }
-        } else {
-          aps_warning(in->node, "Attribute %s.%s is apparently undefined",
-                      decl_name(in->node), symbol_name(asym));
-
-          if (include_comments) {
-            ow->get_outstream() << indent() << "// " << in << " is ready.\n";
-          }
-        }
-        continue;
-      } else if (Declaration_KEY(in->node) == KEYvalue_decl) {
-        if (rhs) {
-          // assigning field of object
-          ow->get_outstream() << indent() << "a_" << asym << DEREF;
-          if (debug)
-            ow->get_outstream() << "assign";
-          else
-            ow->get_outstream() << "set";
-          ow->get_outstream()
-              << "(v_" << decl_name(in->node) << "," << rhs << ");\n";
-        } else {
-          if (include_comments) {
-            ow->get_outstream()
-                << indent() << "// " << in << " is ready now.\n";
-          }
-        }
-        continue;
-      }
-      std::cout << "Problem assigning " << in << "\n";
-      ow->get_outstream() << indent() << "// Not sure what to do for " << in
-                          << "\n";
-    }
+    dump_assignments(aug_graph, cto, instance_assignment, nch, ow);
   }
 
   // Close any dangling loop if any. This should never happen
