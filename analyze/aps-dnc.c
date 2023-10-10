@@ -2638,6 +2638,7 @@ void add_transitive_edges_to_graph(AUG_GRAPH *aug_graph, EDGESET set, EDGESET a,
 }
 
 void close_using_edge(AUG_GRAPH *aug_graph, EDGESET edge) {
+  struct edgeset copy = *edge;
   int i,j;
   int source_index = edge->source->index;
   int sink_index = edge->sink->index;
@@ -2651,38 +2652,12 @@ void close_using_edge(AUG_GRAPH *aug_graph, EDGESET edge) {
   for (i=0; i < n; ++i) {
     /* first: instance[i]->source */
     add_transitive_edges_to_graph(aug_graph, aug_graph->graph[i*n+source_index],
-				  NULL, edge);
+				  NULL, &copy);
     /* then sink->instance[i] */
     add_transitive_edges_to_graph(aug_graph, aug_graph->graph[sink_index*n+i],
-				  edge, NULL);
-    /* remove the following once the replacement seems to be working. */
-#ifdef UNDEF
-    EDGESET e;
-    EDGESET rest;
-    /* first: instance[i]->source */
-    for (e = aug_graph->graph[i*n+source_index];
-	 e != NULL;
-	 e = rest) {
-      rest = e->rest; /* may be modified in following: */
-      add_transitive_edge_to_graph(e->source,edge->sink,
-				   &e->cond,&edge->cond,
-				   e->kind,edge->kind,
-				   aug_graph);
-    }
-    /* then sink->instance[i] */
-    for (e = aug_graph->graph[sink_index*n+i];
-	 e != NULL;
-	 e = rest) {
-      rest = e->rest;
-      add_transitive_edge_to_graph(edge->source,e->sink,
-				   &edge->cond,&e->cond,
-				   edge->kind,e->kind,
-				   aug_graph);
-    }
-#endif
+				  &copy, NULL);
   }
 }
-
 /* A very slow check, hence optional.
  * O(n^3*2^c) where 'n' is the number of instances.
  * (for reasonable non-toy examples, n can be > 100).
