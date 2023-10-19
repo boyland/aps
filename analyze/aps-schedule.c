@@ -1629,6 +1629,10 @@ static CTO_NODE* group_schedule_chunk(AUG_GRAPH* aug_graph,
   return NULL;
 }
 
+static is_conditional_chunk(Chunk* chunk) {
+  return chunk->type == Local && if_rule_p(chunk->instances.array[0].fibered_attr.attr);
+}
+
 /**
  * @brief Scheduler that finds the next chunk in a given SCC to schedule
  */
@@ -1706,10 +1710,9 @@ static CTO_NODE* chunk_schedule(AUG_GRAPH* aug_graph,
   int current_rank = 0;
   int max_rank_index = 0;
   for (i = 0; i < chunk_component->length; i++) {
+    Chunk* chunk = (Chunk*)chunk_component->array[i];
     if ((oag_debug & DEBUG_ORDER) && (oag_debug & DEBUG_ORDER_VERBOSE)) {
       if (rank_array[i] > 0) {
-        Chunk* chunk = (Chunk*)chunk_component->array[i];
-
         print_indent(2, stdout);
         printf("Rank=%d ", rank_array[i]);
         print_chunk_info(chunk);
@@ -1717,7 +1720,7 @@ static CTO_NODE* chunk_schedule(AUG_GRAPH* aug_graph,
       }
     }
 
-    if (rank_array[i] > current_rank) {
+    if (rank_array[i] > current_rank || (rank_array[i] == current_rank && is_conditional_chunk(chunk))) {
       max_rank_index = i;
       current_rank = rank_array[i];
     }
