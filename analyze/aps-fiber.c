@@ -2124,11 +2124,21 @@ void *compute_OU(void *u, void *node)
 	return NULL;
 	break;
       }
-      case KEYcase_stmt: {
+      case KEYfor_in_stmt:
+      {
+        Expression sequence = for_in_stmt_seq(decl);
+        Declaration formal = for_in_stmt_formal(decl);
+        OSET oset = doOU(sequence, EMPTY_USET);
+        add_to_oset(formal, oset);
+        USET uset = get_uset(formal);
+        doOU(sequence, uset);
+        break;
+      }
+      case KEYsome_case_stmt: {
 	Match m;
-	Expression expr = case_stmt_expr(decl);
+	Expression expr = some_case_stmt_expr(decl);
 	OSET oset = doOU(expr, EMPTY_USET);
-	for (m= first_Match(case_stmt_matchers(decl)); m; m = MATCH_NEXT(m)){
+	for (m= first_Match(some_case_stmt_matchers(decl)); m; m = MATCH_NEXT(m)){
 	  USET u = doUOp(matcher_pat(m), oset);
 	  doOU(expr, u);
 	}
@@ -2379,11 +2389,23 @@ void *build_FSA(void *vstate, void *node)
 
         return NULL;
       } // KEYassign
-      case KEYcase_stmt: {
+      case KEYfor_in_stmt:
+      {
+        Expression sequence = for_in_stmt_seq(decl);
+        Declaration formal = for_in_stmt_formal(decl);
+        NODESET m = EMPTY_NODESET;
+        int index = get_node_decl(formal);
+        if (index > 0) {
+          m = set_of_node(index + 1);
+        }
+        link_expr_rhs(sequence, m);
+        break;
+      }
+      case KEYsome_case_stmt: {
         Match m;
-        Expression expr = case_stmt_expr(decl);
+        Expression expr = some_case_stmt_expr(decl);
         NODESET M = link_expr_rhs(expr, EMPTY_NODESET);
-        for (m= first_Match(case_stmt_matchers(decl)); m; m = MATCH_NEXT(m)){
+        for (m= first_Match(some_case_stmt_matchers(decl)); m; m = MATCH_NEXT(m)){
           NODESET N = link_expr_lhs_p(matcher_pat(m), M);
           link_expr_rhs(expr, N);
         }
