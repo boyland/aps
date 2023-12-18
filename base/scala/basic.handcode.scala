@@ -89,7 +89,7 @@ object basic_implicit {
   type T_UNION_LATTICE[T_E,T_T] = T_T;
   type T_INTERSECTION_LATTICE[T_E,T_T] = T_T;
 
-  type T_TUPLE_LATTICE[T_ElemType, T_ST] = List[T_ElemType];
+  type T_TUPLE_LATTICE[T_ElemType, T_ST] = T_ST;
 
   val t_String = new M_STRING("String");
   type T_String = String;
