@@ -682,19 +682,22 @@ static void ensure_non_var_use(Declaration fdecl, void * source, void * current)
     switch (Declaration_KEY(decl)) {
     case KEYvalue_decl: {
       if (is_inside_function(decl) != fdecl && !def_is_constant(value_decl_def(decl))) {
-        aps_error(source, "non-constant value '%s' used inside constant function '%s' but declared outside of function", decl_name(decl), decl_name(fdecl));
+        aps_error(source, "non-constant value '%s' used inside constant function '%s' but declared outside of function",
+          decl_name(decl), decl_name(fdecl));
       }
       break;
     }
     case KEYattribute_decl: {
       if (!def_is_constant(attribute_decl_def(decl))) {
-        aps_error(source, "attribute '%s' used inside constant function '%s'", decl_name(decl), decl_name(fdecl));
+        aps_error(source, "attribute '%s' used inside constant function '%s'",
+          decl_name(decl), decl_name(fdecl));
       }
       break;
     }
     case KEYfunction_decl: {
       if (!def_is_constant(function_decl_def(decl))) {
-        aps_error(source, "function call to non-constant function '%s' inside constant function '%s'", decl_name(decl), decl_name(fdecl));
+        aps_error(source, "function call to non-constant function '%s' inside constant function '%s'",
+          decl_name(decl), decl_name(fdecl));
       }
       break;
     }
