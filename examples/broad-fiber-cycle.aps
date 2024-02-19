@@ -46,7 +46,7 @@ module BROAD_FIBER_CYCLE[T :: var TINY[]] extends T begin
     this.syn := scope_depth(index_scope(this.scope2,n));
   end;
 
-  function index_scope(sc : ContextPtr; i : Integer) : ContextPtr begin
+  var function index_scope(sc : ContextPtr; i : Integer) : ContextPtr begin
     if sc = nil or i = 0 then
       result := sc;
     else

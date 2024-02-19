@@ -184,7 +184,7 @@ module TYPE_BINDING[T :: var TYPE_DECL[]] extends T begin
     e.expr_shape := element_type(a.expr_shape);
   end;
   
-  function element_type(at : Shape) : Shape begin
+  var function element_type(at : Shape) : Shape begin
     case at begin
       match vector_shape(?et:Shape) begin
 	result := et;
