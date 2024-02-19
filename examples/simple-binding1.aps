@@ -140,7 +140,7 @@ module NAME_RESOLUTION[T :: var SIMPLE[]] extends T begin
     endif;
   end;
   
-  function lookup(name : String; scope : Scope) : EntityRef begin
+  var function lookup(name : String; scope : Scope) : EntityRef begin
     if scope = root_scope then
       result := not_found;
     else
