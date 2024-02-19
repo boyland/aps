@@ -636,7 +636,7 @@ static bool sig_is_var(Signature sig) {
   }
 }
 
-static void ensure_non_var_use(Declaration fdecl, void * source, void * current) {
+static void ensure_non_var_use(Declaration fdecl, void* source, void* current) {
   switch (ABSTRACT_APS_tnode_phylum(current)) {
   case KEYExpression: {
     Expression expr = (Expression) current;
