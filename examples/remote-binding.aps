@@ -18,7 +18,7 @@ module NAME_RESOLUTION[T :: var SIMPLE[]] extends T begin
 
   pragma synthesized(decl_used);
 
-  function entity_shape(e : EntityRef) : Shape begin
+  var function entity_shape(e : EntityRef) : Shape begin
     case e begin
       match decl(?, ?ty) begin
 	result := ty.type_shape;
@@ -133,7 +133,7 @@ module NAME_RESOLUTION[T :: var SIMPLE[]] extends T begin
     endif;
   end;
   
-  function lookup(name : String; scope : Scope) : EntityRef begin
+  var function lookup(name : String; scope : Scope) : EntityRef begin
     if scope = root_scope then
       result := not_found;
     else

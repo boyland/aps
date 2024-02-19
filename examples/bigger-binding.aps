@@ -62,7 +62,7 @@ module CODE_GENERATION[T :: var BIGGER[]] extends T begin
   attribute Type.type_shape : Shape;
   attribute Expr.expr_shape : Shape;
 
-  collection size : Integer :> 0, (+);
+  var collection size : Integer :> 0, (+);
 
   pragma inherited(block_scope,decls_scope,decl_scope,
 		   stmts_scope,stmt_scope,expr_scope);

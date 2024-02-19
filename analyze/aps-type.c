@@ -615,6 +615,102 @@ Type infer_expr_type(Expression e)
   return ty;
 }
 
+static Declaration is_inside_function(void* node) {
+  while (node != NULL) {
+    if (ABSTRACT_APS_tnode_phylum((Declaration)node) == KEYDeclaration &&
+        Declaration_KEY((Declaration)node) == KEYfunction_decl) {
+      return (Declaration)node;
+    }
+
+    node = tnode_parent(node);
+  }
+  return NULL;
+}
+
+static bool sig_is_var(Signature sig) {
+  switch (Signature_KEY(sig)) {
+  case KEYsig_inst:
+    return sig_inst_is_var(sig);
+  default:
+    return false;
+  }
+}
+
+static void ensure_non_var_use(Declaration fdecl, void* source, void* current) {
+  switch (ABSTRACT_APS_tnode_phylum(current)) {
+  case KEYExpression: {
+    Expression expr = (Expression) current;
+    switch (Expression_KEY(expr)) {
+    case KEYfuncall: {
+      ensure_non_var_use(fdecl, source, funcall_f(expr));
+      break;
+    }
+    case KEYvalue_use: {
+      Use use = value_use_use(expr);
+      Declaration udecl = USE_DECL(use);
+
+      switch (Use_KEY(use)) {
+      case KEYqual_use: {
+        // Convert type-use to Declaration
+        Declaration decl = canonical_type_decl(canonical_type(qual_use_from(use)));
+        switch (Declaration_KEY(decl)) {
+        case KEYsome_type_formal:
+          // Special case when type formal is VAR, its functions are considered constant
+          if (sig_is_var(some_type_formal_sig(decl))) {
+            return;
+          }
+          break;
+        default:
+          break;
+        }
+        break;
+      }
+      default:
+        break;
+      }
+
+      ensure_non_var_use(fdecl, source, udecl); // investigate the use
+      break;
+    }
+    default:
+      break;
+    }
+    break;
+  }
+  case KEYDeclaration: {
+    Declaration decl = (Declaration) current;
+    switch (Declaration_KEY(decl)) {
+    case KEYvalue_decl: {
+      if (is_inside_function(decl) != fdecl && !def_is_constant(value_decl_def(decl))) {
+        aps_error(source, "non-constant value '%s' used inside constant function '%s' but declared outside of function",
+          decl_name(decl), decl_name(fdecl));
+      }
+      break;
+    }
+    case KEYattribute_decl: {
+      if (!def_is_constant(attribute_decl_def(decl))) {
+        aps_error(source, "attribute '%s' used inside constant function '%s'",
+          decl_name(decl), decl_name(fdecl));
+      }
+      break;
+    }
+    case KEYfunction_decl: {
+      if (!def_is_constant(function_decl_def(decl))) {
+        aps_error(source, "function call to non-constant function '%s' inside constant function '%s'",
+          decl_name(decl), decl_name(fdecl));
+      }
+      break;
+    }
+    default:
+      break;
+    }
+    break;
+  }
+  default:
+    break;
+  }
+}
+
 void check_expr_type(Expression e, Type type)
 {
   if (type == 0) {
@@ -625,6 +721,12 @@ void check_expr_type(Expression e, Type type)
     check_type_equal(e,type,Expression_info(e)->expr_type);
     return;
   }
+
+  Declaration fdecl;
+  if ((fdecl = is_inside_function(e)) != NULL && def_is_constant(function_decl_def(fdecl))) {
+    ensure_non_var_use(fdecl, e, e);
+  }
+
   switch (Expression_KEY(e)) {
   case KEYvalue_use:
     {
