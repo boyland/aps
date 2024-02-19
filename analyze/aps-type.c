@@ -615,7 +615,7 @@ Type infer_expr_type(Expression e)
   return ty;
 }
 
-static Declaration is_inside_function(void *node) {
+static Declaration is_inside_function(void* node) {
   while (node != NULL) {
     if (ABSTRACT_APS_tnode_phylum((Declaration)node) == KEYDeclaration &&
         Declaration_KEY((Declaration)node) == KEYfunction_decl) {
