@@ -2439,6 +2439,8 @@ static void synchronize_dependency_graphs(AUG_GRAPH *aug_graph,
     return;
   }
 
+  bool phylum_is_func_decl = Declaration_KEY(phy_graph->phylum) == KEYfunction_decl;
+
   phy_n = phy_graph->instances.length;
 
   /* discover when the instances for this node end.
@@ -2463,8 +2465,9 @@ static void synchronize_dependency_graphs(AUG_GRAPH *aug_graph,
       int aug_index = i*n + j;
       int sum_index = (i-start)*phy_n + (j-start);
       DEPENDENCY kind=edgeset_kind(aug_graph->graph[aug_index]);
+      // avoid adding augmeneted dependency graph edges to summary graph of function declarations
       if (!AT_MOST(dependency_indirect(kind),
-		   phy_graph->mingraph[sum_index])) {
+		   phy_graph->mingraph[sum_index]) && !phylum_is_func_decl) {
 	kind = dependency_indirect(kind); //! more precisely DNC artificial
 	kind = dependency_join(kind,phy_graph->mingraph[sum_index]);
 	if (kind == phy_graph->mingraph[sum_index]) {
