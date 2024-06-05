@@ -1,0 +1,13 @@
+x = "hello world!";
+y = x + 123;
+WHILE y DO
+  z = y;
+  IF z THEN 
+    z = x + y;
+  ELSE 
+    z = x + y;
+    WHILE x DO 
+      z = x + y;
+    END;
+  END;
+END;
