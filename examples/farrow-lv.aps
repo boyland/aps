@@ -17,6 +17,9 @@ module FARROW_LV[T :: var FARROW_LV_TREE[]] extends T begin
   pragma inherited(stmts_out);
   pragma synthesized(stmts_live);
 
+  circular attribute Program.program_live : SymbolLattice;
+  pragma synthesized(program_live);
+
   attribute Expression.expression_inside : SymbolLattice;
   pragma synthesized(expression_inside);
 
@@ -53,10 +56,28 @@ module FARROW_LV[T :: var FARROW_LV_TREE[]] extends T begin
     self.expression_inside := e1.expression_inside \/ e2.expression_inside; 
   end;
 
+  match ?self:Expression=expr_subtract(?e1: Expression, ?e2: Expression) begin
+    self.expression_inside := e1.expression_inside \/ e2.expression_inside; 
+  end;
+
+  match ?self:Expression=expr_equals(?e1: Expression, ?e2: Expression) begin
+    self.expression_inside := e1.expression_inside \/ e2.expression_inside; 
+  end;
+
+  match ?self:Expression=expr_not_equals(?e1: Expression, ?e2: Expression) begin
+    self.expression_inside := e1.expression_inside \/ e2.expression_inside; 
+  end;
+
+  match ?self:Expression=expr_less_than(?e1: Expression, ?e2: Expression) begin
+    self.expression_inside := e1.expression_inside \/ e2.expression_inside; 
+  end;
+
   match ?self:Expression=expr_lit(?s: Symbol) begin
     self.expression_inside := { }; 
   end;
 
   match ?self:Program=program(?ss: Stmts) begin
+    ss.stmts_out := {};
+    self.program_live := ss.stmts_live;
   end;
 end;
