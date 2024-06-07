@@ -30,6 +30,9 @@
   def ID(s : String) = FarrowLvTokens.ID(Symbol(s));
   def LITERAL(s : String) = FarrowLvTokens.LITERAL(Symbol(s));
   def EQ = FarrowLvTokens.EQ();
+  def EQEQ = FarrowLvTokens.EQEQ();
+  def NEQ = FarrowLvTokens.NEQ();
+  def LT = FarrowLvTokens.LT();
   def SEMICOLON = FarrowLvTokens.SEMICOLON();
   def WHILE = FarrowLvTokens.WHILE();
   def IF = FarrowLvTokens.IF();
@@ -38,6 +41,7 @@
   def DO = FarrowLvTokens.DO();
   def END = FarrowLvTokens.END();
   def PLUS = FarrowLvTokens.PLUS();
+  def MINUS = FarrowLvTokens.MINUS();
   def YYEOFT = FarrowLvTokens.YYEOF();
 
 %}

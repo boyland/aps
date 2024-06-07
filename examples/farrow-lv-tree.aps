@@ -14,6 +14,10 @@ module FARROW_LV_TREE[] begin
   constructor stmts_empty() : Stmts;
   constructor expr_var(s: Symbol) : Expression;
   constructor expr_add(e1: Expression; e2: Expression) : Expression;
+  constructor expr_subtract(e1: Expression; e2: Expression) : Expression;
+  constructor expr_equals(e1: Expression; e2: Expression) : Expression;
+  constructor expr_not_equals(e1: Expression; e2: Expression) : Expression;
+  constructor expr_less_than(e1: Expression; e2: Expression) : Expression;
   constructor expr_lit(s: Symbol) : Expression;
   constructor program(ss: Stmts) : Program;
 

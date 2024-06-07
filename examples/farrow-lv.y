@@ -6,7 +6,10 @@
  */
 
 %token <Symbol> ID LITERAL
-%token SEMICOLON EQ PLUS IF THEN ELSE WHILE DO END
+%token SEMICOLON EQ
+%token EQEQ NEQ PLUS MINUS LT
+%token IF THEN ELSE
+%token WHILE DO END
 
 %type <Stmt> stmt
 %type <Stmts> stmts 
@@ -15,7 +18,9 @@
 
 %left EQ
 %left IF WHILE
-%left PLUS
+%left LT
+%left EQEQ NEQ
+%left PLUS MINUS
 
 %%
 
@@ -43,6 +48,15 @@ expr : ID
    { $$ = expr_lit($1); }
       | expr PLUS expr
    { $$ = expr_add($1, $3); }
+      | expr MINUS expr
+   { $$ = expr_subtract($1, $3); }
+      | expr EQEQ expr
+   { $$ = expr_equals($1, $3); }
+      | expr NEQ expr
+   { $$ = expr_not_equals($1, $3); }
+      | expr LT expr
+   { $$ = expr_less_than($1, $3); }
       ;
+
 %%
 

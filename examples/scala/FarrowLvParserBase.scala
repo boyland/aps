@@ -64,6 +64,30 @@ class FarrowLvParserBase {
     n
   };
 
+  def expr_subtract(e1: Expression, e2: Expression) : Expression = {
+    set_node_numbers();
+    var n = t_Tree.v_expr_subtract(e1, e2);
+    n
+  };
+
+  def expr_equals(e1: Expression, e2: Expression) : Expression = {
+    set_node_numbers();
+    var n = t_Tree.v_expr_equals(e1, e2);
+    n
+  };
+
+  def expr_not_equals(e1: Expression, e2: Expression) : Expression = {
+    set_node_numbers();
+    var n = t_Tree.v_expr_not_equals(e1, e2);
+    n
+  };
+
+  def expr_less_than(e1: Expression, e2: Expression) : Expression = {
+    set_node_numbers();
+    var n = t_Tree.v_expr_less_than(e1, e2);
+    n
+  };
+
   def expr_lit(s: Symbol) : Expression = {
     set_node_numbers();
     var n = t_Tree.v_expr_lit(s);

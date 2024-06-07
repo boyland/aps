@@ -1,13 +1,10 @@
-x = "hello world!";
-y = x + 123;
-WHILE y DO
-  z = y;
-  IF z THEN 
-    z = x + y;
-  ELSE 
-    z = x + y;
-    WHILE x DO 
-      z = x + y;
-    END;
+// Euclidean algorithm (GCD)
+x = 10;
+y = 50;
+WHILE x != y DO
+  IF b < a THEN
+    a = a - b;
+  ELSE
+    b = b - a;
   END;
 END;
