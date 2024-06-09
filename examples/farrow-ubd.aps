@@ -1,0 +1,148 @@
+with "symbol";
+with "table";
+with "farrow-ubd-tree";
+
+-- Farrow use-before-declaration analysis
+module FARROW_UBF[T :: var FARROW_UBF_TREE[]] extends T begin
+  
+  type Integers := SET[Integer];
+  type IntegerLattice := UNION_LATTICE[Integer, Integers];
+  type DeclPairLattice := TABLE_LATTICE[Symbol, IntegerLattice];
+
+  type Messages := SET[String];
+
+  attribute Declaration.decl_name : Symbol;
+  circular collection attribute Declaration.decl_pair : DeclPairLattice;
+  circular collection attribute Declaration.decl_env : DeclPairLattice;
+  attribute Declaration.decl_errs : Messages;
+  pragma inherited(decl_env);
+  pragma synthesized(decl_name, decl_pair, decl_errs);
+
+  circular collection attribute Declarations.decls_defs : DeclPairLattice;
+  circular collection attribute Declarations.decls_env : DeclPairLattice;
+  attribute Declarations.decls_errs : Messages;
+  pragma inherited(decls_env);
+  pragma synthesized(decls_defs, decls_errs);
+
+  attribute Expression.expr_val : Integer;
+  circular collection attribute Expression.expr_env : DeclPairLattice;
+  attribute Expression.expr_errs : Messages;
+  pragma inherited(expr_env);
+  pragma synthesized(expr_val, expr_errs);
+
+  attribute Term.term_val : Integer;
+  circular collection attribute Term.term_env : DeclPairLattice;
+  attribute Term.term_errs : Messages;
+  pragma inherited(term_env);
+  pragma synthesized(term_val, term_errs);
+
+  attribute Operation.op_val : Integer;
+  attribute Operation.op_lval : Integer;
+  attribute Operation.op_rval : Integer;
+  pragma inherited(op_lval, op_rval);
+  pragma synthesized(op_val);
+
+  match ?self:Declarations=scope(?ds: Declarations) begin
+    self.decls_defs := ds.decls_defs;
+    self.decls_errs := ds.decls_errs;
+    ds.decls_env := ds.decls_defs;
+  end;
+
+  match ?self:Declaration=decl_assign(?s: Symbol, ?e: Expression) begin
+    self.decl_pair :> DeclPairLattice$table_entry(s, { e.expr_val });
+    self.decl_name := s;
+    e.expr_env := self.decl_env;
+    self.decl_errs := e.expr_errs;
+  end;
+
+  match ?self:Declarations=decls_empty() begin
+    self.decls_defs := DeclPairLattice$bottom;
+    self.decls_errs := {};
+  end;
+
+  match ?self:Declarations=decls_append(?ds: Declarations, ?d: Declaration) begin
+    ds.decls_env := self.decls_env;
+    d.decl_env := self.decls_env;
+
+    case DeclPairLattice$select(ds.decls_defs, d.decl_name) begin
+      match DeclPairLattice$table_entry(?,Integers${?first,...}) begin
+        self.decls_errs := { "unknown identifier of " ++ symbol_name(d.decl_name) } \/ ds.decls_errs \/ d.decl_errs;
+      end;
+      else
+        self.decls_defs := d.decl_pair;
+        self.decls_errs := ds.decls_errs \/ d.decl_errs;
+    end;
+  end;
+
+  match ?self:Expression=expr_term(?t: Term) begin
+    self.expr_val := t.term_val;
+    self.expr_errs := t.term_errs;
+    t.term_env := self.expr_env;
+  end;
+
+  match ?self:Operation=add_op() begin
+    if self.op_lval = 0 or self.op_rval = 0 then
+      self.op_val := 0;
+    else
+      self.op_val := self.op_lval + self.op_rval;
+    endif;
+  end;
+
+  match ?self:Operation=mul_op() begin
+    if self.op_lval = 0 or self.op_rval = 0 then
+      self.op_val := 0;
+    else
+      self.op_val := self.op_lval * self.op_rval;
+    endif;
+  end;
+
+  match ?self:Operation=sub_op() begin
+    if self.op_lval = 0 or self.op_rval = 0 then
+      self.op_val := 0;
+    else
+      self.op_val := self.op_lval - self.op_rval;
+    endif;
+  end;
+
+  match ?self:Operation=div_op() begin
+    if self.op_lval = 0 or self.op_rval = 0 then
+      self.op_val := 0;
+    else
+      self.op_val := self.op_lval / self.op_rval;
+    endif;
+  end;
+
+  match ?self:Expression=expr_apply(?e: Expression, ?op: Operation, ?t: Term) begin
+    self.expr_val := op.op_val;
+    op.op_lval := e.expr_val;
+    op.op_rval := t.term_val;
+    e.expr_env := self.expr_env;
+    t.term_env := self.expr_env;
+    self.expr_errs := e.expr_errs \/ t.term_errs;
+  end;
+
+  match ?self:Term=term_variable(?s: Symbol) begin
+    variable_value: Integer := 0;
+
+    case DeclPairLattice$select(self.term_env, s) begin
+      match DeclPairLattice$table_entry(?,Integers${?first,...}) begin
+        variable_value := first;
+      end;
+    end;
+
+    if variable_value = 0 then
+      self.term_errs := { "unknown identifier of " ++ symbol_name(s) };
+    else
+      self.term_errs := { };
+    endif;
+  end;
+
+  match ?self:Term=term_literal(?i: Integer) begin
+    self.term_val := i;
+    self.term_errs := {};
+  end;
+
+  match ?self:Program=program(?ds: Declarations) begin
+    ds.decls_env := DeclPairLattice$bottom;
+  end;
+end;
