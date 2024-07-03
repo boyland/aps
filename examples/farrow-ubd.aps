@@ -80,7 +80,7 @@ module FARROW_UBF[T :: var FARROW_UBF_TREE[]] extends T begin
     t.term_env := self.expr_env;
   end;
 
-  match ?self:Operation=add_op() begin
+  match ?self:Operation=op_add() begin
     if self.op_lval = 0 or self.op_rval = 0 then
       self.op_val := 0;
     else
@@ -88,7 +88,7 @@ module FARROW_UBF[T :: var FARROW_UBF_TREE[]] extends T begin
     endif;
   end;
 
-  match ?self:Operation=mul_op() begin
+  match ?self:Operation=op_mul() begin
     if self.op_lval = 0 or self.op_rval = 0 then
       self.op_val := 0;
     else
@@ -96,7 +96,7 @@ module FARROW_UBF[T :: var FARROW_UBF_TREE[]] extends T begin
     endif;
   end;
 
-  match ?self:Operation=sub_op() begin
+  match ?self:Operation=op_sub() begin
     if self.op_lval = 0 or self.op_rval = 0 then
       self.op_val := 0;
     else
@@ -104,7 +104,7 @@ module FARROW_UBF[T :: var FARROW_UBF_TREE[]] extends T begin
     endif;
   end;
 
-  match ?self:Operation=div_op() begin
+  match ?self:Operation=op_div() begin
     if self.op_lval = 0 or self.op_rval = 0 then
       self.op_val := 0;
     else

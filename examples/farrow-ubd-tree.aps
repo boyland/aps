@@ -15,10 +15,10 @@ module FARROW_UBF_TREE[] begin
   constructor decls_empty() : Declarations;
   constructor decls_append(ds: Declarations; d: Declaration) : Declarations;
   constructor expr_term(t: Term) : Expression;
-  constructor add_op() : Operation;
-  constructor mul_op() : Operation;
-  constructor sub_op() : Operation;
-  constructor div_op() : Operation;
+  constructor op_add() : Operation;
+  constructor op_mul() : Operation;
+  constructor op_sub() : Operation;
+  constructor op_div() : Operation;
   constructor expr_apply(e: Expression; op: Operation; t: Term) : Expression;
   constructor term_variable(s: Symbol) : Term;
   constructor term_literal(i: Integer) : Term;
