@@ -550,7 +550,7 @@ Type infer_expr_type(Expression e)
 	ty = infer_formal_type(decl);
 	break;
       default:
-	aps_error(decl,"unknown expression decl");
+	aps_error(decl,"unknown expression decl for %s", decl_name(decl));
 	break;
       }
       ty = type_subst(u,ty);
@@ -754,7 +754,7 @@ void check_expr_type(Expression e, Type type)
 	ty = infer_formal_type(decl);
 	break;
       default:
-	aps_error(decl,"unknown expression decl");
+	aps_error(decl,"unknown expression decl for %s", decl_name(decl));
 	break;
       }
       check_type_subst(e,type,u,ty);
@@ -1057,7 +1057,7 @@ Type infer_function_return_type(Expression f, Actuals args) {
 	ty = infer_formal_type(decl);
 	break;
       default:
-	aps_error(decl,"unknown expression decl");
+	aps_error(decl,"unknown expression decl for %s", decl_name(decl));
 	return error_type;
 	break;
       }
@@ -1106,8 +1106,9 @@ void check_function_return_type(Expression f, Actuals args, Type type) {
 	break;
       case KEYformal:
 	ty = infer_formal_type(decl);
+	break;
       default:
-	aps_error(decl,"unknown expression decl");
+	aps_error(decl,"unknown expression decl for %s", decl_name(decl));
 	return;
       }
       ty = base_type(ty);
