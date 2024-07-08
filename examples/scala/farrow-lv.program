@@ -1,0 +1,10 @@
+// Euclidean algorithm (GCD)
+x = 10;
+y = 50;
+WHILE x != y DO
+  IF b < a THEN
+    a = a - b;
+  ELSE
+    b = b - a;
+  END;
+END;

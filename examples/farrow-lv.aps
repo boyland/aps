@@ -1,0 +1,83 @@
+with "symbol";
+with "table";
+with "farrow-lv-tree";
+
+module FARROW_LV[T :: var FARROW_LV_TREE[]] extends T begin
+
+  type Symbols := SET[Symbol];
+  type SymbolLattice := UNION_LATTICE[Symbol, Symbols];
+
+  circular attribute Stmt.stmt_live : SymbolLattice;
+  circular attribute Stmt.stmt_out : SymbolLattice;
+  pragma inherited(stmt_out);
+  pragma synthesized(stmt_live);
+
+  circular attribute Stmts.stmts_live : SymbolLattice;
+  circular attribute Stmts.stmts_out : SymbolLattice;
+  pragma inherited(stmts_out);
+  pragma synthesized(stmts_live);
+
+  circular attribute Program.program_live : SymbolLattice;
+  pragma synthesized(program_live);
+
+  attribute Expression.expression_inside : SymbolLattice;
+  pragma synthesized(expression_inside);
+
+  match ?self:Stmt=stmt_assign(?id: Symbol, ?e: Expression) begin
+    self.stmt_live := (self.stmt_out /\~ { id }) \/ e.expression_inside;
+  end;
+
+  match ?self:Stmt=stmt_if(?e: Expression, ?s1: Stmts, ?s2: Stmts) begin
+    self.stmt_live := e.expression_inside \/ s1.stmts_live \/ s2.stmts_live;
+    s1.stmts_out := self.stmt_out;
+    s2.stmts_out := self.stmt_out;
+  end;
+
+  match ?self:Stmt=stmt_while(?e: Expression, ?s: Stmts) begin
+    self.stmt_live := self.stmt_out \/ (e.expression_inside \/ s.stmts_live);
+    s.stmts_out := self.stmt_out \/ (e.expression_inside \/ s.stmts_live);
+  end;
+
+  match ?self:Stmts=stmts_append(?s: Stmt, ?ss: Stmts) begin
+    self.stmts_live := s.stmt_live;
+    s.stmt_out := ss.stmts_live;
+    ss.stmts_out := self.stmts_out;
+  end;
+
+  match ?self:Stmts=stmts_empty() begin
+    self.stmts_live := self.stmts_out;
+  end;
+
+  match ?self:Expression=expr_var(?s: Symbol) begin
+    self.expression_inside := { s }; 
+  end;
+
+  match ?self:Expression=expr_add(?e1: Expression, ?e2: Expression) begin
+    self.expression_inside := e1.expression_inside \/ e2.expression_inside; 
+  end;
+
+  match ?self:Expression=expr_subtract(?e1: Expression, ?e2: Expression) begin
+    self.expression_inside := e1.expression_inside \/ e2.expression_inside; 
+  end;
+
+  match ?self:Expression=expr_equals(?e1: Expression, ?e2: Expression) begin
+    self.expression_inside := e1.expression_inside \/ e2.expression_inside; 
+  end;
+
+  match ?self:Expression=expr_not_equals(?e1: Expression, ?e2: Expression) begin
+    self.expression_inside := e1.expression_inside \/ e2.expression_inside; 
+  end;
+
+  match ?self:Expression=expr_less_than(?e1: Expression, ?e2: Expression) begin
+    self.expression_inside := e1.expression_inside \/ e2.expression_inside; 
+  end;
+
+  match ?self:Expression=expr_lit(?s: Symbol) begin
+    self.expression_inside := { }; 
+  end;
+
+  match ?self:Program=program(?ss: Stmts) begin
+    ss.stmts_out := {};
+    self.program_live := ss.stmts_live;
+  end;
+end;
