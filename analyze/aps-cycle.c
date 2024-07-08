@@ -780,7 +780,17 @@ static bool applicable_for_circularity_check(INSTANCE *instance)
     switch (Declaration_KEY(node))
     {
     case KEYformal:
-      return false;
+    {
+      switch (ABSTRACT_APS_tnode_phylum(tnode_parent(node)))
+      {
+      case KEYPattern:
+        // formals used inside match patterns are allowed to be
+        // involved in a cycle.
+        return false;
+      default:
+        break;
+      }
+    }
     default:
       break;
     }
