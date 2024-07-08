@@ -1,0 +1,25 @@
+with "symbol";
+with "table";
+
+module FARROW_LV_TREE[] begin
+  phylum Stmt;
+  phylum Stmts;
+  phylum Expression;
+  phylum Program;
+
+  constructor stmt_assign(s: Symbol; e: Expression) : Stmt;
+  constructor stmt_if(e: Expression; s1, s2: Stmts) : Stmt;
+  constructor stmt_while(e: Expression; s: Stmts) : Stmt;
+  constructor stmts_append(s: Stmt; ss: Stmts) : Stmts;
+  constructor stmts_empty() : Stmts;
+  constructor expr_var(s: Symbol) : Expression;
+  constructor expr_add(e1: Expression; e2: Expression) : Expression;
+  constructor expr_subtract(e1: Expression; e2: Expression) : Expression;
+  constructor expr_equals(e1: Expression; e2: Expression) : Expression;
+  constructor expr_not_equals(e1: Expression; e2: Expression) : Expression;
+  constructor expr_less_than(e1: Expression; e2: Expression) : Expression;
+  constructor expr_lit(s: Symbol) : Expression;
+  constructor program(ss: Stmts) : Program;
+
+  pragma root_phylum(type Program);
+end;
