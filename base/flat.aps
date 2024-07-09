@@ -114,4 +114,7 @@ begin
       endif;
     end;
   end;
+
+  initial = bottom;
+  combine = join;
 end;
