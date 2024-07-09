@@ -10,7 +10,7 @@ int main ()
 {
   Debug::out(cout);
   typedef C_BAG<C_String> C_Strings;
-  C_Strings t_Strings(t_String);
+  C_Strings t_Strings(get_String());
   typedef COLL<C_Strings,C_String> Coll;
 
   C_Strings::T_Result b1 = t_Strings.v_single("s1");
@@ -20,7 +20,7 @@ int main ()
   C_Strings::T_Result b3 = t_Strings.v_none();
 
   typedef C_TABLE<C_Integer,C_Strings> C_Table;
-  C_Table t_Table(t_Integer,&t_Strings);
+  C_Table t_Table(get_Integer(),&t_Strings);
   C_Table::T_Result t1 = t_Table.v_table_entry(3,b1);
   C_Table::T_Result t2 = t_Table.v_table_entry(3,b2);
   C_Table::T_Result t3 = t_Table.v_table_entry(1,b3);
