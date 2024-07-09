@@ -39,7 +39,8 @@ basic.h basic.cpp : ../basic.aps
 
 table.cpp table.h : ../table.aps
 	${APSCPP} ${APSCPPFLAGS} --omit TABLE table
-	echo '#include "table.handcode.h"' >> table.h
+	mv table.h gen-table.h
+	echo '#include "table.handcode.h"' | cat - gen-table.h > table.h
 
 basic.o : basic.handcode.h basic.handcode.cpp
 table.o : table.handcode.h 
@@ -53,7 +54,7 @@ test : test-list test-set test-table
 	${CPP} ${CPPFLAGS} $*.cpp basecpp.a -o $*
 
 clean :
-	rm -f *.o *.a core test-list test-set test-table
+	rm -f *.o *.a core test-list test-set test-table gen*
 	rm -f basic.cpp table.cpp
 
 realclean : clean
