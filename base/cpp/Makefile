@@ -46,9 +46,9 @@ basic.o : basic.handcode.h basic.handcode.cpp
 table.o : table.handcode.h 
 
 test : test-list test-set test-table
-	-test-list
-	-test-set
-	-test-table
+	-./test-list
+	-./test-set
+	-./test-table
 
 % : %.cpp basecpp.a
 	${CPP} ${CPPFLAGS} $*.cpp basecpp.a -o $*
