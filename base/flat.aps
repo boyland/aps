@@ -116,5 +116,5 @@ begin
   end;
 
   initial = bottom;
-  combine = join;
+  function combine(x1,x2 : Result) : Result := join(x1,x2);
 end;
