@@ -8,6 +8,20 @@ begin
   bottom : Result := fbottom();
   top : Result := ftop();
 
+  function string(x : Result) : String begin
+    case x begin
+      match fbottom() begin
+        result := "BOT";
+      end;
+      match ftop() begin
+        result := "TOP";
+      end;
+      match normal(?v) begin
+        result := "LIFT(" ++ E$string(v) ++ ")";
+      end;
+    end;
+  end;
+  
   function compare(v1, v2 : Result) : Boolean begin
     case v1 begin
       match fbottom() begin
