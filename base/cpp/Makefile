@@ -45,17 +45,20 @@ table.cpp table.h : ../table.aps
 basic.o : basic.handcode.h basic.handcode.cpp
 table.o : table.handcode.h 
 
-test : test-list test-set test-table
+test : test-list test-set test-table test-flat
 	-./test-list
 	-./test-set
 	-./test-table
+	-./test-flat
+
+test-flat: flat.h
 
 % : %.cpp basecpp.a
 	${CPP} ${CPPFLAGS} $*.cpp basecpp.a -o $*
 
 clean :
-	rm -f *.o *.a core test-list test-set test-table gen*
-	rm -f basic.cpp table.cpp
+	rm -f *.o *.a core test-list test-set test-table test-flat gen*
+	rm -f basic.cpp table.cpp flat.cpp
 
 realclean : clean
-	rm -f basic.h table.h
+	rm -f basic.h table.h flat.h

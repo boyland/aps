@@ -7,4 +7,5 @@ flat.h
 test-list
 test-set
 test-table
+test-flat
 gen*
