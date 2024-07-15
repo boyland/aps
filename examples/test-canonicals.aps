@@ -945,3 +945,11 @@ pragma test_canonical_base_type(type E0FT5, "(E0$I2,E0$J2,E0$K2,E0$L2)=>E0$L2");
 pragma test_canonical_base_type(type E0FT6, "(String,Integer,E0$C,String)=>String");
 pragma test_canonical_base_type(type E0FT7, "(String,Integer,E0$C,String)=>String");
 pragma test_canonical_base_type(type E0FT8, "(String,Integer,E0$C,String)=>String");
+
+-------------------------------------------------------
+
+-- Qual use from canonical type validation
+
+phylum CoolClassPhylum;
+type CoolClass := remote CoolClassPhylum;
+pragma test_canonical_type(CoolClass$nil, "CoolClassPhylum");
