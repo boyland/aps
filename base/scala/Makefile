@@ -1,12 +1,15 @@
 .PHONY: all install clean
 
-SCALA= aps-impl.scala basic.handcode.scala table.handcode.scala symbol.scala symbol.handcode.scala
+SCALA= aps-impl.scala basic.handcode.scala table.handcode.scala symbol.scala symbol.handcode.scala flat.scala
 SVERSION=2.12
 LIB=../../lib
 
 # We can't make 2.9 anymore because it doesn't understand Java 8
 
 all : aps-library-2.10.jar aps-library-2.11.jar aps-library-2.12.jar
+
+flat.scala: ../flat.aps ../../bin/aps2scala
+	../../bin/aps2scala -p .. flat
 
 install : 
 	mkdir -p ${LIB} && cp aps-library*.jar ${LIB}
