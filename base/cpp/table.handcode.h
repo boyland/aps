@@ -9,7 +9,7 @@ struct APS_less {
   typedef typename C_T::T_Result T_T;
   C_T *t_T;
   APS_less(C_T *_t_T) : t_T(_t_T) {}
-  bool operator()(T_T x, T_T y) { return t_T->v_less(x,y); }
+  bool operator()(T_T x, T_T y) const { return t_T->v_less(x,y); }
 };
 
 template <class C_KeyType, class C_ValueType>
@@ -45,7 +45,7 @@ private:
       V_Table(c),
       t_KeyType(_t_KeyType),
       t_ValueType(_vt),
-      entries(Key_Less(t_KeyType)) {}
+      entries(Key_Less(_t_KeyType)) {}
     V_full_table *as_full() { return this; }
     void add_to(V_full_table *table) {
       typename Entries::const_iterator

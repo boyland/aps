@@ -76,6 +76,7 @@ void impl_module(char *mname, char*type)
 }
 
 bool incremental = false; //! unused
+bool in_constructor = false; // kludge
 int verbose = 0;
 int debug = 0;
 bool include_comments = false;
@@ -675,12 +676,16 @@ void dump_Type_superinit(bool is_phylum, Type ty, ostream& os)
     break;
   case KEYtype_inst:
     {
+      bool saved_in_constructor = in_constructor;
+      in_constructor = true;
       dump_type_inst_construct(ty,os);
+      in_constructor = saved_in_constructor;
     }
     break;
   case KEYtype_use:
     {
       Declaration td = USE_DECL(type_use_use(ty));
+      // 2024/07/08: JTB: I don't understand why we have "*" on the next line:
       os << "C_" << decl_name(td) << "(*_t_" << decl_name(td) << ")";
       break;
     }
@@ -1916,8 +1921,9 @@ void dump_Typed_decl(Type t, Declaration decl, const char*prefix,ostream& o)
   switch (Type_KEY(t)) {
   case KEYfunction_type:
     {
-      static int n = 0;
-      ++n;
+      /* static int n = 0;
+       * ++n;
+       */
       Declaration rdecl = first_Declaration(function_type_return_values(t));
       dump_Type(value_decl_type(rdecl),o);
       o << "(*" << prefix << sym << ")(";
@@ -1944,12 +1950,15 @@ void dump_Type_value(Type t, ostream& o)
   switch (Type_KEY(t)) {
   case KEYtype_use:
     {
-      void *p = tnode_parent(USE_DECL(type_use_use(t)));
+      Declaration decl = USE_DECL(type_use_use(t));
+      void *p = tnode_parent(decl);
       if (p != 0 && ABSTRACT_APS_tnode_phylum(p) == KEYUnit) {
 	// A top-level type!
 	// To avoid problems, we call the "get" function
 	dump_Use(type_use_use(t),"get_",o);
 	o << "()";
+      } else if (in_constructor) {
+	dump_Use(type_use_use(t),"_t_",o);
       } else {
         o << "this->"; // added because of C++ templates
 	dump_Use(type_use_use(t),"t_",o);

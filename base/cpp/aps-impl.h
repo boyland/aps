@@ -17,7 +17,8 @@ class Debug {
 
   std::ostream& out(); // print a debugging comment
   static std::ostream& out(std::ostream&); // change the debugging stream
- private:
+  static int print_depth(int); // change print depth
+private:
   static int depth;
   static std::ostream* output;
 };

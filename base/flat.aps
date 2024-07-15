@@ -1,0 +1,134 @@
+module FLAT_LATTICE[E :: BASIC[], PRINTABLE[]]
+  :: COMBINABLE[], LATTICE[], PRINTABLE[]
+begin
+  constructor fbottom() : Result;
+  constructor ftop() : Result;
+  constructor normal(value : E) : Result;
+
+  bottom : Result := fbottom();
+  top : Result := ftop();
+
+  function string(x : Result) : String begin
+    case x begin
+      match fbottom() begin
+        result := "BOT";
+      end;
+      match ftop() begin
+        result := "TOP";
+      end;
+      match normal(?v) begin
+        result := "LIFT(" ++ E$string(v) ++ ")";
+      end;
+    end;
+  end;
+  
+  function compare(v1, v2 : Result) : Boolean begin
+    case v1 begin
+      match fbottom() begin
+        result := v2 /= v1;
+      end;
+      match normal(?) begin
+        result := v2 = top;
+      end;
+    else
+      result := false;
+    end;
+  end;
+
+  function compare_equal(v1, v2 : Result) : Boolean begin
+    case v1 begin
+      match ftop() begin
+        result := v1 = v2;
+      end;
+      match normal(?) begin
+        result := v1 = v2 or v2 = top;
+      end;
+    else
+      result := true;
+    end;
+  end;
+
+  function join(v1, v2 : Result) : Result begin
+    case v1 begin
+      match fbottom() begin
+        result := v2;
+      end;
+      match normal(?) begin
+        if v2 = bottom or v2 = v1 then
+          result := v1;
+        else
+          result := top;
+        endif;
+      end;
+    else
+       result := top;
+    end;
+  end;
+
+  function meet(v1, v2 : Result) : Result begin
+    case v1 begin
+      match ftop() begin
+        result := v2;
+      end;
+      match normal(?) begin
+        if v2 = top or v2 = v1 then
+          result := v1;
+        else
+          result := bottom;
+        endif;
+      end;
+    else
+      result := bottom;
+    end;
+  end;
+  
+  function lift(e : E) : Result := normal(e);
+
+  -- Current APS compilers cannot handle functional returns
+  -- function liftf1(base : function (x:E) : E) f : function(x:Result) : Result begin
+  -- function resultf(x : Result) : Result begin
+  --    case x begin
+  --      match normal(?v) begin
+  --        result := normal(base(v));
+  --      end;
+  --    else
+  --      result := x;
+  --    end;
+  --  end;
+  --  f := resultf;
+  --end;
+
+  -- Since liftf1 doesn't work
+  function applyf1(base : function (v:E) : E; x:Result) : Result begin
+    case x begin
+      match normal(?v) begin
+        result := normal(base(v));
+      end;
+    else
+      result := x;
+    end;
+  end;
+
+  function applyf2(base : function (v1,v2 : E) : E; x1,x2 : Result) : Result begin
+    case x1 begin
+      match normal(?v1) begin
+        case x2 begin
+          match normal(?v2) begin
+            result := normal(base(v1,v2));
+          end;
+        else
+          result := x2;
+        end;
+      end;
+    else
+      if x2 = bottom then
+        result := x2;
+      else
+        result := x1;
+      endif;
+    end;
+  end;
+
+  initial = bottom;
+  function combine(x1,x2 : Result) : Result := join(x1,x2);
+end;
