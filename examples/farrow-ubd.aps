@@ -122,7 +122,7 @@ module FARROW_UBD[T :: var FARROW_UBD_TREE[]] extends T begin
   end;
 
   match ?self:Term=term_variable(?s: Symbol) begin
-    variable_value: IntegerLattice := IntegerLattice$lift(0);
+    variable_value: IntegerLattice := IntegerLattice$bottom;
 
     case DeclPairLattice$select(self.term_env, s) begin
       match DeclPairLattice$table_entry(?,?value) begin
