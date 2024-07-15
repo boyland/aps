@@ -89,6 +89,12 @@ public:
   int get() { return print_depth; }
 };
 
+int Debug::print_depth(int d) {
+  int result = ::print_depth;
+  ::print_depth = d;
+  return result;
+}
+
 template <>
 std::string s_string<int>(int n) 
 {
