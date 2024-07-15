@@ -5,92 +5,94 @@ class FarrowUbdParserBase {
     PARSE.lineNumber = get_line_number()
   };
   
-  object m_Tree extends M_FARROW_LV_TREE("FarrowUbdTree") {};
+  object m_Tree extends M_FARROW_UBD_TREE("FarrowUbdTree") {};
   val t_Tree = m_Tree.t_Result;
   type T_Tree = m_Tree.T_Result;
 
-  def getTree() : M_FARROW_LV_TREE = m_Tree;
+  def getTree() : M_FARROW_UBD_TREE = m_Tree;
   
-  type Stmt = t_Tree.T_Stmt;
-  type Stmts = t_Tree.T_Stmts;
+  type Declaration = t_Tree.T_Declaration;
+  type Declarations = t_Tree.T_Declarations;
   type Expression = t_Tree.T_Expression;
+  type Term = t_Tree.T_Term;
+  type Operation = t_Tree.T_Operation;
   type Program = t_Tree.T_Program;
 
-  def program(ss : Stmts) : Program = {
+  def program(ds : Declarations) : Program = {
     set_node_numbers();
-    var n = t_Tree.v_program(ss);
+    var n = t_Tree.v_program(ds);
     n
   };
 
-  def stmt_assign(s: Symbol, e: Expression) : Stmt = {
+  def scope(ds: Declarations) : Declarations = {
     set_node_numbers();
-    var n = t_Tree.v_stmt_assign(s, e);
+    var n = t_Tree.v_scope(ds);
     n
   };
 
-  def stmt_if(e: Expression, s1: Stmts, s2: Stmts) : Stmt = {
+  def decl_assign(s: Symbol, e: Expression) : Declaration = {
     set_node_numbers();
-    var n = t_Tree.v_stmt_if(e, s1, s2);
+    var n = t_Tree.v_decl_assign(s, e);
     n
   };
 
-  def stmt_while(e: Expression, s: Stmts) : Stmt = {
+  def decls_empty() : Declarations = {
     set_node_numbers();
-    var n = t_Tree.v_stmt_while(e, s);
+    var n = t_Tree.v_decls_empty();
     n
   };
 
-  def stmts_append(s: Stmt, ss: Stmts) : Stmts = {
+  def decls_append(ds: Declarations, d: Declaration) : Declarations = {
     set_node_numbers();
-    var n = t_Tree.v_stmts_append(s, ss);
+    var n = t_Tree.v_decls_append(ds, d);
     n
   };
 
-  def stmts_empty() : Stmts = {
+  def expr_term(t: Term) : Expression = {
     set_node_numbers();
-    var n = t_Tree.v_stmts_empty();
+    var n = t_Tree.v_expr_term(t);
     n
   };
 
-  def expr_var(s: Symbol) : Expression = {
+  def op_add() : Operation = {
     set_node_numbers();
-    var n = t_Tree.v_expr_var(s);
+    var n = t_Tree.v_op_add();
     n
   };
 
-  def expr_add(e1: Expression, e2: Expression) : Expression = {
+  def op_mul() : Operation = {
     set_node_numbers();
-    var n = t_Tree.v_expr_add(e1, e2);
+    var n = t_Tree.v_op_mul();
     n
   };
 
-  def expr_subtract(e1: Expression, e2: Expression) : Expression = {
+  def op_sub() : Operation = {
     set_node_numbers();
-    var n = t_Tree.v_expr_subtract(e1, e2);
+    var n = t_Tree.v_op_sub();
     n
   };
 
-  def expr_equals(e1: Expression, e2: Expression) : Expression = {
+  def op_div() : Operation = {
     set_node_numbers();
-    var n = t_Tree.v_expr_equals(e1, e2);
+    var n = t_Tree.v_op_div();
     n
   };
 
-  def expr_not_equals(e1: Expression, e2: Expression) : Expression = {
+  def expr_apply(e: Expression, op: Operation, t: Term) : Expression = {
     set_node_numbers();
-    var n = t_Tree.v_expr_not_equals(e1, e2);
+    var n = t_Tree.v_expr_apply(e, op, t);
     n
   };
 
-  def expr_less_than(e1: Expression, e2: Expression) : Expression = {
+  def term_variable(s: Symbol) : Term = {
     set_node_numbers();
-    var n = t_Tree.v_expr_less_than(e1, e2);
+    var n = t_Tree.v_term_variable(s);
     n
   };
 
-  def expr_lit(s: Symbol) : Expression = {
+  def term_literal(s: Symbol) : Term = {
     set_node_numbers();
-    var n = t_Tree.v_expr_lit(s);
+    var n = t_Tree.v_term_literal(java.lang.Integer.parseInt(s.name));
     n
   };
 }

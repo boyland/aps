@@ -35,6 +35,8 @@
   def MINUS = FarrowUbdTokens.MINUS();
   def MUL = FarrowUbdTokens.MUL();
   def DIV = FarrowUbdTokens.DIV();
+  def OPN_BRACE = FarrowUbdTokens.OPN_BRACE();
+  def CLS_BRACE = FarrowUbdTokens.CLS_BRACE();
   def YYEOFT = FarrowUbdTokens.YYEOF();
 
 %}

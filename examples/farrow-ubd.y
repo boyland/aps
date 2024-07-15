@@ -29,13 +29,13 @@ program : decls
 
 decls : /* NOTHING */
    { $$ = decls_empty(); }
-      | decls SEMICOLON decl
-   { $$ = decls_append($1, $3); }
+      | decls decl
+   { $$ = decls_append($1, $2); }
       | OPN_BRACE decls CLS_BRACE
    { $$ = scope($2); }
       ;
 
-decl : ID EQ expr
+decl : ID EQ expr SEMICOLON
    { $$ = decl_assign($1, $3); }   	   
       ;
 

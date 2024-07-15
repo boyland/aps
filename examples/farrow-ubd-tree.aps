@@ -2,7 +2,7 @@ with "symbol";
 with "table";
 
 -- Farrow use-before-declaration analysis tree
-module FARROW_UBF_TREE[] begin
+module FARROW_UBD_TREE[] begin
   phylum Declaration;
   phylum Declarations;
   phylum Expression;
