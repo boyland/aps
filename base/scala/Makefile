@@ -8,6 +8,8 @@ LIB=../../lib
 
 all : aps-library-2.10.jar aps-library-2.11.jar aps-library-2.12.jar
 
+test: test-multiset.run test-set.run test-flat.run
+
 flat.scala: ../flat.aps ../../bin/aps2scala
 	../../bin/aps2scala -p .. flat
 
@@ -36,10 +38,9 @@ aps-library-2.12.jar : ${SCALA}
 	/afs/cs.uwm.edu/package/scala/scala-2.12.8/common/bin/scalac -deprecation ${SCALA}
 	jar cvf $@ *.class
 
-.PHONY: test-multiset.run
-test-multiset.run : aps-library-${SVERSION}.jar
-	scalac -cp aps-library-${SVERSION}.jar test-multiset.scala
-	scala -cp aps-library-${SVERSION}.jar:. TestMultiSet
+.PHONY: test-%.run
+test-%.run : test-%.scala aps-library-${SVERSION}.jar
+	scala -cp aps-library-${SVERSION}.jar $<
 
 clean :
 	rm -f *.class *.jar *-2.*.scala
