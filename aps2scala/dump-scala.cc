@@ -1456,34 +1456,29 @@ bool check_override_decl(Declaration decl, Declaration fdecl, std::set<Declarati
   visited.insert(decl);
 
   switch (Declaration_KEY(decl)) {
-  case KEYphylum_decl:
-    return check_override_decl(module_PHYLUM, fdecl, visited);
-  case KEYtype_decl:
-    return check_override_decl(module_TYPE, fdecl, visited);
-  case KEYsome_class_decl: {
-    Declaration result = some_class_decl_result_type(decl);
-    switch (Declaration_KEY(result)) {
-    case KEYsome_type_decl: {
-      Type rtype = some_type_decl_type(result);
-      if (Type_KEY(rtype) == KEYno_type) {
-        return check_override_decl(result, fdecl, visited);
-      }
-      break;
+  case KEYsome_type_decl: {
+    Type type = some_type_decl_type(decl);
+    switch (Type_KEY(type))
+    {
+    case KEYno_type: {
+      bool is_phylum = Declaration_KEY(decl) == KEYphylum_decl;
+      return check_override_decl(is_phylum ? module_PHYLUM : module_TYPE, fdecl, visited);
     }
+    case KEYtype_use:
+      return check_override_decl(canonical_type_decl(canonical_type(type)), fdecl, visited);
+    case KEYtype_inst:
+      return check_override_decl(USE_DECL(module_use_use(type_inst_module(type))), fdecl, visited);
     default:
-      break;
+      return false;
     }
-
+  }
+  case KEYsome_class_decl: {
     Block body = some_class_decl_contents(decl);
     Declaration item;
-    int i = 0;
     for (item = first_Declaration(block_body(body)); item != NULL; item = DECL_NEXT(item)) {
       switch (Declaration_KEY(item)) {
       case KEYsome_function_decl:
-        if (!strcmp(
-            symbol_name(def_name(some_function_decl_def(item))),
-            symbol_name(def_name(some_function_decl_def(fdecl))))) {
-
+        if (def_name(some_function_decl_def(item)) == def_name(some_function_decl_def(fdecl))) {
           return true;
         }
         break;
@@ -1492,7 +1487,7 @@ bool check_override_decl(Declaration decl, Declaration fdecl, std::set<Declarati
       }
     }
 
-    return check_override_decl(result, fdecl, visited);
+    return check_override_decl(some_class_decl_result_type(decl), fdecl, visited);
   }
   default:
     break;
@@ -1521,8 +1516,6 @@ Declaration get_enclosing_some_class_decl(Declaration source) {
 
     node = tnode_parent(node);
   }
-
-  fatal_error("failed to find enclosing some_class_decl of %s", decl_name(source));
 
   return NULL;
 }
@@ -1995,8 +1988,12 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
       Declaration rdecl = first_Declaration(function_type_return_values(fty));
       Block b = function_decl_body(decl);
       Declaration mdecl = get_enclosing_some_class_decl(decl);
-      std::set<Declaration> visisted;
-      dump_function_prototype(name,fty, check_override_decl(some_class_decl_result_type(mdecl), decl, visisted), oss);
+      bool override_needed = false;
+      if (mdecl != NULL) {
+        std::set<Declaration> visisted;
+        override_needed = check_override_decl(some_class_decl_result_type(mdecl), decl, visisted);
+      }
+      dump_function_prototype(name,fty, override_needed, oss);
 
       // three kinds of definitions:
       // 1. the whole thing: a non-empty body:
