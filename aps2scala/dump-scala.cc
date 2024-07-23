@@ -1448,13 +1448,7 @@ void dump_scala_Declaration_header(Declaration decl, ostream& oss)
   }
 }
 
-bool check_override_decl(Declaration decl, Declaration fdecl, std::set<Declaration> visited) {
-  if (visited.find(decl) != visited.end()) {
-    return false;
-  }
-
-  visited.insert(decl);
-
+bool check_override_decl(Declaration decl, Declaration fdecl) {
   switch (Declaration_KEY(decl)) {
   case KEYsome_type_decl: {
     Type type = some_type_decl_type(decl);
@@ -1462,12 +1456,12 @@ bool check_override_decl(Declaration decl, Declaration fdecl, std::set<Declarati
     {
     case KEYno_type: {
       bool is_phylum = Declaration_KEY(decl) == KEYphylum_decl;
-      return check_override_decl(is_phylum ? module_PHYLUM : module_TYPE, fdecl, visited);
+      return check_override_decl(is_phylum ? module_PHYLUM : module_TYPE, fdecl);
     }
     case KEYtype_use:
-      return check_override_decl(canonical_type_decl(canonical_type(type)), fdecl, visited);
+      return check_override_decl(canonical_type_decl(canonical_type(type)), fdecl);
     case KEYtype_inst:
-      return check_override_decl(USE_DECL(module_use_use(type_inst_module(type))), fdecl, visited);
+      return check_override_decl(USE_DECL(module_use_use(type_inst_module(type))), fdecl);
     default:
       return false;
     }
@@ -1487,7 +1481,11 @@ bool check_override_decl(Declaration decl, Declaration fdecl, std::set<Declarati
       }
     }
 
-    return check_override_decl(some_class_decl_result_type(decl), fdecl, visited);
+    if (decl == module_PHYLUM || decl == module_TYPE) {
+      return false;
+    }
+
+    return check_override_decl(some_class_decl_result_type(decl), fdecl);
   }
   default:
     break;
@@ -1990,8 +1988,7 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
       Declaration mdecl = get_enclosing_some_class_decl(decl);
       bool override_needed = false;
       if (mdecl != NULL) {
-        std::set<Declaration> visisted;
-        override_needed = check_override_decl(some_class_decl_result_type(mdecl), decl, visisted);
+        override_needed = check_override_decl(some_class_decl_result_type(mdecl), decl);
       }
       dump_function_prototype(name,fty, override_needed, oss);
 
