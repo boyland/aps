@@ -1501,7 +1501,8 @@ bool check_override_decl(Declaration decl, Declaration fdecl, std::set<Declarati
   return false;
 }
 
-Declaration get_enclosing_some_class_decl(void * node) {
+Declaration get_enclosing_some_class_decl(Declaration source) {
+  void* node = (void*)source;
   while (node != NULL) {
     switch (ABSTRACT_APS_tnode_phylum(node)) {
     case KEYDeclaration: {
@@ -1520,6 +1521,8 @@ Declaration get_enclosing_some_class_decl(void * node) {
 
     node = tnode_parent(node);
   }
+
+  fatal_error("failed to find enclosing some_class_decl of %s", decl_name(source));
 
   return NULL;
 }
