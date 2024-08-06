@@ -1,4 +1,4 @@
-FROM boylanduwm/cool-compiler:latest AS aps-build
+FROM boylanduwm/cool-compiler:latest
 
 WORKDIR /usr/stage/aps
 
