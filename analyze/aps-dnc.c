@@ -2466,29 +2466,30 @@ static void synchronize_dependency_graphs(AUG_GRAPH *aug_graph,
       int sum_index = (i-start)*phy_n + (j-start);
       DEPENDENCY kind=edgeset_kind(aug_graph->graph[aug_index]);
       // avoid adding augmeneted dependency graph edges to summary graph of function declarations
+      // if synth-function generation is active, also avoid adding augmeneted dependency graph edges to summary graph
       if (!AT_MOST(dependency_indirect(kind),
-		   phy_graph->mingraph[sum_index]) && !phylum_is_func_decl) {
-	kind = dependency_indirect(kind); //! more precisely DNC artificial
-	kind = dependency_join(kind,phy_graph->mingraph[sum_index]);
-	if (kind == phy_graph->mingraph[sum_index]) {
-	  fatal_error("kind computation broken");
-	}
-	if (analysis_debug & SUMMARY_EDGE) {
-	  printf("Adding to summary edge %d: ",kind);
-	  print_instance(source,stdout);
-	  printf(" -> ");
-	  print_instance(sink,stdout);
-	  printf("\n");
-	}
-	if (analysis_debug & TWO_EDGE_CYCLE) {
-	  if (phy_graph->mingraph[(j-start)*phy_n+(i-start)]) {
-	    printf("Found summary two edge cycle: ");
-	    print_instance(source,stdout);
-	    printf(" <-> ");
-	    print_instance(sink,stdout);
-	    printf("\n");
-	  }
-	}
+		    phy_graph->mingraph[sum_index]) && ((!phylum_is_func_decl && !aug_graph->global_state->anc_analysis) || (start == 0))) {
+        kind = dependency_indirect(kind); //! more precisely DNC artificial
+        kind = dependency_join(kind,phy_graph->mingraph[sum_index]);
+        if (kind == phy_graph->mingraph[sum_index]) {
+          fatal_error("kind computation broken");
+        }
+      if (analysis_debug & SUMMARY_EDGE) {
+        printf("Adding to summary edge %d: ",kind);
+        print_instance(source,stdout);
+        printf(" -> ");
+        print_instance(sink,stdout);
+        printf("\n");
+      }
+      if (analysis_debug & TWO_EDGE_CYCLE) {
+        if (phy_graph->mingraph[(j-start)*phy_n+(i-start)]) {
+          printf("Found summary two edge cycle: ");
+          print_instance(source,stdout);
+          printf(" <-> ");
+          print_instance(sink,stdout);
+          printf("\n");
+        }
+      }
 	phy_graph->mingraph[sum_index] = kind;
 	/*?? put on a worklist somehow ? */
       } else if (!AT_MOST(phy_graph->mingraph[sum_index],
@@ -2830,9 +2831,10 @@ void dnc_close(STATE*s) {
   }
 }
 
-STATE *compute_dnc(Declaration module) {
+STATE *compute_dnc(Declaration module, bool anc_analysis) {
   STATE *s=(STATE *)HALLOC(sizeof(STATE));
   Declaration_info(module)->analysis_state = s;
+  s->anc_analysis = anc_analysis;
   init_analysis_state(s,module);
   dnc_close(s);
   if (analysis_debug & (DNC_ITERATE|DNC_FINAL)) {
