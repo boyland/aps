@@ -196,4 +196,7 @@ inline const output_streams& operator<< <header_end>
 }
 #endif /* APS2SCALA */
 
+extern AUG_GRAPH* current_aug_graph;
+extern STATE* current_state;
+
 #endif

@@ -109,6 +109,7 @@ typedef struct analysis_state {
   VECTOR(FIBER) fibers;
   CYCLES cycles;
   BOOL loop_required;
+  BOOL anc_analysis;
   DEPENDENCY original_state_dependency;  // This is value of analysis_state_cycle
                                          // before removing fiber cycle or
                                          // linearization of phases in summary graph
@@ -127,7 +128,7 @@ extern INSTANCE *get_instance(Declaration attr, FIBER fiber,
 
 extern void assert_closed(AUG_GRAPH*);
 extern void dnc_close(STATE *);
-extern STATE *compute_dnc(Declaration module);
+extern STATE *compute_dnc(Declaration module, bool anc_analysis);
 
 /* Low level routines: use with caution */
 extern void free_edge(EDGESET old, AUG_GRAPH *aug_graph);

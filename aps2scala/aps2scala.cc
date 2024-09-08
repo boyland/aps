@@ -39,6 +39,7 @@ extern int aps_yyparse(void);
 
 Implementation* impl;
 bool static_schedule = false;
+bool synth_implementation = false;
 
 int main(int argc,char **argv) {
   argv0 = argv[0];
@@ -60,6 +61,10 @@ int main(int argc,char **argv) {
     } else if (streq(argv[i],"-C") || streq(argv[i],"--static-scc")) {
       static_schedule = true;
       static_scc_schedule = true;
+      continue;
+    } else if (streq(argv[i],"-F") || streq(argv[i],"--synth")) {
+      synth_implementation = true;
+      anc_analysis = true;
       continue;
     } else if (streq(argv[i],"-V") || streq(argv[i],"--verbose")) {
       ++verbose;
@@ -88,8 +93,12 @@ int main(int argc,char **argv) {
     aps_check_error("binding");
     type_Program(p);
     aps_check_error("type");
-    if (static_schedule) {
-      impl = static_scc_schedule ? static_scc_impl : static_impl;
+    if (static_schedule || synth_implementation) {
+      if (static_schedule) {
+        impl = static_scc_schedule ? static_scc_impl : static_impl;
+      } else {
+        impl = synth_impl;
+      }
       analyze_Program(p);
       aps_check_error("analysis");
       if (!impl) {
@@ -105,11 +114,12 @@ int main(int argc,char **argv) {
     if (out.fail())
     {
       std::cerr << "Failed to open output file " << outfilename << std::endl;
-      exit(1);
+      dump_scala_Program(p,std::cout);
+    } else {
+      dump_scala_Program(p,out);
+      out.close();
     }
 
-    dump_scala_Program(p,out);
-    out.close();
   }
   exit(0);
 }

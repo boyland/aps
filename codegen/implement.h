@@ -68,11 +68,14 @@ class Implementation {
   // if a Declaration has an implementation mark on it,
   // this function is called to implement its use:
   virtual void implement_value_use(Declaration vd, ostream&) = 0;
+
+  virtual void dump_instance_rhs(AUG_GRAPH*, INSTANCE*, ostream&) { }
 };
 
 extern Implementation *dynamic_impl;
 extern Implementation *static_impl;
 extern Implementation *static_scc_impl;
+extern Implementation *synth_impl;
 
 #define IMPLEMENTATION_MARKS (127<<24)
 
