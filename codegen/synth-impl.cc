@@ -822,45 +822,6 @@ static bool implement_visit_function(
   return false;  // no more!
 }
 
-// The following function is only for Scala code generation
-static void dump_constructor_owner(Declaration pd, ostream& os) {
-  switch (Declaration_KEY(pd)) {
-    default:
-      aps_error(pd, "cannot attribute this phylum");
-      break;
-    case KEYphylum_formal:
-      os << "t_" << decl_name(pd) << DEREF;
-      break;
-    case KEYphylum_decl:
-      switch (Type_KEY(phylum_decl_type(pd))) {
-        default:
-          aps_error(pd, "cannot attribute this phylum");
-          break;
-        case KEYno_type:
-          break;
-        case KEYtype_inst:
-          os << "t_" << decl_name(pd) << DEREF;
-          break;
-        case KEYtype_use:
-          dump_constructor_owner(USE_DECL(type_use_use(phylum_decl_type(pd))),
-                                 os);
-          break;
-      }
-      break;
-    case KEYtype_renaming:
-      switch (Type_KEY(phylum_decl_type(pd))) {
-        default:
-          aps_error(pd, "cannot attribute this phylum");
-          break;
-        case KEYtype_use:
-          dump_constructor_owner(USE_DECL(type_use_use(phylum_decl_type(pd))),
-                                 os);
-          break;
-      }
-      break;
-  }
-}
-
 #ifdef APS2SCALA
 static void dump_synth_functions(STATE* s, ostream& os)
 #else  /* APS2SCALA */
@@ -909,13 +870,13 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
         Declaration fibered_attr = source_instance->fibered_attr.attr;
 
         if (dep && instance_direction(source_instance) == instance_inward && !is_shared_info) {
-          os << ", v_" << source_instance << ": T_";
-          print_Type(function_type_return_type(attribute_decl_type(fibered_attr)), stdout);
+          os << ", v_" << source_instance << ": ";
+          os << function_type_return_type(attribute_decl_type(fibered_attr));
         }
       }
 
-      os << "): T_";
-      print_Type(function_type_return_type(attribute_decl_type(in->fibered_attr.attr)), stdout);
+      os << "): ";
+      os << function_type_return_type(attribute_decl_type(in->fibered_attr.attr));
       os << " = node match {\n";
       nesting_level++;
 
@@ -945,48 +906,6 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
       os << indent() << "};\n\n";
     }
   }
-
-  Declaration sp = s->start_phylum;
-#ifdef APS2SCALA
-  os << indent() << "def synthEvaluation() : Unit = {\n";
-#else  /* APS2SCALA */
-  oss << header_return_type<Type>(0) << "void " << header_function_name("visit")
-      << "()" << header_end();
-  INDEFINITION;
-  os << " {\n";
-#endif /* APS2SCALA */
-  ++nesting_level;
-#ifdef APS2SCALA
-  os << indent() << "val roots = t_" << decl_name(sp) << ".nodes;\n";
-#else  /* APS2SCALA */
-  os << indent() << "Phylum* phylum = this->t_"
-     << decl_name(sp)  //! bug sometimes
-     << "->get_phylum();\n";
-  os << indent() << "int n_roots = phylum->size();\n";
-  os << "\n";  // blank line
-#endif /* APS2SCALA */
-
-  // printf("sp: %s and pointer %ld %d\n", decl_name(sp), (long)
-  // (Declaration_info(s->start_phylum)->node_phy_graph),
-  // tnode_line_number(s->));
-  int phase = Declaration_info(s->module)->node_phy_graph->max_phase;
-
-  vector<std::set<Expression> > default_instance_assignments(
-      s->global_dependencies.instances.length, std::set<Expression>());
-  vector<std::set<Expression> > instance_assignment = make_instance_assignment(
-      &s->global_dependencies, module_decl_contents(s->module),
-      default_instance_assignments);
-
-  CONDITION cond;
-  cond.positive = 0;
-  cond.negative = 0;
-
-  OutputWriter ow(os);
-  implement_visit_function(
-      &s->global_dependencies, phase, s->global_dependencies.total_order,
-      instance_assignment, 1, &cond, -1, true, -1, false, &ow);
-  --nesting_level;
-  os << indent() << "}\n";
 }
 
 static void* dump_scheduled_local(void* pbs, void* node) {
@@ -1120,8 +1039,6 @@ class SynthScc : public Implementation {
       // char *name = decl_name(module_decl);
 #endif /* APS2SCALA */
 
-    Declarations ds = block_body(module_decl_contents(module_decl));
-
     dump_synth_functions(s, oss);
 
     // Implement finish routine:
@@ -1137,35 +1054,26 @@ class SynthScc : public Implementation {
       os << " {\n";
 #endif /* APS2SCALA */
     ++nesting_level;
-    os << indent() << "visit();\n";
 
-    // types actually should be scheduled...
-    for (Declaration d = first_Declaration(ds); d; d = DECL_NEXT(d)) {
-      const char* kind = NULL;
-      switch (Declaration_KEY(d)) {
-        case KEYphylum_decl:
-        case KEYtype_decl:
-          switch (Type_KEY(some_type_decl_type(d))) {
-            case KEYno_type:
-            case KEYtype_inst:
-              kind = "t_";
-              break;
-            default:
-              break;
-          }
-        default:
-          break;
-      }
-      if (kind != NULL) {
-        const char* n = decl_name(d);
-        os << indent() << kind << n << DEREF << "finish();\n";
-      }
+    PHY_GRAPH* start_phy_graph = summary_graph_for(s, s->start_phylum);
+    os << indent() << "for (root <- t_" << decl_name(s->start_phylum) << ".nodes) {\n";
+    ++nesting_level;
+    int i;
+    for (i = 0; i < start_phy_graph->instances.length; i++) {
+      INSTANCE* in = &start_phy_graph->instances.array[i];
+
+      if (instance_direction(in) != instance_outward) continue;
+
+      os << indent() << "eval_" << phy_graph_name(start_phy_graph) << "_" << &start_phy_graph->instances.array[i] << "(root);\n";
     }
+    --nesting_level;
+    os << indent() << "}\n";
+    
 #ifdef APS2SCALA
     os << indent() << "super.finish();\n";
 #endif /* ! APS2SCALA */
     --nesting_level;
-    os << indent() << "}\n";
+    os << indent() << "};\n";
 
     clear_implementation_marks(module_decl);
   }
