@@ -2309,6 +2309,7 @@ static bool find_instance(AUG_GRAPH* aug_graph, Declaration node, Declaration at
 
 static void dump_attribute(INSTANCE *instance, vector<INSTANCE*> visited, ostream& o) {
   if (std::find(visited.begin(), visited.end(), instance) != visited.end()) {
+    fatal_error("cycle detected while dumping attribute for synth functions");
     return;
   }
 
@@ -2317,6 +2318,20 @@ static void dump_attribute(INSTANCE *instance, vector<INSTANCE*> visited, ostrea
   Declaration node = instance->node;
   Declaration attr = instance->fibered_attr.attr;
   bool is_parent_instance = current_aug_graph->lhs_decl == instance->node;
+
+  void* current = attr;
+  while (current != nullptr) {
+    switch (ABSTRACT_APS_tnode_phylum(current))
+    {
+    case KEYif_stmt:
+      printf("if_stmt at line: %d\n", tnode_line_number(current));
+      break;
+    default:
+      break;
+    }
+
+    current = tnode_parent(current);
+  }
 
   if (ATTR_DECL_IS_INH(attr)) {
     if (is_parent_instance) {
@@ -2402,7 +2417,7 @@ void dump_Expression(Expression e, ostream& o)
     }
 
     Declaration attr;
-    if ((attr = attr_ref_p(e)) != nullptr) {
+    if (impl == synth_impl && (attr = attr_ref_p(e)) != nullptr) {
       vector<INSTANCE*> visited;
 
       Declaration node = USE_DECL(value_use_use(first_Actual(funcall_actuals(e))));

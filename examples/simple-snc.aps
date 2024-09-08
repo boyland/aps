@@ -21,7 +21,11 @@ module SIMPLE_SNC[T :: var SIMPLE[]] extends T begin
     e1.i2 := e1.s1;
     e2.i2 := 0;
     e2.i1 := e2.s2;
-    s.stmt_total := e1.s2 + e2.s1;
+    if e1.s2 < e2.s1 then
+      s.stmt_total := e1.s2 + e2.s1;
+    else
+      s.stmt_total := e1.s2 + e2.s1;
+    endif;
   end;
 
   match ?e:Expr=intconstant(?i:Integer) begin

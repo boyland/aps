@@ -886,7 +886,7 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
         PHY_GRAPH* aug_graph_pg = Declaration_info(aug_graph->lhs_decl)->node_phy_graph;
 
         // if LHS is the current phylum
-        if (aug_graph_pg != pg) continue;
+        // if (aug_graph_pg != pg) continue;
 
         Declaration tplm = top_level_match_constructor_decl(aug_graph->match_rule);
         Declaration cd = aug_graph->syntax_decl;
@@ -1116,10 +1116,56 @@ void implement_value_use(Declaration vd, ostream& os) {
   }
 }
 
+void dump_instance_rhs(AUG_GRAPH* aug_graph, Block block, INSTANCE* instance, ostream& o) {
+    Declarations ds = block_body(block);
+    for (Declaration d = first_Declaration(ds); d; d = DECL_NEXT(d)) {
+      switch (Declaration_KEY(d)) {
+        case KEYif_stmt:
+        {
+          o << "before IF\n";
+          dump_instance_rhs(aug_graph, if_stmt_if_true(d), instance, o);
+          o << "\n after IF\n";
+          dump_instance_rhs(aug_graph, if_stmt_if_false(d), instance, o);
+          o << "\n end if statement\n";
+          break;
+        }
+        case KEYassign: {
+          INSTANCE* rhs_instance = Expression_info(assign_rhs(d))->value_for;
+          Expression lhs_expr = assign_lhs(d);
+          if (rhs_instance) {
+            Declaration attr = USE_DECL(value_use_use(funcall_f(lhs_expr)));
+            Declaration node = USE_DECL(value_use_use(first_Actual(funcall_actuals(lhs_expr))));
+
+            if (node == aug_graph->lhs_decl && attr == instance->fibered_attr.attr) {
+              o << indent();
+              current_aug_graph = aug_graph;
+              dump_Expression(assign_rhs(d), o);
+              o << "\n";
+            }
+          } else {
+            fatal_error("not supported scenario");
+          }
+          break;
+        }
+        default:
+          break;
+      }
+    }
+  }
+
   virtual void dump_instance_rhs(AUG_GRAPH* aug_graph, INSTANCE* instance, ostream& o) override {
     Declarations ds = block_body(matcher_body(top_level_match_m(aug_graph->match_rule)));
     for (Declaration d = first_Declaration(ds); d; d = DECL_NEXT(d)) {
       switch (Declaration_KEY(d)) {
+        case KEYif_stmt:
+        {
+          o << "before IF\n";
+          dump_instance_rhs(aug_graph, if_stmt_if_true(d), instance, o);
+          o << "\n after IF\n";
+          dump_instance_rhs(aug_graph, if_stmt_if_false(d), instance, o);
+          o << "\n end if statement\n";
+          break;
+        }
         case KEYassign: {
           INSTANCE* rhs_instance = Expression_info(assign_rhs(d))->value_for;
           Expression lhs_expr = assign_lhs(d);
