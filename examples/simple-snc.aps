@@ -5,26 +5,32 @@ module SIMPLE_SNC[T :: var SIMPLE[]] extends T begin
   attribute Expr.i2 : Integer;
   attribute Expr.s1 : Integer;
   attribute Expr.s2 : Integer;
-  
-  attribute Stmt.total : Integer;
 
   pragma inherited(i1,i2);
-  pragma synthesized(s1,s2,total);
+  pragma synthesized(s1,s2);
+
+  attribute Stmt.stmt_total : Integer;
+  attribute Stmts.stmts_total : Integer;
+  attribute Block.block_total : Integer;
+  attribute Program.program_total : Integer;
+
+  pragma synthesized(stmt_total, stmts_total, block_total, program_total);
 
   match ?s:Stmt=assign_stmt(?e1:Expr,?e2:Expr) begin
     e1.i1 := 0;
     e1.i2 := e1.s1;
     e2.i2 := 0;
     e2.i1 := e2.s2;
-    s.total := e1.s2 + e2.s1;
+    s.stmt_total := e1.s2 + e2.s1;
   end;
-  
+
   match ?e:Expr=intconstant(?i:Integer) begin
     e.s1 := e.i1;
     e.s2 := e.i2;
   end;
 
   match ?b:Block=block(?ds:Decls,?ss:Stmts) begin
+    b.block_total := ss.stmts_total;
   end;
 
   match ?ds:Decls=no_decls() begin
@@ -37,6 +43,7 @@ module SIMPLE_SNC[T :: var SIMPLE[]] extends T begin
   end;
 
   match ?p:Program=program(?b:Block) begin
+    p.program_total := b.block_total;
   end;
 
   match ?t:Type=integer_type() begin
@@ -45,18 +52,25 @@ module SIMPLE_SNC[T :: var SIMPLE[]] extends T begin
   match ?t:Type=string_type() begin
   end;
 
-  match ?:Stmts=no_stmts() begin
+  match ?ss:Stmts=no_stmts() begin
+    ss.stmts_total := 0;
   end;
   
   match ?ss0:Stmts=xcons_stmts(?ss1:Stmts,?s:Stmt) begin
+    ss0.stmts_total := ss1.stmts_total + s.stmt_total;
   end;
 
   match ?s:Stmt=block_stmt(?b:Block) begin
+    s.stmt_total := b.block_total;
   end;
   
   match ?e:Expr=strconstant(?:String) begin
+    e.s1 := 0;
+    e.s2 := 0;
   end;
 
   match ?e:Expr=variable(?id:String) begin
+    e.s1 := 0;
+    e.s2 := 0;
   end;
 end;
