@@ -458,6 +458,7 @@ static void* validate_canonicals(void* ignore, void*node) {
 
 static Declaration module_TYPE;
 static Declaration module_PHYLUM;
+Declaration module_lattice;
 
 static void* set_root_phylum(void *ignore, void *node)
 {
@@ -468,7 +469,7 @@ static void* set_root_phylum(void *ignore, void *node)
     Declaration d = (Declaration)node;
     switch (Declaration_KEY(d))
     {
-    case KEYmodule_decl:
+    case KEYsome_class_decl:
     {
       if (module_TYPE == 0 && streq(decl_name(d), "TYPE"))
       {
@@ -477,6 +478,10 @@ static void* set_root_phylum(void *ignore, void *node)
       else if (module_PHYLUM == 0 && streq(decl_name(d), "PHYLUM"))
       {
         module_PHYLUM = d;
+      }
+      else if (streq(decl_name(d), "LATTICE"))
+      {
+        module_lattice = d;
       }
 
       return NULL;

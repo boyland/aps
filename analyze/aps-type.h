@@ -1,6 +1,9 @@
 #ifndef APS_TYPE_H
 #define APS_TYPE_H
 
+// Lattice module declaration.
+extern Declaration module_lattice;
+
 extern Type function_type_return_type(Type);
 
 /* We use local type inference a la Turner and Pierce
