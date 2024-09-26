@@ -2294,19 +2294,6 @@ void dump_collect_Actuals(Type ctype, Actuals as, ostream& o)
 STATE* current_state = NULL;
 AUG_GRAPH* current_aug_graph = NULL;
 
-static bool find_instance(AUG_GRAPH* aug_graph, Declaration node, Declaration attr, INSTANCE** instance_out) {
-  int i;
-  for (i = 0; i < aug_graph->instances.length; i++) {
-    INSTANCE* instance = &aug_graph->instances.array[i];
-    if (instance->fibered_attr.attr == attr) {
-      *instance_out = instance;
-      return true;
-    }
-  }
-
-  return false;
-}
-
 static void dump_attribute(INSTANCE *instance, vector<INSTANCE*> visited, ostream& o) {
   if (std::find(visited.begin(), visited.end(), instance) != visited.end()) {
     fatal_error("cycle detected while dumping attribute for synth functions");
@@ -2319,20 +2306,6 @@ static void dump_attribute(INSTANCE *instance, vector<INSTANCE*> visited, ostrea
   Declaration attr = instance->fibered_attr.attr;
   bool is_parent_instance = current_aug_graph->lhs_decl == instance->node;
 
-  void* current = attr;
-  while (current != nullptr) {
-    switch (ABSTRACT_APS_tnode_phylum(current))
-    {
-    case KEYif_stmt:
-      printf("if_stmt at line: %d\n", tnode_line_number(current));
-      break;
-    default:
-      break;
-    }
-
-    current = tnode_parent(current);
-  }
-
   if (ATTR_DECL_IS_INH(attr)) {
     if (is_parent_instance) {
       o << "v_" << decl_name(attr);
@@ -2340,7 +2313,7 @@ static void dump_attribute(INSTANCE *instance, vector<INSTANCE*> visited, ostrea
     } else {
       // we need to find the assignment and dump the RHS
       // recurisve call
-      impl->dump_instance_rhs(current_aug_graph, instance, o);
+      impl->dump_rhs_of_instance(current_aug_graph, instance, o);
     }
   } else if (ATTR_DECL_IS_SYN(attr)) {
     Type ty = infer_formal_type(node);
@@ -2362,33 +2335,13 @@ static void dump_attribute(INSTANCE *instance, vector<INSTANCE*> visited, ostrea
       if (pgraph->mingraph[i* pgraph->instances.length + source_index]) {
         INSTANCE* in = &pgraph->instances.array[i];
 
-        Match match = top_level_match_m(current_aug_graph->match_rule);
-        Block block = matcher_body(match);
-        Declaration item = first_Declaration(block_body(block));
+        o << ", ";
 
-        while (item) {
-          Expression lhs = assign_lhs(item);
-          Expression rhs = assign_rhs(item);
-
-          Declaration lhs_node = USE_DECL(value_use_use(first_Actual(funcall_actuals(lhs))));
-
-          if (attr_ref_p(lhs) == in->fibered_attr.attr && lhs_node == node) {
-            o << ", ";
-            if (attr_ref_p(rhs) == NULL) {
-              dump_Expression(rhs, o);
-            } else {
-              Declaration rhs_node = USE_DECL(value_use_use(first_Actual(funcall_actuals(rhs))));
-              Declaration rhs_attr = attr_ref_p(rhs);
-
-              INSTANCE* instance_out;
-              if (find_instance(current_aug_graph, rhs_node, rhs_attr, &instance_out)) {
-                dump_attribute(instance_out, visited, o);
-              } else {
-                fatal_error("failed");
-              }
-            }
-          }
-          item = DECL_NEXT(item);
+        INSTANCE* instance_out;
+        if (impl->find_instance(current_aug_graph, node, in->fibered_attr.attr, &instance_out)) {
+          impl->dump_rhs_of_instance(current_aug_graph, instance_out, o);
+        } else {
+          fatal_error("failed");
         }
       }
     }
@@ -2422,11 +2375,12 @@ void dump_Expression(Expression e, ostream& o)
 
       Declaration node = USE_DECL(value_use_use(first_Actual(funcall_actuals(e))));
       INSTANCE* instance;
-      if (find_instance(current_aug_graph, node, attr, &instance)) {
+      if (impl->find_instance(current_aug_graph, node, attr, &instance)) {
         dump_attribute(instance, visited, o);
         return;
       } else {
-        fatal_error("failed");
+        fatal_error("failed to find instance");
+        return;
       }
     }
 
