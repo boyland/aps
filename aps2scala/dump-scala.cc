@@ -2294,7 +2294,7 @@ void dump_collect_Actuals(Type ctype, Actuals as, ostream& o)
 STATE* current_state = NULL;
 AUG_GRAPH* current_aug_graph = NULL;
 
-static void dump_attribute(INSTANCE *instance, vector<INSTANCE*> visited, ostream& o) {
+static void dump_synth_attribute(INSTANCE *instance, vector<INSTANCE*> visited, ostream& o) {
   if (std::find(visited.begin(), visited.end(), instance) != visited.end()) {
     fatal_error("cycle detected while dumping attribute for synth functions");
     return;
@@ -2376,7 +2376,7 @@ void dump_Expression(Expression e, ostream& o)
       Declaration node = USE_DECL(value_use_use(first_Actual(funcall_actuals(e))));
       INSTANCE* instance;
       if (impl->find_instance(current_aug_graph, node, attr, &instance)) {
-        dump_attribute(instance, visited, o);
+        dump_synth_attribute(instance, visited, o);
         return;
       } else {
         fatal_error("failed to find instance");

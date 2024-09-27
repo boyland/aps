@@ -69,7 +69,20 @@ class Implementation {
   // this function is called to implement its use:
   virtual void implement_value_use(Declaration vd, ostream&) = 0;
 
-  virtual void dump_instance_rhs(AUG_GRAPH*, INSTANCE*, ostream&) { }
+  virtual void dump_rhs_of_instance(AUG_GRAPH*, INSTANCE*, ostream&) { }
+
+  virtual bool find_instance(AUG_GRAPH* aug_graph, Declaration node, Declaration attr, INSTANCE** instance_out) {
+    int i;
+    for (i = 0; i < aug_graph->instances.length; i++) {
+      INSTANCE* instance = &aug_graph->instances.array[i];
+      if (instance->fibered_attr.attr == attr) {
+        *instance_out = instance;
+        return true;
+      }
+    }
+
+    return false;
+  }
 };
 
 extern Implementation *dynamic_impl;

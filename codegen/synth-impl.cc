@@ -21,162 +21,6 @@ extern "C" {
 #define DEREF "->"
 #endif
 
-template<typename T>
-static std::string any_to_string(const T & value) {
-    std::ostringstream oss;
-    oss << value;
-    return oss.str();
-}
-
-typedef void (*OutputWriterT)(int, std::ostream&);
-
-class OutputWriter {
-  struct Item {
-    OutputWriterT function;
-    int marker;
-  };
-
- private:
-  std::ostream& _os;
-  std::vector<Item> _items;
-
-  void dump_queue() {
-    for (std::vector<Item>::iterator it = _items.begin(); it != _items.end();
-         it++) {
-      ((OutputWriterT)it->function)(it->marker, _os);
-    }
-
-    _items.clear();
-  }
-
-  bool contains_marker(int marker) {
-    for (std::vector<Item>::iterator it = _items.begin(); it != _items.end();
-         it++) {
-      if (it->marker == marker) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
- public:
-  OutputWriter(std::ostream& os) : _os(os), _items(std::vector<Item>()) {}
-
-  std::ostream& get_outstream() {
-    dump_queue();
-    return _os;
-  }
-
-  void queue_write(int marker,
-                   OutputWriterT lambda) {
-    if (!contains_marker(marker)) {
-      struct Item* item = new Item;
-      item->marker = marker;
-      item->function = lambda;
-      _items.push_back(*item);
-    } else {
-      fatal_error("Already enqueued to write marker: %d", VOIDP2INT(marker));
-    }
-  }
-
-  bool any_write_since(int marker) { return !contains_marker(marker); }
-
-  void clear_since(int marker) {
-    bool found_marker = false;
-    for (std::vector<Item>::iterator it = _items.begin(); it != _items.end();) {
-      if (it->marker == marker || found_marker) {
-        it = _items.erase(it);
-        found_marker = true;
-      } else {
-        it++;
-      }
-    }
-  }
-
-  virtual ~OutputWriter() { dump_queue(); }
-};
-
-static Expression default_init(Default def) {
-  switch (Default_KEY(def)) {
-    case KEYsimple:
-      return simple_value(def);
-    case KEYcomposite:
-      return composite_initial(def);
-    default:
-      return 0;
-  }
-}
-
-/* Return new array with instance assignments for block.
- * If "from" is not NULL, then initialize the new array
- * with it.
- */
-static vector<std::set<Expression> > make_instance_assignment(
-    AUG_GRAPH* aug_graph,
-    Block block,
-    vector<std::set<Expression> > from) {
-  int n = aug_graph->instances.length;
-  vector<std::set<Expression> > array(from);
-
-  for (int i = 0; i < n; ++i) {
-    INSTANCE* in = &aug_graph->instances.array[i];
-    Declaration ad = in->fibered_attr.attr;
-    if (ad != 0 && in->fibered_attr.fiber == 0 &&
-        ABSTRACT_APS_tnode_phylum(ad) == KEYDeclaration) {
-      // get default!
-      switch (Declaration_KEY(ad)) {
-        case KEYattribute_decl:
-          array[i].insert(default_init(attribute_decl_default(ad)));
-          break;
-        case KEYvalue_decl:
-          array[i].insert(default_init(value_decl_default(ad)));
-          break;
-        default:
-          break;
-      }
-    }
-  }
-
-  // Step #1 clear any existing assignments and insert normal assignments
-  // Step #2 insert collection assignments
-  int step = 1;
-  while (step <= 2) {
-    Declarations ds = block_body(block);
-    for (Declaration d = first_Declaration(ds); d; d = DECL_NEXT(d)) {
-      switch (Declaration_KEY(d)) {
-        case KEYnormal_assign: {
-          if (INSTANCE* in = Expression_info(assign_rhs(d))->value_for) {
-            if (in->index >= n)
-              fatal_error("bad index [normal_assign] for instance");
-            array[in->index].clear();
-            array[in->index].insert(assign_rhs(d));
-          }
-          break;
-        }
-        case KEYcollect_assign: {
-          if (INSTANCE* in = Expression_info(assign_rhs(d))->value_for) {
-            if (in->index >= n)
-              fatal_error("bad index [collection_assign] for instance");
-
-            if (step == 1)
-              array[in->index].clear();
-            else
-              array[in->index].insert(assign_rhs(d));
-          }
-          break;
-        }
-        default:
-          break;
-      }
-    }
-
-    step++;
-  }
-
-  return array;
-}
-
 // visit procedures are called:
 // visit_n_m
 // where n is the number of the phy_graph and m is the phase.
@@ -184,642 +28,169 @@ static vector<std::set<Expression> > make_instance_assignment(
 // where p is the production number (0-based constructor index)
 #define PHY_GRAPH_NUM(pg) (pg - pg->global_state->phy_graphs)
 
-static void dump_loop_end(AUG_GRAPH* aug_graph,
-                          int parent_ph,
-                          int loop_id,
-                          OutputWriter* ow) {
-#ifdef APS2SCALA
-  if (ow->any_write_since(loop_id)) {
-    std::ostream& os = ow->get_outstream();
-    string suffix = any_to_string(loop_id);
-    std::replace(suffix.begin(), suffix.end(), '-', '_');
-    --nesting_level;
-    os << "\n";
-    os << indent() << "} while(changed);"
-       << "\n";
-    os << indent() << "changed = prevChanged_" << suffix << ";\n"
-       << "\n";
-  } else {
-    ow->clear_since(loop_id);
+#define KEY_BLOCK_ITEM_CONDITION 1
+#define KEY_BLOCK_ITEM_INSTANCE 2
+
+struct block_item_base {
+  int key;
+  INSTANCE* instance;
+  struct block_item_base* prev;
+};
+
+typedef struct block_item_base BlockItem;
+
+struct block_item_condition {
+  int key; /* KEY_BLOCK_ITEM_CONDITION */
+  INSTANCE* instance;
+  BlockItem* prev;
+  Declaration condition;
+  BlockItem* next_positive;
+  BlockItem* next_negative;
+};
+
+struct block_item_instance {
+  int key; /* KEY_BLOCK_ITEM_INSTANCE */
+  INSTANCE* instance;
+  BlockItem* prev;
+  BlockItem* next;
+};
+
+vector<Block> current_blocks;
+BlockItem* current_scope_block;
+
+// Given a block, it prints it linearized schedule.
+static void print_linearized_block(BlockItem* block) {
+  if (block != NULL) {
+    printf("%s", indent().c_str());
+    print_instance(block->instance, stdout);
+    printf("\n");
+    if (block->key == KEY_BLOCK_ITEM_CONDITION) {
+      struct block_item_condition* cond = (struct block_item_condition*)block;
+      printf("%spositive\n", indent().c_str());
+      nesting_level++;
+      print_linearized_block(cond->next_positive);
+      nesting_level--;
+      printf("%snegative\n", indent().c_str());
+      nesting_level++;
+      print_linearized_block(cond->next_negative);
+      nesting_level--;
+    } else {
+      print_linearized_block(((struct block_item_instance*)block)->next);
+    }
   }
-#endif /* APS2SCALA */
 }
 
-static void dump_loop_start_helper(int loop_id, std::ostream& os)
-{
-  // ABS value of component_index because initially it is -1
-  string suffix = any_to_string(loop_id);
-  std::replace(suffix.begin(), suffix.end(), '-', '_');
+// Given an augmented dependency graph, it linearizes it recursively
+static BlockItem* linearize_block_helper(AUG_GRAPH* aug_graph, bool* scheduled, CONDITION* cond, BlockItem* prev) {
+  // impossible merge condition
+  if (CONDITION_IS_IMPOSSIBLE(*cond)) {
+    return NULL;
+  }
 
-  os << indent() << "val prevChanged_" << suffix << " = changed;\n";
-  os << indent() << "do {\n";
-  ++nesting_level;
-  os << indent() << "changed = false;\n";
-}
+  int i, j;
+  int n = aug_graph->instances.length;
+  for (i = 0; i < n; i++) {
+    if (scheduled[i]) continue;
 
-static void dump_loop_start(AUG_GRAPH* aug_graph,
-                            int parent_ph,
-                            int loop_id,
-                            OutputWriter* ow) {
-#ifdef APS2SCALA
+    INSTANCE* instance = &aug_graph->instances.array[i];
 
-  ow->queue_write(
-      loop_id,
-      dump_loop_start_helper);
-
-#endif /* APS2SCALA */
-}
-
-// phase is what we are generating code for,
-// current is the current value of ph
-// return true if there are still more instances after this phase:
-static bool implement_visit_function(
-    AUG_GRAPH* aug_graph,
-    int phase, /* phase to impl. */
-    CTO_NODE* cto,
-    vector<std::set<Expression> > instance_assignment,
-    int nch,
-    CONDITION* cond,
-    int chunk_index,
-    bool loop_allowed,
-    int loop_id,
-    bool skip_previous_visit_code,
-    OutputWriter* ow) {
-  for (; cto; cto = cto->cto_next) {
-    INSTANCE* in = cto->cto_instance;
-    int ch = cto->child_phase.ch;
-    int ph = cto->child_phase.ph;
-    bool chunk_changed = chunk_index != -1 && cto->chunk_index != chunk_index;
-    PHY_GRAPH* pg_parent =
-        Declaration_info(aug_graph->lhs_decl)->node_phy_graph;
-
-    bool is_conditional = in != NULL && if_rule_p(in->fibered_attr.attr);
-
-    Declaration ad = in != NULL ? in->fibered_attr.attr : NULL;
-    void* ad_parent = ad != NULL ? tnode_parent(ad) : NULL;
-    bool node_is_for_in_stmt = ad_parent != NULL &&
-                               ABSTRACT_APS_tnode_phylum(ad_parent) == KEYDeclaration &&
-                               Declaration_KEY((Declaration)ad_parent) == KEYfor_in_stmt;
-
-    bool is_mod = false;
-    switch (Declaration_KEY(aug_graph->syntax_decl)) {
-      case KEYsome_class_decl:
-        is_mod = true;
-        break;
-      default:
-        break;
+    // impossible merge condition, cannot schedule this instance
+    if (MERGED_CONDITION_IS_IMPOSSIBLE(*cond, instance_condition(instance))) {
+      continue;
     }
+    
+    bool ready_to_schedule = true;
+    for (j = 0; j < n; j++) {
+      INSTANCE* other_instance = &aug_graph->instances.array[j];
 
-    if (!is_mod && chunk_changed) {
-      if (include_comments) {
-        ow->get_outstream()
-            << indent() << "// Finished with chunk #" << chunk_index << "\n";
-      }
-
-      // Need to close the loop if any
-      if (loop_allowed && loop_id != -1) {
-        dump_loop_end(aug_graph, phase, loop_id, ow);
-        loop_id = -1;
-      }
-
-      if (include_comments) {
-        ow->get_outstream() << indent() << "// Started working on chunk #"
-                            << cto->chunk_index << "\n";
-      }
-
-      if (loop_allowed && cto->chunk_circular) {
-        if (!pg_parent->cyclic_flags[phase]) {
-          loop_id = cto->chunk_index;
-          dump_loop_start(aug_graph, phase, loop_id, ow);
-        } else {
-          if (include_comments) {
-            ow->get_outstream()
-                << indent() << "// Parent phase " << phase
-                << " is circular, fixed-point loop cannot be added here\n";
-          }
-        }
-      }
-    }
-
-    // Code generate if:
-    // - CTO_NODE belongs to this visit
-    // - OR CTO_NODE is conditional
-    // - OR CTO_NODE is for-in-stmt
-    if (skip_previous_visit_code && !is_conditional && !node_is_for_in_stmt) {
-      // CTO_NODE belongs to this visit
-      if (cto->visit != phase) {
-        chunk_index = cto->chunk_index;
+      // already scheduled dependency
+      if (scheduled[j]) {
         continue;
       }
+
+      // impossible merge condition, ignore this dependency
+      if (MERGED_CONDITION_IS_IMPOSSIBLE(instance_condition(instance), instance_condition(other_instance))) {
+        continue;
+      }
+
+      // not a direct dependency
+      if (!(edgeset_kind(aug_graph->graph[j * n + i]) & DEPENDENCY_MAYBE_DIRECT)) {
+        continue;
+      }
+
+      ready_to_schedule = false;
+      break;
     }
 
-    // Update chunk index
-    chunk_index = cto->chunk_index;
-
-    // Visit marker for when visit ends
-    if (in == NULL && ch == -1) {
-      // If we are the module (roots) level
-      if (is_mod) {
-        int n = PHY_GRAPH_NUM(
-            Declaration_info(aug_graph->syntax_decl)->node_phy_graph);
-
-        // Dump loop start if this phase of global dependency is circular and
-        // loop is allowed
-        if (pg_parent->cyclic_flags[ph] && loop_allowed) {
-          loop_id = cto->chunk_index;
-          dump_loop_start(aug_graph, phase, loop_id, ow);
-        }
-#ifdef APS2SCALA
-        ow->get_outstream() << indent() << "for (root <- roots) {\n";
-#else  /* APS2SCALA */
-        ow->get_outstream()
-            << indent() << "for (int i=0; i < n_roots; ++i) {\n";
-#endif /* APS2SCALA */
-        ++nesting_level;
-#ifndef APS2SCALA
-        ow->get_outstream()
-            << indent() << "C_PHYLUM::Node *root = phylum->node(i);\n";
-#endif /* APS2SCALA */
-
-        ow->get_outstream() << indent() << "visit_" << n << "_" << ph << "(";
-        ow->get_outstream() << "root";
-        ow->get_outstream() << ");\n";
-
-        --nesting_level;
-        ow->get_outstream() << indent() << "}\n";
-
-        // Dump loop end if this phase of global dependency was circular, and we
-        // are inside the loop
-        if (pg_parent->cyclic_flags[ph] && loop_allowed && loop_id != -1) {
-          dump_loop_end(aug_graph, phase, loop_id, ow);
-          loop_id = -1;
-        }
-      }
-
-      if (include_comments) {
-        ow->get_outstream()
-            << indent() << "// End of parent (" << aug_graph_name(aug_graph)
-            << ") phase visit marker for phase: " << ph << "\n";
-      }
-      if (!is_mod) {
-        // Need to close the loop if any
-        if (loop_allowed && loop_id != -1) {
-          dump_loop_end(aug_graph, phase, loop_id, ow);
-          loop_id = -1;
-        }
-      }
-
-      // If ph == phase to implement then stop, cannot continue any further for
-      // this visit
-      if (ph == phase) {
-        return false;
-      }
-
-      // Otherwise, continue, there is more instances to implement
+    // if all dependencies are ready to schedule
+    if (!ready_to_schedule) {
       continue;
     }
 
-    // Visit marker for when child visit happens
-    if (in == NULL && ch > -1) {
-      ow->get_outstream() << "\n";
+    BlockItem* item_base;
+    scheduled[i] = true;
 
-      if (include_comments) {
-        ow->get_outstream()
-            << indent() << "// aug_graph: " << aug_graph_name(aug_graph)
-            << "\n";
-        ow->get_outstream()
-            << indent() << "// visit marker(" << ph << "," << ch << ")\n";
-      }
+    if (if_rule_p(instance->fibered_attr.attr)) {
+      struct block_item_condition* item = (struct block_item_condition*)malloc(sizeof(struct block_item_condition));
+      item_base = (BlockItem*)item;
 
-      PHY_GRAPH* pg = Declaration_info(cto->child_decl)->node_phy_graph;
-      int n = PHY_GRAPH_NUM(pg);
-
-      if (include_comments) {
-        ow->get_outstream()
-            << indent() << "// parent visit of " << decl_name(pg_parent->phylum)
-            << " at phase " << phase << " is "
-            << (pg_parent->cyclic_flags[phase] ? "circular" : "non-circular")
-            << "\n";
-        ow->get_outstream()
-            << indent() << "// child visit of " << decl_name(pg->phylum)
-            << " at phase " << ph << " is "
-            << (pg->cyclic_flags[ph] ? "circular" : "non-circular") << "\n";
-      }
-
-      if (!pg_parent->cyclic_flags[phase] && pg->cyclic_flags[ph] &&
-          loop_allowed && chunk_index == -1) {
-        fatal_error(
-            "The child visit(%d,%d) of %s should have been wrapped in a "
-            "do-while loop.",
-            n, ph, aug_graph_name(aug_graph));
-      }
-
-      ow->get_outstream() << indent() << "visit_" << n << "_" << ph << "(";
-#ifdef APS2SCALA
-      ow->get_outstream() << "v_" << decl_name(cto->child_decl);
-#else  /* APS2SCALA */
-      ow->get_outstream() << "v_" << decl_name(cto->child_decl);
-#endif /* APS2SCALA */
-      ow->get_outstream() << ");\n";
-
-      continue;
-    }
-
-    // Instance should not be null for non-visit marker CTO nodes
-    // Visit markers have a form of either: <ph,ch> or <-ph,-1>
-    if (in == NULL) {
-      fatal_error(
-          "total_order is malformed: Instance should not be null for non-visit "
-          "marker CTO nodes.");
-    }
-
-    bool node_is_lhs = in->node == aug_graph->lhs_decl;
-    bool node_is_syntax = ch < nch || node_is_lhs;
-
-    CONDITION icond = instance_condition(in);
-    if (MERGED_CONDITION_IS_IMPOSSIBLE(*cond, icond)) {
-      if (include_comments) {
-        ow->get_outstream()
-            << indent() << "// '" << in
-            << "' attribute instance is impossible because cond: (+"
-            << cond->positive << ",-" << cond->negative << ") icond: (+"
-            << icond.positive << ",-" << icond.negative << ")\n";
-      }
-      continue;
-    }
-
-    if (node_is_for_in_stmt) {
-      Declaration for_in_stmt_decl = (Declaration)ad_parent;
-      Block body = for_in_stmt_body(for_in_stmt_decl);
-      Declaration formal = for_in_stmt_formal(for_in_stmt_decl);
-      Expression sequence = for_in_stmt_seq(for_in_stmt_decl);
-
-      bool prev_loop_allowed = loop_allowed;
-      if (loop_allowed) {
-        // If loop is allowed, and we are not in the loop already then allow
-        // loops inside the for-in-stmt.
-        loop_allowed = loop_id == -1;
-      }
-
-#ifdef APS2SCALA
-        ow->get_outstream() << indent() << "for (v_" << decl_name(formal) << " <- " << sequence << ") {\n";
-        ++nesting_level;
-#endif /* APS2SCALA */
-
-      vector<std::set<Expression> > assignment =
-          make_instance_assignment(aug_graph, body, instance_assignment);
-
-      bool cont = implement_visit_function(aug_graph, phase, cto->cto_next,
-                               assignment, nch, cond, cto->chunk_index,
-                               loop_allowed, loop_id, skip_previous_visit_code,
-                               ow);
-
-#ifdef APS2SCALA
-      --nesting_level;
-      ow->get_outstream() << indent() << "}\n";
-
-
-      // Restore previous value of loop allowed.
-      loop_allowed = prev_loop_allowed;
-
-      // Closing of the loop now that for-in-stmt is finished
-      if (loop_allowed && loop_id != -1) {
-        dump_loop_end(aug_graph, phase, loop_id, ow);
-        loop_id = -1;
-      }
-#endif /* APS2SCALA */
-      return cont;
-    }
-
-    if (if_rule_p(ad)) {
-      bool prev_loop_allowed = loop_allowed;
-      if (loop_allowed) {
-        // If loop is allowed, and we are not in the loop already then allow
-        // loops inside the true and false branch of the conditional.
-        loop_allowed = loop_id == -1;
-      };
-
-      bool is_match = ABSTRACT_APS_tnode_phylum(ad) == KEYMatch;
-      Block if_true;
-      Block if_false;
-      if (is_match) {
-        Match m = (Match)ad;
-        Pattern p = matcher_pat(m);
-        Declaration header = Match_info(m)->header;
-        // if first match in case, we evaluate variable:
-        if (m == first_Match(case_stmt_matchers(header))) {
-          Expression e = case_stmt_expr(header);
-#ifdef APS2SCALA
-          // Type ty = infer_expr_type(e);
-          ow->get_outstream() << indent() << "val node = " << e << ";\n";
-#else  /* APS2SCALA */
-          Type ty = infer_expr_type(e);
-          ow->get_outstream() << indent() << ty << " node=" << e << ";\n";
-#endif /* APS2SCALA */
-        }
-#ifdef APS2SCALA
-        ow->get_outstream() << indent() << "node match {\n";
-        ow->get_outstream() << indent() << "case " << p << " => {\n";
-#else  /* APS2SCALA */
-        ow->get_outstream() << indent() << "if (";
-        dump_Pattern_cond(p, "node", ow->get_outstream());
-        ow->get_outstream() << ") {\n";
-#endif /* APS2SCALA */
-        nesting_level += 1;
-#ifndef APS2SCALA
-        dump_Pattern_bindings(p, ow->get_outstream());
-#endif /* APS2SCALA */
-        if_true = matcher_body(m);
-        if (MATCH_NEXT(m)) {
-          if_false = 0;  //? Why not the nxt match ?
-        } else {
-          if_false = case_stmt_default(header);
-        }
-      } else {
-        // Symbol boolean_symbol = intern_symbol("Boolean");
-        ow->get_outstream()
-            << indent() << "if (" << if_stmt_cond(ad) << ") {\n";
-        ++nesting_level;
-        if_true = if_stmt_if_true(ad);
-        if_false = if_stmt_if_false(ad);
-      }
-
-      int cmask = 1 << (if_rule_index(ad));
-      vector<std::set<Expression> > true_assignment =
-          make_instance_assignment(aug_graph, if_true, instance_assignment);
-
+      item->key = KEY_BLOCK_ITEM_CONDITION;
+      item->instance = instance;
+      item->condition = instance->fibered_attr.attr;
+      item->prev = prev;
+      
+      int cmask = 1 << (if_rule_index(instance->fibered_attr.attr));
       cond->positive |= cmask;
-      implement_visit_function(aug_graph, phase, cto->cto_if_true,
-                               true_assignment, nch, cond, cto->chunk_index,
-                               loop_allowed, loop_id, skip_previous_visit_code,
-                               ow);
+      item->next_positive = linearize_block_helper(aug_graph, scheduled, cond, item_base);
       cond->positive &= ~cmask;
-
-      --nesting_level;
-#ifdef APS2SCALA
-      if (is_match) {
-        ow->get_outstream() << indent() << "}\n";
-        ow->get_outstream() << indent() << "case _ => {\n";
-      } else {
-        ow->get_outstream() << indent() << "} else {\n";
-      }
-#else  /* APS2SCALA */
-      ow->get_outstream() << indent() << "} else {\n";
-#endif /* APS2SCALA */
-      ++nesting_level;
-      vector<std::set<Expression> > false_assignment =
-          if_false ? make_instance_assignment(aug_graph, if_false,
-                                              instance_assignment)
-                   : instance_assignment;
-
       cond->negative |= cmask;
-      bool cont = implement_visit_function(
-          aug_graph, phase, cto->cto_if_false, false_assignment, nch, cond,
-          cto->chunk_index, loop_allowed, loop_id, skip_previous_visit_code,
-          ow);
+      item->next_negative = linearize_block_helper(aug_graph, scheduled, cond, item_base);
       cond->negative &= ~cmask;
+    } else {
+      struct block_item_instance* item = (struct block_item_instance*)malloc(sizeof(struct block_item_instance));
+      item_base = (BlockItem*)item;
+      item->key = KEY_BLOCK_ITEM_INSTANCE;
+      item->instance = instance;
+      item->next = linearize_block_helper(aug_graph, scheduled, cond, item_base);
+    }
 
-      --nesting_level;
-#ifdef APS2SCALA
-      if (is_match) {
-        ow->get_outstream() << indent() << "}}\n";
+    scheduled[i] = false;
+
+    return item_base;
+  }
+
+  return NULL;
+}
+
+// Given an augmented dependency graph, it linearizes
+// the direct dependency schedule.
+static BlockItem* linearize_block(AUG_GRAPH* aug_graph) {
+  int n = aug_graph->instances.length;
+  bool* scheduled = (bool*)alloca(sizeof(bool) * n);
+  memset(scheduled, 0, sizeof(bool) * n);
+
+  CONDITION cond = {0, 0};
+
+  return linearize_block_helper(aug_graph, scheduled, &cond, NULL);
+}
+
+// Given an instance it traverses the direct dependency schedule
+// trying to find the instance and if it sees the condition 
+// along the way, it returns that condition.
+static BlockItem* find_surrounding_block(BlockItem* block, INSTANCE* instance) {
+  while (block != NULL) {
+    if (block->key == KEY_BLOCK_ITEM_CONDITION) {
+      return block;
+    } else if (block->key == KEY_BLOCK_ITEM_INSTANCE) {
+      if (block->instance == instance) {
+        return block;
       } else {
-        ow->get_outstream() << indent() << "}\n";
+        block = ((struct block_item_instance*)block)->next;
       }
-
-      // Restore previous value of loop allowed.
-      loop_allowed = prev_loop_allowed;
-
-      // Delay closing of the loop until conditional is finished
-      if (loop_allowed && loop_id != -1) {
-        dump_loop_end(aug_graph, phase, loop_id, ow);
-        loop_id = -1;
-      }
-
-#else  /* APS2SCALA */
-      ow->get_outstream() << indent() << "}\n";
-#endif /* APS2SCALA */
-      return cont;
-    }
-
-    Symbol asym = ad ? def_name(declaration_def(ad)) : 0;
-
-    if (instance_direction(in) == instance_inward) {
-      if (include_comments) {
-        ow->get_outstream() << indent() << "// " << in << " is ready now.\n";
-      }
-      continue;
-    }
-
-    for (std::set<Expression>::iterator rhs_it =
-             instance_assignment[in->index].begin();
-         rhs_it != instance_assignment[in->index].end(); rhs_it++) {
-      Expression rhs = *rhs_it;
-
-      if (rhs == NULL)
-        continue;
-
-      if (in->node && Declaration_KEY(in->node) == KEYnormal_assign) {
-        // parameter value will be filled in at call site
-        if (include_comments) {
-          ow->get_outstream()
-              << indent() << "// delaying " << in << " to call site.\n";
-        }
-        continue;
-      }
-
-      if (in->node && Declaration_KEY(in->node) == KEYpragma_call) {
-        if (include_comments) {
-          ow->get_outstream()
-              << indent() << "// place holder for " << in << "\n";
-        }
-        continue;
-      }
-
-      if (in->fibered_attr.fiber != NULL) {
-        if (rhs == NULL) {
-          if (include_comments) {
-            ow->get_outstream() << indent() << "// " << in << "\n";
-          }
-          continue;
-        }
-
-        Declaration assign = (Declaration)tnode_parent(rhs);
-        Expression lhs = assign_lhs(assign);
-        Declaration field = 0;
-        ow->get_outstream() << indent();
-        // dump the object containing the field
-        switch (Expression_KEY(lhs)) {
-          case KEYvalue_use:
-            // shared global collection
-            field = USE_DECL(value_use_use(lhs));
-#ifdef APS2SCALA
-            ow->get_outstream() << "a_" << decl_name(field) << ".";
-            if (debug)
-              ow->get_outstream() << "assign";
-            else
-              ow->get_outstream() << "set";
-            ow->get_outstream() << "(" << rhs << ");\n";
-#else  /* APS2SCALA */
-            ow->get_outstream() << "v_" << decl_name(field) << "=";
-            switch (Default_KEY(value_decl_default(field))) {
-              case KEYcomposite:
-                ow->get_outstream()
-                    << composite_combiner(value_decl_default(field));
-                break;
-              default:
-                ow->get_outstream()
-                    << as_val(value_decl_type(field)) << "->v_combine";
-                break;
-            }
-            ow->get_outstream()
-                << "(v_" << decl_name(field) << "," << rhs << ");\n";
-#endif /* APS2SCALA */
-            break;
-          case KEYfuncall:
-            field = field_ref_p(lhs);
-            if (field == 0)
-              fatal_error("what sort of assignment lhs: %d",
-                          tnode_line_number(assign));
-            ow->get_outstream() << "a_" << decl_name(field) << DEREF;
-            if (debug)
-              ow->get_outstream() << "assign";
-            else
-              ow->get_outstream() << "set";
-            ow->get_outstream()
-                << "(" << field_ref_object(lhs) << "," << rhs << ");\n";
-            break;
-          default:
-            fatal_error("what sort of assignment lhs: %d",
-                        tnode_line_number(assign));
-        }
-        continue;
-      }
-
-      if (in->node == 0 && ad != NULL) {
-        if (rhs) {
-          if (Declaration_info(ad)->decl_flags & LOCAL_ATTRIBUTE_FLAG) {
-            ow->get_outstream() << indent() << "a" << LOCAL_UNIQUE_PREFIX(ad)
-                                << "_" << asym << DEREF;
-            if (debug)
-              ow->get_outstream() << "assign";
-            else
-              ow->get_outstream() << "set";
-            ow->get_outstream() << "(anchor," << rhs << ");\n";
-          } else {
-            int i = LOCAL_UNIQUE_PREFIX(ad);
-            if (i == 0) {
-#ifdef APS2SCALA
-              if (!def_is_constant(value_decl_def(ad))) {
-                if (include_comments) {
-                  ow->get_outstream()
-                      << indent() << "// v_" << asym
-                      << " is assigned/initialized by default.\n";
-                }
-              } else {
-                if (include_comments) {
-                  ow->get_outstream() << indent() << "// v_" << asym
-                                      << " is initialized in module.\n";
-                }
-              }
-#else
-              ow->get_outstream()
-                  << indent() << "v_" << asym << " = " << rhs << ";\n";
-#endif
-            } else {
-              ow->get_outstream() << indent() << "v" << i << "_" << asym
-                                  << " = " << rhs << "; // local\n";
-            }
-          }
-        } else {
-          if (Declaration_KEY(ad) == KEYvalue_decl &&
-              !direction_is_collection(value_decl_direction(ad))) {
-            aps_warning(ad, "Local attribute %s is apparently undefined",
-                        decl_name(ad));
-          }
-          if (include_comments) {
-            ow->get_outstream() << indent() << "// " << in << " is ready now\n";
-          }
-        }
-        continue;
-      } else if (node_is_syntax) {
-        if (ATTR_DECL_IS_SHARED_INFO(ad) && ch < nch) {
-          if (include_comments) {
-            ow->get_outstream() << indent() << "// shared info for "
-                                << decl_name(in->node) << " is ready.\n";
-          }
-        } else if (ATTR_DECL_IS_UP_DOWN(ad)) {
-          if (include_comments) {
-            ow->get_outstream() << indent() << "// " << decl_name(in->node)
-                                << "." << decl_name(ad) << " implicit.\n";
-          }
-        } else if (rhs) {
-          if (Declaration_KEY(in->node) == KEYfunction_decl) {
-            if (direction_is_collection(value_decl_direction(ad))) {
-              std::cout << "Not expecting collection here!\n";
-              ow->get_outstream()
-                  << indent() << "v_" << asym << " = somehow_combine(v_" << asym
-                  << "," << rhs << ");\n";
-            } else {
-              int i = LOCAL_UNIQUE_PREFIX(ad);
-              if (i == 0)
-                ow->get_outstream() << indent() << "v_" << asym << " = " << rhs
-                                    << "; // function\n";
-              else
-                ow->get_outstream() << indent() << "v" << i << "_" << asym
-                                    << " = " << rhs << ";\n";
-            }
-          } else {
-            ow->get_outstream() << indent() << "a_" << asym << DEREF;
-            if (debug)
-              ow->get_outstream() << "assign";
-            else
-              ow->get_outstream() << "set";
-            ow->get_outstream()
-                << "(v_" << decl_name(in->node) << "," << rhs << ");\n";
-          }
-        } else {
-          aps_warning(in->node, "Attribute %s.%s is apparently undefined",
-                      decl_name(in->node), symbol_name(asym));
-
-          if (include_comments) {
-            ow->get_outstream() << indent() << "// " << in << " is ready.\n";
-          }
-        }
-        continue;
-      } else if (Declaration_KEY(in->node) == KEYvalue_decl) {
-        if (rhs) {
-          // assigning field of object
-          ow->get_outstream() << indent() << "a_" << asym << DEREF;
-          if (debug)
-            ow->get_outstream() << "assign";
-          else
-            ow->get_outstream() << "set";
-          ow->get_outstream()
-              << "(v_" << decl_name(in->node) << "," << rhs << ");\n";
-        } else {
-          if (include_comments) {
-            ow->get_outstream()
-                << indent() << "// " << in << " is ready now.\n";
-          }
-        }
-        continue;
-      }
-      std::cout << "Problem assigning " << in << "\n";
-      ow->get_outstream() << indent() << "// Not sure what to do for " << in
-                          << "\n";
     }
   }
 
-  // Close any dangling loop if any. This should never happen
-  // because after circular visit is followed by non-empty or empty
-  // non-circular visit so this code never happens.
-  if (loop_allowed && loop_id != -1) {
-    dump_loop_end(aug_graph, phase, loop_id, ow);
-    loop_id = -1;
-  }
-
-  return false;  // no more!
+  return NULL;
 }
 
 #ifdef APS2SCALA
@@ -881,20 +252,37 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
       nesting_level++;
 
       // foreach augmented dependency graph
-      for (k = 0; k < s->aug_graphs->instances.length; k++) {
+      int aug_graph_count = s->match_rules.length;
+      for (k = 0; k < aug_graph_count; k++) {
         AUG_GRAPH* aug_graph = &s->aug_graphs[k];
         PHY_GRAPH* aug_graph_pg = Declaration_info(aug_graph->lhs_decl)->node_phy_graph;
 
         // if LHS is the current phylum
-        // if (aug_graph_pg != pg) continue;
+        if (aug_graph_pg != pg) continue;
 
         Declaration tplm = top_level_match_constructor_decl(aug_graph->match_rule);
         Declaration cd = aug_graph->syntax_decl;
         os << indent() << "case " << matcher_pat(top_level_match_m(aug_graph->match_rule)) << " => {\n";
         nesting_level++;
 
+        os << indent();
+
         current_state = s;
-        impl->dump_instance_rhs(aug_graph, in, os);
+        current_aug_graph = aug_graph;
+        current_blocks.push_back(matcher_body(top_level_match_m(aug_graph->match_rule)));
+
+        current_scope_block = linearize_block(aug_graph);
+
+        INSTANCE* instance_out;
+        if (impl->find_instance(aug_graph, aug_graph->lhs_decl, in->fibered_attr.attr, &instance_out)) {
+          impl->dump_rhs_of_instance(aug_graph, instance_out, os);
+        } else {
+          fatal_error("something is wrong with instances in aug graph %s", aug_graph_name(aug_graph));
+        }
+
+        os << "\n";
+
+        current_blocks.clear();
 
         nesting_level--;
         os << indent() << "}\n";
@@ -905,96 +293,6 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
       nesting_level--;
       os << indent() << "};\n\n";
     }
-  }
-}
-
-static void* dump_scheduled_local(void* pbs, void* node) {
-  ostream& bs = *(ostream*)pbs;
-  if (ABSTRACT_APS_tnode_phylum(node) == KEYDeclaration) {
-    Declaration d = (Declaration)node;
-    if (Declaration_KEY(d) == KEYvalue_decl) {
-      static int unique = 0;
-      LOCAL_UNIQUE_PREFIX(d) = ++unique;
-      Declaration_info(d)->decl_flags |= LOCAL_VALUE_FLAG;
-#ifdef APS2SCALA
-      bs << indent() << "var "
-         << " v" << unique << "_" << decl_name(d) << " : " << value_decl_type(d)
-         << " = null.asInstanceOf[" << value_decl_type(d) << "]"
-         << ";\n";
-#else  /* APS2SCALA */
-      bs << indent() << value_decl_type(d) << " v" << unique << "_"
-         << decl_name(d) << ";\n";
-#endif /* APS2SCALA */
-    }
-  }
-  return pbs;
-}
-
-static void dump_scheduled_function_body(Declaration fd, STATE* s, ostream& bs) {
-  const char* name = decl_name(fd);
-  Type ft = function_decl_type(fd);
-
-  // dump any local values:
-  traverse_Declaration(dump_scheduled_local, &bs, fd);
-
-  int index;
-  for (index = 0; index < s->match_rules.length; ++index)
-    if (s->match_rules.array[index] == fd)
-      break;
-
-  if (index >= s->match_rules.length)
-    fatal_error("Cannot find function %s in top-level-matches", name);
-
-  int pindex;
-  for (pindex = 0; pindex < s->phyla.length; ++pindex)
-    if (s->phyla.array[pindex] == fd)
-      break;
-
-  if (pindex >= s->phyla.length)
-    fatal_error("Cannot find function %s in phyla", name);
-
-  AUG_GRAPH* aug_graph = &s->aug_graphs[index];
-  CTO_NODE* schedule = aug_graph->total_order;
-
-  vector<std::set<Expression> > default_instance_assignments(
-      aug_graph->instances.length, std::set<Expression>());
-  vector<std::set<Expression> > instance_assignment = make_instance_assignment(
-      aug_graph, function_decl_body(fd), default_instance_assignments);
-
-  CONDITION cond;
-  cond.positive = 0;
-  cond.negative = 0;
-
-  int max_phase =
-      Declaration_info(aug_graph->lhs_decl)->node_phy_graph->max_phase;
-
-  OutputWriter ow(bs);
-  bool cont = implement_visit_function(aug_graph, max_phase, schedule,
-                                       instance_assignment, 0, &cond, -1, false,
-                                       -1, false, &ow);
-
-  Declaration returndecl = first_Declaration(function_type_return_values(ft));
-  if (returndecl == 0) {
-    bs << indent() << "return;\n";
-  } else {
-    bs << indent() << "return v" << LOCAL_UNIQUE_PREFIX(returndecl) << "_"
-       << decl_name(returndecl) << ";\n";
-  }
-
-  if (cont) {
-    std::cout << "Function " << name << " should not require a second pass!\n";
-    int phase = 2;
-    bs << "    /*\n";
-    bs << "    // phase 2\n";
-
-    while (implement_visit_function(aug_graph, phase, schedule,
-                                    instance_assignment, 0, &cond, -1, false,
-                                    -1, true, &ow)) {
-      if (include_comments) {
-        bs << indent() << "// phase " << ++phase << "\n";
-      }
-    }
-    bs << indent() << "*/\n";
   }
 }
 
@@ -1084,16 +382,6 @@ Super* get_module_info(Declaration m) {
 }
 
 void implement_function_body(Declaration f, ostream& os) {
-  Declaration module = (Declaration)tnode_parent(f);
-  while (module && (ABSTRACT_APS_tnode_phylum(module) != KEYDeclaration ||
-                    Declaration_KEY(module) != KEYmodule_decl))
-    module = (Declaration)tnode_parent(module);
-  if (module) {
-    STATE* s = (STATE*)Declaration_info(module)->analysis_state;
-    dump_scheduled_function_body(f, s, os);
-  } else {
-    dynamic_impl->implement_function_body(f, os);
-  }
 }
 
 void implement_value_use(Declaration vd, ostream& os) {
@@ -1116,78 +404,71 @@ void implement_value_use(Declaration vd, ostream& os) {
   }
 }
 
-void dump_instance_rhs(AUG_GRAPH* aug_graph, Block block, INSTANCE* instance, ostream& o) {
-    Declarations ds = block_body(block);
-    for (Declaration d = first_Declaration(ds); d; d = DECL_NEXT(d)) {
-      switch (Declaration_KEY(d)) {
-        case KEYif_stmt:
-        {
-          o << "before IF\n";
-          dump_instance_rhs(aug_graph, if_stmt_if_true(d), instance, o);
-          o << "\n after IF\n";
-          dump_instance_rhs(aug_graph, if_stmt_if_false(d), instance, o);
-          o << "\n end if statement\n";
-          break;
-        }
-        case KEYassign: {
-          INSTANCE* rhs_instance = Expression_info(assign_rhs(d))->value_for;
-          Expression lhs_expr = assign_lhs(d);
-          if (rhs_instance) {
-            Declaration attr = USE_DECL(value_use_use(funcall_f(lhs_expr)));
-            Declaration node = USE_DECL(value_use_use(first_Actual(funcall_actuals(lhs_expr))));
+  void dump_rhs_of_instance_helper(AUG_GRAPH* aug_graph, BlockItem* block, INSTANCE* instance, ostream& o) {
+    if (block->key == KEY_BLOCK_ITEM_INSTANCE) {
+      for (auto it = current_blocks.rbegin(); it != current_blocks.rend(); it++) {
+        Declarations ds = block_body(*it);
+        for (Declaration d = first_Declaration(ds); d; d = DECL_NEXT(d)) {
+          switch (Declaration_KEY(d)) {
+            case KEYassign: {
+              Expression rhs = assign_rhs(d);
+              Expression lhs = assign_lhs(d);
+              INSTANCE* rhs_instance = Expression_info(rhs)->value_for;
+              
+              if (attr_ref_p(lhs) != NULL) {
+                Declaration lhs_node = USE_DECL(value_use_use(first_Actual(funcall_actuals(lhs))));
+                Declaration lhs_attr = attr_ref_p(lhs);
 
-            if (node == aug_graph->lhs_decl && attr == instance->fibered_attr.attr) {
-              o << indent();
-              current_aug_graph = aug_graph;
-              dump_Expression(assign_rhs(d), o);
-              o << "\n";
+                if (lhs_node == instance->node && lhs_attr == instance->fibered_attr.attr) {
+                  current_aug_graph = aug_graph;
+                  dump_Expression(assign_rhs(d), o);
+
+                  return;
+                }
+              }
+              break;
             }
-          } else {
-            fatal_error("not supported scenario");
+            default:
+              break;
           }
-          break;
         }
-        default:
-          break;
+
+        // printf("(block lineno %d)=>", tnode_line_number(*it));
+        // print_instance(instance, stdout);
+        // printf("<=\n");
+        // aps_warning(instance, "could not find assignment for instance");
       }
+    } else if (block->key == KEY_BLOCK_ITEM_CONDITION) {
+      struct block_item_condition* cond = (struct block_item_condition*)block;
+      Declaration if_stmt = cond->condition;
+
+      o << "if (";
+      dump_Expression(if_stmt_cond(if_stmt), o);
+      o << ") {\n";
+      nesting_level++;
+      current_blocks.push_back(if_stmt_if_true(if_stmt));
+      o << indent();
+      dump_rhs_of_instance_helper(aug_graph, cond->next_positive, instance, o);
+      current_blocks.pop_back();
+      o << "\n";
+      nesting_level--;
+      o << indent() << "} else {\n";
+      nesting_level++;
+      current_blocks.push_back(if_stmt_if_false(if_stmt));
+      o << indent();
+      dump_rhs_of_instance_helper(aug_graph, cond->next_negative, instance, o);
+      current_blocks.pop_back();
+      nesting_level--;
+      o << "\n";
+      o << indent() << "}";
     }
   }
 
-  virtual void dump_instance_rhs(AUG_GRAPH* aug_graph, INSTANCE* instance, ostream& o) override {
-    Declarations ds = block_body(matcher_body(top_level_match_m(aug_graph->match_rule)));
-    for (Declaration d = first_Declaration(ds); d; d = DECL_NEXT(d)) {
-      switch (Declaration_KEY(d)) {
-        case KEYif_stmt:
-        {
-          o << "before IF\n";
-          dump_instance_rhs(aug_graph, if_stmt_if_true(d), instance, o);
-          o << "\n after IF\n";
-          dump_instance_rhs(aug_graph, if_stmt_if_false(d), instance, o);
-          o << "\n end if statement\n";
-          break;
-        }
-        case KEYassign: {
-          INSTANCE* rhs_instance = Expression_info(assign_rhs(d))->value_for;
-          Expression lhs_expr = assign_lhs(d);
-          if (rhs_instance) {
-            Declaration attr = USE_DECL(value_use_use(funcall_f(lhs_expr)));
-            Declaration node = USE_DECL(value_use_use(first_Actual(funcall_actuals(lhs_expr))));
+  // given LHS, it tries to find assignment that assigns to the LHS and then dumps the RHS
+  virtual void dump_rhs_of_instance(AUG_GRAPH* aug_graph, INSTANCE* instance, ostream& o) override {
+    BlockItem* block = find_surrounding_block(current_scope_block, instance);
 
-            if (node == aug_graph->lhs_decl && attr == instance->fibered_attr.attr) {
-              o << indent();
-              current_aug_graph = aug_graph;
-              dump_Expression(assign_rhs(d), o);
-              o << "\n";
-            }
-          } else {
-            fatal_error("not supported scenario");
-          }
-          break;
-        }
-        default:
-          break;
-      }
-    }
+    dump_rhs_of_instance_helper(aug_graph, block, instance, o);
   }
 }
 ;

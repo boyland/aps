@@ -1,6 +1,7 @@
 #ifndef DUMP_H
 #include <iostream>
 #include <string>
+#include <vector>
 
 using std::ostream;
 using std::string;
