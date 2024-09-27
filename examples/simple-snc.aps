@@ -16,15 +16,24 @@ module SIMPLE_SNC[T :: var SIMPLE[]] extends T begin
 
   pragma synthesized(stmt_total, stmts_total, block_total, program_total);
 
-  match ?s:Stmt=assign_stmt(?e1:Expr,?e2:Expr) begin
+  match ?self:Stmt=assign_stmt(?e1:Expr,?e2:Expr) begin
     e1.i1 := 0;
     e1.i2 := e1.s1;
     e2.i2 := 0;
     e2.i1 := e2.s2;
+
     if e1.s2 < e2.s1 then
-      s.stmt_total := e1.s2 + e2.s1;
+      if e2.s1 > 700 then
+        self.stmt_total := e1.s2 + e2.s1 + 100;
+      else
+        self.stmt_total := e1.s2 - e2.s1 + 200;
+      endif;
     else
-      s.stmt_total := e1.s2 + e2.s1;
+      if e2.s1 < 800 then
+        self.stmt_total := e1.s2 + e2.s1 - 300;
+      else
+        self.stmt_total := e1.s2 - e2.s1 - 400;
+      endif;
     endif;
   end;
 
