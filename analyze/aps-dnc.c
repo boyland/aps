@@ -2443,6 +2443,22 @@ static void synchronize_dependency_graphs(AUG_GRAPH *aug_graph,
 
   phy_n = phy_graph->instances.length;
 
+  int index_of_lhs = -1;
+  for (i = 0; i < n; i++) {
+    if (aug_graph->instances.array[i].node == aug_graph->lhs_decl) {
+      index_of_lhs = i;
+      break;
+    }
+  }
+
+  if (index_of_lhs == -1) {
+    fatal_error("LHS %d not found in instances of %s", decl_name(aug_graph->lhs_decl), aug_graph_name(aug_graph));
+  } else {
+    if (analysis_debug & SUMMARY_EDGE) {
+      printf("LHS found at index %d for %s\n", index_of_lhs, aug_graph_name(aug_graph));
+    }
+  }
+
   /* discover when the instances for this node end.
    */
   max = start + phy_n;
@@ -2465,10 +2481,12 @@ static void synchronize_dependency_graphs(AUG_GRAPH *aug_graph,
       int aug_index = i*n + j;
       int sum_index = (i-start)*phy_n + (j-start);
       DEPENDENCY kind=edgeset_kind(aug_graph->graph[aug_index]);
+
       // avoid adding augmeneted dependency graph edges to summary graph of function declarations
       // if synth-function generation is active, also avoid adding augmeneted dependency graph edges to summary graph
       if (!AT_MOST(dependency_indirect(kind),
-		    phy_graph->mingraph[sum_index]) && ((!phylum_is_func_decl && !aug_graph->global_state->anc_analysis) || (start == 0))) {
+        // phy_graph->mingraph[sum_index]) && !phylum_is_func_decl) {
+        phy_graph->mingraph[sum_index]) && ((!phylum_is_func_decl && !aug_graph->global_state->anc_analysis) || (start == index_of_lhs))) {
         kind = dependency_indirect(kind); //! more precisely DNC artificial
         kind = dependency_join(kind,phy_graph->mingraph[sum_index]);
         if (kind == phy_graph->mingraph[sum_index]) {
@@ -2514,7 +2532,6 @@ static void augment_dependency_graph_for_node(AUG_GRAPH *aug_graph,
 					      Declaration node) {
   int start=Declaration_info(node)->instance_index;
   PHY_GRAPH *phy_graph = Declaration_info(node)->node_phy_graph;
-
   synchronize_dependency_graphs(aug_graph,start,phy_graph);
 }
 

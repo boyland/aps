@@ -75,7 +75,7 @@ class Implementation {
     int i;
     for (i = 0; i < aug_graph->instances.length; i++) {
       INSTANCE* instance = &aug_graph->instances.array[i];
-      if (instance->fibered_attr.attr == attr) {
+      if (instance->node == node && instance->fibered_attr.attr == attr) {
         *instance_out = instance;
         return true;
       }
