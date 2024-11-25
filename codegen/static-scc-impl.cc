@@ -127,7 +127,10 @@ static vector<std::set<Expression> > make_instance_assignment(
       // get default!
       switch (Declaration_KEY(ad)) {
         case KEYattribute_decl:
-          array[i].insert(default_init(attribute_decl_default(ad)));
+          // Multiple assignments to only collection attributes are permissible
+          if (array[i].empty() || (array[i].size() > 0 && direction_is_collection(attribute_decl_direction(ad)))) {
+            array[i].insert(default_init(attribute_decl_default(ad)));
+          }
           break;
         case KEYvalue_decl:
           array[i].insert(default_init(value_decl_default(ad)));
