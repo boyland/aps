@@ -115,28 +115,29 @@ static Expression default_init(Default def) {
 static vector<std::set<Expression> > make_instance_assignment(
     AUG_GRAPH* aug_graph,
     Block block,
-    vector<std::set<Expression> > from) {
+    vector<std::set<Expression> > from,
+    bool add_defaults = false) {
   int n = aug_graph->instances.length;
   vector<std::set<Expression> > array(from);
 
-  for (int i = 0; i < n; ++i) {
-    INSTANCE* in = &aug_graph->instances.array[i];
-    Declaration ad = in->fibered_attr.attr;
-    if (ad != 0 && in->fibered_attr.fiber == 0 &&
-        ABSTRACT_APS_tnode_phylum(ad) == KEYDeclaration) {
-      // get default!
-      switch (Declaration_KEY(ad)) {
-        case KEYattribute_decl:
-          // Multiple assignments to only collection attributes are permissible
-          if (array[i].empty() || (array[i].size() > 0 && direction_is_collection(attribute_decl_direction(ad)))) {
+  if (add_defaults) {
+    for (int i = 0; i < n; ++i) {
+      INSTANCE* in = &aug_graph->instances.array[i];
+      Declaration ad = in->fibered_attr.attr;
+      if (ad != 0 && in->fibered_attr.fiber == 0 &&
+          ABSTRACT_APS_tnode_phylum(ad) == KEYDeclaration) {
+        // get default!
+        switch (Declaration_KEY(ad)) {
+          case KEYattribute_decl:
+            // Multiple assignments to only collection attributes are permissible
             array[i].insert(default_init(attribute_decl_default(ad)));
-          }
-          break;
-        case KEYvalue_decl:
-          array[i].insert(default_init(value_decl_default(ad)));
-          break;
-        default:
-          break;
+            break;
+          case KEYvalue_decl:
+            array[i].insert(default_init(value_decl_default(ad)));
+            break;
+          default:
+            break;
+        }
       }
     }
   }
@@ -860,7 +861,7 @@ static void dump_visit_functions(PHY_GRAPH* phy_graph,
   vector<std::set<Expression> > default_instance_assignments(
       aug_graph->instances.length, std::set<Expression>());
   vector<std::set<Expression> > instance_assignment =
-      make_instance_assignment(aug_graph, block, default_instance_assignments);
+      make_instance_assignment(aug_graph, block, default_instance_assignments, true /* add defaults assignments */);
 
   // the following loop is controlled in two ways:
   // (1) if total order is zero, there are no visits at all.
