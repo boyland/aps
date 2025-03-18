@@ -2121,6 +2121,7 @@ static void set_decl_flags_module(STATE* s, Declaration module) {
   for (; decl != NULL; decl = Declaration_info(decl)->next_decl) {
     switch (Declaration_KEY(decl)) {
       case KEYattribute_decl:
+	/** DOn't do this error -- FIELD is not yet set.
         if (!ATTR_DECL_IS_SYN(decl) && !ATTR_DECL_IS_INH(decl) &&
             !FIELD_DECL_P(decl)) {
           aps_warning(decl,
@@ -2129,6 +2130,7 @@ static void set_decl_flags_module(STATE* s, Declaration module) {
                       decl_name(decl));
           Declaration_info(decl)->decl_flags |= ATTR_DECL_SYN_FLAG;
         }
+	*/
         break;
       case KEYsome_function_decl:
       {
