@@ -699,7 +699,7 @@ end;
 [T] function debug_output(x : T) : String;
 
 -- get the line number:
-[Node :: PHYLUM[]] function lineno(x : Node) : Integer;
+[Node :: PHYLUM[]] function lineno(x : remote Node) : Integer;
 
 module TUPLE_LATTICE[ElemType :: LATTICE[]; ST :: LIST[ElemType]]
   :: LIST[ElemType], LATTICE[] extends ST

@@ -2090,6 +2090,9 @@ static void set_decl_flags_aug_graph(Declaration tlm, STATE* state) {
               case KEYpattern_var: {
                 Declaration next_rhs = pattern_var_formal(next_pat);
                 Declaration_info(next_rhs)->decl_flags |= DECL_RHS_FLAG;
+		if (type_is_phylum(base_type(Pattern_info(next_pat)->pat_type))) {
+		  Declaration_info(next_rhs)->decl_flags |= DECL_RHS_SYNTAX_FLAG;
+		}
                 break;
               }
               default:

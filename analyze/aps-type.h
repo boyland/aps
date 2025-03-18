@@ -54,6 +54,8 @@ extern void check_type_actuals(TypeActuals,Declarations,Use);
 extern BOOL type_is_phylum(Type);
 extern Type type_element_type(Type);
 
+extern BOOL type_is_scalar(Type); // true for Integer, Boolean, Real, Char
+
 /* return true is environment is ready to use
  * (no remaining inference required)
  * Since polymorphic scopes may not export type declarations

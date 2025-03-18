@@ -2246,6 +2246,13 @@ int base_type_equal(Type b1, Type b2) {
   }
 }
 
+BOOL type_is_scalar(Type t) {
+  return base_type_equal(t, Integer_Type) ||
+    base_type_equal(t, Boolean_Type) ||
+    base_type_equal(t, Real_Type) ||
+    base_type_equal(t, Char_Type);
+}
+
 void check_type_equal(void *node, Type t1, Type t2) {
   if (t1 == t2) return; /* easy case */
   if (t1 == 0 || t2 == 0) return;

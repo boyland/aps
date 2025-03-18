@@ -1748,6 +1748,7 @@ OSET doOU(Expression e, USET uset)
 		// * 2> w.f (field_ref)
 		// * 3> local function
 		// * 4> primitive function
+	        // *    special functions that never involve fibers: e.g. lineno
 		// 
 	{
 	  Declaration fdecl;
