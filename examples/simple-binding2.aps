@@ -48,6 +48,7 @@ module NAME_RESOLUTION[T :: var SIMPLE[]] extends T begin
   
   not_found : EntityRef := nil;
   
+  no_shape : Shape := nil;
   int_shape : Shape := shape("integer");
   str_shape : Shape := shape("string");
 
@@ -63,7 +64,7 @@ module NAME_RESOLUTION[T :: var SIMPLE[]] extends T begin
   attribute Expr.expr_scope : Scope;
 
   attribute Type.type_shape : Shape;
-  attribute Expr.expr_shape : Shape;
+  attribute Expr.expr_shape : Shape := no_shape;
   
   pragma inherited(block_scope,decls_scope,decl_scope,
 		   stmts_scope,stmt_scope,expr_scope);
