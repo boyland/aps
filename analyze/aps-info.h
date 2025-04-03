@@ -43,6 +43,7 @@ struct Declaration_info {
   unsigned decl_flags;
   void * call_sites;
   void *analysis_state;
+  BOOL is_circular;     /* boolean indicating if decl is circular */
 #define DECL_LHS_FLAG 1
 #define DECL_RHS_FLAG 2
 #define DECL_OBJECT_FLAG 4

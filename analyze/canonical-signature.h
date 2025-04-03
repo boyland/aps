@@ -1,6 +1,9 @@
 #ifndef CANONICAL_SIGNATURE_H
 #define CANONICAL_SIGNATURE_H
 
+#include <stdbool.h>
+#include "canonical-type.h"
+
 struct CanonicalSignature_type
 {
   bool is_input;
@@ -41,5 +44,13 @@ void print_canonical_signature(void *untyped, FILE *f);
  * @return f FILE output
  */
 void print_canonical_signature_set(void *untyped, FILE *f);
+
+/**
+ * Given a canonical signature, it returns whether it contains module declaration
+ * @param csig canonical signature
+ * @param module_or_class_decl module or class declaration
+ * @return boolean indicating if module is in the type hierarchy of signature
+ */
+bool canonical_signature_hierarchy_contains(CanonicalSignature* csig, Declaration module_or_class_decl);
 
 #endif
