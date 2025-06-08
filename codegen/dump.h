@@ -18,6 +18,8 @@ extern int verbose;
 extern int debug;
 extern bool include_comments;
 
+typedef struct synth_function_state SYNTH_FUNCTION_STATE;
+
 class Implementation;
 
 extern Implementation *impl;
@@ -199,5 +201,6 @@ inline const output_streams& operator<< <header_end>
 
 extern AUG_GRAPH* current_aug_graph;
 extern STATE* current_state;
+extern std::vector<SYNTH_FUNCTION_STATE*> synth_functions_states;
 
 #endif

@@ -2293,61 +2293,19 @@ void dump_collect_Actuals(Type ctype, Actuals as, ostream& o)
 
 STATE* current_state = NULL;
 AUG_GRAPH* current_aug_graph = NULL;
+std::vector<SYNTH_FUNCTION_STATE*> synth_functions_states;
 
-static void dump_synth_attribute(INSTANCE *instance, vector<INSTANCE*> visited, ostream& o) {
-  if (std::find(visited.begin(), visited.end(), instance) != visited.end()) {
-    fatal_error("cycle detected while dumping attribute for synth functions");
-    return;
+static bool find_instance(AUG_GRAPH* aug_graph, Declaration node, Declaration attr, INSTANCE** instance_out) {
+  int i;
+  for (i = 0; i < aug_graph->instances.length; i++) {
+    INSTANCE* instance = &aug_graph->instances.array[i];
+    if (instance->node == node && instance->fibered_attr.attr == attr) {
+      *instance_out = instance;
+      return true;
+    }
   }
 
-  visited.push_back(instance);
-
-  Declaration node = instance->node;
-  Declaration attr = instance->fibered_attr.attr;
-  bool is_parent_instance = current_aug_graph->lhs_decl == instance->node;
-
-  if (ATTR_DECL_IS_INH(attr)) {
-    if (is_parent_instance) {
-      o << "v_" << decl_name(attr);
-      return;
-    } else {
-      // we need to find the assignment and dump the RHS
-      // recurisve call
-      impl->dump_rhs_of_instance(current_aug_graph, instance, o);
-    }
-  } else if (ATTR_DECL_IS_SYN(attr)) {
-    Type ty = infer_formal_type(node);
-    Declaration ctype_decl = canonical_type_decl(canonical_type(ty));
-    PHY_GRAPH* pgraph = summary_graph_for(current_state, ctype_decl);
-    o << "eval_" << phy_graph_name(pgraph) << "_" << decl_name(attr) << "(" << "v_" << decl_name(node);
-
-    int i;
-    int source_index;
-    for (i = 0; i < pgraph->instances.length; i++) {
-      if (pgraph->instances.array[i].fibered_attr.attr == attr) {
-        source_index = i;
-        break;
-      }
-    }
-
-    int j = 0;
-    for (i = 0; i < pgraph->instances.length; i++) {
-      if (pgraph->mingraph[i* pgraph->instances.length + source_index]) {
-        INSTANCE* in = &pgraph->instances.array[i];
-
-        o << ", ";
-
-        INSTANCE* instance_out;
-        if (impl->find_instance(current_aug_graph, node, in->fibered_attr.attr, &instance_out)) {
-          impl->dump_rhs_of_instance(current_aug_graph, instance_out, o);
-        } else {
-          fatal_error("failed");
-        }
-      }
-    }
-
-    o << ")";
-  }
+  return false;
 }
 
 void dump_Expression(Expression e, ostream& o)
@@ -2372,11 +2330,12 @@ void dump_Expression(Expression e, ostream& o)
     Declaration attr;
     if (impl == synth_impl && (attr = attr_ref_p(e)) != nullptr) {
       vector<INSTANCE*> visited;
-
+      struct Expression_info *  index = Expression_info(e);
       Declaration node = USE_DECL(value_use_use(first_Actual(funcall_actuals(e))));
       INSTANCE* instance;
-      if (impl->find_instance(current_aug_graph, node, attr, &instance)) {
-        dump_synth_attribute(instance, visited, o);
+      if (find_instance(current_aug_graph, node, attr, &instance)) {
+        // dump_synth_attribute(instance, visited, o);
+        impl->dump_synth_instance(instance, o);
         return;
       } else {
         fatal_error("failed to find instance");
