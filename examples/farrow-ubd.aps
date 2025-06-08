@@ -42,6 +42,9 @@ module FARROW_UBD[T :: var FARROW_UBD_TREE[]] extends T begin
   pragma inherited(op_lval, op_rval);
   pragma synthesized(op_val);
 
+  attribute Expression.program_errs : Messages;
+  pragma synthesized(program_errs);
+
   match ?self:Declarations=scope(?ds: Declarations) begin
     self.decls_defs := ds.decls_defs;
     self.decls_errs := ds.decls_errs;
@@ -144,5 +147,6 @@ module FARROW_UBD[T :: var FARROW_UBD_TREE[]] extends T begin
 
   match ?self:Program=program(?ds: Declarations) begin
     ds.decls_env := DeclPairLattice$bottom;
+    self.program_errs := ds.decls_errs ++ ds.decls_inherited;
   end;
 end;
