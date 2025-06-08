@@ -18,7 +18,6 @@ extern "C" {
 
 #include "dump.h"
 #include "implement.h"
-#include "outputwriter.h"
 
 #define LOCAL_VALUE_FLAG (1 << 28)
 
@@ -377,8 +376,8 @@ static std::vector<INSTANCE*> collect_fiber_dependencies_to_finish(AUG_GRAPH* au
         sink_instance->fibered_attr.fiber != NULL &&
         // sink_instance->fibered_attr.fiber->shorter == base_fiber &&
         fiber_is_reverse(sink_instance->fibered_attr.fiber)) {
-      auto amir = collect_aug_graph_attr_dependencies(aug_graph, sink_instance);
-      result.insert(result.end(), amir.begin(), amir.end());
+      auto dependencies = collect_aug_graph_attr_dependencies(aug_graph, sink_instance);
+      result.insert(result.end(), dependencies.begin(), dependencies.end());
     }
   }
 
@@ -566,13 +565,9 @@ static std::vector<SYNTH_FUNCTION_STATE*> build_synth_functions_state(STATE* s) 
       bool is_fiber = instance->fibered_attr.fiber != NULL;
       bool is_shared_info = ATTR_DECL_IS_SHARED_INFO(instance->fibered_attr.attr);
 
-      // HERE I made !is_fiber
       if (is_local && !is_fiber && !if_rule_p(instance->fibered_attr.attr)) {
         switch (Declaration_KEY(instance->fibered_attr.attr)) {
           case KEYformal:
-            printf("skipping amir ");
-            print_instance(instance, stdout);
-            printf("\n");
             continue;
             break;
           default:
@@ -610,8 +605,7 @@ static std::vector<SYNTH_FUNCTION_STATE*> build_synth_functions_state(STATE* s) 
     printf("  Is fiber evaluation: %s\n", synth_functions_state->is_fiber_evaluation ? "true" : "false");
     printf("  Formals:\n");
     printf("  Aug graphs:\n");
-    for (auto it = synth_functions_state->aug_graphs.begin(); it != synth_functions_state->aug_graphs.end();
-         it++) {
+    for (auto it = synth_functions_state->aug_graphs.begin(); it != synth_functions_state->aug_graphs.end(); it++) {
       printf("    %s (%d)\n", aug_graph_name(*it), Declaration_KEY((*it)->lhs_decl));
     }
 
@@ -719,7 +713,7 @@ static void dump_fiber_dependencies_recursively(AUG_GRAPH* aug_graph, INSTANCE* 
   int i;
   int n = aug_graph->instances.length;
 
-  vector<INSTANCE*> relevant_instances; 
+  vector<INSTANCE*> relevant_instances;
 
   for (i = 0; i < n; i++) {
     INSTANCE* in = &aug_graph->instances.array[i];
@@ -727,7 +721,7 @@ static void dump_fiber_dependencies_recursively(AUG_GRAPH* aug_graph, INSTANCE* 
     if (in->node != NULL && Declaration_KEY(in->node) == KEYpragma_call) {
       continue;
     }
-    
+
     if (edgeset_kind(aug_graph->graph[in->index * n + sink->index])) {
       if (in->fibered_attr.fiber != NULL) {
         if (instance_is_synthesized(in) || instance_is_local(in)) {
@@ -777,10 +771,6 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
          << " = scala.collection.mutable.Map[T_" << decl_name(synth_functions_state->source_phy_graph->phylum)
          << ", Boolean]()"
          << "\n\n";
-    }
-
-    if (synth_functions_state->fdecl_name == "Block_sharedinfo_msgsX") {
-      printf("here\n");
     }
 
     os << indent() << "def eval_" << synth_functions_state->fdecl_name << "(";
@@ -1105,7 +1095,7 @@ static vector<std::set<Expression> > make_instance_assignment() {
   return from;
 }
 
-void amir(INSTANCE* in, Expression rhs, ostream& o) {
+void dump_assignment(INSTANCE* in, Expression rhs, ostream& o) {
   Declaration ad = in != NULL ? in->fibered_attr.attr : NULL;
   Symbol asym = ad ? def_name(declaration_def(ad)) : 0;
   bool node_is_syntax = in->node == current_aug_graph->lhs_decl;
@@ -1269,22 +1259,13 @@ void dump_rhs_instance_helper(AUG_GRAPH* aug_graph, BlockItem* item, INSTANCE* i
         // Declaration assign = (Declaration)tnode_parent(rhs);
         // Expression lhs = assign_lhs(assign);
         bool is_global_attribute =
-            ATTR_DECL_IS_SHARED_INFO(instance->fibered_attr.attr) && instance->fibered_attr.fiber != NULL;
-            
-        if (instance->fibered_attr.fiber != NULL) {
-          amir(instance, rhs, o);
-          o << " /* end of amir */";
+           ATTR_DECL_IS_SHARED_INFO(instance->fibered_attr.attr) && instance->fibered_attr.fiber != NULL;
+
+        if (instance->fibered_attr.fiber != NULL || is_global_attribute) {
+          dump_assignment(instance, rhs, o);
         } else {
-          if (is_global_attribute) {
-            dump_fiber_attribute_assignment(
-                instance,
-                "",
-                [&]() { dump_Expression(rhs, o);
-                  return true; },
-                o);
-          } else {
-            dump_Expression(rhs, o);
-          }
+          // just dump RHS since synth functions are only interested in RHS, not side-effect
+          dump_Expression(rhs, o);
         }
       }
 
@@ -1293,7 +1274,9 @@ void dump_rhs_instance_helper(AUG_GRAPH* aug_graph, BlockItem* item, INSTANCE* i
 
     if (instance->fibered_attr.fiber != NULL) {
       // Shared info attribute wasn't assigned in this block, dump its default
-      o << "/* did not find any assignment for this fiber attribute " << instance << " */";
+      if (include_comments) {
+        o << "/* did not find any assignment for this fiber attribute " << instance << " */";
+      }
       return;
     } else {
       fatal_error("crashed since non-fiber instance is missing an assignment");
