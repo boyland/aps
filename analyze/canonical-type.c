@@ -301,7 +301,7 @@ Declaration canonical_type_decl(CanonicalType *canonical_type)
     return canonical_qual_use_type->decl;
   }
   default:
-    aps_error(canonical_type, "Failed to find the decl for CanonicalType");
+    aps_error(canonical_type, "Failed to find the decl for CanonicalType key:%d", canonical_type->key);
     return NULL;
   }
 }

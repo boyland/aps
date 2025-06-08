@@ -23,6 +23,8 @@ typedef struct attribute_instance {
   int index;
 } INSTANCE;
 
+extern BOOL instance_equal(INSTANCE*, INSTANCE*);
+
 enum instance_direction {instance_local, instance_inward, instance_outward};
 enum instance_direction fibered_attr_direction(FIBERED_ATTRIBUTE *fa);
 enum instance_direction instance_direction(INSTANCE *);

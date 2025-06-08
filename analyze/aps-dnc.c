@@ -14,6 +14,9 @@ int analysis_debug = 0;
 
 
 /*** FUNCTIONS FOR INSTANCES */
+BOOL instance_equal(INSTANCE *in1, INSTANCE *in2) {
+  return in1->node == in2->node && fibered_attr_equal(&in1->fibered_attr, &in2->fibered_attr);
+}
 
 BOOL fibered_attr_equal(FIBERED_ATTRIBUTE *fa1, FIBERED_ATTRIBUTE *fa2) {
   return fa1->attr == fa2->attr && fa1->fiber == fa2->fiber;
@@ -881,6 +884,7 @@ static void *get_instances(void *vaug_graph, void *node) {
 			      nil_Expressions());
 	  Expression_info(e)->funcall_proxy = proxy;
 	  Declaration_info(proxy)->instance_index = index;
+	  Declaration_info(proxy)->proxy_fdecl = fdecl;
 	  Declaration_info(proxy)->node_phy_graph = 
 	    summary_graph_for(s,fdecl);
 	  Declaration_info(proxy)->decl_flags |= DECL_RHS_FLAG;
@@ -1740,7 +1744,9 @@ PHY_GRAPH* summary_graph_for(STATE *state, Declaration pdecl)
 {
   int i;
   for (i=0; i < state->phyla.length; ++i) {
-    if (state->phyla.array[i] == pdecl) {
+    Declaration amir = state->phyla.array[i];
+    // printf("Looking at %s (%d)\n",decl_name(amir), Declaration_KEY(amir));
+    if (amir == pdecl) {
       return &state->phy_graphs[i];
     }
   }
@@ -2893,6 +2899,7 @@ void print_dep_vertex(VERTEX *v, FILE *stream)
  
 void print_instance(INSTANCE *i, FILE *stream) {
   if (stream == 0) stream = stdout;
+  fprintf(stream,"[%d]", i->index);
   if (i->node != NULL) {
     if (ABSTRACT_APS_tnode_phylum(i->node) != KEYDeclaration) {
       fprintf(stream,"%d:?<%d>",tnode_line_number(i->node),
