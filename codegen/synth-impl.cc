@@ -809,7 +809,7 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
     } else {
       os << indent() << instance_to_attr(synth_functions_state->source)
          << ".checkNode(node).status match {\n";
-      os << indent(nesting_level + 1) << "case Evaluation.EVALUATED | Evaluation.ASSIGNED => ";
+      os << indent(nesting_level + 1) << "case Evaluation.ASSIGNED => ";
       os << "return " << instance_to_attr(synth_functions_state->source) << ".get(node)\n";
     }
 
@@ -866,6 +866,7 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
       os << indent() << "evaluated_map_" << synth_functions_state->fdecl_name << ".update(node, true);\n";
     } else {
       os << indent() << instance_to_attr(synth_functions_state->source) << ".assign(node, result);\n";
+      os << indent() << instance_to_attr(synth_functions_state->source) << ".get(node);\n";
       os << indent() << "result\n";
     }
     nesting_level--;
@@ -1256,12 +1257,7 @@ void dump_rhs_instance_helper(AUG_GRAPH* aug_graph, BlockItem* item, INSTANCE* i
     if (!relevant_assignments.empty()) {
       for (auto it = relevant_assignments.begin(); it != relevant_assignments.end(); it++) {
         Expression rhs = *it;
-        // Declaration assign = (Declaration)tnode_parent(rhs);
-        // Expression lhs = assign_lhs(assign);
-        bool is_global_attribute =
-           ATTR_DECL_IS_SHARED_INFO(instance->fibered_attr.attr) && instance->fibered_attr.fiber != NULL;
-
-        if (instance->fibered_attr.fiber != NULL || is_global_attribute) {
+        if (instance->fibered_attr.fiber != NULL) {
           dump_assignment(instance, rhs, o);
         } else {
           // just dump RHS since synth functions are only interested in RHS, not side-effect
