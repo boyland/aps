@@ -1744,9 +1744,7 @@ PHY_GRAPH* summary_graph_for(STATE *state, Declaration pdecl)
 {
   int i;
   for (i=0; i < state->phyla.length; ++i) {
-    Declaration amir = state->phyla.array[i];
-    // printf("Looking at %s (%d)\n",decl_name(amir), Declaration_KEY(amir));
-    if (amir == pdecl) {
+    if (state->phyla.array[i] == pdecl) {
       return &state->phy_graphs[i];
     }
   }
