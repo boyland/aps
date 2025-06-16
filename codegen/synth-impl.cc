@@ -674,19 +674,28 @@ auto dump_fiber_attribute_assignment(INSTANCE* instance, string node, Callable f
   return result;
 }
 
-static void dump_fiber_dependencies_recursively_helper(AUG_GRAPH* aug_graph, vector<INSTANCE*> relevant_instances, bool* scheduled, ostream& os) {
+static void dump_fiber_dependencies_recursively_helper(
+  AUG_GRAPH* aug_graph,
+  vector<INSTANCE*> relevant_instances,
+  int count_relevant_instances,
+  bool* scheduled,
+  int& count_scheduled,
+  ostream& os) {
+
   int i;
   int n = aug_graph->instances.length;
 
+  if (count_scheduled == count_relevant_instances) {
+    return;
+  }
+
   for (auto it1 = relevant_instances.begin(); it1 != relevant_instances.end(); it1++) {
     INSTANCE* in = *it1;
-
     if (scheduled[in->index]) {
       continue;
     }
 
     bool dependency_ready = true;
-
     for (auto it2 = relevant_instances.begin(); it2 != relevant_instances.end(); it2++) {
       INSTANCE* dependency_instance = *it2;
 
@@ -705,7 +714,13 @@ static void dump_fiber_dependencies_recursively_helper(AUG_GRAPH* aug_graph, vec
     os << indent();
     impl->dump_synth_instance(in, os);
     os << "\n";
-    dump_fiber_dependencies_recursively_helper(aug_graph, relevant_instances, scheduled, os);
+    count_scheduled++;
+    dump_fiber_dependencies_recursively_helper(aug_graph, relevant_instances, count_relevant_instances, scheduled, count_scheduled, os);
+  }
+
+  if (count_scheduled != count_relevant_instances) {
+    fatal_error("failed to find next dependency to schedule count_scheduled: %d, count_relevant_instances: %d", count_scheduled, count_relevant_instances);
+    return;
   }
 }
 
@@ -713,6 +728,7 @@ static void dump_fiber_dependencies_recursively(AUG_GRAPH* aug_graph, INSTANCE* 
   int i;
   int n = aug_graph->instances.length;
 
+  int count = 0;
   vector<INSTANCE*> relevant_instances;
 
   for (i = 0; i < n; i++) {
@@ -726,6 +742,7 @@ static void dump_fiber_dependencies_recursively(AUG_GRAPH* aug_graph, INSTANCE* 
       if (in->fibered_attr.fiber != NULL) {
         if (instance_is_synthesized(in) || instance_is_local(in)) {
           relevant_instances.push_back(in);
+          count++;
         }
       }
     }
@@ -734,7 +751,8 @@ static void dump_fiber_dependencies_recursively(AUG_GRAPH* aug_graph, INSTANCE* 
   bool* scheduled = (bool*)alloca(sizeof(bool) * n);
   memset(scheduled, 0, sizeof(bool) * n);
 
-  dump_fiber_dependencies_recursively_helper(aug_graph, relevant_instances, scheduled, os);
+  int count_scheduled = 0;
+  dump_fiber_dependencies_recursively_helper(aug_graph, relevant_instances, count, scheduled, count_scheduled, os);
 }
 
 #ifdef APS2SCALA
