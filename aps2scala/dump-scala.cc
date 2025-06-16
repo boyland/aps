@@ -154,22 +154,22 @@ void dump_scala_Program(Program p,std::ostream&oss)
     case KEYno_unit: break;
     case KEYwith_unit: 
       oss << "import " << program_id((char*)(with_unit_name(u)))
-    << "_implicit._;\n";
+	  << "_implicit._;\n";
       break;
     case KEYdecl_unit: 
       {
-  Declaration d = decl_unit_decl(u);
-  switch (Declaration_KEY(d)) {
-  case KEYmodule_decl:
-    dump_scala_Declaration_header(d,oss);
-    break;
-  case KEYclass_decl:
-  case KEYpolymorphic:
-    break;
-  default:
-    dump_scala_Declaration(d,oss);
-    break;
-  }
+	Declaration d = decl_unit_decl(u);
+	switch (Declaration_KEY(d)) {
+	case KEYmodule_decl:
+	  dump_scala_Declaration_header(d,oss);
+	  break;
+	case KEYclass_decl:
+	case KEYpolymorphic:
+	  break;
+	default:
+	  dump_scala_Declaration(d,oss);
+	  break;
+	}
       }
     }
   }
@@ -183,21 +183,21 @@ void dump_scala_Program(Program p,std::ostream&oss)
     case KEYno_unit: break;
     case KEYwith_unit:
       oss << "import " << program_id((char*)with_unit_name(u))
-    << "_implicit._;\n";
+	  << "_implicit._;\n";
       break;
     case KEYdecl_unit: 
       {
-  Declaration d = decl_unit_decl(u);
-  switch (Declaration_KEY(d)) {
-  case KEYclass_decl:
-  case KEYmodule_decl:
-  case KEYpolymorphic:
-    dump_scala_Declaration(d,oss);
-    break;
-  default:
-    // already dumped
-    break;
-  }
+	Declaration d = decl_unit_decl(u);
+	switch (Declaration_KEY(d)) {
+	case KEYclass_decl:
+	case KEYmodule_decl:
+	case KEYpolymorphic:
+	  dump_scala_Declaration(d,oss);
+	  break;
+	default:
+	  // already dumped
+	  break;
+	}
       }
     }
   }
@@ -392,16 +392,16 @@ void dump_Pattern(Pattern p, ostream& os)
       string n = symbol_name(def_name(formal_def(f)));
       if (n == "_") os << "v_" << std::to_string(formal_count);
       else {
-  os << "v_" << n;
-  // Generating a type causes Scala to warn about erasure
-  // because typing has a pattern matching effect that cannot be
-  // implemented.  In our case, because APS doesn't have subtyping,
-  // the type inferred by the Scala compiler should always be correct.
-  /*
-  if (Pattern_info(p)->pat_type != 0) {
-    os << ":" << Pattern_info(p)->pat_type;
-  }
-  */
+	os << "v_" << n;
+	// Generating a type causes Scala to warn about erasure
+	// because typing has a pattern matching effect that cannot be
+	// implemented.  In our case, because APS doesn't have subtyping,
+	// the type inferred by the Scala compiler should always be correct.
+	/*
+	if (Pattern_info(p)->pat_type != 0) {
+	  os << ":" << Pattern_info(p)->pat_type;
+	}
+	*/
       }
     }
     break;
@@ -423,14 +423,14 @@ bool type_is_syntax(Type t)
       switch (Declaration_KEY(d)) {
       case KEYphylum_formal:
       case KEYphylum_decl:
-  return true;
+	return true;
       case KEYtype_formal:
       case KEYtype_decl:
-  return false;
+	return false;
       case KEYtype_renaming:
-  return type_is_syntax(type_renaming_old(d));
+	return type_is_syntax(type_renaming_old(d));
       default:
-  aps_error(d,"What sort of type_decl is this?");
+	aps_error(d,"What sort of type_decl is this?");
       }
     }
   case KEYtype_inst:
@@ -438,22 +438,22 @@ bool type_is_syntax(Type t)
       Module m = type_inst_module(t);
       switch (Module_KEY(m)) {
       default:
-  aps_error(m,"What sort of module is this?");
+	aps_error(m,"What sort of module is this?");
       case KEYmodule_use: 
-  {
-    Declaration d = USE_DECL(module_use_use(m));
-    switch (Declaration_KEY(d)) {
-    default:
-      aps_error(m,"What sort of module is this?");
-    case KEYmodule_decl:
-      switch (Declaration_KEY(module_decl_result_type(d))) {
-      default:
-        aps_error(m,"What sort of result decl does this module have?");
-      case KEYtype_decl: return false;
-      case KEYphylum_decl: return true;
-      }
-    }
-  }
+	{
+	  Declaration d = USE_DECL(module_use_use(m));
+	  switch (Declaration_KEY(d)) {
+	  default:
+	    aps_error(m,"What sort of module is this?");
+	  case KEYmodule_decl:
+	    switch (Declaration_KEY(module_decl_result_type(d))) {
+	    default:
+	      aps_error(m,"What sort of result decl does this module have?");
+	    case KEYtype_decl: return false;
+	    case KEYphylum_decl: return true;
+	    }
+	  }
+	}
       }
     }
   }
@@ -471,9 +471,9 @@ static Declaration find_basic_decl(string name)
     default: break;
     case KEYdecl_unit:
       {
-  Declaration d = decl_unit_decl(u);
-  if (decl_namespaces(d) > 0 && name == decl_name(d))
-    return d;
+	Declaration d = decl_unit_decl(u);
+	if (decl_namespaces(d) > 0 && name == decl_name(d))
+	  return d;
       }
       break;
     }
@@ -518,7 +518,7 @@ const char* decl_code_name(Declaration decl)
 void dump_Signature_service_transfers(ServiceRecord&,string,Signature,ostream&);
 void dump_Type_service_transfers(ServiceRecord&,string,bool,Type,ostream&);
 void dump_Class_service_transfers(ServiceRecord& sr, string from,
-          Declaration cd, ostream& oss)
+				  Declaration cd, ostream& oss)
 {
   // cout << "transfering services from " << from << " :: " << decl_name(cd) << endl;
   dump_Signature_service_transfers(sr,from,some_class_decl_parent(cd),oss);
@@ -527,7 +527,7 @@ void dump_Class_service_transfers(ServiceRecord& sr, string from,
       Declaration rdecl = module_decl_result_type(cd);
       bool is_phylum = Declaration_KEY(rdecl) == KEYphylum_decl;
       dump_Type_service_transfers(sr,from,is_phylum,
-          some_type_decl_type(rdecl),oss);
+				  some_type_decl_type(rdecl),oss);
     }
   }
   Declarations ds = block_body(some_class_decl_contents(cd));
@@ -539,32 +539,32 @@ void dump_Class_service_transfers(ServiceRecord& sr, string from,
       default: break;
       case KEYpattern_decl:
       case KEYconstructor_decl:
-  oss << indent() << "val p_" << n
-      << " = " << from << ".p_" << n << ";\n";
-  if (Declaration_KEY(d) == KEYpattern_decl) break;
-  /* fall through */
+	oss << indent() << "val p_" << n
+	    << " = " << from << ".p_" << n << ";\n";
+	if (Declaration_KEY(d) == KEYpattern_decl) break;
+	/* fall through */
       case KEYvalue_decl:
       case KEYvalue_renaming:
       case KEYfunction_decl:
       case KEYattribute_decl:
-  oss << indent() << "val v_" << n
-      << " = " << from << ".v_" << n << ";\n";
-  break;
+	oss << indent() << "val v_" << n
+	    << " = " << from << ".v_" << n << ";\n";
+	break;
       case KEYtype_decl:
       case KEYphylum_decl:
       case KEYtype_renaming:
-  oss << indent() << "type T_" << n
-      << " = " << from << ".T_" << n << ";\n";
-  oss << indent() << "val t_" << n
-      << " = " << from << ".t_" << n << ";\n";	
-  break;
+	oss << indent() << "type T_" << n
+	    << " = " << from << ".T_" << n << ";\n";
+	oss << indent() << "val t_" << n
+	    << " = " << from << ".t_" << n << ";\n";	
+	break;
       }
     }
   }
 }
 
 void dump_Signature_service_transfers(ServiceRecord& sr, string from,
-              Signature s, ostream& oss)
+				      Signature s, ostream& oss)
 {
   switch (Signature_KEY(s)) {
   case KEYno_sig:
@@ -575,16 +575,16 @@ void dump_Signature_service_transfers(ServiceRecord& sr, string from,
       Declaration d = USE_DECL(u);
       switch (Declaration_KEY(d)) {
       case KEYsignature_decl:
-  dump_Signature_service_transfers(sr,from,
-           sig_subst(u,signature_decl_sig(d)),
-           oss);
-  break;
+	dump_Signature_service_transfers(sr,from,
+					 sig_subst(u,signature_decl_sig(d)),
+					 oss);
+	break;
       case KEYsignature_renaming:
-  s = signature_renaming_old(d);
-  dump_Signature_service_transfers(sr,from,sig_subst(u,s),oss);
+	s = signature_renaming_old(d);
+	dump_Signature_service_transfers(sr,from,sig_subst(u,s),oss);
       default:
-  // There shouldn't be any other possibilities
-  aps_error(d,"unexpected signature decl");
+	// There shouldn't be any other possibilities
+	aps_error(d,"unexpected signature decl");
       }
     }
     break;
@@ -603,9 +603,9 @@ void dump_Signature_service_transfers(ServiceRecord& sr, string from,
 }
 
 void dump_Type_service_transfers(ServiceRecord& sr,
-         string from,
-         bool is_phylum,
-         Type ty, ostream& oss)
+				 string from,
+				 bool is_phylum,
+				 Type ty, ostream& oss)
 {
   // cout << "transfer from " << from << " as " << ty << endl;
   switch (Type_KEY(ty)) {
@@ -630,8 +630,8 @@ void dump_Type_service_transfers(ServiceRecord& sr,
       Module m = type_inst_module(ty);
       switch (Module_KEY(m)) {
       case KEYmodule_use:
-  dump_Class_service_transfers(sr,from,USE_DECL(module_use_use(m)),oss);
-  break;
+	dump_Class_service_transfers(sr,from,USE_DECL(module_use_use(m)),oss);
+	break;
       }
       /*
       // if the extended type is one of the parameters, recurse through it
@@ -639,11 +639,11 @@ void dump_Type_service_transfers(ServiceRecord& sr,
       //cout << "base type: " << bt << endl;
       TypeActuals tas = type_inst_type_actuals(ty);
       for (Type ta = first_TypeActual(tas); ta; ta = TYPE_NEXT(ta)) {
-  //cout << "  actual: " << ta << endl;
-  if (ta == bt) {
-    //cout << "    found match!" << endl;
-    dump_Type_service_transfers(sr,from,is_phylum,ta,oss);
-  }
+	//cout << "  actual: " << ta << endl;
+	if (ta == bt) {
+	  //cout << "    found match!" << endl;
+	  dump_Type_service_transfers(sr,from,is_phylum,ta,oss);
+	}
       }
       */
     }
@@ -656,28 +656,28 @@ void dump_Type_service_transfers(ServiceRecord& sr,
       string name = string("t_") + decl_name(td);
       switch (Declaration_KEY(td)) {
       case KEYtype_decl:
-  as = type_subst(u,type_decl_type(td));
-  dump_Type_service_transfers(sr,name,false,as,oss);
-  break;
+	as = type_subst(u,type_decl_type(td));
+	dump_Type_service_transfers(sr,name,false,as,oss);
+	break;
       case KEYphylum_decl:
-  as = type_subst(u,phylum_decl_type(td));
-  dump_Type_service_transfers(sr,name,true,as,oss);
-  break;
+	as = type_subst(u,phylum_decl_type(td));
+	dump_Type_service_transfers(sr,name,true,as,oss);
+	break;
       case KEYphylum_formal:
-  is_phylum = true;
-  // fall through
+	is_phylum = true;
+	// fall through
       case KEYtype_formal:
-  {
-    Signature sig = sig_subst(u,some_type_formal_sig(td));
-    dump_Signature_service_transfers(sr,name,sig,oss);
-  }
-  break;
+	{
+	  Signature sig = sig_subst(u,some_type_formal_sig(td));
+	  dump_Signature_service_transfers(sr,name,sig,oss);
+	}
+	break;
       case KEYtype_renaming:
-  dump_Type_service_transfers(sr,name,is_phylum,
-            type_subst(u,type_renaming_old(td)),oss);
-  break;
+	dump_Type_service_transfers(sr,name,is_phylum,
+				    type_subst(u,type_renaming_old(td)),oss);
+	break;
       default:
-  aps_error(td,"What sort of type decl to get services from ?");
+	aps_error(td,"What sort of type decl to get services from ?");
       }
     }
     break;
@@ -685,11 +685,11 @@ void dump_Type_service_transfers(ServiceRecord& sr,
 }
 
 void dump_some_attribute(Declaration d, string i,
-       Type nt, Type vt,
-       Direction dir,
-       Default deft,
-       Implementation::ModuleInfo *info,
-       ostream& oss)
+			 Type nt, Type vt,
+			 Direction dir,
+			 Default deft,
+			 Implementation::ModuleInfo *info,
+			 ostream& oss)
 {
   const char *name = decl_name(d);
   bool is_col = direction_is_collection(dir);
@@ -731,35 +731,35 @@ void dump_some_attribute(Declaration d, string i,
   case KEYno_default:
     if (is_col) {
       oss << indent() << "override def initial : " << vt << " = " 
-    << as_val(vt) << ".v_initial;\n";
+	  << as_val(vt) << ".v_initial;\n";
       oss << indent() << "override def combine(v1 : " << vt
-    << ", v2 : " << vt << ") = " 
-    << as_val(vt) << ".v_combine(v1,v2);\n";
+	  << ", v2 : " << vt << ") = " 
+	  << as_val(vt) << ".v_combine(v1,v2);\n";
     }
     break;
   case KEYsimple:
     if (i == "") {
       //TODO: bind the formal parameter to anchor
       oss << indent() << "override def getDefault = "
-    << simple_value(deft) << ";\n";
+	  << simple_value(deft) << ";\n";
     }
     if (is_col) {
       oss << indent() << "override def combine(v1 : " << vt
-    << ", v2 : " << vt << ") = " 
-    << as_val(vt) << ".v_combine(v1,v2);\n";
+	  << ", v2 : " << vt << ") = " 
+	  << as_val(vt) << ".v_combine(v1,v2);\n";
     }
     break;
   case KEYcomposite:
     oss << indent() << "override def initial : " << vt << " = "
-  << composite_initial(deft) << ";\n";
+	<< composite_initial(deft) << ";\n";
     oss << indent() << "override def combine(v1 : " << vt
-  << ", v2 : " << vt << ") = ";
+	<< ", v2 : " << vt << ") = ";
     oss << composite_combiner(deft) << "(v1,v2);\n";
   }
 
   if (is_cir) {
     oss << indent() << "def lattice() : C_LATTICE[" << vt << "] = "
-  << as_val(vt) << ";\n" << std::endl;
+	<< as_val(vt) << ";\n" << std::endl;
   }
 
   if (Declaration_KEY(d) == KEYvalue_decl) {
@@ -776,17 +776,17 @@ void dump_some_attribute(Declaration d, string i,
 
   if (nt == 0) {
     oss << indent() << "private object a_" << name
-  << " extends E_" << name << "(null) {}\n";
+	<< " extends E_" << name << "(null) {}\n";
   } else {
     oss << indent() << "private object a" << i << "_" << name
-  << " extends Attribute" << tmps.str() 
-  << "(" << as_val(nt) << "," << as_val(vt) << ",\"" << name << "\")"
-  << " {\n";
+	<< " extends Attribute" << tmps.str() 
+	<< "(" << as_val(nt) << "," << as_val(vt) << ",\"" << name << "\")"
+	<< " {\n";
     ++nesting_level;
     
     oss << indent()
-  << "override def createEvaluation(anchor : " << nt << ") : Evaluation"
-  << tmps.str() << " = new E" << i << "_" << name << "(anchor);\n";
+	<< "override def createEvaluation(anchor : " << nt << ") : Evaluation"
+	<< tmps.str() << " = new E" << i << "_" << name << "(anchor);\n";
 
     --nesting_level;
     oss << indent() << "}\n";
@@ -795,7 +795,7 @@ void dump_some_attribute(Declaration d, string i,
 }
   
 void dump_local_attributes(Block b, Type at, Implementation::ModuleInfo* info,
-         ostream& oss)
+			   ostream& oss)
 {
   for (Declaration d = first_Declaration(block_body(b)); d; d=DECL_NEXT(d)) {
     switch (Declaration_KEY(d)) {
@@ -810,9 +810,9 @@ void dump_local_attributes(Block b, Type at, Implementation::ModuleInfo* info,
         LOCAL_UNIQUE_PREFIX(d) = ++unique;
         std::ostringstream ns;
         ns << unique;
-  dump_some_attribute(d,ns.str(),at,value_decl_type(d),
-          value_decl_direction(d),
-          value_decl_default(d),info,oss);
+	dump_some_attribute(d,ns.str(),at,value_decl_type(d),
+			    value_decl_direction(d),
+			    value_decl_default(d),info,oss);
       }
       break;
     case KEYassign:
@@ -826,11 +826,11 @@ void dump_local_attributes(Block b, Type at, Implementation::ModuleInfo* info,
       break;
     case KEYcase_stmt:
       {
-  FOR_SEQUENCE
-    (Match,m,Matches,case_stmt_matchers(d),
-     dump_local_attributes(matcher_body(m),at,info,oss));
+	FOR_SEQUENCE
+	  (Match,m,Matches,case_stmt_matchers(d),
+	   dump_local_attributes(matcher_body(m),at,info,oss));
 
-  dump_local_attributes(case_stmt_default(d),at,info,oss);
+	dump_local_attributes(case_stmt_default(d),at,info,oss);
       }
       break;
     }
@@ -1034,8 +1034,8 @@ void dump_some_class_decl(Declaration decl, ostream& oss)
     {
       Declaration rdecl = module_decl_result_type(decl);
       oss << "C_"
-    << ((Declaration_KEY(rdecl) == KEYphylum_decl) ? "PHYLUM" : "TYPE")
-    << "[T_Result]";
+	  << ((Declaration_KEY(rdecl) == KEYphylum_decl) ? "PHYLUM" : "TYPE")
+	  << "[T_Result]";
       dump_Type_Signature(some_type_decl_type(rdecl),string("T_Result"),oss);
     }
     break;
@@ -1056,26 +1056,26 @@ void dump_some_class_decl(Declaration decl, ostream& oss)
       /*FALLTHROUGH*/
     case KEYtype_decl:
       oss << indent() << "type T_" << n << (is_phylum ? " <: Node" : "")
-    << ";\n";
+	  << ";\n";
       oss << indent() << "val t_" << n << " : C_"
-    << (is_phylum ? "PHYLUM" : "TYPE")
-    << "[T_" << n << "]";
+	  << (is_phylum ? "PHYLUM" : "TYPE")
+	  << "[T_" << n << "]";
       dump_Type_Signature(some_type_decl_type(d),string("T_") + n,oss);
       oss << ";\n";
       break;
     case KEYtype_renaming:
       is_phylum = type_is_phylum(type_renaming_old(d));
       oss << indent() << "type T_" << n << " = "
-    << type_renaming_old(d) << ";\n";
+	  << type_renaming_old(d) << ";\n";
       oss << indent() << "val t_" << n << " : C_"
-    << (is_phylum ? "PHYLUM" : "TYPE")
-    << "[T_" << n << "]";
+	  << (is_phylum ? "PHYLUM" : "TYPE")
+	  << "[T_" << n << "]";
       dump_Type_Signature(type_renaming_old(d),string("T_") + n,oss);
       oss << ";\n";
       break;
     case KEYvalue_renaming:
       oss << indent() << "def v_" << n << " : "
-    << infer_expr_type(value_renaming_old(d)) << ";\n";
+	  << infer_expr_type(value_renaming_old(d)) << ";\n";
       break;
     case KEYconstructor_decl:
       dump_pattern_prototype(n,constructor_decl_type(d),oss);
@@ -1083,12 +1083,12 @@ void dump_some_class_decl(Declaration decl, ostream& oss)
       /* FALL THROUGH */
     case KEYvalue_decl:
       oss << indent() << "def v_" << n << " : " 
-    << some_value_decl_type(d) << ";\n";
+	  << some_value_decl_type(d) << ";\n";
       break;
     case KEYattribute_decl:
     case KEYfunction_decl:
       oss << indent() << "val v_" << n << " : " 
-    << some_value_decl_type(d) << ";\n";
+	  << some_value_decl_type(d) << ";\n";
       break;
     case KEYpattern_decl:
       dump_pattern_prototype(n,pattern_decl_type(d),oss);
@@ -1122,8 +1122,8 @@ static Type hack_type_subst(Use u, Type t)
       TypeActuals tas = type_inst_type_actuals(t);
       TypeActuals ntas = nil_TypeActuals();
       for (Type ta = first_TypeActual(tas); ta; ta=TYPE_NEXT(ta)) {
-  Type nta = hack_type_subst(u,ta);
-  ntas = append_TypeActuals(ntas,list_TypeActuals(nta));
+	Type nta = hack_type_subst(u,ta);
+	ntas = append_TypeActuals(ntas,list_TypeActuals(nta));
       }
       return type_inst(type_inst_module(t),ntas,type_inst_actuals(t));
     }
@@ -1192,9 +1192,9 @@ static string type_inst_as_scala_type(Type ty)
       oss << "T_" << decl_name(m);
       bool started = false;
       for (Type ta = first_TypeActual(tas); ta; ta = TYPE_NEXT(ta)) {
-  if (started) oss << ",";
-  else { started = true; oss << "["; }
-  oss << ta;
+	if (started) oss << ",";
+	else { started = true; oss << "["; }
+	oss << ta;
       }
       if (started) oss << "]";
       return oss.str();
@@ -1218,9 +1218,9 @@ static string type_inst_as_scala_type(Type ty)
       rut = type_subst(u,first_TypeActual(type_inst_type_actuals(rut)));
       // type_debug = false;
       if (Type_KEY(rut) != KEYtype_inst) {
-  ostringstream oss;
-  oss << rut;
-  return oss.str();
+	ostringstream oss;
+	oss << rut;
+	return oss.str();
       }
     }
     // return type_inst_as_scala_type(rut); (wrong scope)
@@ -1242,10 +1242,10 @@ static void dump_type_inst(string n, string nameArg, Declaration decl, Type ti, 
     default: break;
     case KEYtype_inst: 
       {
-  std::ostringstream ss;
-  ss << n << ++u;
-  dump_type_inst(ss.str(),nameArg+"+\"$\"+"+ss.str(),decl, ta,oss);
-  break;
+	std::ostringstream ss;
+	ss << n << ++u;
+	dump_type_inst(ss.str(),nameArg+"+\"$\"+"+ss.str(),decl, ta,oss);
+	break;
       }
     }
   }
@@ -1273,8 +1273,8 @@ static void dump_type_inst(string n, string nameArg, Declaration decl, Type ti, 
       break;
     case KEYtype_inst: 
       {
-  oss << "T_" << n << u;
-  break;
+	oss << "T_" << n << u;
+	break;
       }
     }
   }
@@ -1289,8 +1289,8 @@ static void dump_type_inst(string n, string nameArg, Declaration decl, Type ti, 
       break;
     case KEYtype_inst: 
       {
-  oss << "t_" << n << u;
-  break;
+	oss << "t_" << n << u;
+	break;
       }
     }
   }
@@ -1327,11 +1327,11 @@ static void dump_new_phylum(string n, string nameArg, bool isStart, ostream& oss
 }
 
 static void dump_scala_pattern_function(
-  Declaration decl, 
-  bool is_syntax,
-  Type ft,
-  Pattern body, 
-  ostream& oss)
+	Declaration decl, 
+	bool is_syntax,
+	Type ft,
+	Pattern body, 
+	ostream& oss)
 {
   string name = decl_name(decl);
   Formals formals = function_type_formals(ft);
@@ -1368,22 +1368,22 @@ static void dump_scala_pattern_function(
     case KEYno_pattern: break;
     case KEYchoice_pattern:
       {
-  Patterns choices = choice_pattern_choices(body);
-  for (Pattern p = first_Pattern(choices); p; p=PAT_NEXT(p)) {
-    oss << indent() << "  x@case ";// probably won't type check
-    dump_Pattern(p,oss); // should get x from here?
-    oss << " => Some(" << uargs << ");\n";
-  }
+	Patterns choices = choice_pattern_choices(body);
+	for (Pattern p = first_Pattern(choices); p; p=PAT_NEXT(p)) {
+	  oss << indent() << "  x@case ";// probably won't type check
+	  dump_Pattern(p,oss); // should get x from here?
+	  oss << " => Some(" << uargs << ");\n";
+	}
       }
       break;
     default:
       oss << indent() << "  case " << body
-    << " => Some(" << uargs << ");\n";
+	  << " => Some(" << uargs << ");\n";
       break;
     }
   } else {
     oss << indent() << "  case x@c_" << name << args
-  << " => Some(" << uargs << ");\n";
+	<< " => Some(" << uargs << ");\n";
   }
   oss << indent() << "  case _ => None };\n";
   
@@ -1413,42 +1413,42 @@ void dump_scala_Declaration_header(Declaration decl, ostream& oss)
       const char *impl_type = 0;
 
       for (int i=0; i < omitted_number; ++i)
-  if (streq(omitted[i],name)) return;
+	if (streq(omitted[i],name)) return;
 
       for (int j=0; j < impl_number; ++j)
-  if (streq(impl_types[j],name)) impl_type = impl_types[j+1];
+	if (streq(impl_types[j],name)) impl_type = impl_types[j+1];
 
       Type rut = some_type_decl_type(rdecl);
 
       // peel away remote/private (irrelevant in the Scala)
       while (Type_KEY(rut) == KEYprivate_type)
-  rut = private_type_rep(rut);
+	rut = private_type_rep(rut);
       while (Type_KEY(rut) == KEYremote_type)
-  rut = remote_type_nodetype(rut);
+	rut = remote_type_nodetype(rut);
       
       switch (Type_KEY(rut)) {
       case KEYno_type: break;
       default:
-  oss << "type T_" << name;
-  bool started = false;
-  for (Declaration tf = first_Declaration(tfs); tf; tf=DECL_NEXT(tf)) {
-    if (started) oss << ",";
-    else { started = true; oss << "["; }
-    oss << "T_" << decl_name(tf);
-  }
-  if (started) oss << "]";
-  if (impl_type) {
-    oss << " = " << impl_type << ";\n";
-  } else {
-    oss << " = " << rut << ";\n";
-  }
+	oss << "type T_" << name;
+	bool started = false;
+	for (Declaration tf = first_Declaration(tfs); tf; tf=DECL_NEXT(tf)) {
+	  if (started) oss << ",";
+	  else { started = true; oss << "["; }
+	  oss << "T_" << decl_name(tf);
+	}
+	if (started) oss << "]";
+	if (impl_type) {
+	  oss << " = " << impl_type << ";\n";
+	} else {
+	  oss << " = " << rut << ";\n";
+	}
       }
     }
     break;
   }
 }
 
-void dump_scala_Declaration(Declaration decl, ostream& oss)
+void dump_scala_Declaration(Declaration decl,ostream& oss)
 {
   const char *name = 0;
   switch (Declaration_KEY(decl)) {
@@ -1480,7 +1480,7 @@ void dump_scala_Declaration(Declaration decl, ostream& oss)
       const char *impl_type = 0;
 
       for (int j=0; j < impl_number; ++j)
-  if (streq(impl_types[j],name)) impl_type = impl_types[j+1];
+	if (streq(impl_types[j],name)) impl_type = impl_types[j+1];
       if (impl_type) first_decl = first_Declaration(body);
       
       dump_some_class_decl(decl,oss);
@@ -1490,116 +1490,116 @@ void dump_scala_Declaration(Declaration decl, ostream& oss)
       Type rut = some_type_decl_type(rdecl);
       // peel away remote/private (irrelevant in the Scala)
       while (Type_KEY(rut) == KEYprivate_type)
-  rut = private_type_rep(rut);
+	rut = private_type_rep(rut);
       while (Type_KEY(rut) == KEYremote_type)
-  rut = remote_type_nodetype(rut);
+	rut = remote_type_nodetype(rut);
 
       string result_type;
       string result_typeval;
       
       if (impl_type) {
-  result_type = impl_type;
+	result_type = impl_type;
       } else {
-  switch (Type_KEY(rut)) {
-  default: break;
-  case KEYtype_use:
-    {
-      std::ostringstream results;
-      results << rut;
-      result_type = results.str();
-      std::ostringstream resultvals;
-      resultvals << as_val(rut);
-      result_typeval = resultvals.str();
+	switch (Type_KEY(rut)) {
+	default: break;
+	case KEYtype_use:
+	  {
+	    std::ostringstream results;
+	    results << rut;
+	    result_type = results.str();
+	    std::ostringstream resultvals;
+	    resultvals << as_val(rut);
+	    result_typeval = resultvals.str();
 
-      // cout << "result = " << result_type << ", result_val = " << result_typeval << endl;
-    }
-    break;
-  case KEYno_type:	  
-    {
-      std::ostringstream results;
-      results << "T_" << name;
-      bool started = false;
-      for (Declaration tf = first_Declaration(tfs); tf; tf=DECL_NEXT(tf)) {
-        if (started) results << ",";
-        else { started = true; results << "["; }
-        results << "T_" << decl_name(tf);
-      }
-      if (started) results << "]";
-      result_type = results.str();
-      
-      oss << indent() << "abstract class T_" << name;
-      dump_TypeFormals(tfs,oss);
-      oss << "(t : C_" << name << "[" << result_type;
-      for (Declaration tf = first_Declaration(tfs); tf; tf=DECL_NEXT(tf)) {
-        oss << ",T_" << decl_name(tf);
-      }
-      oss << "]) extends " << (rdecl_is_phylum ? "Node" : "Value") 
-    << "(t) { }\n" << std::endl;
+	    // cout << "result = " << result_type << ", result_val = " << result_typeval << endl;
+	  }
+	  break;
+	case KEYno_type:	  
+	  {
+	    std::ostringstream results;
+	    results << "T_" << name;
+	    bool started = false;
+	    for (Declaration tf = first_Declaration(tfs); tf; tf=DECL_NEXT(tf)) {
+	      if (started) results << ",";
+	      else { started = true; results << "["; }
+	      results << "T_" << decl_name(tf);
+	    }
+	    if (started) results << "]";
+	    result_type = results.str();
+	    
+	    oss << indent() << "abstract class T_" << name;
+	    dump_TypeFormals(tfs,oss);
+	    oss << "(t : C_" << name << "[" << result_type;
+	    for (Declaration tf = first_Declaration(tfs); tf; tf=DECL_NEXT(tf)) {
+	      oss << ",T_" << decl_name(tf);
+	    }
+	    oss << "]) extends " << (rdecl_is_phylum ? "Node" : "Value") 
+		<< "(t) { }\n" << std::endl;
 
-    }
-  }
+	  }
+	}
       }
 
       oss << indent() << "class M_" << def_name(some_class_decl_def(decl));
       dump_TypeFormals(tfs,oss);
       oss << "(name : String";
       {
-  for (Declaration tf=first_Declaration(tfs); tf ; tf = DECL_NEXT(tf)) {
-    oss << ",";
-    dump_TypeFormal_value(tf,oss);
-  }
-  Formals vfs = module_decl_value_formals(decl);
-  for (Declaration vf=first_Declaration(vfs); vf; vf = DECL_NEXT(vf)) {
-    oss << ",";
-    dump_formal(vf,oss);
-  }
-  oss << ")\n";
+	for (Declaration tf=first_Declaration(tfs); tf ; tf = DECL_NEXT(tf)) {
+	  oss << ",";
+	  dump_TypeFormal_value(tf,oss);
+	}
+	Formals vfs = module_decl_value_formals(decl);
+	for (Declaration vf=first_Declaration(vfs); vf; vf = DECL_NEXT(vf)) {
+	  oss << ",";
+	  dump_formal(vf,oss);
+	}
+	oss << ")\n";
       }
 
       // define extends
       if (result_typeval != "") {
-  oss << indent() << "  extends Module(name)\n";
+	oss << indent() << "  extends Module(name)\n";
       } else if (result_type != "") {
-  oss << indent() << "  extends I_"
-      << (rdecl_is_phylum ? "PHYLUM" : "TYPE")
-      << "[" << result_type << "](name)\n";
+	oss << indent() << "  extends I_"
+	    << (rdecl_is_phylum ? "PHYLUM" : "TYPE")
+	    << "[" << result_type << "](name)\n";
       } else {
-  switch (Type_KEY(rut)) {
-  default:
-    aps_error(decl,"internal error: extension?");
-    break;
-  case KEYtype_inst:
-    {
-      oss << indent() << "  ";
-      dump_Use(module_use_use(type_inst_module(rut)),"M_",oss);
+	switch (Type_KEY(rut)) {
+	default:
+	  aps_error(decl,"internal error: extension?");
+	  break;
+	case KEYtype_inst:
+	  {
+	    oss << indent() << "  ";
+	    dump_Use(module_use_use(type_inst_module(rut)),"M_",oss);
 
-      bool started = false;
-      TypeActuals tas = type_inst_type_actuals(rut);
-      for (Type ta = first_TypeActual(tas); ta; ta=TYPE_NEXT(ta)) {
-        if (started) oss << ",";
-        else { started = true; oss << "["; }
-        oss << ta;
-      }
-      if (started) oss << "]";
-      oss << "(name";
-      for (Type ta = first_TypeActual(tas); ta; ta=TYPE_NEXT(ta)) {
-        oss << "," << as_val(ta);
-      }
-      Actuals as = type_inst_actuals(rut);
-      for (Expression e = first_Actual(as); e; e = EXPR_NEXT(e)) {
-        oss << "," << e;
-      }
-      oss << ")\n";
+	    bool started = false;
+	    TypeActuals tas = type_inst_type_actuals(rut);
+	    for (Type ta = first_TypeActual(tas); ta; ta=TYPE_NEXT(ta)) {
+	      if (started) oss << ",";
+	      else { started = true; oss << "["; }
+	      oss << ta;
+	    }
+	    if (started) oss << "]";
+	    oss << "(name";
+	    for (Type ta = first_TypeActual(tas); ta; ta=TYPE_NEXT(ta)) {
+	      oss << "," << as_val(ta);
+	    }
+	    Actuals as = type_inst_actuals(rut);
+	    for (Expression e = first_Actual(as); e; e = EXPR_NEXT(e)) {
+	      oss << "," << e;
+	    }
+	    oss << ")\n";
 
-      result_type = type_inst_as_scala_type(rut);
-    }
-  }
+	    result_type = type_inst_as_scala_type(rut);
+	  }
+	}
       }
 
       // define with
       oss << indent() << "  with C_" << name << "[" << result_type;
       for (Declaration tf=first_Declaration(tfs); tf ; tf = DECL_NEXT(tf)) {
-  oss << ",T_" << decl_name(tf);
+	oss << ",T_" << decl_name(tf);
       }
       oss << "]\n";
       oss << indent() << "{\n";
@@ -1617,20 +1617,20 @@ void dump_scala_Declaration(Declaration decl, ostream& oss)
       }
 
       if (result_typeval != "") {
-  oss << indent() << "type T_" << rname << " = "
-      << result_type << ";\n";
-  ServiceRecord sr;
-  // get "inherited" services:
-  // need to get typedefs which don't inherit
-  for (Declaration d = first_decl; d ; d = DECL_NEXT(d)) {
-    sr.add(d);
-  }
-  // cout << "result_val = " << result_typeval << endl;
-  dump_Type_service_transfers(sr,result_typeval,rdecl_is_phylum,rut,oss);
-  if (rdecl_is_phylum) {
-    oss << indent() << "val nodes = " << result_typeval << ".nodes;\n";
-  }
-  oss << std::endl;
+	oss << indent() << "type T_" << rname << " = "
+	    << result_type << ";\n";
+	ServiceRecord sr;
+	// get "inherited" services:
+	// need to get typedefs which don't inherit
+	for (Declaration d = first_decl; d ; d = DECL_NEXT(d)) {
+	  sr.add(d);
+	}
+	// cout << "result_val = " << result_typeval << endl;
+	dump_Type_service_transfers(sr,result_typeval,rdecl_is_phylum,rut,oss);
+	if (rdecl_is_phylum) {
+	  oss << indent() << "val nodes = " << result_typeval << ".nodes;\n";
+	}
+	oss << std::endl;
       }
 
       oss << indent() << "val t_" << rname << " : this.type = this;\n";
@@ -1638,84 +1638,84 @@ void dump_scala_Declaration(Declaration decl, ostream& oss)
       Implementation::ModuleInfo *info = impl->get_module_info(decl);
 
       for (Declaration d = first_decl; d ; d = DECL_NEXT(d)) {
-  string n = decl_code_name(d);
+	string n = decl_code_name(d);
 
-  // dump most declarations:
-  switch (Declaration_KEY(d)) {
-  case KEYtype_renaming:
-    oss << indent() << "val t_" << n << " = "
-        << as_val(type_renaming_old(d)) << ";\n"; 
-    break;
-  default:
-    dump_scala_Declaration(d,oss);
-    break;
-  }
+	// dump most declarations:
+	switch (Declaration_KEY(d)) {
+	case KEYtype_renaming:
+	  oss << indent() << "val t_" << n << " = "
+	      << as_val(type_renaming_old(d)) << ";\n"; 
+	  break;
+	default:
+	  dump_scala_Declaration(d,oss);
+	  break;
+	}
       
-  // now specific to module things:
-  switch (Declaration_KEY(d)) {
-  case KEYtop_level_match:
-    {
-      Match m = top_level_match_m(d);
-      Type anchor_type = infer_pattern_type(matcher_pat(m));
-      Block body = matcher_body(m);
-      dump_local_attributes(body,anchor_type,info,oss);
-    }
-    info->note_top_level_match(d,oss);
-    break;
+	// now specific to module things:
+	switch (Declaration_KEY(d)) {
+	case KEYtop_level_match:
+	  {
+	    Match m = top_level_match_m(d);
+	    Type anchor_type = infer_pattern_type(matcher_pat(m));
+	    Block body = matcher_body(m);
+	    dump_local_attributes(body,anchor_type,info,oss);
+	  }
+	  info->note_top_level_match(d,oss);
+	  break;
 
-  case KEYvalue_decl:
-    if (!def_is_constant(value_decl_def(d))) {
-      Default init = value_decl_default(d);
-      Direction dir = value_decl_direction(d);
-      Type type = value_decl_type(d);
-      dump_some_attribute(d,"",0,
-        value_decl_type(d),
-        value_decl_direction(d),
-        init,info,oss);
-      
-      oss << indent() << "def v_" << n << ":" << type
-    << " = a_" << n << ".get;\n";
-      if (direction_is_input(dir)) {
-        // NB: the a_object handles combination, as appropriate
-        oss << indent() << "def s_" << n << "(value:" << type
-      << ") = " << "a_" << n
-      << ".set(value);\n";
-      }
-      oss << std::endl;
-    }
-    break;
+	case KEYvalue_decl:
+	  if (!def_is_constant(value_decl_def(d))) {
+	    Default init = value_decl_default(d);
+	    Direction dir = value_decl_direction(d);
+	    Type type = value_decl_type(d);
+	    dump_some_attribute(d,"",0,
+				value_decl_type(d),
+				value_decl_direction(d),
+				init,info,oss);
+	    
+	    oss << indent() << "def v_" << n << ":" << type
+		<< " = a_" << n << ".get;\n";
+	    if (direction_is_input(dir)) {
+	      // NB: the a_object handles combination, as appropriate
+	      oss << indent() << "def s_" << n << "(value:" << type
+		  << ") = " << "a_" << n
+		  << ".set(value);\n";
+	    }
+	    oss << std::endl;
+	  }
+	  break;
 
-  case KEYattribute_decl:
-    {
-      Type fty = attribute_decl_type(d);
-      Declaration f = first_Declaration(function_type_formals(fty));
-      Declarations rdecls = function_type_return_values(fty);
-      Declaration rdecl = first_Declaration(rdecls);
+	case KEYattribute_decl:
+	  {
+	    Type fty = attribute_decl_type(d);
+	    Declaration f = first_Declaration(function_type_formals(fty));
+	    Declarations rdecls = function_type_return_values(fty);
+	    Declaration rdecl = first_Declaration(rdecls);
+	    
+	    dump_some_attribute(d,"",infer_formal_type(f),
+				value_decl_type(rdecl),
+				attribute_decl_direction(d),
+				attribute_decl_default(d),info,oss);
+	    
+	    oss << indent() << "val v_" << n << " : "
+		<< infer_formal_type(f) << " => " << value_decl_type(rdecl)
+		<< " = a_" << n << ".get _;\n";
+	    
+	    if (direction_is_input(attribute_decl_direction(d))) {
+	      oss << indent() << "def s_" << n << "(node:"
+		  << infer_formal_type(f)
+		  << ", value:" << value_decl_type(rdecl)
+		  << ") = " << "a_" << n
+		  << ".assign(node,value);\n";
+	    }
+	    oss << std::endl;
       
-      dump_some_attribute(d,"",infer_formal_type(f),
-        value_decl_type(rdecl),
-        attribute_decl_direction(d),
-        attribute_decl_default(d),info,oss);
-      
-      oss << indent() << "val v_" << n << " : "
-    << infer_formal_type(f) << " => " << value_decl_type(rdecl)
-    << " = a_" << n << ".get _;\n";
-      
-      if (direction_is_input(attribute_decl_direction(d))) {
-        oss << indent() << "def s_" << n << "(node:"
-      << infer_formal_type(f)
-      << ", value:" << value_decl_type(rdecl)
-      << ") = " << "a_" << n
-      << ".assign(node,value);\n";
-      }
-      oss << std::endl;
-      
-    }
-    break;
+	  }
+	  break;
 
-  default:
-    break;
-  }
+	default:
+	  break;
+	}
       }
 
       info->implement(oss);
@@ -1733,19 +1733,19 @@ void dump_scala_Declaration(Declaration decl, ostream& oss)
       string qname = string("\"") + name + "\"";
       switch (Type_KEY(type)) {
       case KEYno_type:
-  if (is_phylum) {
-    dump_new_phylum(name,qname,!!DECL_IS_START_PHYLUM(decl),oss);
-  } else {
-    dump_new_type(name,qname,oss);
-  }
-  break;
+	if (is_phylum) {
+	  dump_new_phylum(name,qname,!!DECL_IS_START_PHYLUM(decl),oss);
+	} else {
+	  dump_new_type(name,qname,oss);
+	}
+	break;
       case KEYtype_inst:
-  dump_type_inst(name,qname,decl,type,oss);
-  break;
+	dump_type_inst(name,qname,decl,type,oss);
+	break;
       default:
-  oss << indent() << "type T_" << name << " = " << type << ";\n";
-  oss << indent() << "val t_" << name << " = " << as_val(type) << ";\n";
-  break;
+	oss << indent() << "type T_" << name << " = " << type << ";\n";
+	oss << indent() << "val t_" << name << " = " << as_val(type) << ";\n";
+	break;
       }
     }
     break;
@@ -1761,46 +1761,46 @@ void dump_scala_Declaration(Declaration decl, ostream& oss)
       // const char *base_type_name = decl_name(tdecl);
       switch (Declaration_KEY(tdecl)) {
       case KEYphylum_decl:
-  is_syntax = true;
-  break;
+	is_syntax = true;
+	break;
       case KEYtype_decl:
-  is_syntax = false;
-  break;
+	is_syntax = false;
+	break;
       default:
-  aps_error(decl,"constructor not built on type or phylum");
-  return;
+	aps_error(decl,"constructor not built on type or phylum");
+	return;
       }
 
       // the case class:
       oss << indent() << "case class c_" << name << "(";
       bool started = false;
       for (Declaration f = first_Declaration(formals); f; f = DECL_NEXT(f)) {
-  if (started) oss << ","; else started = true;
-  dump_formal(f,oss);
+	if (started) oss << ","; else started = true;
+	dump_formal(f,oss);
       }
       oss << ") extends " << rt << "(" << as_val(rt) << ") {\n";
       ++nesting_level;
       if (is_syntax) {
-  oss << indent() << "override def children : List[Node] = List(";
-  started = false;
-  for (Declaration f = first_Declaration(formals); f; f = DECL_NEXT(f)) {
-    Type fty = formal_type(f);
-    if (type_is_syntax(fty)) {
-      if (started) oss << ","; else started = true;
-      oss << "v_" << decl_name(f);
-    }
-  }
-  oss << ");\n";
+	oss << indent() << "override def children : List[Node] = List(";
+	started = false;
+	for (Declaration f = first_Declaration(formals); f; f = DECL_NEXT(f)) {
+	  Type fty = formal_type(f);
+	  if (type_is_syntax(fty)) {
+	    if (started) oss << ","; else started = true;
+	    oss << "v_" << decl_name(f);
+	  }
+	}
+	oss << ");\n";
       }
       oss << indent()
-    << "override def toString() : String = Debug.with_level {\n";
+	  << "override def toString() : String = Debug.with_level {\n";
       ++nesting_level;
       oss << indent() << "\"" << name << "(\"";
       started = false;
       for (Declaration f = first_Declaration(formals); f; f = DECL_NEXT(f)) {
-  //TODO: do something different for remote. Type fty = formal_type(f);
-  if (started) oss << " + \",\""; else started = true;
-  oss << "+ v_" << decl_name(f);
+	//TODO: do something different for remote. Type fty = formal_type(f);
+	if (started) oss << " + \",\""; else started = true;
+	oss << "+ v_" << decl_name(f);
       }
       oss << "+ \")\";\n";
       --nesting_level;
@@ -1815,8 +1815,8 @@ void dump_scala_Declaration(Declaration decl, ostream& oss)
       started = false;
       argss << "(";
       for (Declaration f = first_Declaration(formals); f; f = DECL_NEXT(f)) {
-  if (started) argss << ","; else started = true;
-  argss << "v_" << decl_name(f);
+	if (started) argss << ","; else started = true;
+	argss << "v_" << decl_name(f);
       }
       argss << ")";
       string args = argss.str();
@@ -1826,8 +1826,8 @@ void dump_scala_Declaration(Declaration decl, ostream& oss)
       ostringstream typess;
       started = false;
       for (Declaration f = first_Declaration(formals); f; f = DECL_NEXT(f)) {
-  if (started) typess << ","; else { typess << "("; started = true; }
-  typess << infer_formal_type(f);
+	if (started) typess << ","; else { typess << "("; started = true; }
+	typess << infer_formal_type(f);
       }
       if (started) typess << ")";
       string types = started ? typess.str() : "Unit";
@@ -1845,15 +1845,15 @@ void dump_scala_Declaration(Declaration decl, ostream& oss)
       oss << indent() << "def u_" << name << "(x:Any)";
       oss << " : Option[" << utypes << "] = x match {\n";
       oss << indent() << "  case x@c_" << name << args
-    << " => Some(" << uargs << ");\n";
+	  << " => Some(" << uargs << ");\n";
       oss << indent() << "  case _ => None };\n";
 
       // the pattern function
       oss << indent() << "val p_" << name;
       if (types == "Unit") {
-  oss << " = new Pattern0Function[";
+	oss << " = new Pattern0Function[";
       } else {
-  oss << " = new PatternFunction[" << types << ",";
+	oss << " = new PatternFunction[" << types << ",";
       }
       oss << rt << "](u_" << name << ");\n" << endl;
       */
@@ -1867,42 +1867,42 @@ void dump_scala_Declaration(Declaration decl, ostream& oss)
       Direction dir = value_decl_direction(decl);
       Type type = value_decl_type(decl);
       oss << indent() << (direction_is_input(dir) ? "var" : "val")
-    << " v_" << name << ":" << type;
+	  << " v_" << name << ":" << type;
       switch (Default_KEY(init)) {
       case KEYsimple:
-  oss << " = ";
-  dump_Expression(simple_value(init),oss);
-  break;
+	oss << " = ";
+	dump_Expression(simple_value(init),oss);
+	break;
       case KEYcomposite:
-  oss << " = ";
-  dump_Expression(composite_initial(init),oss);
-  break;
+	oss << " = ";
+	dump_Expression(composite_initial(init),oss);
+	break;
       case KEYno_default:
-  if (direction_is_collection(dir)) {
-    oss << " = " << as_val(type) << ".v_initial";
-  } else {
-    aps_error(decl,"No default value?");
-  }
-  break;
+	if (direction_is_collection(dir)) {
+	  oss << " = " << as_val(type) << ".v_initial";
+	} else {
+	  aps_error(decl,"No default value?");
+	}
+	break;
       }
       oss << ";\n";
       if (direction_is_input(dir)) {
-  oss << indent() << "def s_" << name << "(value:" << type
-      << ") : Unit = {\n";
-  oss << "  v_" << name << " = ";
-  if (direction_is_collection(dir)) {
-    switch (Default_KEY(init)) {
-    default:
-      oss << as_val(value_decl_type(decl)) << ".v_combine";
-      break;
-    case KEYcomposite:
-      oss << composite_combiner(init);
-    }
-    oss << "(v_" << name << ",value);\n";
-  } else {
-    oss << "value;\n";
-  }
-  oss << "}\n";
+	oss << indent() << "def s_" << name << "(value:" << type
+	    << ") : Unit = {\n";
+	oss << "  v_" << name << " = ";
+	if (direction_is_collection(dir)) {
+	  switch (Default_KEY(init)) {
+	  default:
+	    oss << as_val(value_decl_type(decl)) << ".v_combine";
+	    break;
+	  case KEYcomposite:
+	    oss << composite_combiner(init);
+	  }
+	  oss << "(v_" << name << ",value);\n";
+	} else {
+	  oss << "value;\n";
+	}
+	oss << "}\n";
       }
     }
     break;
@@ -1920,39 +1920,39 @@ void dump_scala_Declaration(Declaration decl, ostream& oss)
       // three kinds of definitions:
       // 1. the whole thing: a non-empty body:
       if (first_Declaration(block_body(b))) {
-  oss << " = {\n";
-  ++nesting_level;
-  if (debug)
-    dump_function_debug_start(name,fty,oss);
-  impl->implement_function_body(decl,oss);
-  if (debug)
-    dump_debug_end(oss);
-  --nesting_level;
-  oss << indent() << "}\n" << std::endl;
-  return;
+	oss << " = {\n";
+	++nesting_level;
+	if (debug)
+	  dump_function_debug_start(name,fty,oss);
+	impl->implement_function_body(decl,oss);
+	if (debug)
+	  dump_debug_end(oss);
+	--nesting_level;
+	oss << indent() << "}\n" << std::endl;
+	return;
       } else if (rdecl) {
-  // 2. simple default
-  switch (Default_KEY(value_decl_default(rdecl))) {
-  case KEYsimple:
-    {
-      Expression result = simple_value(value_decl_default(rdecl));
-      oss << " = ";
-      if (debug) {
-        oss << "{\n";
-        ++nesting_level;
-        dump_function_debug_start(decl_name(decl),fty,oss);
-        oss << indent() << "return " << result << ";\n";
-        dump_debug_end(oss);
-        --nesting_level;
-        oss << indent() << "};\n";
-      } else {
-        oss << result << ";\n";
-      }
-      return;
-    }
-  default:
-    break;
-  }
+	// 2. simple default
+	switch (Default_KEY(value_decl_default(rdecl))) {
+	case KEYsimple:
+	  {
+	    Expression result = simple_value(value_decl_default(rdecl));
+	    oss << " = ";
+	    if (debug) {
+	      oss << "{\n";
+	      ++nesting_level;
+	      dump_function_debug_start(decl_name(decl),fty,oss);
+	      oss << indent() << "return " << result << ";\n";
+	      dump_debug_end(oss);
+	      --nesting_level;
+	      oss << indent() << "};\n";
+	    } else {
+	      oss << result << ";\n";
+	    }
+	    return;
+	  }
+	default:
+	  break;
+	}
       }
       aps_warning(decl,"Function %s not implemented.",decl_name(decl));
       // cout << name << " has no body.\n";
@@ -1968,19 +1968,19 @@ void dump_scala_Declaration(Declaration decl, ostream& oss)
       oss << indent() << "class M_" << name << "[";
       bool started = false;
       for (Declaration f=first_Declaration(tfs); f; f=DECL_NEXT(f)) {
-  if (started) oss << ","; else started = true;
-  oss << "T_" << decl_name(f);
+	if (started) oss << ","; else started = true;
+	oss << "T_" << decl_name(f);
       }
       oss << "](";
       started = false;
       for (Declaration f=first_Declaration(tfs); f; f=DECL_NEXT(f)) {
-  if (started) oss << ","; else started = true;
-  dump_TypeFormal_value(f,oss);
+	if (started) oss << ","; else started = true;
+	dump_TypeFormal_value(f,oss);
       }
       oss << ") {\n";
       ++nesting_level;
       for (Declaration d=first_Declaration(body); d; d=DECL_NEXT(d)) {
-  dump_scala_Declaration(d,oss);
+	dump_scala_Declaration(d,oss);
       }
       --nesting_level;      
       oss << "};\n\n";
@@ -2044,11 +2044,11 @@ void dump_Signature(Signature s, string n, ostream& o)
       Declaration d = USE_DECL(sig_use_use(s));
       switch (Declaration_KEY(d)) {
       default:
-  aps_error(s,"cannot handle this signature decl");
-  break;
+	aps_error(s,"cannot handle this signature decl");
+	break;
       case KEYsignature_decl:
-  dump_Signature(signature_decl_sig(d),n,o);
-  break;
+	dump_Signature(signature_decl_sig(d),n,o);
+	break;
       }
     }
     break;
@@ -2058,7 +2058,7 @@ void dump_Signature(Signature s, string n, ostream& o)
       o << " with C_" << decl_name(USE_DECL(class_use_use(c))) << "[" << n;
       TypeActuals tas = sig_inst_actuals(s);
       for (Type ta = first_TypeActual(tas); ta; ta=TYPE_NEXT(ta)) {
-  o << "," << ta;
+	o << "," << ta;
       }
       o << "]";
     }
@@ -2084,17 +2084,17 @@ void dump_Type_Signature(Type t, string name, ostream& o)
       Declaration td = USE_DECL(type_use_use(t));
       switch (Declaration_KEY(td)) {
       default:
-  aps_error(td,"What sort of type decl?");
-  break;
+	aps_error(td,"What sort of type decl?");
+	break;
       case KEYsome_type_decl:
-  dump_Type_Signature(some_type_decl_type(td),name,o);
-  break;
+	dump_Type_Signature(some_type_decl_type(td),name,o);
+	break;
       case KEYtype_renaming:
-  dump_Type_Signature(type_renaming_old(td),name,o);
-  break;
+	dump_Type_Signature(type_renaming_old(td),name,o);
+	break;
       case KEYsome_type_formal:
-  dump_Signature(some_type_formal_sig(td),name,o);
-  break;
+	dump_Signature(some_type_formal_sig(td),name,o);
+	break;
       }
     }
     break;
@@ -2105,7 +2105,7 @@ void dump_Type_Signature(Type t, string name, ostream& o)
       Declaration mdecl = USE_DECL(module_use_use(m));
       o << "with C_" << decl_name(mdecl) << "[" << name;
       for (Type ta = first_TypeActual(tas); ta; ta = TYPE_NEXT(ta)) {
-  o << "," << ta;
+	o << "," << ta;
       }
       o << "]";
       //TODO: technically, we should dump the result of this call too.
@@ -2134,11 +2134,11 @@ void dump_Type(Type t, ostream& o)
       Use u = type_use_use(t);
       switch (Use_KEY(u)) {
       case KEYuse:
-  o << "T_" << symbol_name(use_name(u));
-  break;
+	o << "T_" << symbol_name(use_name(u));
+	break;
       case KEYqual_use:
-  o << as_val(qual_use_from(u)) << ".T_" << symbol_name(qual_use_name(u));
-  break;
+	o << as_val(qual_use_from(u)) << ".T_" << symbol_name(qual_use_name(u));
+	break;
       }
     }
     break;
@@ -2153,18 +2153,18 @@ void dump_Type(Type t, ostream& o)
       o << "(";
       bool started = false;
       for (Declaration f=first_Declaration(function_type_formals(t));
-     f ; f = DECL_NEXT(f)) {
-  if (started) o << ","; else started = true;
-  dump_Type(formal_type(f),o);
-  if (Declaration_KEY(f) == KEYseq_formal)
-    o << "*";
+	   f ; f = DECL_NEXT(f)) {
+	if (started) o << ","; else started = true;
+	dump_Type(formal_type(f),o);
+	if (Declaration_KEY(f) == KEYseq_formal)
+	  o << "*";
       }
       o << ") => ";
       Declaration rdecl = first_Declaration(function_type_return_values(t));
       if (rdecl) {
-  o << value_decl_type(rdecl);
+	o << value_decl_type(rdecl);
       } else {
-  o << "Unit";
+	o << "Unit";
       }
     }
     break;
@@ -2185,11 +2185,11 @@ void dump_Type_value(Type t, ostream& o)
       Use u = type_use_use(t);
       switch (Use_KEY(u)) {
       case KEYuse:
-  o << "t_" << symbol_name(use_name(u));
-  break;
+	o << "t_" << symbol_name(use_name(u));
+	break;
       case KEYqual_use:
-  o << as_val(qual_use_from(u)) << ".t_" << symbol_name(qual_use_name(u));
-  break;
+	o << as_val(qual_use_from(u)) << ".t_" << symbol_name(qual_use_name(u));
+	break;
       }
     }
     break;
@@ -2243,11 +2243,11 @@ bool funcall_is_collection_construction(Expression e)
       Symbol sym = 0;
       switch (Use_KEY(u)) {
       case KEYuse:
-  sym = use_name(u);
-  break;
+	sym = use_name(u);
+	break;
       case KEYqual_use:
-  sym = qual_use_name(u);
-  break;
+	sym = qual_use_name(u);
+	break;
       }
       if (sym == braces) return true;
     }
@@ -2268,12 +2268,12 @@ void dump_collect_Actuals(Type ctype, Actuals as, ostream& o)
       Expression e = list_Actuals_elem(as);
       /* Handle a special case of sequence expression: */
       if (Expression_KEY(e) == KEYrepeat) {
-  Expression seq = repeat_expr(e);
-  if (base_type_equal(infer_expr_type(seq),ctype)) {
-    dump_Expression(seq,o);
-    return;
-  }
-  /* Fall through and cause error */
+	Expression seq = repeat_expr(e);
+	if (base_type_equal(infer_expr_type(seq),ctype)) {
+	  dump_Expression(seq,o);
+	  return;
+	}
+	/* Fall through and cause error */
       }
       dump_Type_value(ctype,o);
       o << ".v_single(";
@@ -2348,15 +2348,15 @@ void dump_Expression(Expression e, ostream& o)
     {
       bool start = true;
       FOR_SEQUENCE(Expression,arg,Actuals,funcall_actuals(e),
-       if (start) start = false;
-       else o << ",";
-       dump_Expression(arg,o));
+		   if (start) start = false;
+		   else o << ",";
+		   dump_Expression(arg,o));
       Declarations fs = function_type_formals(infer_expr_type(funcall_f(e)));
       for (Declaration f=first_Declaration(fs); f; f=DECL_NEXT(f))
-  if (Declaration_KEY(f) == KEYseq_formal) {
-    if (start) start = false; else o << ",";
-    o << "0";
-  }
+	if (Declaration_KEY(f) == KEYseq_formal) {
+	  if (start) start = false; else o << ",";
+	  o << "0";
+	}
     }
     o << ")";
     break;
@@ -2365,11 +2365,11 @@ void dump_Expression(Expression e, ostream& o)
       Use u = value_use_use(e);
       Declaration d = USE_DECL(u);
       if (Declaration_info(d)->decl_flags & IMPLEMENTATION_MARKS) {
-  impl->implement_value_use(d,o);
+	impl->implement_value_use(d,o);
       } else if (Declaration_info(d)->decl_flags & IMPLEMENTED_PATTERN_VAR) {
-  o << *((string*)(Pattern_info((Pattern)tnode_parent(d))->pat_impl));
+	o << *((string*)(Pattern_info((Pattern)tnode_parent(d))->pat_impl));
       } else {
-  dump_Use(u,"v_",o);
+	dump_Use(u,"v_",o);
       }
     }
     break;
@@ -2391,16 +2391,16 @@ static void dump_TypeContour(TypeContour *tc, bool instance, ostream& os)
     {
       int n=0;
       for (Declaration f=first_Declaration(tc->type_formals);
-     f; f=DECL_NEXT(f))
-  ++n;
+	   f; f=DECL_NEXT(f))
+	++n;
       for (int i=0; i < n; ++i) {
-  type_actuals.push_back(tc->u.inferred[i]);
+	type_actuals.push_back(tc->u.inferred[i]);
       }
     }
     break;
   case KEYmodule_decl:
     for (Type ta = first_TypeActual(tc->u.type_actuals);
-   ta ; ta = TYPE_NEXT(ta)) {
+	 ta ; ta = TYPE_NEXT(ta)) {
       type_actuals.push_back(ta);
     }
     break;
@@ -2486,13 +2486,13 @@ void debug_Instance(INSTANCE *i, ostream& os) {
   if (i->node != NULL) {
     if (ABSTRACT_APS_tnode_phylum(i->node) != KEYDeclaration) {
       os << tnode_line_number(i->node) << ":?<" 
-   << ABSTRACT_APS_tnode_phylum(i->node) << ">";
+	 << ABSTRACT_APS_tnode_phylum(i->node) << ">";
     } else if (Declaration_KEY(i->node) == KEYnormal_assign) {
       Declaration pdecl = proc_call_p(normal_assign_rhs(i->node));
       os << decl_name(pdecl) << "@";
     } else if (Declaration_KEY(i->node) == KEYpragma_call) {
       os << pragma_call_name(i->node) << "(...):" 
-   << tnode_line_number(i->node);
+	 << tnode_line_number(i->node);
     } else {
       os << symbol_name(def_name(declaration_def(i->node)));
     }
