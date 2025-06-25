@@ -301,7 +301,7 @@ Declaration canonical_type_decl(CanonicalType *canonical_type)
     return canonical_qual_use_type->decl;
   }
   default:
-    aps_error(canonical_type, "Failed to find the decl for CanonicalType");
+    aps_error(canonical_type, "Failed to find the decl for CanonicalType key:%d", canonical_type->key);
     return NULL;
   }
 }
@@ -371,6 +371,8 @@ static CanonicalType *canonical_type_use(Use use)
 
     case KEYfunction_type:
       return canonical_type(some_type_decl_type(td));
+    case KEYremote_type:
+      return canonical_type(remote_type_nodetype(some_type_decl_type(td)));
     default:
       fatal_error("Unknown type use_decl type key %d", (int)Type_KEY(some_type_decl_type(td)));
       return NULL;

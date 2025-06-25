@@ -2,6 +2,7 @@ with "symbol";
 with "table";
 with "farrow-lv-tree";
 
+-- Farrow live-variable analysis circular-AG
 module FARROW_LV[T :: var FARROW_LV_TREE[]] extends T begin
 
   type Symbols := SET[Symbol];
