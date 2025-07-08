@@ -1,0 +1,57 @@
+with "tiny";
+
+module TEST_SYNTH[T :: TINY[]] extends T begin
+  var collection sum : Integer :> 0, (+);
+
+  attribute Root.syn : Integer;
+  pragma synthesized(syn);
+  
+  attribute Wood.i1 : Integer := 10;
+  attribute Wood.i2 : Integer;
+  pragma inherited(i1, i2);
+  
+  attribute Wood.s1 : Integer := 100;
+  attribute Wood.s2 : Integer;
+  pragma synthesized(s1, s2);
+
+  function hf(x : Integer; y : Integer) : Boolean begin
+    q : Integer := x / y;
+    result := q * y == x;
+  end;
+  
+  match ?r=root(?w) begin
+    if hf(sum,3) then
+      r.syn := 3;
+      w.i1 := 2;
+    endif;
+    if hf(sum,5) then
+      r.syn := 5;
+      w.i2 := 4;
+    endif;
+    w.i2 := w.s1;
+    r.syn := 2;
+  end;
+
+  match ?w=leaf(?x) begin
+    if hf(x,2) then
+      sum :> 2;
+      w.s1 := 2 * w.i1;
+    endif;
+    if hf(x,3) then
+      sum :> 3;
+      w.s2 := x;
+    endif;
+    sum :> 5;
+    w.s2 := 1;
+  end;
+
+  match ?w=branch(?x,?y) begin
+    y.i1 := y.s2;
+    y.i2 := 2;
+    x.i2 := y.s1;
+    w.s1 := w.i1;
+    w.s2 := w.i2;
+    sum :> x.s2;
+    sum :> x.s1;
+  end;
+end;
