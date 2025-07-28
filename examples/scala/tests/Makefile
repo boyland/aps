@@ -1,4 +1,4 @@
-SPECS=FirstSpec FollowSpec NullableSpec NTupleLatticeSpec
+SPECS=FirstSpec FollowSpec NullableSpec NTupleLatticeSpec TestSynthSpec
 EXAMPLES_PATH=../..
 ROOT_PATH=../${EXAMPLES_PATH}
 SCALAV=2.12
@@ -11,7 +11,7 @@ all: $(addsuffix .run, $(SPECS))
 
 .PHONY: clean
 clean:
-	rm -f *.class grammar.scala first.scala follow.scala tiny.scala ntuple-lattice.scala
+	rm -f *.class grammar.scala first.scala follow.scala tiny.scala ntuple-lattice.scala test-synth.scala nullable.scala
 
 %.class: %.scala
 	scalac -cp ${SCALA_FLAGS} $<
@@ -39,3 +39,6 @@ NullableSpec.class: Spec.class GrammarUtil.class nullable.class
 
 NTupleLatticeSpec.class: Spec.class tiny.class ntuple-lattice.class
 	scalac -cp ${SCALA_FLAGS} NTupleLatticeSpec.scala
+
+TestSynthSpec.class: Spec.class tiny.class test-synth.class
+	scalac -cp ${SCALA_FLAGS} TestSynthSpec.scala
