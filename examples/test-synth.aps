@@ -16,7 +16,7 @@ module TEST_SYNTH[T :: TINY[]] extends T begin
 
   function hf(x : Integer; y : Integer) : Boolean begin
     q : Integer := x / y;
-    result := q * y == x;
+    result := q * y = x;
   end;
   
   match ?r=root(?w) begin
