@@ -1104,6 +1104,7 @@ static void *activate_pragmas(void *ignore, void *node) {
   }
   if (ABSTRACT_APS_tnode_phylum(node) == KEYDeclaration) {
     Declaration decl=(Declaration)node;
+    Declaration_info(decl)->is_circular = FALSE;  // set default value of is_circular
     switch (Declaration_KEY(decl)) {
     case KEYpragma_call:
       { Symbol pragma_sym = pragma_call_name(decl);
