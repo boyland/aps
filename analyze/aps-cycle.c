@@ -885,6 +885,17 @@ static void assert_circular_declaration(STATE* s) {
             if (declared_circular) {
               any_cycle = true;
             } else {
+              if (instance->node != NULL && 
+                  ABSTRACT_APS_tnode_phylum(instance->node) == KEYDeclaration &&
+                  Declaration_KEY(instance->node) == KEYpragma_call) {
+
+                if (cycle_debug & DEBUG_UP_DOWN) {
+                  printf("function call proxy (%s) involves in a cycle\n", instance_to_str);
+                }
+
+                continue;
+              }
+
               aps_error(node,
                         "Instance (%s) involves in a cycle but it is not "
                         "declared circular.",
