@@ -63,6 +63,7 @@ struct block_item_instance {
 
 vector<Block> current_blocks;
 BlockItem* current_scope_block;
+vector<BlockItem*> dumped_conditional_block_items;
 
 // Given a block, it prints it linearized schedule.
 static void print_linearized_block(BlockItem* block) {
@@ -73,6 +74,14 @@ static void print_linearized_block(BlockItem* block) {
     printf("\n");
     if (block->key == KEY_BLOCK_ITEM_CONDITION) {
       struct block_item_condition* cond = (struct block_item_condition*)block;
+
+      if (cond->prev != NULL && cond->prev->key != KEY_BLOCK_ITEM_CONDITION) {
+        printf("%s", indent().c_str());
+        print_instance(cond->prev->instance, stdout);
+        printf(" %d", cond->prev->instance->index);
+        printf("\n");
+      }
+
       printf("%spositive\n", indent().c_str());
       nesting_level++;
       print_linearized_block(cond->next_positive);
@@ -115,7 +124,8 @@ static BlockItem* linearize_block_helper(AUG_GRAPH* aug_graph,
                                          bool* scheduled,
                                          CONDITION* cond,
                                          BlockItem* prev,
-                                         int remaining) {
+                                         int remaining,
+                                         INSTANCE* aug_graph_instance) {
   // impossible merge condition
   if (CONDITION_IS_IMPOSSIBLE(*cond)) {
     return NULL;
@@ -128,14 +138,23 @@ static BlockItem* linearize_block_helper(AUG_GRAPH* aug_graph,
     INSTANCE* instance = *it;
     int i = instance->index;
 
-    if (scheduled[i])
+    if (scheduled[i]) {
       continue;
+    }
 
     // impossible merge condition, cannot schedule this instance
     if (MERGED_CONDITION_IS_IMPOSSIBLE(*cond, instance_condition(instance))) {
       scheduled[i] = true;
-      BlockItem* result =
-          linearize_block_helper(aug_graph, sorted_instances, scheduled, cond, prev, remaining - 1);
+      BlockItem* result = linearize_block_helper(aug_graph, sorted_instances, scheduled, cond, prev, remaining - 1, aug_graph_instance);
+      scheduled[i] = false;
+      return result;
+    }
+
+    // if there is no dependency between this instance and the augmented dependency instance that we want to linearize for,
+    // then this instance should not be included in the linearization linked-list
+    if (aug_graph_instance != instance && !edgeset_kind(aug_graph->graph[instance->index * n + aug_graph_instance->index])) {
+      scheduled[i] = true;
+      BlockItem* result = linearize_block_helper(aug_graph, sorted_instances, scheduled, cond, prev, remaining - 1, aug_graph_instance);
       scheduled[i] = false;
       return result;
     }
@@ -179,16 +198,11 @@ static BlockItem* linearize_block_helper(AUG_GRAPH* aug_graph,
       continue;
     }
 
-    // printf("scheduling: ");
-    // print_instance(instance, stdout);
-    // printf("\n\n");
-
     BlockItem* item_base;
     scheduled[i] = true;
 
     if (if_rule_p(instance->fibered_attr.attr)) {
-      struct block_item_condition* item =
-          (struct block_item_condition*)malloc(sizeof(struct block_item_condition));
+      struct block_item_condition* item = (struct block_item_condition*)malloc(sizeof(struct block_item_condition));
       item_base = (BlockItem*)item;
 
       item->key = KEY_BLOCK_ITEM_CONDITION;
@@ -198,22 +212,18 @@ static BlockItem* linearize_block_helper(AUG_GRAPH* aug_graph,
 
       int cmask = 1 << (if_rule_index(instance->fibered_attr.attr));
       cond->positive |= cmask;
-      item->next_positive =
-          linearize_block_helper(aug_graph, sorted_instances, scheduled, cond, item_base, remaining - 1);
+      item->next_positive = linearize_block_helper(aug_graph, sorted_instances, scheduled, cond, item_base, remaining - 1, aug_graph_instance);
       cond->positive &= ~cmask;
       cond->negative |= cmask;
-      item->next_negative =
-          linearize_block_helper(aug_graph, sorted_instances, scheduled, cond, item_base, remaining - 1);
+      item->next_negative = linearize_block_helper(aug_graph, sorted_instances, scheduled, cond, item_base, remaining - 1, aug_graph_instance);
       cond->negative &= ~cmask;
     } else {
-      struct block_item_instance* item =
-          (struct block_item_instance*)malloc(sizeof(struct block_item_instance));
+      struct block_item_instance* item = (struct block_item_instance*)malloc(sizeof(struct block_item_instance));
       item_base = (BlockItem*)item;
       item->key = KEY_BLOCK_ITEM_INSTANCE;
       item->instance = instance;
       item->prev = prev;
-      item->next =
-          linearize_block_helper(aug_graph, sorted_instances, scheduled, cond, item_base, remaining - 1);
+      item->next = linearize_block_helper(aug_graph, sorted_instances, scheduled, cond, item_base, remaining - 1, aug_graph_instance);
     }
 
     scheduled[i] = false;
@@ -230,7 +240,7 @@ static BlockItem* linearize_block_helper(AUG_GRAPH* aug_graph,
 
 // Given an augmented dependency graph, it linearizes
 // the direct dependency schedule.
-static BlockItem* linearize_block(AUG_GRAPH* aug_graph) {
+static BlockItem* linearize_block(AUG_GRAPH* aug_graph, INSTANCE* aug_graph_instance) {
   int n = aug_graph->instances.length;
   bool* scheduled = (bool*)alloca(sizeof(bool) * n);
   memset(scheduled, 0, sizeof(bool) * n);
@@ -238,7 +248,7 @@ static BlockItem* linearize_block(AUG_GRAPH* aug_graph) {
   CONDITION cond = {0, 0};
   vector<INSTANCE*> sorted_instances = sort_instances(aug_graph);
 
-  return linearize_block_helper(aug_graph, sorted_instances, scheduled, &cond, NULL, n);
+  return linearize_block_helper(aug_graph, sorted_instances, scheduled, &cond, NULL, n, aug_graph_instance);
 }
 
 // Given an instance it traverses the direct dependency schedule
@@ -511,6 +521,42 @@ static string instance_to_attr(INSTANCE* in) {
   return ss.str();
 }
 
+static vector<INSTANCE*> collect_conditions_before_instance(BlockItem* item, INSTANCE* instance) {
+  vector<INSTANCE*> result;
+
+  if (item == NULL) {
+    return result;
+  }
+
+  switch (item->key)
+  {
+  case KEY_BLOCK_ITEM_CONDITION:
+  {
+    struct block_item_condition* cond = (struct block_item_condition*)item;
+
+    vector<INSTANCE*> conditions_positive = collect_conditions_before_instance(cond->next_positive, instance);
+    vector<INSTANCE*> conditions_negative = collect_conditions_before_instance(cond->next_negative, instance);
+
+    result.push_back(cond->instance);
+    result.insert(result.end(), conditions_positive.begin(), conditions_positive.end());
+    result.insert(result.end(), conditions_negative.begin(), conditions_negative.end());
+
+    return result;
+  }
+  case KEY_BLOCK_ITEM_INSTANCE:
+    if (item->instance == instance) {
+      break;
+    } else {
+      struct block_item_instance* inst = (struct block_item_instance*)item;
+      return collect_conditions_before_instance(inst->next, instance);
+    }
+  default:
+    fatal_error("unknown block item key");
+  }
+
+  return result;
+}
+
 static std::vector<SYNTH_FUNCTION_STATE*> build_synth_functions_state(STATE* s) {
   std::vector<SYNTH_FUNCTION_STATE*> synth_function_states;
   int i, j, k;
@@ -595,6 +641,38 @@ static std::vector<SYNTH_FUNCTION_STATE*> build_synth_functions_state(STATE* s) 
     }
   }
 
+  // Causes cycle, bad idea
+  // need to add instances used in conditional that are wrapping the instance
+  // for (auto it1 = synth_function_states.begin(); it1 != synth_function_states.end(); it1++) {
+  //   SYNTH_FUNCTION_STATE* synth_functions_state = *it1;
+    
+  //   for (auto it2 = synth_functions_state->aug_graphs.begin(); it2 != synth_functions_state->aug_graphs.end(); it2++) {
+  //     AUG_GRAPH* aug_graph = *it2;
+  //     INSTANCE* aug_graph_instance = NULL;
+  //     if (synth_functions_state->is_phylum_instance) {
+  //       if (!find_instance(aug_graph, aug_graph->lhs_decl, synth_functions_state->source->fibered_attr, &aug_graph_instance)) {
+  //         fatal_error("something is wrong with instances in aug graph %s", aug_graph_name(aug_graph));
+  //       }
+  //     } else {
+  //       aug_graph_instance = synth_functions_state->source;
+  //     }
+
+  //     BlockItem* block = linearize_block(aug_graph);
+  //     vector<INSTANCE*> surrounding_conditions = collect_conditions_before_instance(block, aug_graph_instance);
+
+  //     for (auto it3 = surrounding_conditions.begin(); it3 != surrounding_conditions.end(); it3++) {
+  //       INSTANCE* condition_instance = *it3;
+  //       int n = aug_graph->instances.length;
+  //       for (int i = 0; i < n; i++) {
+  //         INSTANCE* instance = &aug_graph->instances.array[i];
+  //         if (edgeset_kind(aug_graph->graph[instance->index * n + condition_instance->index]) & DEPENDENCY_MAYBE_DIRECT) {
+  //           synth_functions_state->regular_dependencies.push_back(instance);
+  //         }
+  //       }
+  //     }
+  //   }
+  // }
+
   for (auto it = synth_function_states.begin(); it != synth_function_states.end(); it++) {
     SYNTH_FUNCTION_STATE* synth_functions_state = *it;
     printf("Synth function: %s\n", synth_functions_state->fdecl_name.c_str());
@@ -674,86 +752,239 @@ auto dump_fiber_attribute_assignment(INSTANCE* instance, string node, Callable f
   return result;
 }
 
-static void dump_fiber_dependencies_recursively_helper(
-  AUG_GRAPH* aug_graph,
-  vector<INSTANCE*> relevant_instances,
-  int count_relevant_instances,
-  bool* scheduled,
-  int& count_scheduled,
-  ostream& os) {
+class FiberDependencyDumper {
+public:
+  static void dump(AUG_GRAPH* aug_graph, INSTANCE* sink, ostream& os) {
 
-  int i;
-  int n = aug_graph->instances.length;
+    printf("Fiber dependencies for ");
+    print_instance(sink, stdout);
+    printf("\n");
 
-  if (count_scheduled == count_relevant_instances) {
-    return;
-  }
-
-  for (auto it1 = relevant_instances.begin(); it1 != relevant_instances.end(); it1++) {
-    INSTANCE* in = *it1;
-    if (scheduled[in->index]) {
-      continue;
+    if (sink->index == 61 || sink->index == 45)
+    {
+      printf("break\n");
     }
 
-    bool dependency_ready = true;
-    for (auto it2 = relevant_instances.begin(); it2 != relevant_instances.end(); it2++) {
-      INSTANCE* dependency_instance = *it2;
+    int i, j;
+    int n = aug_graph->instances.length;
 
-      if (scheduled[dependency_instance->index] || !edgeset_kind(aug_graph->graph[dependency_instance->index * n + in->index])) {
+    vector<INSTANCE*> relevant_instances;
+
+    // collect relevant fiber dependencies
+    for (i = 0; i < n; i++) {
+      INSTANCE* in = &aug_graph->instances.array[i];
+      if (in->node != NULL && Declaration_KEY(in->node) == KEYpragma_call) {
         continue;
       }
 
-      dependency_ready = false;
-    }
-
-    if (!dependency_ready) {
-      continue;
-    }
-
-    scheduled[in->index] = true;
-    os << indent();
-    impl->dump_synth_instance(in, os);
-    os << "\n";
-    count_scheduled++;
-    dump_fiber_dependencies_recursively_helper(aug_graph, relevant_instances, count_relevant_instances, scheduled, count_scheduled, os);
-  }
-
-  if (count_scheduled != count_relevant_instances) {
-    fatal_error("failed to find next dependency to schedule count_scheduled: %d, count_relevant_instances: %d", count_scheduled, count_relevant_instances);
-    return;
-  }
-}
-
-static void dump_fiber_dependencies_recursively(AUG_GRAPH* aug_graph, INSTANCE* sink, ostream& os) {
-  int i;
-  int n = aug_graph->instances.length;
-
-  int count = 0;
-  vector<INSTANCE*> relevant_instances;
-
-  for (i = 0; i < n; i++) {
-    INSTANCE* in = &aug_graph->instances.array[i];
-
-    if (in->node != NULL && Declaration_KEY(in->node) == KEYpragma_call) {
-      continue;
-    }
-
-    if (edgeset_kind(aug_graph->graph[in->index * n + sink->index])) {
-      if (in->fibered_attr.fiber != NULL) {
-        if (instance_is_synthesized(in) || instance_is_local(in)) {
-          relevant_instances.push_back(in);
-          count++;
+      if (edgeset_kind(aug_graph->graph[in->index * n + sink->index])) {
+        if (in->fibered_attr.fiber != NULL) {
+          if (instance_is_synthesized(in) || instance_is_local(in)) {
+            relevant_instances.push_back(in);
+          }
         }
+      }
+    }
+
+    for (auto it = relevant_instances.begin(); it != relevant_instances.end(); it++) {
+      INSTANCE* in = *it;
+      printf("  ");
+      print_instance(in, stdout);
+      printf("\n");
+    }
+    
+    printf("\n");
+
+    if (relevant_instances.empty()) {
+      return;
+    }
+
+    bool* scheduled = (bool*)alloca(sizeof(bool) * n);
+    memset(scheduled, 0, sizeof(bool) * n);
+
+    SccGraph scc_graph;
+    scc_graph_initialize(&scc_graph, static_cast<int>(relevant_instances.size()));
+
+    // add vertices to the SCC graph
+    for (auto it = relevant_instances.begin(); it != relevant_instances.end(); it++) {
+      INSTANCE* in = *it;
+      scc_graph_add_vertex(&scc_graph, in);
+    }
+
+    // add edges to the SCC graph
+    for (auto it1 = relevant_instances.begin(); it1 != relevant_instances.end(); it1++) {
+      INSTANCE* in1 = *it1;
+      for (auto it2 = relevant_instances.begin(); it2 != relevant_instances.end(); it2++) {
+        INSTANCE* in2 = *it2;
+        if (in1->index == in2->index) {
+          continue;
+        }
+
+        if (edgeset_kind(aug_graph->graph[in1->index * n + in2->index])) {
+          scc_graph_add_edge(&scc_graph, in1, in2);
+        }
+      }
+    }
+
+    SCC_COMPONENTS* components = scc_graph_components(&scc_graph);
+
+    for (i = 0; i < components->length; i++) {
+      SCC_COMPONENT* component = components->array[i];
+
+      printf("Component %d:\n", i);
+      for (j = 0; j < component->length; j++) {
+        INSTANCE* in = (INSTANCE*)component->array[j];
+        printf("  ");
+        print_instance(in, stdout);
+        printf("\n");
+      }
+    }
+
+    dump_scc_helper(aug_graph, components, scheduled, os);
+
+    scc_graph_destroy(&scc_graph);
+  }
+
+private:
+  static void dump_scc_helper(AUG_GRAPH* aug_graph, SCC_COMPONENTS* components, bool* scheduled, ostream& os) {
+    int component_count = components->length;
+    int i;
+    for (i = 0; i < component_count; i++) {
+      SCC_COMPONENT* component = find_next_ready_component(aug_graph, components, scheduled);
+
+      printf("\nScheduling component:\n");
+      for (int j = 0; j < component->length; j++) {
+        INSTANCE* in = (INSTANCE*)component->array[j];
+        printf("  ");
+        print_instance(in, stdout);
+        printf("\n");
+      }
+
+      dump_scc_helper_dump(aug_graph, component, scheduled, os);
+    }
+
+    for (i = 0; i < component_count; i++) {
+      SCC_COMPONENT* component = components->array[i];
+      if (!already_scheduled(aug_graph, component, scheduled)) {
+        fatal_error("some instances were not scheduled");
       }
     }
   }
 
-  bool* scheduled = (bool*)alloca(sizeof(bool) * n);
-  memset(scheduled, 0, sizeof(bool) * n);
+  static void dump_scc_helper_dump(AUG_GRAPH* aug_graph, SCC_COMPONENT* component, bool* scheduled, ostream& os) {
+    
+    int i;
 
-  int count_scheduled = 0;
-  dump_fiber_dependencies_recursively_helper(aug_graph, relevant_instances, count, scheduled, count_scheduled, os);
-}
+    if (already_scheduled(aug_graph, component, scheduled)) {
+      printf("Component already scheduled\n");
+      return;
+    }
+
+    int count_scheduled = 0;
+    int n = aug_graph->instances.length;
+    if (count_scheduled == component->length) {
+      return;
+    }
+
+    for (i = 0; i < component->length; i++) {
+      INSTANCE* in = (INSTANCE*)component->array[i];
+
+      if (in->index == 97) {
+        printf("break\n");
+      }
+
+      if (scheduled[in->index]) {
+        continue;
+      }
+
+      int dependency_ready = true;
+      for (int j = 0; j < component->length && dependency_ready; j++) {
+        INSTANCE* dependency_instance = (INSTANCE*)component->array[j];
+        if (dependency_instance == in) {
+          continue;
+        }
+
+        if (!scheduled[dependency_instance->index] &&
+            edgeset_kind(aug_graph->graph[dependency_instance->index * n + in->index]) & DEPENDENCY_MAYBE_DIRECT) {
+          dependency_ready = false;
+        }
+      }
+
+      if (!dependency_ready) {
+        continue;
+      }
+      
+      printf("Scheduling instance ");
+      print_instance(in, stdout);
+      printf("\n");
+
+      scheduled[in->index] = true;
+      os << indent();
+      impl->dump_synth_instance(in, os);
+      count_scheduled++;
+      os << "\n";
+
+      dump_scc_helper_dump(aug_graph, component, scheduled, os);
+    }
+  }
+
+  static bool already_scheduled(AUG_GRAPH* aug_graph, SCC_COMPONENT* component, bool* scheduled) {
+    for (int i = 0; i < component->length; i++) {
+      INSTANCE* in = (INSTANCE*)component->array[i];
+      if (!scheduled[in->index]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  static SCC_COMPONENT* find_next_ready_component(AUG_GRAPH* aug_graph,
+                                            SCC_COMPONENTS* components,
+                                            bool* scheduled) {
+
+    int n = aug_graph->instances.length;
+
+    for (int i = 0; i < components->length; i++) {
+      SCC_COMPONENT* component = components->array[i];
+
+      // if all instances in the component are scheduled, skip it
+      if (already_scheduled(aug_graph, component, scheduled)) {
+        continue;
+      }
+
+      bool component_ready = true;
+      for (int j = 0; j < component->length && component_ready; j++) {
+        INSTANCE* in = (INSTANCE*)component->array[j];
+
+        for (int k = 0; k < components->length && component_ready; k++) {
+          SCC_COMPONENT* other_component = components->array[k];
+          if (other_component == component) {
+            continue;
+          }
+
+          if (already_scheduled(aug_graph, other_component, scheduled)) {
+            continue;
+          }
+
+          for (int l = 0; l < other_component->length; l++) {
+            INSTANCE* other_in = (INSTANCE*)other_component->array[l];
+            if (edgeset_kind(aug_graph->graph[other_in->index * n + in->index])) {
+              component_ready = false;
+              break;
+            }
+          }
+        }
+      }
+
+      if (component_ready) {
+        return component;
+      }
+    }
+
+    fatal_error("no more components to schedule");
+    return NULL;
+  }
+};
 
 #ifdef APS2SCALA
 static void dump_synth_functions(STATE* s, ostream& os)
@@ -780,6 +1011,7 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
 
   for (auto state_it = synth_functions_states.begin(); state_it != synth_functions_states.end(); state_it++) {
     SYNTH_FUNCTION_STATE* synth_functions_state = *state_it;
+    current_synth_functions_state = synth_functions_state;
 
     os << indent() << "// " << synth_functions_state->source << " ("
        << (synth_functions_state->is_phylum_instance ? "phylum" : "auggraph") << " "
@@ -805,8 +1037,16 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
         continue;
       }
 
-      os << ", " << "/*" << source_instance << " (#" << source_instance->index << ") " << "*/ " << "v_"
-         << instance_to_string(source_instance, false, true) << ": ";
+      // for locals, it needs prefix in formals, not for fibers or regular attributes
+
+      os << ", " << "/*" << source_instance << " (#" << source_instance->index << ") " << "*/ " << "v_";
+
+      if (!synth_functions_state->is_phylum_instance) {
+        os << instance_to_string(source_instance, false, false) << ": ";
+      } else {
+        os << instance_to_string(source_instance, false, true) << ": ";
+      }
+
       dump_attribute_type(source_instance, os);
     }
 
@@ -847,7 +1087,6 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
 
       current_aug_graph = aug_graph;
       current_blocks.push_back(matcher_body(top_level_match_m(aug_graph->match_rule)));
-      current_scope_block = linearize_block(aug_graph);
 
       os << indent() << "case " << matcher_pat(top_level_match_m(aug_graph->match_rule)) << " => {\n";
       nesting_level++;
@@ -861,8 +1100,21 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
         aug_graph_instance = synth_functions_state->source;
       }
 
+      // Linearize the current scope block but make sure IF statements or conditional instances
+      // that have nothing to do with this instance don't appear in linearization
+      current_scope_block = linearize_block(aug_graph, aug_graph_instance);
+
+      printf("Linearizing augmented graph %s for ", aug_graph_name(aug_graph));
+      print_instance(aug_graph_instance, stdout);
+      printf("\n");
+      print_linearized_block(current_scope_block);
+
+      if (aug_graph_instance->index == 143) {
+        printf("here\n");
+      }
+
       if (synth_functions_state->is_fiber_evaluation) {
-        dump_fiber_dependencies_recursively(aug_graph, aug_graph_instance, os);
+        FiberDependencyDumper::dump(aug_graph, aug_graph_instance, os);
       }
 
       os << indent();
@@ -870,6 +1122,7 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
       os << "\n";
 
       current_blocks.clear();
+      dumped_conditional_block_items.clear();
 
       nesting_level--;
       os << indent() << "}\n";
@@ -1001,10 +1254,11 @@ void implement_value_use(Declaration vd, ostream& os) {
         Declaration fibered_attr = source_instance->fibered_attr.attr;
         bool is_shared_info = ATTR_DECL_IS_SHARED_INFO(fibered_attr);
         bool is_fiber_attr = source_instance->fibered_attr.fiber != NULL;
-        bool is_result = !strcmp("result", decl_name(source_instance->fibered_attr.attr));
-        bool is_bad = Declaration_KEY(source_instance->node) == KEYpragma_call;
+        bool is_conditional = fibered_attr != NULL && Declaration_KEY(fibered_attr) == KEYif_stmt;
+        bool is_result = !is_conditional && !strcmp("result", decl_name(source_instance->fibered_attr.attr));
+        bool is_bad = source_instance->node != NULL && Declaration_KEY(source_instance->node) == KEYpragma_call;
 
-        if (source_instance->fibered_attr.fiber == NULL && !is_bad && !is_shared_info) {
+        if (source_instance->fibered_attr.fiber == NULL && !is_bad && !is_shared_info && !is_conditional) {
           os << ", ";
           impl->dump_synth_instance(source_instance, os);
         }
@@ -1080,22 +1334,29 @@ static vector<std::set<Expression> > make_instance_assignment() {
         switch (Declaration_KEY(d)) {
           case KEYnormal_assign: {
             if (INSTANCE* in = Expression_info(assign_rhs(d))->value_for) {
-              if (in->index >= n)
+              if (in->index >= n) {
                 fatal_error("bad index [normal_assign] for instance");
+              }
               array[in->index].clear();
+              if (assign_rhs(d) == NULL) {
+                printf("Warning: assignment to %s is empty\n", instance_to_string(in).c_str());
+              }
+
               array[in->index].insert(assign_rhs(d));
             }
             break;
           }
           case KEYcollect_assign: {
             if (INSTANCE* in = Expression_info(assign_rhs(d))->value_for) {
-              if (in->index >= n)
+              if (in->index >= n) {
                 fatal_error("bad index [collection_assign] for instance");
+              }
 
-              if (step == 1)
+              if (step == 1) {
                 array[in->index].clear();
-              else
+              } else {
                 array[in->index].insert(assign_rhs(d));
+              }
             }
             break;
           }
@@ -1122,7 +1383,7 @@ void dump_assignment(INSTANCE* in, Expression rhs, ostream& o) {
   if (in->fibered_attr.fiber != NULL) {
     if (rhs == NULL) {
       if (include_comments) {
-        o << indent() << "// " << in << "\n";
+        o << "// " << in << "\n";
       }
       return;
     }
@@ -1130,7 +1391,6 @@ void dump_assignment(INSTANCE* in, Expression rhs, ostream& o) {
     Declaration assign = (Declaration)tnode_parent(rhs);
     Expression lhs = assign_lhs(assign);
     Declaration field = 0;
-    o << indent();
     // dump the object containing the field
     switch (Expression_KEY(lhs)) {
       case KEYvalue_use:
@@ -1176,7 +1436,7 @@ void dump_assignment(INSTANCE* in, Expression rhs, ostream& o) {
   if (in->node == 0 && ad != NULL) {
     if (rhs) {
       if (Declaration_info(ad)->decl_flags & LOCAL_ATTRIBUTE_FLAG) {
-        o << indent() << "a" << LOCAL_UNIQUE_PREFIX(ad) << "_" << asym << DEREF;
+        o << "a" << LOCAL_UNIQUE_PREFIX(ad) << "_" << asym << DEREF;
         if (debug)
           o << "assign";
         else
@@ -1188,18 +1448,18 @@ void dump_assignment(INSTANCE* in, Expression rhs, ostream& o) {
 #ifdef APS2SCALA
           if (!def_is_constant(value_decl_def(ad))) {
             if (include_comments) {
-              o << indent() << "// v_" << asym << " is assigned/initialized by default.\n";
+              o << "// v_" << asym << " is assigned/initialized by default.\n";
             }
           } else {
             if (include_comments) {
-              o << indent() << "// v_" << asym << " is initialized in module.\n";
+              o << "// v_" << asym << " is initialized in module.\n";
             }
           }
 #else
-            o << indent() << "v_" << asym << " = " << rhs << ";\n";
+            o << "v_" << asym << " = " << rhs << ";\n";
 #endif
         } else {
-          o << indent() << "v" << i << "_" << asym << " = " << rhs << "; // local\n";
+          o << "v" << i << "_" << asym << " = " << rhs << "; // local\n";
         }
       }
     } else {
@@ -1207,33 +1467,33 @@ void dump_assignment(INSTANCE* in, Expression rhs, ostream& o) {
         aps_warning(ad, "Local attribute %s is apparently undefined", decl_name(ad));
       }
       if (include_comments) {
-        o << indent() << "// " << in << " is ready now\n";
+        o << "// " << in << " is ready now\n";
       }
     }
     return;
   } else if (node_is_syntax) {
     if (ATTR_DECL_IS_SHARED_INFO(ad)) {
       if (include_comments) {
-        o << indent() << "// shared info for " << decl_name(in->node) << " is ready.\n";
+        o << "// shared info for " << decl_name(in->node) << " is ready.\n";
       }
     } else if (ATTR_DECL_IS_UP_DOWN(ad)) {
       if (include_comments) {
-        o << indent() << "// " << decl_name(in->node) << "." << decl_name(ad) << " implicit.\n";
+        o  << "// " << decl_name(in->node) << "." << decl_name(ad) << " implicit.\n";
       }
     } else if (rhs) {
       if (Declaration_KEY(in->node) == KEYfunction_decl) {
         if (direction_is_collection(value_decl_direction(ad))) {
           std::cout << "Not expecting collection here!\n";
-          o << indent() << "v_" << asym << " = somehow_combine(v_" << asym << "," << rhs << ");\n";
+          o << "v_" << asym << " = somehow_combine(v_" << asym << "," << rhs << ");\n";
         } else {
           int i = LOCAL_UNIQUE_PREFIX(ad);
           if (i == 0)
-            o << indent() << "v_" << asym << " = " << rhs << "; // function\n";
+            o << "v_" << asym << " = " << rhs << "; // function\n";
           else
-            o << indent() << "v" << i << "_" << asym << " = " << rhs << ";\n";
+            o << "v" << i << "_" << asym << " = " << rhs << ";\n";
         }
       } else {
-        o << indent() << "a_" << asym << DEREF;
+        o << "a_" << asym << DEREF;
         if (debug)
           o << "assign";
         else
@@ -1245,14 +1505,14 @@ void dump_assignment(INSTANCE* in, Expression rhs, ostream& o) {
                   symbol_name(asym));
 
       if (include_comments) {
-        o << indent() << "// " << in << " is ready.\n";
+        o << "// " << in << " is ready.\n";
       }
     }
     return;
   } else if (Declaration_KEY(in->node) == KEYvalue_decl) {
     if (rhs) {
       // assigning field of object
-      o << indent() << "a_" << asym << DEREF;
+      o << "a_" << asym << DEREF;
       if (debug)
         o << "assign";
       else
@@ -1260,7 +1520,7 @@ void dump_assignment(INSTANCE* in, Expression rhs, ostream& o) {
       o << "(v_" << decl_name(in->node) << "," << rhs << ");\n";
     } else {
       if (include_comments) {
-        o << indent() << "// " << in << " is ready now.\n";
+        o << "// " << in << " is ready now.\n";
       }
     }
     return;
@@ -1268,58 +1528,175 @@ void dump_assignment(INSTANCE* in, Expression rhs, ostream& o) {
 }
 
 void dump_rhs_instance_helper(AUG_GRAPH* aug_graph, BlockItem* item, INSTANCE* instance, ostream& o) {
+  if (item == NULL) {
+    if (include_comments) {
+      o << "// " << instance << " is ready now.\n";
+    }
+    return;
+  }
+
   if (item->key == KEY_BLOCK_ITEM_INSTANCE) {
+    struct block_item_instance* bi = (struct block_item_instance*)item;
     vector<std::set<Expression> > all_assignments = make_instance_assignment();
     std::set<Expression> relevant_assignments = all_assignments[instance->index];
 
-    if (!relevant_assignments.empty()) {
-      for (auto it = relevant_assignments.begin(); it != relevant_assignments.end(); it++) {
-        Expression rhs = *it;
-        if (instance->fibered_attr.fiber != NULL) {
-          dump_assignment(instance, rhs, o);
-        } else {
-          // just dump RHS since synth functions are only interested in RHS, not side-effect
-          dump_Expression(rhs, o);
+    if (bi->instance == instance || bi->next == NULL) {
+      if (!relevant_assignments.empty()) {
+        for (auto it = relevant_assignments.begin(); it != relevant_assignments.end(); it++) {
+          Expression rhs = *it;
+          if (rhs == NULL) {
+            continue;
+          }
+
+          if (instance->fibered_attr.fiber != NULL) {
+            dump_assignment(instance, rhs, o);
+          } else {
+            // just dump RHS since synth functions are only interested in RHS, not side-effect
+            dump_Expression(rhs, o);
+          }
         }
+
+        return;
       }
 
-      return;
-    }
-
-    if (instance->fibered_attr.fiber != NULL) {
-      // Shared info attribute wasn't assigned in this block, dump its default
-      if (include_comments) {
-        o << "/* did not find any assignment for this fiber attribute " << instance << " */";
+      if (instance->fibered_attr.fiber != NULL) {
+        // Shared info attribute wasn't assigned in this block, dump its default
+          o << "/* did not find any assignment for this fiber attribute " << instance << " */";
+        return;
+      } else {
+        print_instance(instance, stdout);
+        printf(" is a non-fiber instance, but no assignment found in this block. %d\n", if_rule_p(instance->fibered_attr.attr));
+        fatal_error("crashed since non-fiber instance is missing an assignment");
+        return;
       }
       return;
     } else {
-      fatal_error("crashed since non-fiber instance is missing an assignment");
+      dump_rhs_instance_helper(aug_graph, bi->next, instance, o);
       return;
     }
   } else if (item->key == KEY_BLOCK_ITEM_CONDITION) {
     struct block_item_condition* cond = (struct block_item_condition*)item;
-    Declaration if_stmt = cond->condition;
-    bool result = true;
+    bool visited_if_stmt = std::find(dumped_conditional_block_items.begin(), dumped_conditional_block_items.end(), item) != dumped_conditional_block_items.end();
+    dumped_conditional_block_items.push_back(item);
 
-    o << "if (";
-    dump_Expression(if_stmt_cond(if_stmt), o);
-    o << ") {\n";
-    nesting_level++;
-    current_blocks.push_back(if_stmt_if_true(if_stmt));
-    o << indent();
-    dump_rhs_instance_helper(aug_graph, cond->next_positive, instance, o);
-    current_blocks.pop_back();
-    o << "\n";
-    nesting_level--;
-    o << indent() << "} else {\n";
-    nesting_level++;
-    current_blocks.push_back(if_stmt_if_false(if_stmt));
-    o << indent();
-    dump_rhs_instance_helper(aug_graph, cond->next_negative, instance, o);
-    current_blocks.pop_back();
-    nesting_level--;
-    o << "\n";
-    o << indent() << "}";
+    switch (ABSTRACT_APS_tnode_phylum(cond->condition))
+    {
+    case KEYDeclaration:
+    {
+      Declaration if_stmt = (Declaration)cond->condition;
+      if (ABSTRACT_APS_tnode_phylum(cond->condition) != KEYDeclaration) {
+        fatal_error("expected declaration, got %s %d", decl_name(cond->condition), ABSTRACT_APS_tnode_phylum(cond->condition));
+      }
+      if (Declaration_KEY(if_stmt) != KEYif_stmt) {
+        fatal_error("expected if statement, got %s %d", decl_name(if_stmt), Declaration_info(if_stmt));
+      }
+
+      if (!edgeset_kind(current_aug_graph->graph[cond->instance->index * current_aug_graph->instances.length + instance->index])) {
+        printf("interesting: ");
+        print_instance(cond->instance, stdout);
+        printf(" does not affect ");
+        print_instance(instance, stdout);
+        printf("\n");
+        printf("\n");
+        fatal_error("crashed since instance not affected by condition");
+      }
+
+      if (!visited_if_stmt) {
+        o << "if (";
+        dump_Expression(if_stmt_cond(if_stmt), o);
+        o << ") {\n";
+        nesting_level++;
+      }
+      current_blocks.push_back(if_stmt_if_true(if_stmt));
+      if (!visited_if_stmt) {
+        o << indent();
+      }
+      dump_rhs_instance_helper(aug_graph, cond->next_positive, instance, o);
+      if (!visited_if_stmt) {
+        current_blocks.pop_back();
+        o << "\n";
+        nesting_level--;
+        o << indent() << "} else {\n";
+        nesting_level++;
+      }
+      current_blocks.push_back(if_stmt_if_false(if_stmt));
+      if (!visited_if_stmt) {
+        o << indent();
+      }
+      dump_rhs_instance_helper(aug_graph, cond->next_negative, instance, o);
+      current_blocks.pop_back();
+      if (!visited_if_stmt) {
+        nesting_level--;
+        o << "\n";
+        o << indent() << "}";
+      }
+	    break;
+    }
+    case KEYMatch:
+    {
+      Match m = (Match)cond->condition;
+      Pattern p = matcher_pat(m);
+      Declaration header = Match_info(m)->header;
+      // if first match in case, we evaluate variable:
+      if (m == first_Match(case_stmt_matchers(header))) {
+        Expression e = case_stmt_expr(header);
+#ifdef APS2SCALA
+        // Type ty = infer_expr_type(e);
+        o << indent() << "val node" << instance->index << " = " << e << ";\n";
+#else  /* APS2SCALA */
+        Type ty = infer_expr_type(e);
+        o << indent() << ty << " node" << instance->index << " = " << e << ";\n";
+#endif /* APS2SCALA */
+      }
+#ifdef APS2SCALA
+      o << indent() << "node" << instance->index << " match {\n";
+      o << indent() << "case " << p << " => {\n";
+#else  /* APS2SCALA */
+      o << indent() << "if (";
+      dump_Pattern_cond(p, "node" + std::to_string(instance->index), o);
+      o << ") {\n";
+#endif /* APS2SCALA */
+      nesting_level += 1;
+#ifndef APS2SCALA
+      dump_Pattern_bindings(p, o);
+#endif /* APS2SCALA */
+      Block if_true;
+      Block if_false;
+      if_true = matcher_body(m);
+      if (MATCH_NEXT(m)) {
+        if_false = 0;  //? Why not the nxt match ?
+      } else {
+        if_false = case_stmt_default(header);
+      }
+
+      current_blocks.push_back(if_true);
+      dump_rhs_instance_helper(aug_graph, cond->next_positive, instance, o);
+      current_blocks.pop_back();
+
+#ifdef APS2SCALA
+      o << indent() << "}\n";
+      o << indent() << "case _ => {\n";
+#else  /* APS2SCALA */
+      o << "} else {\n";
+#endif /* APS2SCALA */
+      ++nesting_level;
+      current_blocks.push_back(if_false);
+      dump_rhs_instance_helper(aug_graph, cond->next_negative, instance, o);
+      current_blocks.pop_back();
+
+      --nesting_level;
+#ifdef APS2SCALA
+      o << indent() << "}}\n";
+#else  /* APS2SCALA */
+      o << indent() << "}\n";
+#endif /* APS2SCALA */
+      
+      break;
+    }
+    default:
+      fatal_error("unhandled if statement type");
+      break;
+    }
   }
 }
 
@@ -1336,8 +1713,7 @@ virtual void dump_synth_instance(INSTANCE* instance, ostream& o) override {
 
   if (is_inherited) {
     if (is_parent_instance) {
-      o << "v_" << instance_to_string(instance, false, true);
-      return;
+      o << "v_" << instance_to_string(instance, false, !current_synth_functions_state->is_phylum_instance ? false : true);
     } else {
       // we need to find the assignment and dump the RHS recursive call
       dump_rhs_instance_helper(aug_graph, block, instance, o);
@@ -1346,7 +1722,13 @@ virtual void dump_synth_instance(INSTANCE* instance, ostream& o) override {
     if (is_parent_instance) {
       dump_rhs_instance_helper(aug_graph, block, instance, o);
     } else {
+      printf("instance: ");
+      print_instance(instance, stdout);
+      printf("\n");
+
       Type ty = infer_formal_type(node);
+      print_Type(ty, stdout);
+      o << "\n";
       Declaration ctype_decl = canonical_type_decl(canonical_type(ty));
       PHY_GRAPH* pgraph = summary_graph_for(current_state, ctype_decl);
 

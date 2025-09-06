@@ -159,7 +159,7 @@ static void dump_context_open(void *c, ostream& os) {
       Declaration header = Match_info(m)->header;
       bool is_exclusive = Declaration_KEY(header) == KEYcase_stmt;
       os << indent() << (is_exclusive ? "else if (" : "if (");
-      dump_Pattern_cond(p,"node",os);
+      dump_Pattern_cond(p, "node", os);
       os << ") {\n";
       nesting_level+=1;
       dump_Pattern_bindings(p,os);

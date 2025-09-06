@@ -79,7 +79,7 @@ bool incremental = false; //! unused
 bool in_constructor = false; // kludge
 int verbose = 0;
 int debug = 0;
-bool include_comments = false;
+bool include_comments = true;
 
 int inline_definitions = 0;
 
