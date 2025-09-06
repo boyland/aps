@@ -202,5 +202,6 @@ inline const output_streams& operator<< <header_end>
 extern AUG_GRAPH* current_aug_graph;
 extern STATE* current_state;
 extern std::vector<SYNTH_FUNCTION_STATE*> synth_functions_states;
+extern SYNTH_FUNCTION_STATE* current_synth_functions_state;
 
 #endif

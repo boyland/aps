@@ -27,7 +27,7 @@ using std::string;
 extern int aps_yylineno;
 int nesting_level = 0;
 bool activate_static_circular = false;
-bool include_comments = false;
+bool include_comments = true;
 
 ostream& operator<<(ostream&o,Symbol s)
 {
@@ -2294,6 +2294,7 @@ void dump_collect_Actuals(Type ctype, Actuals as, ostream& o)
 STATE* current_state = NULL;
 AUG_GRAPH* current_aug_graph = NULL;
 std::vector<SYNTH_FUNCTION_STATE*> synth_functions_states;
+SYNTH_FUNCTION_STATE* current_synth_functions_state = NULL;
 
 static bool find_instance(AUG_GRAPH* aug_graph, Declaration node, Declaration attr, INSTANCE** instance_out) {
   int i;
