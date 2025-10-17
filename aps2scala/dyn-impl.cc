@@ -460,8 +460,26 @@ void implement_local_attributes(vector<Declaration>& local_attributes,
   }
 }
 
+Declaration surrounding_module_decl(void* node) {
+  while (node != NULL) {
+    if (ABSTRACT_APS_tnode_phylum(node) == KEYDeclaration) {
+      Declaration decl = (Declaration)node;
+      switch (Declaration_KEY(decl)) {
+      case KEYsome_class_decl:
+        return decl;
+      default:
+        break;
+      }
+    }
+    node = tnode_parent(node);
+  }
+
+  return NULL;
+}
+
 void implement_attributes(const vector<Declaration>& attrs,
 			  const vector<Declaration>& tlms,
+        const vector<Declaration>& constructors,
 			  ostream& oss)
 {
   int n = attrs.size();
@@ -477,6 +495,10 @@ void implement_attributes(const vector<Declaration>& attrs,
     Type rt = value_decl_type(rdecl);
     bool inh = (ATTR_DECL_IS_INH(ad) != 0);
     bool is_col = direction_is_collection(attribute_decl_direction(ad));
+
+    Declaration attr_decl_phylum = attribute_decl_phylum(ad);
+    Declaration mdecl = surrounding_module_decl(attr_decl_phylum);
+    bool is_syntax = first_Declaration(some_class_decl_type_formals(mdecl)) != NULL;
 
     oss << indent() << "def c_" << name << "(anode : " << at << ") : "
 	<< rt << " = {\n";
@@ -494,7 +516,39 @@ void implement_attributes(const vector<Declaration>& attrs,
 	++nesting_level;
 	oss << indent() << "val anchorNodes = anchor.myType.nodes;\n";
       } else {
-	oss << indent() << "val anchor = anode;\n";
+        auto pgraph = Declaration_info(attr_decl_phylum)->decl_flags;
+        if (!is_syntax) {
+          oss << indent() << "val anchor = anode;\n";
+        } else {
+          oss << indent() << "val anchor = anode match {\n";
+          nesting_level++;
+          for (vector<Declaration>::const_iterator it = constructors.begin(); it != constructors.end(); ++it) {
+            Declaration decl = *it;
+            if (constructor_decl_phylum(decl) == attr_decl_phylum) {
+              oss << indent() << "case c_" << decl_name(decl) << "(";
+
+              bool started = false;
+              Type ft = constructor_decl_type(decl);
+              Declarations formals = function_type_formals(ft);
+              for (Declaration formal = first_Declaration(formals); formal != NULL; formal = DECL_NEXT(formal)) {
+                if (started) {
+                  oss << ", ";
+                } else {
+                  started = true;
+                }
+                oss << "_";
+              }
+
+              if (started) {
+                oss << ", ";
+              }
+              oss << "ast) => { println(f\"$anode to $ast fixed\"); ast }\n";
+            }
+          }
+          oss << indent() << "case _ => anode\n";
+          nesting_level--;
+          oss << indent() << "}\n";
+        }
       }
     }
     // The scala compiler generates exponential code for
@@ -618,7 +672,19 @@ public:
 
     void implement(ostream& oss) {
       implement_local_attributes(local_attributes,oss);
-      implement_attributes(attribute_decls,top_level_matches,oss);
+
+      vector<Declaration> constructors;
+      for (Declaration d = first_Declaration(block_body(module_decl_contents(module_decl))); d != NULL; d = DECL_NEXT(d)) {
+        switch(Declaration_KEY(d)) {
+        default:
+          break;
+        case KEYconstructor_decl:
+          constructors.push_back(d);
+          break;
+        }
+      }
+
+      implement_attributes(attribute_decls,top_level_matches,constructors,oss);
       implement_var_value_decls(var_value_decls,top_level_matches,oss);
 
       // const char *name = decl_name(module_decl);
