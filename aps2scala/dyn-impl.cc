@@ -498,6 +498,7 @@ void implement_attributes(const vector<Declaration>& attrs,
 
     Declaration attr_decl_phylum = attribute_decl_phylum(ad);
     Declaration mdecl = surrounding_module_decl(attr_decl_phylum);
+    // If phylum is defined in extended class/module then its a object
     bool is_syntax = first_Declaration(some_class_decl_type_formals(mdecl)) != NULL;
 
     oss << indent() << "def c_" << name << "(anode : " << at << ") : "
