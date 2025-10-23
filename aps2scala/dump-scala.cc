@@ -2199,23 +2199,25 @@ void dump_Type(Type t, ostream& o)
     {
       bool dump_anchor = false;
 
-      Type rtype = function_type_return_type(t);
-      switch (Type_KEY(rtype)) {
-      case KEYtype_use: {
-        Declaration udecl = USE_DECL(type_use_use(rtype));
-        
-        switch (Declaration_KEY(udecl)) {
-        case KEYphylum_decl: {
-          dump_anchor = true;
+      if (impl == dynamic_impl) {
+        Type rtype = function_type_return_type(t);
+        switch (Type_KEY(rtype)) {
+        case KEYtype_use: {
+          Declaration udecl = USE_DECL(type_use_use(rtype));
+          
+          switch (Declaration_KEY(udecl)) {
+          case KEYphylum_decl: {
+            dump_anchor = true;
+            break;
+          }
+          default:
+            break;
+          }
           break;
         }
         default:
           break;
         }
-        break;
-      }
-      default:
-        break;
       }
 
       o << "(";
