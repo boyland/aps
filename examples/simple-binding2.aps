@@ -48,7 +48,7 @@ module NAME_RESOLUTION[T :: var SIMPLE[]] extends T begin
   
   not_found : EntityRef := nil;
   
-  no_shape : Shape := nil;
+  no_shape : Shape := Shape$nil;
   int_shape : Shape := shape("integer");
   str_shape : Shape := shape("string");
 
@@ -64,7 +64,7 @@ module NAME_RESOLUTION[T :: var SIMPLE[]] extends T begin
   attribute Expr.expr_scope : Scope;
 
   attribute Type.type_shape : Shape;
-  attribute Expr.expr_shape : Shape := no_shape;
+  attribute Expr.expr_shape : Shape;
   
   pragma inherited(block_scope,decls_scope,decl_scope,
 		   stmts_scope,stmt_scope,expr_scope);
@@ -137,6 +137,7 @@ module NAME_RESOLUTION[T :: var SIMPLE[]] extends T begin
     decl := lookup(id,e.expr_scope);
     if decl = not_found then
       msgs :> {id ++ " not declared"};
+      e.expr_shape := no_shape;
     else
       decl.entity_used :> true;
       e.expr_shape := decl.entity_shape;
