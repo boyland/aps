@@ -1883,7 +1883,7 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
       string utypes = started ? ("(" + types + "," + typess.str() + ")") : typess.str(); 
       
       // the constructor function:
-      dump_function_prototype(name,ft,false,oss);
+      dump_function_prototype(name,ft,oss);
       oss << " = c_" << name << args;
       if (is_syntax) oss << ".register";
       oss << ";\n";
