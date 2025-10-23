@@ -543,7 +543,7 @@ void implement_attributes(const vector<Declaration>& attrs,
               if (started) {
                 oss << ", ";
               }
-              oss << "ast) => { println(f\"$anode to $ast fixed\"); ast }\n";
+              oss << "ast) => ast\n";
             }
           }
           oss << indent() << "case _ => anode\n";
