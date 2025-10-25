@@ -460,23 +460,6 @@ void implement_local_attributes(vector<Declaration>& local_attributes,
   }
 }
 
-Declaration surrounding_module_decl(void* node) {
-  while (node != NULL) {
-    if (ABSTRACT_APS_tnode_phylum(node) == KEYDeclaration) {
-      Declaration decl = (Declaration)node;
-      switch (Declaration_KEY(decl)) {
-      case KEYsome_class_decl:
-        return decl;
-      default:
-        break;
-      }
-    }
-    node = tnode_parent(node);
-  }
-
-  return NULL;
-}
-
 void implement_attributes(const vector<Declaration>& attrs,
 			  const vector<Declaration>& tlms,
         const vector<Declaration>& constructors,
@@ -497,7 +480,12 @@ void implement_attributes(const vector<Declaration>& attrs,
     bool is_col = direction_is_collection(attribute_decl_direction(ad));
 
     Declaration attr_decl_phylum = attribute_decl_phylum(ad);
-    Declaration mdecl = surrounding_module_decl(attr_decl_phylum);
+
+    Declaration mdecl = NULL;
+    if (!check_surrounding_decl(attr_decl_phylum, KEYmodule_decl, &mdecl)) {
+      fatal_error("Cannot find surrounding module for phylum of attribute %s", decl_name(ad));
+    }
+
     // If phylum is defined in extended class/module then its a object
     bool is_syntax = first_Declaration(some_class_decl_type_formals(mdecl)) != NULL;
 
@@ -543,7 +531,7 @@ void implement_attributes(const vector<Declaration>& attrs,
               if (started) {
                 oss << ", ";
               }
-              oss << "ast) => ast\n";
+              oss << "ast) if ast != null => ast\n";
             }
           }
           oss << indent() << "case _ => anode\n";

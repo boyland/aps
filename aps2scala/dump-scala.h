@@ -97,4 +97,6 @@ inline ostream& operator<<(ostream&os, INSTANCE*i) {
 
 extern string operator+(string, int);
 
+extern bool check_surrounding_decl(void* node, KEYTYPE_Declaration decl_key, Declaration* result_decl);
+
 #endif

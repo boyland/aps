@@ -2414,6 +2414,9 @@ void dump_Expression(Expression e, ostream& o)
       }
     }
 
+    Declaration tplm;
+    bool inside_top_level_match = check_surrounding_decl(e, KEYtop_level_match, &tplm);
+
     dump_Expression(funcall_f(e),o);
     o << "(";
     {
@@ -2433,7 +2436,11 @@ void dump_Expression(Expression e, ostream& o)
       if (first_Actual(funcall_actuals(e)) != NULL) {
         o << ", ";
       }
-      o << "anchor";
+      if (inside_top_level_match) {
+        o << "anchor";
+      } else {
+        o << "null";
+      }
     }
 
     o << ")";
@@ -2611,3 +2618,19 @@ string operator+(string s, int i)
 }
 
 string indent(int nl) { return string(indent_multiple*nl,' '); }
+
+bool check_surrounding_decl(void* node, KEYTYPE_Declaration decl_key, Declaration* result_decl) {
+  while (node != NULL) {
+    if (ABSTRACT_APS_tnode_phylum(node) == KEYDeclaration) {
+      Declaration decl = (Declaration)node;
+      if (Declaration_KEY(decl) == decl_key) {
+        *result_decl = decl;
+        return true;
+      }
+    }
+    node = tnode_parent(node);
+  }
+
+  *result_decl = NULL;
+  return false;
+}
