@@ -114,12 +114,11 @@ int main(int argc,char **argv) {
     if (out.fail())
     {
       std::cerr << "Failed to open output file " << outfilename << std::endl;
-      dump_scala_Program(p,std::cout);
-    } else {
-      dump_scala_Program(p,out);
-      out.close();
+      exit(1);
     }
 
+    dump_scala_Program(p,out);
+    out.close();
   }
   exit(0);
 }

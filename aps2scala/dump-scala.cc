@@ -27,7 +27,7 @@ using std::string;
 extern int aps_yylineno;
 int nesting_level = 0;
 bool activate_static_circular = false;
-bool include_comments = true;
+bool include_comments = false;
 
 ostream& operator<<(ostream&o,Symbol s)
 {
@@ -2335,7 +2335,6 @@ void dump_Expression(Expression e, ostream& o)
       Declaration node = USE_DECL(value_use_use(first_Actual(funcall_actuals(e))));
       INSTANCE* instance;
       if (find_instance(current_aug_graph, node, attr, &instance)) {
-        // dump_synth_attribute(instance, visited, o);
         impl->dump_synth_instance(instance, o);
         return;
       } else {
@@ -2530,4 +2529,4 @@ string operator+(string s, int i)
   return os.str();
 }
 
-string indent(int nl) { return string(indent_multiple*abs(nl),' '); }
+string indent(int nl) { return string(indent_multiple*nl,' '); }
