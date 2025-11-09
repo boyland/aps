@@ -199,6 +199,7 @@ inline const output_streams& operator<< <header_end>
 }
 #endif /* APS2SCALA */
 
+// The following are used for synth function implementation only 
 extern AUG_GRAPH* current_aug_graph;
 extern STATE* current_state;
 extern std::vector<SYNTH_FUNCTION_STATE*> synth_functions_states;
