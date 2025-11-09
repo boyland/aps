@@ -2485,7 +2485,6 @@ static void synchronize_dependency_graphs(AUG_GRAPH *aug_graph,
       int aug_index = i*n + j;
       int sum_index = (i-start)*phy_n + (j-start);
       DEPENDENCY kind=edgeset_kind(aug_graph->graph[aug_index]);
-
       // avoid adding augmeneted dependency graph edges to summary graph of function declarations
       // if synth-function generation is active, also avoid adding augmeneted dependency graph edges to summary graph
       if (!AT_MOST(dependency_indirect(kind),
