@@ -760,11 +760,6 @@ public:
     print_instance(sink, stdout);
     printf("\n");
 
-    if (sink->index == 61 || sink->index == 45)
-    {
-      printf("break\n");
-    }
-
     int i, j;
     int n = aug_graph->instances.length;
 
@@ -785,15 +780,6 @@ public:
         }
       }
     }
-
-    for (auto it = relevant_instances.begin(); it != relevant_instances.end(); it++) {
-      INSTANCE* in = *it;
-      printf("  ");
-      print_instance(in, stdout);
-      printf("\n");
-    }
-    
-    printf("\n");
 
     if (relevant_instances.empty()) {
       return;
@@ -889,10 +875,6 @@ private:
     for (i = 0; i < component->length; i++) {
       INSTANCE* in = (INSTANCE*)component->array[i];
 
-      if (in->index == 97) {
-        printf("break\n");
-      }
-
       if (scheduled[in->index]) {
         continue;
       }
@@ -919,9 +901,11 @@ private:
       printf("\n");
 
       scheduled[in->index] = true;
+      os << in << "\n";
       os << indent();
       impl->dump_synth_instance(in, os);
       count_scheduled++;
+      dumped_conditional_block_items.clear();
       os << "\n";
 
       dump_scc_helper_dump(aug_graph, component, scheduled, os);
@@ -1018,7 +1002,8 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
        << synth_functions_state->source->index << ")\n";
     if (synth_functions_state->is_fiber_evaluation) {
       os << indent() << "val evaluated_map_" << synth_functions_state->fdecl_name
-         << " = scala.collection.mutable.Map[T_" << decl_name(synth_functions_state->source_phy_graph->phylum)
+        //  << " = scala.collection.mutable.Map[T_" << decl_name(synth_functions_state->source_phy_graph->phylum)
+            << " = scala.collection.mutable.Map[Int"
          << ", Boolean]()"
          << "\n\n";
     }
@@ -1061,7 +1046,7 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
 
     if (synth_functions_state->is_fiber_evaluation) {
       os << indent() << "evaluated_map_" << synth_functions_state->fdecl_name
-         << ".getOrElse(node, false) match {\n";
+         << ".getOrElse(node.nodeNumber, false) match {\n";
       os << indent(nesting_level + 1) << "case true => ";
       os << "return ()\n";
     } else {
@@ -1109,10 +1094,6 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
       printf("\n");
       print_linearized_block(current_scope_block);
 
-      if (aug_graph_instance->index == 143) {
-        printf("here\n");
-      }
-
       if (synth_functions_state->is_fiber_evaluation) {
         FiberDependencyDumper::dump(aug_graph, aug_graph_instance, os);
       }
@@ -1134,7 +1115,7 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
     os << indent() << "};\n";
 
     if (synth_functions_state->is_fiber_evaluation) {
-      os << indent() << "evaluated_map_" << synth_functions_state->fdecl_name << ".update(node, true);\n";
+      os << indent() << "evaluated_map_" << synth_functions_state->fdecl_name << ".update(node.nodeNumber, true);\n";
     } else {
       os << indent() << instance_to_attr(synth_functions_state->source) << ".assign(node, result);\n";
       os << indent() << instance_to_attr(synth_functions_state->source) << ".get(node);\n";
@@ -1302,28 +1283,28 @@ static vector<std::set<Expression> > make_instance_assignment() {
 
   vector<std::set<Expression> > from(n);
 
+  for (int i = 0; i < n; ++i) {
+    INSTANCE* in = &current_aug_graph->instances.array[i];
+    Declaration ad = in->fibered_attr.attr;
+    if (ad != 0 && in->fibered_attr.fiber == 0 && ABSTRACT_APS_tnode_phylum(ad) == KEYDeclaration) {
+      // get default!
+      switch (Declaration_KEY(ad)) {
+        case KEYattribute_decl:
+          from[in->index].insert(default_init(attribute_decl_default(ad)));
+          break;
+        case KEYvalue_decl:
+          from[in->index].insert(default_init(value_decl_default(ad)));
+          break;
+        default:
+          break;
+      }
+    }
+  }
+
   // start from the outer-most and override it with the most inner scope
   for (auto it = current_blocks.begin(); it != current_blocks.end(); it++) {
     Block block = *it;
     vector<std::set<Expression> > array(from);
-
-    for (int i = 0; i < n; ++i) {
-      INSTANCE* in = &current_aug_graph->instances.array[i];
-      Declaration ad = in->fibered_attr.attr;
-      if (ad != 0 && in->fibered_attr.fiber == 0 && ABSTRACT_APS_tnode_phylum(ad) == KEYDeclaration) {
-        // get default!
-        switch (Declaration_KEY(ad)) {
-          case KEYattribute_decl:
-            array[in->index].insert(default_init(attribute_decl_default(ad)));
-            break;
-          case KEYvalue_decl:
-            array[in->index].insert(default_init(value_decl_default(ad)));
-            break;
-          default:
-            break;
-        }
-      }
-    }
 
     // Step #1 clear any existing assignments and insert normal assignments
     // Step #2 insert collection assignments
@@ -1561,7 +1542,24 @@ void dump_rhs_instance_helper(AUG_GRAPH* aug_graph, BlockItem* item, INSTANCE* i
 
       if (instance->fibered_attr.fiber != NULL) {
         // Shared info attribute wasn't assigned in this block, dump its default
-          o << "/* did not find any assignment for this fiber attribute " << instance << " */";
+          auto direction = fibered_attr_direction(&instance->fibered_attr);
+          auto directionStr = "";
+          switch (direction)
+          {
+          case instance_inward:
+            directionStr = "instance_inward";
+            break;
+          case instance_outward:
+            directionStr = "instance_outward";
+            break;
+          case instance_local:
+            directionStr = "instance_local";
+            break;
+          default:
+            break;
+          }
+
+          o << "/* did not find any assignment for this fiber attribute " << instance << " ->" << directionStr << "<-" <<" */";
         return;
       } else {
         print_instance(instance, stdout);
@@ -1592,11 +1590,10 @@ void dump_rhs_instance_helper(AUG_GRAPH* aug_graph, BlockItem* item, INSTANCE* i
       }
 
       if (!edgeset_kind(current_aug_graph->graph[cond->instance->index * current_aug_graph->instances.length + instance->index])) {
-        printf("interesting: ");
+        printf("\n");
         print_instance(cond->instance, stdout);
         printf(" does not affect ");
         print_instance(instance, stdout);
-        printf("\n");
         printf("\n");
         fatal_error("crashed since instance not affected by condition");
       }
