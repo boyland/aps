@@ -217,7 +217,6 @@ static int count_declarations(Declarations declarations)
  */
 CanonicalType *new_canonical_type_use(Declaration decl)
 {
- //  printf("Creating canonical type use at line number: %d\n", tnode_line_number(decl));
   struct Canonical_use_type ctype_use = {KEY_CANONICAL_USE, decl};
   void *memory = hash_cons_get(&ctype_use, sizeof(ctype_use), &canonical_type_table);
   return (CanonicalType *)memory;
