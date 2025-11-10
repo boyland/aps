@@ -115,10 +115,12 @@ static Expression default_init(Default def) {
 static vector<std::set<Expression> > make_instance_assignment(
     AUG_GRAPH* aug_graph,
     Block block,
-    vector<std::set<Expression> > from) {
+    vector<std::set<Expression> > from,
+    bool include_initial_defaults) {
   int n = aug_graph->instances.length;
   vector<std::set<Expression> > array(from);
 
+  if (include_initial_defaults) {
   for (int i = 0; i < n; ++i) {
     INSTANCE* in = &aug_graph->instances.array[i];
     Declaration ad = in->fibered_attr.attr;
@@ -136,6 +138,7 @@ static vector<std::set<Expression> > make_instance_assignment(
           break;
       }
     }
+  }
   }
 
   // Step #1 clear any existing assignments and insert normal assignments
@@ -467,7 +470,7 @@ static bool implement_visit_function(
 #endif /* APS2SCALA */
 
       vector<std::set<Expression> > assignment =
-          make_instance_assignment(aug_graph, body, instance_assignment);
+          make_instance_assignment(aug_graph, body, instance_assignment, false /* defaults are already included */);
 
       bool cont = implement_visit_function(aug_graph, phase, cto->cto_next,
                                assignment, nch, cond, cto->chunk_index,
@@ -546,7 +549,7 @@ static bool implement_visit_function(
 
       int cmask = 1 << (if_rule_index(ad));
       vector<std::set<Expression> > true_assignment =
-          make_instance_assignment(aug_graph, if_true, instance_assignment);
+          make_instance_assignment(aug_graph, if_true, instance_assignment, false /* defaults are already included */);
 
       cond->positive |= cmask;
       implement_visit_function(aug_graph, phase, cto->cto_if_true,
@@ -569,7 +572,7 @@ static bool implement_visit_function(
       ++nesting_level;
       vector<std::set<Expression> > false_assignment =
           if_false ? make_instance_assignment(aug_graph, if_false,
-                                              instance_assignment)
+                                              instance_assignment, false /* defaults are already included */)
                    : instance_assignment;
 
       cond->negative |= cmask;
@@ -857,7 +860,7 @@ static void dump_visit_functions(PHY_GRAPH* phy_graph,
   vector<std::set<Expression> > default_instance_assignments(
       aug_graph->instances.length, std::set<Expression>());
   vector<std::set<Expression> > instance_assignment =
-      make_instance_assignment(aug_graph, block, default_instance_assignments);
+      make_instance_assignment(aug_graph, block, default_instance_assignments, true /* include defaults */);
 
   // the following loop is controlled in two ways:
   // (1) if total order is zero, there are no visits at all.
@@ -1116,7 +1119,7 @@ static void dump_visit_functions(STATE* s, output_streams& oss)
       s->global_dependencies.instances.length, std::set<Expression>());
   vector<std::set<Expression> > instance_assignment = make_instance_assignment(
       &s->global_dependencies, module_decl_contents(s->module),
-      default_instance_assignments);
+      default_instance_assignments, true /* include defaults */);
 
   CONDITION cond;
   cond.positive = 0;
@@ -1181,7 +1184,7 @@ static void dump_scheduled_function_body(Declaration fd, STATE* s, ostream& bs) 
   vector<std::set<Expression> > default_instance_assignments(
       aug_graph->instances.length, std::set<Expression>());
   vector<std::set<Expression> > instance_assignment = make_instance_assignment(
-      aug_graph, function_decl_body(fd), default_instance_assignments);
+      aug_graph, function_decl_body(fd), default_instance_assignments, true /* include defaults */);
 
   CONDITION cond;
   cond.positive = 0;
