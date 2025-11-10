@@ -64,6 +64,7 @@ struct block_item_instance {
 vector<Block> current_blocks;
 BlockItem* current_scope_block;
 vector<BlockItem*> dumped_conditional_block_items;
+vector<INSTANCE*> dumped_instances;
 
 // Given a block, it prints it linearized schedule.
 static void print_linearized_block(BlockItem* block) {
@@ -641,62 +642,6 @@ static std::vector<SYNTH_FUNCTION_STATE*> build_synth_functions_state(STATE* s) 
     }
   }
 
-  // Causes cycle, bad idea
-  // need to add instances used in conditional that are wrapping the instance
-  // for (auto it1 = synth_function_states.begin(); it1 != synth_function_states.end(); it1++) {
-  //   SYNTH_FUNCTION_STATE* synth_functions_state = *it1;
-    
-  //   for (auto it2 = synth_functions_state->aug_graphs.begin(); it2 != synth_functions_state->aug_graphs.end(); it2++) {
-  //     AUG_GRAPH* aug_graph = *it2;
-  //     INSTANCE* aug_graph_instance = NULL;
-  //     if (synth_functions_state->is_phylum_instance) {
-  //       if (!find_instance(aug_graph, aug_graph->lhs_decl, synth_functions_state->source->fibered_attr, &aug_graph_instance)) {
-  //         fatal_error("something is wrong with instances in aug graph %s", aug_graph_name(aug_graph));
-  //       }
-  //     } else {
-  //       aug_graph_instance = synth_functions_state->source;
-  //     }
-
-  //     BlockItem* block = linearize_block(aug_graph);
-  //     vector<INSTANCE*> surrounding_conditions = collect_conditions_before_instance(block, aug_graph_instance);
-
-  //     for (auto it3 = surrounding_conditions.begin(); it3 != surrounding_conditions.end(); it3++) {
-  //       INSTANCE* condition_instance = *it3;
-  //       int n = aug_graph->instances.length;
-  //       for (int i = 0; i < n; i++) {
-  //         INSTANCE* instance = &aug_graph->instances.array[i];
-  //         if (edgeset_kind(aug_graph->graph[instance->index * n + condition_instance->index]) & DEPENDENCY_MAYBE_DIRECT) {
-  //           synth_functions_state->regular_dependencies.push_back(instance);
-  //         }
-  //       }
-  //     }
-  //   }
-  // }
-
-  for (auto it = synth_function_states.begin(); it != synth_function_states.end(); it++) {
-    SYNTH_FUNCTION_STATE* synth_functions_state = *it;
-    printf("Synth function: %s\n", synth_functions_state->fdecl_name.c_str());
-    printf("  Source: ");
-    print_instance(synth_functions_state->source, stdout);
-    printf("\n");
-    printf("  Is phylum instance: %s\n", synth_functions_state->is_phylum_instance ? "true" : "false");
-    printf("  Is fiber evaluation: %s\n", synth_functions_state->is_fiber_evaluation ? "true" : "false");
-    printf("  Formals:\n");
-    printf("  Aug graphs:\n");
-    for (auto it = synth_functions_state->aug_graphs.begin(); it != synth_functions_state->aug_graphs.end(); it++) {
-      printf("    %s (%d)\n", aug_graph_name(*it), Declaration_KEY((*it)->lhs_decl));
-    }
-
-    printf("  Regular dependencies:\n");
-    for (auto it = synth_functions_state->regular_dependencies.begin();
-         it != synth_functions_state->regular_dependencies.end(); it++) {
-      printf("    ");
-      print_instance(*it, stdout);
-      printf("\n");
-    }
-    printf("\n");
-  }
-
   return synth_function_states;
 }
 
@@ -858,7 +803,6 @@ private:
   }
 
   static void dump_scc_helper_dump(AUG_GRAPH* aug_graph, SCC_COMPONENT* component, bool* scheduled, ostream& os) {
-    
     int i;
 
     if (already_scheduled(aug_graph, component, scheduled)) {
@@ -906,6 +850,7 @@ private:
       impl->dump_synth_instance(in, os);
       count_scheduled++;
       dumped_conditional_block_items.clear();
+      dumped_instances.clear();
       os << "\n";
 
       dump_scc_helper_dump(aug_graph, component, scheduled, os);
@@ -998,8 +943,7 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
     current_synth_functions_state = synth_functions_state;
 
     os << indent() << "// " << synth_functions_state->source << " ("
-       << (synth_functions_state->is_phylum_instance ? "phylum" : "auggraph") << " "
-       << synth_functions_state->source->index << ")\n";
+       << (synth_functions_state->is_phylum_instance ? "phylum" : "auggraph") << ")\n";
     if (synth_functions_state->is_fiber_evaluation) {
       os << indent() << "val evaluated_map_" << synth_functions_state->fdecl_name
         //  << " = scala.collection.mutable.Map[T_" << decl_name(synth_functions_state->source_phy_graph->phylum)
@@ -1089,18 +1033,32 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
       // that have nothing to do with this instance don't appear in linearization
       current_scope_block = linearize_block(aug_graph, aug_graph_instance);
 
-      printf("Linearizing augmented graph %s for ", aug_graph_name(aug_graph));
-      print_instance(aug_graph_instance, stdout);
-      printf("\n");
-      print_linearized_block(current_scope_block);
-
       if (synth_functions_state->is_fiber_evaluation) {
         FiberDependencyDumper::dump(aug_graph, aug_graph_instance, os);
       }
 
-      os << indent();
+      bool is_circular = edgeset_kind(aug_graph->graph[aug_graph_instance->index * n + aug_graph_instance->index]) != 0;
+      if (is_circular) {
+        os << indent() << "var prevValue" << synth_functions_state->source->index << " = " << instance_to_attr(synth_functions_state->source) << ".get(node);\n";
+        os << indent() << "var currentValue" << synth_functions_state->source->index << " = prevValue" << synth_functions_state->source->index << ";\n";
+        os << indent() << "do {\n";
+        nesting_level++;
+        os << indent() << "currentValue" << synth_functions_state->source->index << " = ";
+      } else {
+        os << indent();
+      }
+
       impl->dump_synth_instance(aug_graph_instance, os);
       os << "\n";
+
+      if (is_circular) {
+        os << indent() << instance_to_attr(synth_functions_state->source) << ".assign(node, currentValue" << synth_functions_state->source->index << ");\n";
+        nesting_level--;
+        os << indent() << "} while (prevValue" << synth_functions_state->source->index << " != currentValue" << synth_functions_state->source->index << ")\n";
+        if (!synth_functions_state->is_fiber_evaluation) {
+          os << "currentValue" << synth_functions_state->source->index << "\n";
+        }
+      }
 
       current_blocks.clear();
       dumped_conditional_block_items.clear();
@@ -1608,7 +1566,11 @@ void dump_rhs_instance_helper(AUG_GRAPH* aug_graph, BlockItem* item, INSTANCE* i
       if (!visited_if_stmt) {
         o << indent();
       }
+      
+      vector<INSTANCE*> dumped_instanced_positive(dumped_instances);
       dump_rhs_instance_helper(aug_graph, cond->next_positive, instance, o);
+      dumped_instances = dumped_instanced_positive;
+
       if (!visited_if_stmt) {
         current_blocks.pop_back();
         o << "\n";
@@ -1620,7 +1582,11 @@ void dump_rhs_instance_helper(AUG_GRAPH* aug_graph, BlockItem* item, INSTANCE* i
       if (!visited_if_stmt) {
         o << indent();
       }
+
+      vector<INSTANCE*> dumped_instanced_negative(dumped_instances);
       dump_rhs_instance_helper(aug_graph, cond->next_negative, instance, o);
+      dumped_instances = dumped_instanced_negative;
+
       current_blocks.pop_back();
       if (!visited_if_stmt) {
         nesting_level--;
@@ -1698,6 +1664,13 @@ void dump_rhs_instance_helper(AUG_GRAPH* aug_graph, BlockItem* item, INSTANCE* i
 }
 
 virtual void dump_synth_instance(INSTANCE* instance, ostream& o) override {
+  bool already_dumped = false;
+  if (std::find(dumped_instances.begin(), dumped_instances.end(), instance) != dumped_instances.end()) {
+    already_dumped = true;
+  } else {
+    dumped_instances.push_back(instance);
+  }
+
   AUG_GRAPH* aug_graph = current_aug_graph;
   BlockItem* block = find_surrounding_block(current_scope_block, instance);
 
@@ -1707,10 +1680,12 @@ virtual void dump_synth_instance(INSTANCE* instance, ostream& o) override {
 
   bool is_synthesized = instance_is_synthesized(instance);
   bool is_inherited = instance_is_inherited(instance);
+  bool is_circular = edgeset_kind(current_aug_graph->graph[instance->index * current_aug_graph->instances.length + instance->index]);
 
   if (is_inherited) {
     if (is_parent_instance) {
       o << "v_" << instance_to_string(instance, false, !current_synth_functions_state->is_phylum_instance ? false : true);
+      dumped_instances.push_back(instance);
     } else {
       // we need to find the assignment and dump the RHS recursive call
       dump_rhs_instance_helper(aug_graph, block, instance, o);
@@ -1719,13 +1694,16 @@ virtual void dump_synth_instance(INSTANCE* instance, ostream& o) override {
     if (is_parent_instance) {
       dump_rhs_instance_helper(aug_graph, block, instance, o);
     } else {
-      printf("instance: ");
-      print_instance(instance, stdout);
-      printf("\n");
+      if (is_circular) {
+        if (already_dumped) {
+          o << "/** use the existing value for circular attribute instance: ";
+          o << instance << " **/";
+          o << instance_to_attr(instance) << ".get(node)\n";
+          return;
+        }
+      }
 
       Type ty = infer_formal_type(node);
-      print_Type(ty, stdout);
-      o << "\n";
       Declaration ctype_decl = canonical_type_decl(canonical_type(ty));
       PHY_GRAPH* pgraph = summary_graph_for(current_state, ctype_decl);
 
