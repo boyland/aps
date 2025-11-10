@@ -36,6 +36,8 @@ static void *analyze_thing(void *ignore, void *node)
         {
           print_cycles(s, stdout);
         }
+        d = (s->original_state_dependency = analysis_state_cycle(s));
+        s->loop_required = !(d & DEPENDENCY_MAYBE_SIMPLE);
       } else {
         if (!(d = (s->original_state_dependency = analysis_state_cycle(s))))
         {
