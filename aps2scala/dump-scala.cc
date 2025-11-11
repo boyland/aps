@@ -1346,7 +1346,7 @@ static void dump_scala_pattern_function(
   Type rt = value_decl_type(first_Declaration(rdecls));
 
   bool dump_anchor_actual = false;
-  if (impl == dynamic_impl) {
+  if (should_include_ast_for_objects()) {
     switch (Declaration_KEY(decl))
     {
     case KEYconstructor_decl: {
@@ -1817,7 +1817,7 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
 	dump_formal(f,oss);
       }
 
-      if (impl == dynamic_impl) {
+      if (should_include_ast_for_objects()) {
         if (is_syntax) {
           if (started) {
             oss << ", ";
@@ -2199,7 +2199,7 @@ void dump_Type(Type t, ostream& o)
     {
       bool dump_anchor = false;
 
-      if (impl == dynamic_impl) {
+      if (should_include_ast_for_objects()) {
         Type rtype = function_type_return_type(t);
         switch (Type_KEY(rtype)) {
         case KEYtype_use: {
@@ -2387,7 +2387,7 @@ void dump_Expression(Expression e, ostream& o)
       return;
     }
     bool dump_anchor_actual = false;
-    if (impl == dynamic_impl) {
+    if (should_include_ast_for_objects()) {
       Expression fexpr = funcall_f(e);
       switch (Expression_KEY(fexpr)) {
         case KEYvalue_use: {

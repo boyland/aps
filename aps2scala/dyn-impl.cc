@@ -506,7 +506,7 @@ void implement_attributes(const vector<Declaration>& attrs,
 	oss << indent() << "val anchorNodes = anchor.myType.nodes;\n";
       } else {
         auto pgraph = Declaration_info(attr_decl_phylum)->decl_flags;
-        if (!is_syntax) {
+        if (!is_syntax || !should_include_ast_for_objects()) {
           oss << indent() << "val anchor = anode;\n";
         } else {
           oss << indent() << "val anchor = anode match {\n";

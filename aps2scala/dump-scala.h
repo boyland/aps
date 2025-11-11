@@ -99,4 +99,6 @@ extern string operator+(string, int);
 
 extern bool check_surrounding_decl(void* node, KEYTYPE_Declaration decl_key, Declaration* result_decl);
 
+extern bool should_include_ast_for_objects();
+
 #endif
