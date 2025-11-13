@@ -39,6 +39,27 @@ extern int aps_yyparse(void);
 
 Implementation* impl;
 bool static_schedule = false;
+bool is_tree_only_program = false;
+
+static void* program_is_tree_only(void *scope, void *node) {
+  if (ABSTRACT_APS_tnode_phylum(node) == KEYDeclaration) {
+    Declaration decl = (Declaration)node;
+    switch (Declaration_KEY(decl)) {
+      case KEYsome_class_decl: {
+        is_tree_only_program |= first_Declaration(some_class_decl_type_formals(decl)) == NULL;
+        return NULL;
+      }
+      default:
+        break;
+    }
+  }
+
+  return scope;
+}
+
+bool should_include_ast_for_objects() {
+  return !static_schedule && !is_tree_only_program;
+}
 
 int main(int argc,char **argv) {
   argv0 = argv[0];
@@ -87,6 +108,7 @@ int main(int argc,char **argv) {
     bind_Program(p);
     aps_check_error("binding");
     type_Program(p);
+    traverse_Program(program_is_tree_only, p, p);
     aps_check_error("type");
     if (static_schedule) {
       impl = static_scc_schedule ? static_scc_impl : static_impl;
