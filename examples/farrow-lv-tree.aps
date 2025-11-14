@@ -1,6 +1,7 @@
 with "symbol";
 with "table";
 
+-- Farrow live-variable analysis tree
 module FARROW_LV_TREE[] begin
   phylum Stmt;
   phylum Stmts;
