@@ -11,12 +11,13 @@ APS2SCALAFLAGS = -p ..:${APSTOP}/base -G
 SCALAGEN = simple.scala classic-binding.scala tiny.scala broad-fiber-cycle.scala \
 	test-coll.scala test-use-coll.scala test-cycle.scala use-global.scala \
 	grammar.scala first.scala follow.scala nullable.scala	\
-	farrow-lv-tree.scala farrow-lv.static.scala
+	farrow-lv-tree.scala farrow-lv.static.scala \
+	farrow-ubd-tree.scala farrow-ubd.static.scala
 
 MISCGEN = nested-cycles.scala SimpleParser.scala SimpleScanner.scala \
 	GrammarTokens.scala SimpleTokens.scala GrammarScanner.scala GrammarParser.scala \
-	FarrowLvTokens.scala FarrowLvTokens.scala FarrowLvScanner.scala FarrowLvParser.scala \
-	farrow-lv.scala \
+	FarrowLvTokens.scala FarrowLvTokens.scala FarrowLvScanner.scala FarrowLvParser.scala farrow-lv.scala \
+	FarrowUbdTokens.scala FarrowUbdTokens.scala FarrowUbdScanner.scala FarrowUbdParser.scala farrow-ubd.scala \
 	*.output *.lex *.y *.scala~
 
 .PHONY: all clean phony_explicit
@@ -30,6 +31,7 @@ all : test_cycle_implicit.class TestCycleDriver.class
 all : test_use_coll_implicit.class TestUseCollDriver.class
 all : grammar_implicit.class GrammarDriver.class
 all : FarrowLv_implicit.class FarrowLvDriver.class
+all : FarrowUbd_implicit.class FarrowUbdDriver.class
 all : nested_cycles_implicit.class NestedCyclesDriver.class
 all : broad_fiber_cycle_implicit.class BroadFiberCycleDriver.class
 
@@ -47,6 +49,38 @@ phony_explicit:
 
 %_implicit.class : %.scala
 	${SCALAC} ${SCALACFLAGS} $*.scala
+
+FarrowUbd.lex : ../farrow-ubd.lex FarrowUbd.lex.scala
+	cat FarrowUbd.lex.scala ../farrow-ubd.lex > $@
+
+FarrowUbdScanner.scala : FarrowUbd.lex
+	java -jar ${SCALAFLEX} --scala $<
+
+FarrowUbd.y : ../farrow-ubd.y FarrowUbd.y.scala
+	cat $< FarrowUbd.y.scala > $@
+
+FarrowUbdParser.scala FarrowUbdTokens.scala : FarrowUbd.y ${SCALABISON}
+	bison -v FarrowUbd.y
+	rm FarrowUbd.tab.c
+	${SCALA} -classpath ${SCALABISON} edu.uwm.cs.scalabison.RunGenerator FarrowUbd.y
+
+FarrowUbdScanner.class : FarrowUbdScanner.scala FarrowUbdTokens.class
+	${SCALAC} ${SCALACFLAGS} $<
+
+FarrowUbdParser.class : FarrowUbdParser.scala FarrowUbdScanner.class FarrowUbdParserBase.class
+	${SCALAC} ${SCALACFLAGS} $<
+
+FarrowUbdParserBase.class : FarrowUbdParserBase.scala FarrowUbd_implicit.class
+	${SCALAC} ${SCALACFLAGS} $<
+
+FarrowUbdTokens.class : FarrowUbdTokens.scala
+	${SCALAC} ${SCALACFLAGS} $<
+
+FarrowUbd_implicit.class : farrow-ubd-tree.scala farrow-ubd.scala
+	${SCALAC} ${SCALACFLAGS} $^
+
+FarrowUbdDriver.class : FarrowUbd_implicit.class FarrowUbdParser.class
+	${SCALAC} ${SCALACFLAGS} farrow-ubd-driver.scala
 
 FarrowLv.lex : ../farrow-lv.lex FarrowLv.lex.scala
 	cat FarrowLv.lex.scala ../farrow-lv.lex > $@
