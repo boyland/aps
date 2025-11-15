@@ -217,10 +217,10 @@ void dump_formal(Declaration formal, ostream&os)
   if (KEYseq_formal == Declaration_KEY(formal)) os << "*";
 }
 
-void dump_function_prototype(string name, Type ft, ostream& oss)
+void dump_function_prototype(string name, Type ft, bool override_needed, ostream& oss)
 {
-  oss << indent() << "val v_" << name << " = f_" << name << " _;\n";
-  oss << indent() << "def f_" << name << "(";
+  oss << indent() << (override_needed ? "override " : "") << "val v_" << name << " = f_" << name << " _;\n";
+  oss << indent() << (override_needed ? "override " : "") << "def f_" << name << "(";
 
   Declarations formals = function_type_formals(ft);
   for (Declaration formal = first_Declaration(formals);
@@ -1388,7 +1388,7 @@ static void dump_scala_pattern_function(
   
   if (!body) {
     // the constructor function:
-    dump_function_prototype(name,ft,oss);
+    dump_function_prototype(name,ft,false,oss);
     oss << " = c_" << name << args;
     if (is_syntax) oss << ".register";
     oss << ";\n";
@@ -1445,6 +1445,76 @@ void dump_scala_Declaration_header(Declaration decl, ostream& oss)
     }
     break;
   }
+}
+
+bool check_override_decl(Declaration decl, Declaration fdecl) {
+  switch (Declaration_KEY(decl)) {
+  case KEYsome_type_decl: {
+    Type type = some_type_decl_type(decl);
+    switch (Type_KEY(type))
+    {
+    case KEYno_type: {
+      bool is_phylum = Declaration_KEY(decl) == KEYphylum_decl;
+      return check_override_decl(is_phylum ? module_PHYLUM : module_TYPE, fdecl);
+    }
+    case KEYtype_use:
+      return check_override_decl(canonical_type_decl(canonical_type(type)), fdecl);
+    case KEYtype_inst:
+      return check_override_decl(USE_DECL(module_use_use(type_inst_module(type))), fdecl);
+    default:
+      return false;
+    }
+  }
+  case KEYsome_class_decl: {
+    Block body = some_class_decl_contents(decl);
+    Declaration item;
+    for (item = first_Declaration(block_body(body)); item != NULL; item = DECL_NEXT(item)) {
+      switch (Declaration_KEY(item)) {
+      case KEYsome_function_decl:
+        if (def_name(some_function_decl_def(item)) == def_name(some_function_decl_def(fdecl))) {
+          return true;
+        }
+        break;
+      default:
+        break;
+      }
+    }
+
+    if (decl == module_PHYLUM || decl == module_TYPE) {
+      return false;
+    }
+
+    return check_override_decl(some_class_decl_result_type(decl), fdecl);
+  }
+  default:
+    break;
+  }
+
+  return false;
+}
+
+Declaration get_enclosing_some_class_decl(Declaration source) {
+  void* node = (void*)source;
+  while (node != NULL) {
+    switch (ABSTRACT_APS_tnode_phylum(node)) {
+    case KEYDeclaration: {
+      Declaration decl = (Declaration) node;
+      switch (Declaration_KEY(decl)) {
+      case KEYsome_class_decl:
+        return decl;
+      default:
+        break;
+      }
+      break;
+    }
+    default:
+      break;
+    }
+
+    node = tnode_parent(node);
+  }
+
+  return NULL;
 }
 
 void dump_scala_Declaration(Declaration decl,ostream& oss)
@@ -1914,7 +1984,12 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
       Type fty = function_decl_type(decl);
       Declaration rdecl = first_Declaration(function_type_return_values(fty));
       Block b = function_decl_body(decl);
-      dump_function_prototype(name,fty,oss);
+      Declaration mdecl = get_enclosing_some_class_decl(decl);
+      bool override_needed = false;
+      if (mdecl != NULL) {
+        override_needed = check_override_decl(some_class_decl_result_type(mdecl), decl);
+      }
+      dump_function_prototype(name,fty, override_needed, oss);
 
       // three kinds of definitions:
       // 1. the whole thing: a non-empty body:
