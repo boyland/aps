@@ -1,0 +1,28 @@
+with "symbol";
+with "table";
+
+-- Farrow use-before-declaration analysis tree
+module FARROW_UBD_TREE[] begin
+  phylum Declaration;
+  phylum Declarations;
+  phylum Expression;
+  phylum Term;
+  phylum Operation;
+  phylum Program;
+
+  constructor scope(ds: Declarations) : Declarations;
+  constructor decl_assign(s: Symbol; e: Expression) : Declaration;
+  constructor decls_empty() : Declarations;
+  constructor decls_append(ds: Declarations; d: Declaration) : Declarations;
+  constructor expr_term(t: Term) : Expression;
+  constructor op_add() : Operation;
+  constructor op_mul() : Operation;
+  constructor op_sub() : Operation;
+  constructor op_div() : Operation;
+  constructor expr_apply(e: Expression; op: Operation; t: Term) : Expression;
+  constructor term_variable(s: Symbol) : Term;
+  constructor term_literal(i: Integer) : Term;
+  constructor program(ds: Declarations) : Program;
+
+  pragma root_phylum(type Program);
+end;
