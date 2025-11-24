@@ -48,6 +48,7 @@ module NAME_RESOLUTION[T :: var SIMPLE[]] extends T begin
   
   not_found : EntityRef := nil;
   
+  no_shape : Shape := Shape$nil;
   int_shape : Shape := shape("integer");
   str_shape : Shape := shape("string");
 
@@ -136,6 +137,7 @@ module NAME_RESOLUTION[T :: var SIMPLE[]] extends T begin
     decl := lookup(id,e.expr_scope);
     if decl = not_found then
       msgs :> {id ++ " not declared"};
+      e.expr_shape := no_shape;
     else
       decl.entity_used :> true;
       e.expr_shape := decl.entity_shape;

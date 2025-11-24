@@ -2090,6 +2090,9 @@ static void set_decl_flags_aug_graph(Declaration tlm, STATE* state) {
               case KEYpattern_var: {
                 Declaration next_rhs = pattern_var_formal(next_pat);
                 Declaration_info(next_rhs)->decl_flags |= DECL_RHS_FLAG;
+		if (type_is_phylum(base_type(Pattern_info(next_pat)->pat_type))) {
+		  Declaration_info(next_rhs)->decl_flags |= DECL_RHS_SYNTAX_FLAG;
+		}
                 break;
               }
               default:
@@ -2121,6 +2124,7 @@ static void set_decl_flags_module(STATE* s, Declaration module) {
   for (; decl != NULL; decl = Declaration_info(decl)->next_decl) {
     switch (Declaration_KEY(decl)) {
       case KEYattribute_decl:
+	/** DOn't do this error -- FIELD is not yet set.
         if (!ATTR_DECL_IS_SYN(decl) && !ATTR_DECL_IS_INH(decl) &&
             !FIELD_DECL_P(decl)) {
           aps_warning(decl,
@@ -2129,6 +2133,7 @@ static void set_decl_flags_module(STATE* s, Declaration module) {
                       decl_name(decl));
           Declaration_info(decl)->decl_flags |= ATTR_DECL_SYN_FLAG;
         }
+	*/
         break;
       case KEYsome_function_decl:
       {
@@ -2439,8 +2444,6 @@ static void synchronize_dependency_graphs(AUG_GRAPH *aug_graph,
     return;
   }
 
-  bool phylum_is_func_decl = Declaration_KEY(phy_graph->phylum) == KEYfunction_decl;
-
   phy_n = phy_graph->instances.length;
 
   /* discover when the instances for this node end.
@@ -2465,9 +2468,8 @@ static void synchronize_dependency_graphs(AUG_GRAPH *aug_graph,
       int aug_index = i*n + j;
       int sum_index = (i-start)*phy_n + (j-start);
       DEPENDENCY kind=edgeset_kind(aug_graph->graph[aug_index]);
-      // avoid adding augmeneted dependency graph edges to summary graph of function declarations
       if (!AT_MOST(dependency_indirect(kind),
-		   phy_graph->mingraph[sum_index]) && !phylum_is_func_decl) {
+		   phy_graph->mingraph[sum_index])) {
 	kind = dependency_indirect(kind); //! more precisely DNC artificial
 	kind = dependency_join(kind,phy_graph->mingraph[sum_index]);
 	if (kind == phy_graph->mingraph[sum_index]) {
