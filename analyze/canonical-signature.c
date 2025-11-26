@@ -482,6 +482,17 @@ static CanonicalSignature* join_canonical_signature_actuals(CanonicalType *sourc
     struct Canonical_use_type *ctype_use = (struct Canonical_use_type *)source_ctype;
 
     Declaration tdecl = ctype_use->decl;
+    switch (Declaration_KEY(tdecl))
+    {
+    case KEYsome_type_decl:
+      break;
+    default:
+      // short-circuit.
+      // only when the source declaration of canonical type is some kind of
+      // type declaration then "join" (or simplifying) would be possible.
+      return canonical_sig;
+    }
+
     Declaration mdecl = USE_DECL(module_use_use(type_inst_module(some_type_decl_type(tdecl))));
 
     CanonicalType **substituted_actuals = (CanonicalType **)alloca(canonical_sig->num_actuals);
@@ -692,4 +703,42 @@ void initialize_canonical_signature(Declaration module_TYPE_decl, Declaration mo
   module_PHYLUM = module_PHYLUM_decl;
 
   initialized = true;
+}
+
+/**
+ * Given a signature, it returns whether it contains module declaration
+ * @param sig signature
+ * @param module_or_class_decl module or class declaration
+ * @return boolean indicating if module is in the type hierarchy of signature
+ */
+bool signature_hierarchy_contains(Signature sig, Declaration module_or_class_decl)
+{
+  switch (Signature_KEY(sig))
+  {
+  case KEYsig_inst:
+    Declaration some_mdecl = USE_DECL(class_use_use(sig_inst_class(sig)));
+    return some_mdecl == module_or_class_decl ||
+           signature_hierarchy_contains(some_class_decl_parent(some_mdecl), module_or_class_decl);
+  case KEYmult_sig:
+    return signature_hierarchy_contains(mult_sig_sig1(sig), module_or_class_decl) ||
+           signature_hierarchy_contains(mult_sig_sig2(sig), module_or_class_decl);
+  case KEYsig_use:
+    return USE_DECL(sig_use_use(sig)) == module_or_class_decl;
+  case KEYno_sig:
+  case KEYfixed_sig:
+    return false;
+  }
+}
+
+/**
+ * Given a canonical signature, it returns whether it contains module declaration
+ * @param csig canonical signature
+ * @param module_or_class_decl module or class declaration
+ * @return boolean indicating if module is in the type hierarchy of signature
+ */
+bool canonical_signature_hierarchy_contains(CanonicalSignature* csig, Declaration module_or_class_decl)
+{
+  if (csig->source_class == module_or_class_decl) return true;
+
+  return signature_hierarchy_contains(some_class_decl_parent(csig->source_class), module_or_class_decl);
 }

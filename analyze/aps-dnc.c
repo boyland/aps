@@ -80,7 +80,7 @@ DEPENDENCY dependency_trans(DEPENDENCY k1, DEPENDENCY k2)
 	   (k2 & DEPENDENCY_NOT_JUST_FIBER)) |
 	  ((k1 & DEPENDENCY_MAYBE_CARRYING)&
 	   (k2 & DEPENDENCY_MAYBE_CARRYING)) |
-	  ((k1 & DEPENDENCY_MAYBE_SIMPLE)&
+	  ((k1 & DEPENDENCY_MAYBE_SIMPLE) |
 	   (k2 & DEPENDENCY_MAYBE_SIMPLE)) | 
 	  SOME_DEPENDENCY);
 }
@@ -1056,9 +1056,117 @@ BOOL decl_is_circular(Declaration d)
     return direction_is_circular(value_decl_direction(d));
   case KEYattribute_decl: 
     return direction_is_circular(attribute_decl_direction(d));
+  case KEYformal:
+    return Declaration_info(d)->is_circular;
   default:
     return FALSE;
   }
+}
+
+/**
+ * Utility function that detects if canonical type is circular
+ * by checking if its inferred signature set includes any of the
+ * LATTICE types.
+ * 
+ * @param ctype canonical type
+ * @return BOOL indicating whether canonical type can be considered circular
+ */
+static BOOL canonical_type_is_lattice_type(CanonicalType* ctype) {
+  CanonicalSignatureSet cset = infer_canonical_signatures(ctype);
+
+  int i;
+  for (i = 0; i < cset->num_elements; i++) {
+    CanonicalSignature* csig = (CanonicalSignature*)cset->elements[i];
+
+    // If class declaration extends any of the LATTICE types (UNION_LATTICE, MAKE_LATTICE and etc.)
+    if (canonical_signature_hierarchy_contains(csig, module_lattice)) {
+      return TRUE;
+    }
+  }
+
+  return FALSE;
+}
+
+/**
+ * Utility function that detects if use of result of some function call is monotone
+ * by checking if the result of function call equals the LHS type and is extending
+ * lattice.
+ * 
+ * @param sink_type LHS type
+ * @param expr function call expression
+ * @param fdecl function declaration
+ * @return BOOL indicating whether result of some function call is monotone
+ */
+static BOOL funcall_result_is_monotone_use(Type sink_type, Expression expr, Declaration fdecl) {
+  Use use = value_use_use(funcall_f(expr));
+  TypeEnvironment te = USE_TYPE_ENV(use);
+
+  if (analysis_debug & ADD_EDGE) {
+    printf("fdecl: %s (lineno %d)\n", decl_name(fdecl), tnode_line_number(expr));
+    printf("type environment: ");
+    print_TypeEnvironment(te, stdout);
+    printf("\n");
+  }
+
+  Type fdecl_type = some_function_decl_type(fdecl);
+
+  // return type should be equal to sink type and be circular
+  Type fdecl_return_type = type_subst(use, function_type_return_type(fdecl_type));
+
+  if (analysis_debug & ADD_EDGE) {
+    printf(" return type: ");
+    print_Type(fdecl_return_type, stdout);
+    printf("\n");
+    printf(" sink type: ");
+    print_Type(sink_type, stdout);
+    printf("\n");
+  }
+
+  CanonicalType* fdecl_return_ctype = canonical_type(fdecl_return_type);
+  CanonicalType* sink_ctype = canonical_type(sink_type);
+
+  return fdecl_return_ctype == sink_ctype && canonical_type_is_lattice_type(fdecl_return_ctype);
+}
+
+/**
+ * Utility function that detects if use of actual of some function call is monotone
+ * by checking if formal and actual type are equal and is extending lattice.
+ * 
+ * @param expr function call expression
+ * @param actual function call actual expression
+ * @param fdecl function declaration
+ * @return BOOL indicating whether use of actual of some function call is monotone
+ */
+static BOOL funcall_actual_is_monotone_use(Expression expr, Expression actual, Declaration fdecl) {
+  Use use = value_use_use(funcall_f(expr));
+  TypeEnvironment te = USE_TYPE_ENV(use);
+
+  if (analysis_debug & ADD_EDGE) {
+    printf("fdecl: %s (lineno %d)\n", decl_name(fdecl), tnode_line_number(expr));
+    printf("type environment: ");
+    print_TypeEnvironment(te, stdout);
+    printf("\n");
+  }
+
+  Declaration formal = function_actual_formal(fdecl, actual, expr);
+
+  Type formal_ty = type_subst(use, infer_formal_type(formal));
+  Type actual_ty = infer_expr_type(actual);
+
+  if (analysis_debug & ADD_EDGE) {
+    printf(" formal type: ");
+    print_Type(formal_ty, stdout);
+    printf("\n");
+    printf(" actual type: ");
+    print_Type(actual_ty, stdout);
+    printf("\n");
+  }
+
+  CanonicalType* formal_ctype = canonical_type(formal_ty);
+  CanonicalType* actual_ctype = canonical_type(actual_ty);
+
+  // formal and actual should be equal and be circular
+  return formal_ctype == actual_ctype && canonical_type_is_lattice_type(formal_ctype);
 }
 
 // return true if we are sure this vertex represents an input dependency
@@ -1134,6 +1242,9 @@ void add_edges_to_graph(VERTEX* v1,
 
   // if carrying, then we add fiber dependencies.
   kind &= ~DEPENDENCY_NOT_JUST_FIBER;
+
+  // Fiber dependencies are always monotone.
+  kind &= ~DEPENDENCY_MAYBE_SIMPLE;
   
   for (i=0; i < s->fibers.length; ++i) {
     FIBER f = s->fibers.array[i];
@@ -1168,7 +1279,7 @@ Declaration attr_ref_node_decl(Expression e)
  * @param mod modifier to apply to instances found
  * @param kind whether carrying/non-fiber etc.
  */
-static void record_expression_dependencies(VERTEX *sink, CONDITION *cond,
+static void record_expression_dependencies(VERTEX *sink, Type sink_type, CONDITION *cond,
 					   DEPENDENCY kind, MODIFIER *mod,
 					   Expression e, AUG_GRAPH *aug_graph)
 {
@@ -1195,14 +1306,16 @@ static void record_expression_dependencies(VERTEX *sink, CONDITION *cond,
     /* nothing to do */
     break;
   case KEYrepeat:
-    record_expression_dependencies(sink,cond,kind,mod,
+    record_expression_dependencies(sink,sink_type,cond,kind,mod,
 				   repeat_expr(e),aug_graph);
     break;
   case KEYvalue_use:
     { Declaration decl=Use_info(value_use_use(e))->use_decl;
       Declaration rdecl;
       int new_kind = kind;
-      if (!decl_is_circular(decl)) new_kind |= DEPENDENCY_MAYBE_SIMPLE;
+      if (!decl_is_circular(decl) && mod == NO_MODIFIER) {
+         new_kind |= DEPENDENCY_MAYBE_SIMPLE;
+      }
       if (decl == NULL)
 	fatal_error("%d: unbound expression",tnode_line_number(e));
       if (DECL_IS_LOCAL(decl) &&
@@ -1231,6 +1344,8 @@ static void record_expression_dependencies(VERTEX *sink, CONDITION *cond,
 	source.attr = decl;
 	source.modifier = mod;
 	if (vertex_is_output(&source)) aps_warning(e,"Dependence on output value");
+	// XXX: this needs to be revisited after modifying aps-dnc to not treat functions as procedures
+	new_kind &= ~DEPENDENCY_MAYBE_SIMPLE;
 	add_edges_to_graph(&source,sink,cond,new_kind,aug_graph);
       } else {
 	source.node = NULL;
@@ -1245,34 +1360,39 @@ static void record_expression_dependencies(VERTEX *sink, CONDITION *cond,
     { Declaration decl;
       int new_kind = kind;
       if ((decl = attr_ref_p(e)) != NULL) {
-  if (!decl_is_circular(decl)) new_kind |= DEPENDENCY_MAYBE_SIMPLE; else new_kind = kind;
+  if (!decl_is_circular(decl) && mod == NO_MODIFIER) new_kind |= DEPENDENCY_MAYBE_SIMPLE; else new_kind = kind;
 	source.node = attr_ref_node_decl(e);
 	source.attr = decl;
 	source.modifier = mod;
 	if (vertex_is_output(&source)) aps_warning(e,"Dependence on output value");
 	add_edges_to_graph(&source,sink,cond,new_kind,aug_graph);
       } else if ((decl = field_ref_p(e)) != NULL) {
-  if (!decl_is_circular(decl)) new_kind |= DEPENDENCY_MAYBE_SIMPLE; else new_kind = kind;
+  if (!decl_is_circular(decl) && mod == NO_MODIFIER) new_kind |= DEPENDENCY_MAYBE_SIMPLE; else new_kind = kind;
 	Expression object = field_ref_object(e);
 	new_mod.field = decl;
 	new_mod.next = mod;
 	// first the dependency on the pointer itself (NOT carrying)
-	record_expression_dependencies(sink,cond,
+	record_expression_dependencies(sink,sink_type,cond,
 				       new_kind&~DEPENDENCY_MAYBE_CARRYING,
 				       NO_MODIFIER,object,aug_graph);
 	// then the dependency on the field (possibly carrying)
-	record_expression_dependencies(sink,cond,new_kind,&new_mod,object,
+	record_expression_dependencies(sink,sink_type,cond,new_kind,&new_mod,object,
 				       aug_graph);
       } else if ((decl = local_call_p(e)) != NULL) {
-  if (!decl_is_circular(decl)) new_kind |= DEPENDENCY_MAYBE_SIMPLE; else new_kind = kind;
 	Declaration result = some_function_decl_result(decl);
 	Expression actual = first_Actual(funcall_actuals(e));
 	/* first depend on the arguments (not carrying, no fibers) */
 	if (mod == NO_MODIFIER) {
 	  for (;actual!=NULL; actual=Expression_info(actual)->next_actual) {
-	    record_expression_dependencies(sink,cond,
+
+      if (!funcall_actual_is_monotone_use(e, actual, decl)) {
+        new_kind |= DEPENDENCY_MAYBE_SIMPLE;
+      }
+
+	    record_expression_dependencies(sink,sink_type,cond,
 					   new_kind&~DEPENDENCY_MAYBE_CARRYING,
 					   NO_MODIFIER,actual,aug_graph);
+      new_kind = kind; // restore new_kind
 	  }
 	}
 
@@ -1281,18 +1401,35 @@ static void record_expression_dependencies(VERTEX *sink, CONDITION *cond,
 	 *	 tnode_line_number(e),decl_name(decl));
 	 */
 	{
+    if (!funcall_result_is_monotone_use(sink_type, e, decl)) {
+      new_kind |= DEPENDENCY_MAYBE_SIMPLE;
+    }
+
 	  Declaration proxy = Expression_info(e)->funcall_proxy;
 	  source.node = proxy;
 	  source.attr = result;
 	  source.modifier = mod;
 	  if (vertex_is_output(&source)) aps_warning(e,"Dependence on output value");
-	  add_edges_to_graph(&source,sink,cond,kind,aug_graph);
+
+    // XXX: If we have procedure, this code needs to be revisted.
+    if (Declaration_KEY(decl) == KEYfunction_decl && some_function_decl_result(decl) == result) {
+      if (analysis_debug & ADD_EDGE) {
+        printf("skipped adding a SIMPLE edge between: ");
+        print_dep_vertex(&source, stdout);
+        printf("->");
+        print_dep_vertex(sink, stdout);
+        printf("\n");
+      }
+      
+      new_kind &= ~DEPENDENCY_MAYBE_SIMPLE;
+    }
+	  add_edges_to_graph(&source,sink,cond,new_kind,aug_graph);
 	}
       } else {
 	/* some random (external) function call */
 	Expression actual = first_Actual(funcall_actuals(e));
 	for (; actual != NULL; actual=Expression_info(actual)->next_actual) {
-	  record_expression_dependencies(sink,cond,kind,mod,
+	  record_expression_dependencies(sink,sink_type,cond,new_kind,mod,
 					 actual,aug_graph);
 	}
       }
@@ -1359,6 +1496,8 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
   case KEYvalue_use:
     {
       Declaration decl = USE_DECL(value_use_use(lhs));
+      Use use = value_use_use(lhs);
+      Type sink_type = type_subst(use, infer_expr_type(lhs));
       VERTEX sink;
       MODIFIER new_mod;
 	
@@ -1405,17 +1544,20 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
       set_value_for(&sink,rhs,aug_graph);
       if (vertex_is_input(&sink)) aps_error(lhs,"Assignment of input value");
       // don't make error even if not output: local attributes!
-      record_expression_dependencies(&sink,cond,kind,NULL,rhs,aug_graph);
+      record_expression_dependencies(&sink,sink_type,cond,kind,NULL,rhs,aug_graph);
       record_condition_dependencies(&sink,cond,aug_graph);
     }
     break;
   case KEYfuncall:
     {
+      Use use = value_use_use(funcall_f(lhs));
+      Type sink_type = type_subst(use, infer_expr_type(lhs));
+
       int new_kind = kind;
       Declaration field, attr, fdecl, decl;
       VERTEX sink;
       if ((field = field_ref_p(lhs)) != NULL) {
-  if (!decl_is_circular(field)) new_kind |= DEPENDENCY_MAYBE_SIMPLE; else new_kind = kind;
+  if (!decl_is_circular(field) && mod == NO_MODIFIER) new_kind |= DEPENDENCY_MAYBE_SIMPLE; else new_kind = kind;
 	/* Assignment of a field, or a field of a field */
 	Expression object = field_ref_object(lhs);
 	MODIFIER new_mod;
@@ -1429,16 +1571,16 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
 	record_lhs_dependencies(object,cond,control_dependency,
 				&new_mod,object,aug_graph);
       } else if ((attr = attr_ref_p(lhs)) != NULL) {
-  if (!decl_is_circular(attr)) new_kind |= DEPENDENCY_MAYBE_SIMPLE; else new_kind = kind;
+  if (!decl_is_circular(attr) && mod == NO_MODIFIER) new_kind |= DEPENDENCY_MAYBE_SIMPLE; else new_kind = kind;
 	sink.node = attr_ref_node_decl(lhs);
 	sink.attr = attr;
 	sink.modifier = mod;
 	set_value_for(&sink,rhs,aug_graph);
 	if (vertex_is_input(&sink)) aps_error(lhs,"Assignment of input value");
-	record_expression_dependencies(&sink,cond,kind,NULL,rhs,aug_graph);
+	record_expression_dependencies(&sink,sink_type,cond,kind,NULL,rhs,aug_graph);
 	record_condition_dependencies(&sink,cond,aug_graph);
       } else if ((fdecl = local_call_p(lhs)) != NULL) {     
-	if (!decl_is_circular(fdecl)) new_kind |= DEPENDENCY_MAYBE_SIMPLE; else new_kind = kind;
+	if (!decl_is_circular(fdecl) && mod == NO_MODIFIER) new_kind |= DEPENDENCY_MAYBE_SIMPLE; else new_kind = kind;
 	Declaration result = some_function_decl_result(decl);
 	Declaration proxy = Expression_info(lhs)->funcall_proxy;
 	if (mod == NO_MODIFIER) {
@@ -1449,7 +1591,7 @@ static void record_lhs_dependencies(Expression lhs, CONDITION *cond,
 	sink.modifier = mod;
 	set_value_for(&sink,rhs,aug_graph);
 	if (vertex_is_input(&sink)) aps_error(lhs,"Assignment of input value");
-	record_expression_dependencies(&sink,cond,new_kind,NULL,rhs,aug_graph);
+	record_expression_dependencies(&sink,sink_type,cond,new_kind,NULL,rhs,aug_graph);
 	record_condition_dependencies(&sink,cond,aug_graph);
       } else {
 	Expression actual = first_Actual(funcall_actuals(lhs));
@@ -1506,6 +1648,7 @@ static void *get_edges(void *vaug_graph, void *node) {
 	return NULL;
       case KEYformal:
 	{ Declaration case_stmt = formal_in_case_p(decl);
+    Type sink_type = infer_formal_type(decl);
 	  if (case_stmt != NULL) {
 	    Expression expr = some_case_stmt_expr(case_stmt);
 	    VERTEX f;
@@ -1513,7 +1656,7 @@ static void *get_edges(void *vaug_graph, void *node) {
 	    f.attr = decl;
 	    f.modifier = NO_MODIFIER;
 	    record_condition_dependencies(&f,cond,aug_graph);
-	    record_expression_dependencies(&f,cond,dependency,NO_MODIFIER,
+	    record_expression_dependencies(&f,sink_type,cond,dependency,NO_MODIFIER,
 					   expr,aug_graph);
 	  }
 	}
@@ -1532,10 +1675,10 @@ static void *get_edges(void *vaug_graph, void *node) {
 	  case KEYsimple:
 	    /* XXX: I don't know I have to do it both ways.
 	     */
-	    record_expression_dependencies(&sink,cond,dependency,NO_MODIFIER,
+	    record_expression_dependencies(&sink,no_type(),cond,dependency,NO_MODIFIER,
 					   simple_value(def),aug_graph);
 	    sink.node = 0;
-	    record_expression_dependencies(&sink,cond,dependency,NO_MODIFIER,
+	    record_expression_dependencies(&sink,no_type(),cond,dependency,NO_MODIFIER,
 					   simple_value(def),aug_graph);
 	    if ((cdecl = constructor_call_p(simple_value(def))) != NULL) {
 	      FIBERSET fs = fiberset_for(decl,FIBERSET_NORMAL_FINAL);
@@ -1578,7 +1721,7 @@ static void *get_edges(void *vaug_graph, void *node) {
 	    }
 	    break;
 	  case KEYcomposite:
-	    record_expression_dependencies(&sink,cond,dependency,NO_MODIFIER,
+	    record_expression_dependencies(&sink,no_type(),cond,dependency,NO_MODIFIER,
 					   composite_initial(def),aug_graph);
 	    break;
 	  }
@@ -1622,13 +1765,14 @@ static void *get_edges(void *vaug_graph, void *node) {
       case KEYif_stmt:
 	{
 	  Expression test = if_stmt_cond(decl);
+    Type sink_type = infer_expr_type(test);
 	  VERTEX sink;
 	  sink.node = 0;
 	  sink.attr = decl;
 	  sink.modifier = NO_MODIFIER;
 	  record_condition_dependencies(&sink,cond,aug_graph);
 
-	  record_expression_dependencies(&sink,cond,control_dependency,
+	  record_expression_dependencies(&sink,sink_type,cond,control_dependency,
 					 NO_MODIFIER, test, aug_graph);
 	}
 	break;
@@ -1638,13 +1782,31 @@ static void *get_edges(void *vaug_graph, void *node) {
 	  VERTEX sink;
 	  sink.node = 0;
 	  sink.modifier = NO_MODIFIER;
+
+      Expression case_expr = some_case_stmt_expr(decl);
+      BOOL case_expr_is_circular = canonical_type_is_lattice_type(canonical_type(infer_expr_type(case_expr)));
+
 	  for (m=first_Match(some_case_stmt_matchers(decl)); m; m=MATCH_NEXT(m)) {
+
+      if (case_expr_is_circular) {
+          Declaration match_formal = match_first_rhs_decl(m);
+          while (match_formal != NULL) {
+            // XXX: strictly should look at the parent calls in-between
+            if (canonical_type_is_lattice_type(canonical_type(infer_formal_type(match_formal)))) {
+              Declaration_info(match_formal)->is_circular = TRUE;
+            }
+
+            match_formal = next_rhs_decl(match_formal);
+          }
+      }
+
 	    Expression test = Match_info(m)->match_test;
 	    sink.attr = (Declaration)m;
+      Type sink_type = infer_expr_type(test);
 	    record_condition_dependencies(&sink,cond,aug_graph);
 
 	    for (; test != 0; test = Expression_info(test)->next_expr) {
-	      record_expression_dependencies(&sink,cond,control_dependency,
+	      record_expression_dependencies(&sink,sink_type,cond,control_dependency,
 					     NO_MODIFIER, test, aug_graph);
 	    }
 	  }
@@ -1653,12 +1815,13 @@ static void *get_edges(void *vaug_graph, void *node) {
       case KEYfor_in_stmt:
         { Declaration formal = for_in_stmt_formal(decl);
           Expression expr = for_in_stmt_seq(decl);
+          Type formal_type = infer_formal_type(formal);
           VERTEX f;
           f.node = 0;
           f.attr = formal;
           f.modifier = NO_MODIFIER;
           record_condition_dependencies(&f,cond,aug_graph);
-          record_expression_dependencies(&f,cond,dependency,NO_MODIFIER,
+          record_expression_dependencies(&f,formal_type,cond,dependency,NO_MODIFIER,
                                          expr,aug_graph);
 	}
         break;
@@ -1697,13 +1860,14 @@ static void *get_edges(void *vaug_graph, void *node) {
 	{
 	  Type ft = some_function_decl_type(fdecl);
 	  Declaration f = first_Declaration(function_type_formals(ft));
+    Type formal_type = infer_formal_type(f);
 	  Expression a = first_Actual(funcall_actuals(e));
 	  for (; f != NULL; f = DECL_NEXT(f), a = EXPR_NEXT(a)) {
 	    VERTEX sink;
 	    sink.node = proxy;
 	    sink.attr = f;
 	    sink.modifier = NO_MODIFIER;
-	    record_expression_dependencies(&sink,cond,dependency,
+	    record_expression_dependencies(&sink,formal_type,cond,dependency,
 					   NO_MODIFIER,a,aug_graph);
 	    record_condition_dependencies(&sink,cond,aug_graph);
 	  }
