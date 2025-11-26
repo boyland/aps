@@ -1428,7 +1428,7 @@ static void dump_scala_pattern_function(
   if (!body) {
     // the constructor function:
     dump_function_prototype(name,ft,dump_anchor_actual,oss);
-  oss << " = c_" << name << args;
+    oss << " = c_" << name << args;
     if (is_syntax) oss << ".register";
     oss << ";\n";
   }
