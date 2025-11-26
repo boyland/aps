@@ -10,8 +10,6 @@ static CanonicalSignatureSet from_declaration(Declaration decl);
 static CanonicalSignatureSet substitute_canonical_signature_set_actuals(CanonicalType* source, CanonicalSignatureSet sig_set);
 static int canonical_signature_compare(CanonicalSignature *sig1, CanonicalSignature *sig2);
 
-static Declaration module_TYPE;
-static Declaration module_PHYLUM;
 static bool initialized = false;
 
 /**

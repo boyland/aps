@@ -1447,7 +1447,10 @@ void dump_scala_Declaration_header(Declaration decl, ostream& oss)
   }
 }
 
-bool check_override_decl(Declaration decl, Declaration fdecl) {
+// recursive helper function to check given a surrounding declaration (module_decl, class_decl or type_decl)
+// if it contains a function declaration that matches the given name and return type
+// if true then override would be needed otherwise not needed
+static bool check_override_decl(Declaration decl, Symbol fdecl_name, Type fdecl_rtype) {
   switch (Declaration_KEY(decl)) {
   case KEYsome_type_decl: {
     Type type = some_type_decl_type(decl);
@@ -1455,12 +1458,12 @@ bool check_override_decl(Declaration decl, Declaration fdecl) {
     {
     case KEYno_type: {
       bool is_phylum = Declaration_KEY(decl) == KEYphylum_decl;
-      return check_override_decl(is_phylum ? module_PHYLUM : module_TYPE, fdecl);
+      return check_override_decl(is_phylum ? module_PHYLUM : module_TYPE, fdecl_name, fdecl_rtype);
     }
     case KEYtype_use:
-      return check_override_decl(canonical_type_decl(canonical_type(type)), fdecl);
+      return check_override_decl(canonical_type_decl(canonical_type(type)), fdecl_name, fdecl_rtype);
     case KEYtype_inst:
-      return check_override_decl(USE_DECL(module_use_use(type_inst_module(type))), fdecl);
+      return check_override_decl(USE_DECL(module_use_use(type_inst_module(type))), fdecl_name, fdecl_rtype);
     default:
       return false;
     }
@@ -1471,7 +1474,9 @@ bool check_override_decl(Declaration decl, Declaration fdecl) {
     for (item = first_Declaration(block_body(body)); item != NULL; item = DECL_NEXT(item)) {
       switch (Declaration_KEY(item)) {
       case KEYsome_function_decl:
-        if (def_name(some_function_decl_def(item)) == def_name(some_function_decl_def(fdecl))) {
+        if (def_name(some_function_decl_def(item)) == fdecl_name &&
+            // using canonical type to check type equality
+            canonical_type_compare(canonical_type(function_type_return_type(some_function_decl_type(item))), canonical_type(fdecl_rtype)) == 0) {
           return true;
         }
         break;
@@ -1482,9 +1487,9 @@ bool check_override_decl(Declaration decl, Declaration fdecl) {
 
     if (decl == module_PHYLUM || decl == module_TYPE) {
       return false;
+    } else {
+      return check_override_decl(some_class_decl_result_type(decl), fdecl_name, fdecl_rtype);
     }
-
-    return check_override_decl(some_class_decl_result_type(decl), fdecl);
   }
   default:
     break;
@@ -1987,7 +1992,7 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
       Declaration mdecl = get_enclosing_some_class_decl(decl);
       bool override_needed = false;
       if (mdecl != NULL) {
-        override_needed = check_override_decl(some_class_decl_result_type(mdecl), decl);
+        override_needed = check_override_decl(some_class_decl_result_type(mdecl), def_name(declaration_def(decl)), function_type_return_type(fty));
       }
       dump_function_prototype(name,fty, override_needed, oss);
 
