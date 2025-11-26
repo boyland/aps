@@ -456,9 +456,6 @@ static void* validate_canonicals(void* ignore, void*node) {
   return node;
 }
 
-static Declaration module_TYPE;
-static Declaration module_PHYLUM;
-
 static void* set_root_phylum(void *ignore, void *node)
 {
   switch (ABSTRACT_APS_tnode_phylum(node))
