@@ -414,8 +414,29 @@ static void* validate_canonicals(void* ignore, void*node) {
         Expressions exprs = pragma_call_parameters(decl);
         Expression type_expr = first_Expression(exprs);
         Expression result_expr = Expression_info(type_expr)->next_expr;
+        Type type;
 
-        Type type = type_value_T(type_expr);
+        switch (Expression_KEY(type_expr)) {
+        case KEYtype_value:
+          type = type_value_T(type_expr);
+          break;
+        case KEYvalue_use: {
+          Use use = value_use_use(type_expr);
+          switch (Use_KEY(use)) {
+          case KEYqual_use:
+            type = qual_use_from(use);
+            break;
+          default:
+            aps_error(node, "only qual uses have a type that can be validated");
+            return NULL;
+          }
+          break;
+        }
+        default:
+          aps_error(node, "unknown AST type passed into canonical type validation");
+          return NULL;
+        }
+
         String expected_string = string_const_token(result_expr);
 
         char actual_to_string[BUFFER_SIZE];
