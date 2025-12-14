@@ -1447,10 +1447,10 @@ void dump_scala_Declaration_header(Declaration decl, ostream& oss)
   }
 }
 
-// recursive helper function to check given a surrounding declaration (module_decl, class_decl or type_decl)
+// Recursive helper function to check given a surrounding declaration (module_decl, class_decl or type_decl)
 // if it contains a function declaration that matches the given name and return type
 // if true then override would be needed otherwise not needed
-static bool check_override_decl(Declaration decl, Symbol fdecl_name, Type fdecl_rtype) {
+static void type_has_service_function(Declaration decl, Symbol fdecl_name, vector<Declaration>& found_decls) {
   switch (Declaration_KEY(decl)) {
   case KEYsome_type_decl: {
     Type type = some_type_decl_type(decl);
@@ -1458,14 +1458,14 @@ static bool check_override_decl(Declaration decl, Symbol fdecl_name, Type fdecl_
     {
     case KEYno_type: {
       bool is_phylum = Declaration_KEY(decl) == KEYphylum_decl;
-      return check_override_decl(is_phylum ? module_PHYLUM : module_TYPE, fdecl_name, fdecl_rtype);
+      return type_has_service_function(is_phylum ? module_PHYLUM : module_TYPE, fdecl_name, found_decls);
     }
     case KEYtype_use:
-      return check_override_decl(canonical_type_decl(canonical_type(type)), fdecl_name, fdecl_rtype);
+      return type_has_service_function(canonical_type_decl(canonical_type(type)), fdecl_name, found_decls);
     case KEYtype_inst:
-      return check_override_decl(USE_DECL(module_use_use(type_inst_module(type))), fdecl_name, fdecl_rtype);
+      return type_has_service_function(USE_DECL(module_use_use(type_inst_module(type))), fdecl_name, found_decls);
     default:
-      return false;
+      break;
     }
   }
   case KEYsome_class_decl: {
@@ -1474,11 +1474,10 @@ static bool check_override_decl(Declaration decl, Symbol fdecl_name, Type fdecl_
     for (item = first_Declaration(block_body(body)); item != NULL; item = DECL_NEXT(item)) {
       switch (Declaration_KEY(item)) {
       case KEYsome_function_decl:
-        if (def_name(some_function_decl_def(item)) == fdecl_name &&
-            // using canonical type to check type equality
-            canonical_type_compare(canonical_type(function_type_return_type(some_function_decl_type(item))), canonical_type(fdecl_rtype)) == 0) {
-          return true;
+        if (def_name(some_function_decl_def(item)) == fdecl_name) {
+          found_decls.push_back(item);
         }
+
         break;
       default:
         break;
@@ -1486,16 +1485,14 @@ static bool check_override_decl(Declaration decl, Symbol fdecl_name, Type fdecl_
     }
 
     if (decl == module_PHYLUM || decl == module_TYPE) {
-      return false;
+      return;
     } else {
-      return check_override_decl(some_class_decl_result_type(decl), fdecl_name, fdecl_rtype);
+      type_has_service_function(some_class_decl_result_type(decl), fdecl_name, found_decls);
     }
   }
   default:
     break;
   }
-
-  return false;
 }
 
 Declaration get_enclosing_some_class_decl(Declaration source) {
@@ -1992,7 +1989,32 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
       Declaration mdecl = get_enclosing_some_class_decl(decl);
       bool override_needed = false;
       if (mdecl != NULL) {
-        override_needed = check_override_decl(some_class_decl_result_type(mdecl), def_name(declaration_def(decl)), function_type_return_type(fty));
+        vector<Declaration> found_fdecls;
+        type_has_service_function(some_class_decl_result_type(mdecl), def_name(declaration_def(decl)), found_fdecls);
+
+        auto cftype2 = (struct Canonical_function_type *)canonical_type(fty);
+        for (auto& found_fdecl : found_fdecls) {
+          auto cftype1 = (struct Canonical_function_type *)canonical_type(some_function_decl_type(found_fdecl));
+          if (cftype1->num_formals == cftype2->num_formals) {
+            bool formals_type_match = true;
+            // start from 1 to skip "this" (or Result) formal
+            for (int i = 1; i < cftype1->num_formals; ++i) {
+              if (canonical_type_compare(cftype1->param_types[i], cftype2->param_types[i]) != 0) {
+                formals_type_match = false;
+              }
+            }
+
+            if (formals_type_match) {
+              if (canonical_type_compare(cftype1->return_type, cftype2->return_type) == 0) {
+                override_needed = true;
+                break;
+              } else {
+                aps_error(decl, "Function %s has same name as inherited function but different return type; overriding not possible since return types are incompatible", decl_name(decl));
+                return;
+              }
+            }
+          }
+        }
       }
       dump_function_prototype(name,fty, override_needed, oss);
 
