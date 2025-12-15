@@ -33,4 +33,7 @@ extern int decl_namespaces(Declaration d);
 extern int bind_debug;
 #define PRAGMA_ACTIVATION 1
 
+extern Declaration module_TYPE;
+extern Declaration module_PHYLUM;
+
 #endif

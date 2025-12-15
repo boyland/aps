@@ -217,10 +217,10 @@ void dump_formal(Declaration formal, ostream&os)
   if (KEYseq_formal == Declaration_KEY(formal)) os << "*";
 }
 
-void dump_function_prototype(string name, Type ft, ostream& oss)
+void dump_function_prototype(string name, Type ft, bool override_needed, ostream& oss)
 {
-  oss << indent() << "val v_" << name << " = f_" << name << " _;\n";
-  oss << indent() << "def f_" << name << "(";
+  oss << indent() << (override_needed ? "override " : "") << "val v_" << name << " = f_" << name << " _;\n";
+  oss << indent() << (override_needed ? "override " : "") << "def f_" << name << "(";
 
   Declarations formals = function_type_formals(ft);
   for (Declaration formal = first_Declaration(formals);
@@ -1388,7 +1388,7 @@ static void dump_scala_pattern_function(
   
   if (!body) {
     // the constructor function:
-    dump_function_prototype(name,ft,oss);
+    dump_function_prototype(name,ft,false,oss);
     oss << " = c_" << name << args;
     if (is_syntax) oss << ".register";
     oss << ";\n";
@@ -1445,6 +1445,78 @@ void dump_scala_Declaration_header(Declaration decl, ostream& oss)
     }
     break;
   }
+}
+
+// Recursive helper function to check given a surrounding declaration (module_decl, class_decl or type_decl)
+// if it contains a function declaration that matches the given name and return type
+// if true then override would be needed otherwise not needed
+static void type_has_service_function(Declaration decl, Symbol fdecl_name, vector<Declaration>& found_decls) {
+  switch (Declaration_KEY(decl)) {
+  case KEYsome_type_decl: {
+    Type type = some_type_decl_type(decl);
+    switch (Type_KEY(type))
+    {
+    case KEYno_type: {
+      bool is_phylum = Declaration_KEY(decl) == KEYphylum_decl;
+      return type_has_service_function(is_phylum ? module_PHYLUM : module_TYPE, fdecl_name, found_decls);
+    }
+    case KEYtype_use:
+      return type_has_service_function(canonical_type_decl(canonical_type(type)), fdecl_name, found_decls);
+    case KEYtype_inst:
+      return type_has_service_function(USE_DECL(module_use_use(type_inst_module(type))), fdecl_name, found_decls);
+    default:
+      break;
+    }
+  }
+  case KEYsome_class_decl: {
+    Block body = some_class_decl_contents(decl);
+    Declaration item;
+    for (item = first_Declaration(block_body(body)); item != NULL; item = DECL_NEXT(item)) {
+      switch (Declaration_KEY(item)) {
+      case KEYsome_function_decl:
+        if (def_name(some_function_decl_def(item)) == fdecl_name) {
+          found_decls.push_back(item);
+        }
+
+        break;
+      default:
+        break;
+      }
+    }
+
+    if (decl == module_PHYLUM || decl == module_TYPE) {
+      return;
+    } else {
+      type_has_service_function(some_class_decl_result_type(decl), fdecl_name, found_decls);
+    }
+  }
+  default:
+    break;
+  }
+}
+
+Declaration get_enclosing_some_class_decl(Declaration source) {
+  void* node = (void*)source;
+  while (node != NULL) {
+    switch (ABSTRACT_APS_tnode_phylum(node)) {
+    case KEYDeclaration: {
+      Declaration decl = (Declaration) node;
+      switch (Declaration_KEY(decl)) {
+      case KEYsome_class_decl:
+        return decl;
+      default:
+        break;
+      }
+      break;
+    }
+    default:
+      break;
+    }
+
+    node = tnode_parent(node);
+  }
+
+  return NULL;
 }
 
 void dump_scala_Declaration(Declaration decl,ostream& oss)
@@ -1914,7 +1986,37 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
       Type fty = function_decl_type(decl);
       Declaration rdecl = first_Declaration(function_type_return_values(fty));
       Block b = function_decl_body(decl);
-      dump_function_prototype(name,fty,oss);
+      Declaration mdecl = get_enclosing_some_class_decl(decl);
+      bool override_needed = false;
+      if (mdecl != NULL) {
+        vector<Declaration> found_fdecls;
+        type_has_service_function(some_class_decl_result_type(mdecl), def_name(declaration_def(decl)), found_fdecls);
+
+        auto cftype2 = (struct Canonical_function_type *)canonical_type(fty);
+        for (auto& found_fdecl : found_fdecls) {
+          auto cftype1 = (struct Canonical_function_type *)canonical_type(some_function_decl_type(found_fdecl));
+          if (cftype1->num_formals == cftype2->num_formals) {
+            bool formals_type_match = true;
+            // start from 1 to skip "this" (or Result) formal
+            for (int i = 1; i < cftype1->num_formals; ++i) {
+              if (canonical_type_compare(cftype1->param_types[i], cftype2->param_types[i]) != 0) {
+                formals_type_match = false;
+              }
+            }
+
+            if (formals_type_match) {
+              if (canonical_type_compare(cftype1->return_type, cftype2->return_type) == 0) {
+                override_needed = true;
+                break;
+              } else {
+                aps_error(decl, "Function %s has same name as inherited function but different return type; overriding not possible since return types are incompatible", decl_name(decl));
+                return;
+              }
+            }
+          }
+        }
+      }
+      dump_function_prototype(name,fty, override_needed, oss);
 
       // three kinds of definitions:
       // 1. the whole thing: a non-empty body:

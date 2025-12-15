@@ -42,8 +42,8 @@ struct env_item {
 };
 typedef struct env_item *SCOPE;
 
-static Declaration module_TYPE;
-static Declaration module_PHYLUM;
+Declaration module_TYPE;
+Declaration module_PHYLUM;
 
 static TypeEnvironment current_type_env = 0;
 
