@@ -198,9 +198,9 @@ static void dump_loop_end(AUG_GRAPH* aug_graph,
     std::replace(suffix.begin(), suffix.end(), '-', '_');
     --nesting_level;
     os << "\n";
-    os << indent() << "} while(changed);"
+    os << indent() << "} while(changed.get);"
        << "\n";
-    os << indent() << "changed = prevChanged_" << suffix << ";\n"
+    os << indent() << "changed.set(prevChanged_" << suffix << ");\n"
        << "\n";
   } else {
     ow->clear_since(loop_id);
@@ -214,10 +214,10 @@ static void dump_loop_start_helper(int loop_id, std::ostream& os)
   string suffix = any_to_string(loop_id);
   std::replace(suffix.begin(), suffix.end(), '-', '_');
 
-  os << indent() << "val prevChanged_" << suffix << " = changed;\n";
+  os << indent() << "val prevChanged_" << suffix << " = changed.get;\n";
   os << indent() << "do {\n";
   ++nesting_level;
-  os << indent() << "changed = false;\n";
+  os << indent() << "changed.set(false);\n";
 }
 
 static void dump_loop_start(AUG_GRAPH* aug_graph,
@@ -248,6 +248,9 @@ static bool implement_visit_function(
     int loop_id,
     bool skip_previous_visit_code,
     OutputWriter* ow) {
+
+  STATE* s = aug_graph->global_state;
+
   for (; cto; cto = cto->cto_next) {
     INSTANCE* in = cto->cto_instance;
     int ch = cto->child_phase.ch;
@@ -346,6 +349,9 @@ static bool implement_visit_function(
 
         ow->get_outstream() << indent() << "visit_" << n << "_" << ph << "(";
         ow->get_outstream() << "root";
+        if (s->loop_required) {
+          ow->get_outstream() << ", new AtomicBoolean(false)";
+        }
         ow->get_outstream() << ");\n";
 
         --nesting_level;
@@ -420,6 +426,9 @@ static bool implement_visit_function(
       ow->get_outstream() << indent() << "visit_" << n << "_" << ph << "(";
 #ifdef APS2SCALA
       ow->get_outstream() << "v_" << decl_name(cto->child_decl);
+      if (s->loop_required) {
+        ow->get_outstream() << ", changed";
+      }
 #else  /* APS2SCALA */
       ow->get_outstream() << "v_" << decl_name(cto->child_decl);
 #endif /* APS2SCALA */
@@ -662,7 +671,13 @@ static bool implement_visit_function(
               ow->get_outstream() << "assign";
             else
               ow->get_outstream() << "set";
-            ow->get_outstream() << "(" << rhs << ");\n";
+            ow->get_outstream() << "(" << rhs;
+            
+            if (s->loop_required) {
+              ow->get_outstream() << ", changed";
+            }
+            
+            ow->get_outstream() << ");\n";
 #else  /* APS2SCALA */
             ow->get_outstream() << "v_" << decl_name(field) << "=";
             switch (Default_KEY(value_decl_default(field))) {
@@ -690,7 +705,13 @@ static bool implement_visit_function(
             else
               ow->get_outstream() << "set";
             ow->get_outstream()
-                << "(" << field_ref_object(lhs) << "," << rhs << ");\n";
+                << "(" << field_ref_object(lhs) << "," << rhs;
+            
+            if (s->loop_required) {
+              ow->get_outstream() << ", changed";
+            }
+
+            ow->get_outstream() << ");\n";
             break;
           default:
             fatal_error("what sort of assignment lhs: %d",
@@ -708,7 +729,11 @@ static bool implement_visit_function(
               ow->get_outstream() << "assign";
             else
               ow->get_outstream() << "set";
-            ow->get_outstream() << "(anchor," << rhs << ");\n";
+            ow->get_outstream() << "(anchor," << rhs;
+            if (s->loop_required) {
+              ow->get_outstream() << ", changed";
+            }
+            ow->get_outstream() << ");\n";
           } else {
             int i = LOCAL_UNIQUE_PREFIX(ad);
             if (i == 0) {
@@ -779,7 +804,12 @@ static bool implement_visit_function(
             else
               ow->get_outstream() << "set";
             ow->get_outstream()
-                << "(v_" << decl_name(in->node) << "," << rhs << ");\n";
+                << "(v_" << decl_name(in->node) << "," << rhs;
+
+            if (s->loop_required) {
+              ow->get_outstream() << ", changed";
+            }
+            ow->get_outstream() << ");\n";
           }
         } else {
           aps_warning(in->node, "Attribute %s.%s is apparently undefined",
@@ -799,7 +829,11 @@ static bool implement_visit_function(
           else
             ow->get_outstream() << "set";
           ow->get_outstream()
-              << "(v_" << decl_name(in->node) << "," << rhs << ");\n";
+              << "(v_" << decl_name(in->node) << "," << rhs;
+          if (s->loop_required) {
+            ow->get_outstream() << ", changed";
+          }
+          ow->get_outstream() << ");\n";
         } else {
           if (include_comments) {
             ow->get_outstream()
@@ -870,8 +904,13 @@ static void dump_visit_functions(PHY_GRAPH* phy_graph,
   for (phase = 1; phase <= phy_graph->max_phase; phase++) {
 #ifdef APS2SCALA
     os << indent() << "def visit_" << pgn << "_" << phase << "_" << j
-       << "(anchor : T_" << decl_name(phy_graph->phylum)
-       << ") : Unit = anchor match {\n";
+       << "(anchor : T_" << decl_name(phy_graph->phylum);
+
+       if (s->loop_required) {
+         os << ", changed : AtomicBoolean";
+       }
+
+    os << ") : Unit = anchor match {\n";
     ++nesting_level;
     os << indent() << "case " << matcher_pat(m) << " => {\n";
 #else  /* APS2SCALA */
@@ -1011,7 +1050,13 @@ static void dump_visit_functions(PHY_GRAPH* pg, output_streams& oss)
   for (int ph = 1; ph <= pg->max_phase; ++ph) {
 #ifdef APS2SCALA
     os << indent() << "def visit_" << pgn << "_" << ph << "(node : T_"
-       << decl_name(pg->phylum) << ") : Unit = node match {\n";
+       << decl_name(pg->phylum);
+       
+    if (s->loop_required) {
+      os << ", changed : AtomicBoolean";
+    }
+
+    os << ") : Unit = node match {\n";
 #else  /* APS2SCALA */
     oss << header_return_type<Type>(0) << "void "
         << header_function_name("visit_") << pgn << "_" << ph
@@ -1035,11 +1080,21 @@ static void dump_visit_functions(PHY_GRAPH* pg, output_streams& oss)
       }
       os << ") => "
          << "visit_" << pgn << "_" << ph << "_"
-         << Declaration_info(cd)->instance_index << "(node);\n";
+         << Declaration_info(cd)->instance_index << "(node";
+
+      if (s->loop_required) {
+        os << ", changed";
+      }
+        
+      os << ");\n";
 #else  /* APS2SCALA */
       os << indent() << "case " << j << ":\n";
       ++nesting_level;
-      os << indent() << "visit_" << pgn << "_" << ph << "_" << j << "(node);\n";
+      os << indent() << "visit_" << pgn << "_" << ph << "_" << j << "(node";
+      if (s->loop_required) {
+        os << ", changed";
+      }
+      os << ");\n";
       os << indent() << "break;\n";
       --nesting_level;
 #endif /* APS2SCALA */

@@ -4,6 +4,7 @@
 
 import scala.collection.mutable.Buffer;
 import scala.collection.mutable.ArrayBuffer;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 object Debug {
   private var depth : Int = 0;
@@ -263,15 +264,19 @@ class Evaluation[T_P, T_V](val anchor : T_P, val name : String)
     }
   }
 
-  def assign(v : ValueType) : Unit = {
+  def assign(v : ValueType, changed: AtomicBoolean = null) : Unit = {
     Debug.out(name + " := " + v);
-    set(v);
+    set(v, changed);
   }
 
-  def set(v : ValueType) : Unit = {
+  def set(v : ValueType, changed: AtomicBoolean = null) : Unit = {
     status match {
     case EVALUATED => if (checkForLateUpdate) throw TooLateError else ();
     case _ => ();
+    }
+
+    if (changed != null) {
+      changed.set(changed.get() || (value != v));
     }
     value = v;
     status = ASSIGNED;
@@ -305,10 +310,10 @@ extends Module("Attribute " + name)
   private val evaluations : Buffer[Evaluation[T_P,T_V]] = new ArrayBuffer();
   private var evaluationStarted : Boolean = false;
 
-  def assign(n : NodeType, v : ValueType) : Unit = {
+  def assign(n : NodeType, v : ValueType, changed: AtomicBoolean = null) : Unit = {
     Debug.begin(t_P.v_string(n) + "." + name + ":=" + v);
     if (evaluationStarted) throw TooLateError;
-    set(n,v);
+    set(n,v, changed);
     Debug.end();
   }
     
@@ -340,8 +345,8 @@ extends Module("Attribute " + name)
     evaluations(num)
   }
   
-  def set(n : NodeType, v : ValueType) : Unit = {
-    checkNode(n).set(v);
+  def set(n : NodeType, v : ValueType, changed: AtomicBoolean = null) : Unit = {
+    checkNode(n).set(v, changed);
   }
 
   def get(n : Any) : ValueType = {
@@ -374,14 +379,14 @@ trait CollectionEvaluation[V_P, V_T] extends Evaluation[V_P,V_T] {
     super.get
   }
 
-  override def assign(v : ValueType) : Unit = {
+  override def assign(v : ValueType, changed: AtomicBoolean = null) : Unit = {
     Debug.out(name + " :> " + v);
-    set(v);
+    set(v, changed);
   }
 
-  override def set(v : ValueType) : Unit = {
+  override def set(v : ValueType, changed: AtomicBoolean = null) : Unit = {
     initialize;
-    super.set(combine(value,v));
+    super.set(combine(value,v), changed);
   }
 }
 
@@ -509,9 +514,9 @@ trait CircularEvaluation[V_P, V_T] extends Evaluation[V_P,V_T] {
     }
   };
   
-  override def set(newValue : ValueType) : Unit = {
+  override def set(newValue : ValueType, changed: AtomicBoolean = null) : Unit = {
     check(newValue);
-    super.set(newValue);
+    super.set(newValue, changed);
   }
   
   def recompute() : Unit = {
@@ -532,4 +537,19 @@ class PatternSeqFunction[R,A](f : Any => Option[(R,Seq[A])]) {
 
 object P_AND {
   def unapply[T](x : T) : Option[(T,T)] = Some((x,x));
+}
+
+trait StaticCircularEvaluation[V_P, V_T] extends CircularEvaluation[V_P, V_T] {
+  override def check(newValue : ValueType) : Unit = {
+    if (value != null) {
+      if (!lattice.v_equal(value, newValue)) {
+        if (!lattice.v_compare(value, newValue)) {
+          throw new Evaluation.CyclicAttributeException("non-monotonic " + name);
+        }
+      }
+    }
+  }
+
+  // Needed to prevent TooLateError
+  checkForLateUpdate = false;
 }
