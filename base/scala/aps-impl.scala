@@ -91,7 +91,7 @@ class I_TYPE[T](name : String) extends Module(name) with C_TYPE[T] {
       case t:Value => assert(t.myType == this)
     };
   def f_equal(x : T_Result, y : T_Result) : Boolean = f_node_equivalent(x,y);
-  def f_node_equivalent(x : T_Result, y : T_Result) : Boolean = x != null && y != null && x.equals(y);
+  def f_node_equivalent(x : T_Result, y : T_Result) : Boolean = x != null && y != null && x == y;
   def f_string(x : T_Result) : String = x.toString();
 }
     
@@ -282,13 +282,13 @@ class Evaluation[T_P, T_V](val anchor : T_P, val name : String)
   }
   
   def detectedCycle : ValueType = {
-    throw new CyclicAttributeException(anchor+"."+name);
+    throw new CyclicAttributeException(s"$anchor.$name");
   }
 
   def compute : ValueType = getDefault;
 
   def getDefault : ValueType = {
-    throw new UndefinedAttributeException(anchor+"."+name);
+    throw new UndefinedAttributeException(s"$anchor.$name");
   };
 }
 
@@ -349,7 +349,7 @@ extends Module("Attribute " + name)
   }
   
   def createEvaluation(anchor : NodeType) : Evaluation[NodeType,ValueType] = {
-    return new Evaluation(anchor, anchor + "." + name);
+    return new Evaluation(anchor, s"$anchor.$name");
   }
 }
 
