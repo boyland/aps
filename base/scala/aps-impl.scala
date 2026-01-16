@@ -537,10 +537,11 @@ object P_AND {
 
 trait StaticCircularEvaluation[V_P, V_T] extends CircularEvaluation[V_P, V_T] {
   def assign(v: ValueType, changed: AtomicBoolean): Unit = {
+    Debug.out(name + " := " + v);
     this.set(v, changed)
   }
 
-  def set(newValue : ValueType, changed: AtomicBoolean) : Unit = {
+  def set(newValue: ValueType, changed: AtomicBoolean): Unit = {
     val prevValue = value;
     super.set(newValue);
     if (prevValue != value) {
@@ -548,7 +549,7 @@ trait StaticCircularEvaluation[V_P, V_T] extends CircularEvaluation[V_P, V_T] {
     }
   }
 
-  override def check(newValue : ValueType) : Unit = {
+  override def check(newValue: ValueType): Unit = {
     if (value != null) {
       if (!lattice.v_equal(value, newValue)) {
         if (!lattice.v_compare(value, newValue)) {
@@ -565,11 +566,14 @@ trait StaticCircularEvaluation[V_P, V_T] extends CircularEvaluation[V_P, V_T] {
 trait ChangeTrackingAttribute[T_P <: Node, T_V] {
   this: Attribute[T_P, T_V] =>
 
-  def set(n: T_P, v: T_V, changed: AtomicBoolean): Unit = checkNode(n).asInstanceOf[StaticCircularEvaluation[T_P, T_V]].set(v, changed);
-
   def assign(n: T_P, v: T_V, changed: AtomicBoolean): Unit = {
     Debug.begin(t_P.v_string(n) + "." + name + ":=" + v);
     this.set(n, v, changed);
     Debug.end();
   }
+
+  def set(n: T_P, v: T_V, changed: AtomicBoolean): Unit = checkNode(n)
+    .asInstanceOf[StaticCircularEvaluation[T_P, T_V]]
+    .set(v, changed);
 }
+
