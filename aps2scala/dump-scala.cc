@@ -1665,7 +1665,7 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
 		<< infer_formal_type(f) << " => " << value_decl_type(rdecl)
 		<< " = a_" << n << ".get _;\n";
 	    
-      bool is_input =direction_is_input(attribute_decl_direction(d));
+      bool is_input = direction_is_input(attribute_decl_direction(d));
       bool is_circular = direction_is_circular(attribute_decl_direction(d));
 
 	    if (is_input) {
