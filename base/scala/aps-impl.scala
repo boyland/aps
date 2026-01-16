@@ -264,19 +264,15 @@ class Evaluation[T_P, T_V](val anchor : T_P, val name : String)
     }
   }
 
-  def assign(v : ValueType, changed: AtomicBoolean = null) : Unit = {
+  def assign(v : ValueType) : Unit = {
     Debug.out(name + " := " + v);
-    set(v, changed);
+    set(v);
   }
 
-  def set(v : ValueType, changed: AtomicBoolean = null) : Unit = {
+  def set(v : ValueType) : Unit = {
     status match {
     case EVALUATED => if (checkForLateUpdate) throw TooLateError else ();
     case _ => ();
-    }
-
-    if (changed != null) {
-      changed.set(changed.get() || (value != v));
     }
     value = v;
     status = ASSIGNED;
@@ -310,10 +306,10 @@ extends Module("Attribute " + name)
   private val evaluations : Buffer[Evaluation[T_P,T_V]] = new ArrayBuffer();
   private var evaluationStarted : Boolean = false;
 
-  def assign(n : NodeType, v : ValueType, changed: AtomicBoolean = null) : Unit = {
+  def assign(n : NodeType, v : ValueType) : Unit = {
     Debug.begin(t_P.v_string(n) + "." + name + ":=" + v);
     if (evaluationStarted) throw TooLateError;
-    set(n,v, changed);
+    set(n,v);
     Debug.end();
   }
     
@@ -345,8 +341,8 @@ extends Module("Attribute " + name)
     evaluations(num)
   }
   
-  def set(n : NodeType, v : ValueType, changed: AtomicBoolean = null) : Unit = {
-    checkNode(n).set(v, changed);
+  def set(n : NodeType, v : ValueType) : Unit = {
+    checkNode(n).set(v);
   }
 
   def get(n : Any) : ValueType = {
@@ -379,14 +375,14 @@ trait CollectionEvaluation[V_P, V_T] extends Evaluation[V_P,V_T] {
     super.get
   }
 
-  override def assign(v : ValueType, changed: AtomicBoolean = null) : Unit = {
+  override def assign(v : ValueType) : Unit = {
     Debug.out(name + " :> " + v);
-    set(v, changed);
+    set(v);
   }
 
-  override def set(v : ValueType, changed: AtomicBoolean = null) : Unit = {
+  override def set(v : ValueType) : Unit = {
     initialize;
-    super.set(combine(value,v), changed);
+    super.set(combine(value,v));
   }
 }
 
@@ -514,9 +510,9 @@ trait CircularEvaluation[V_P, V_T] extends Evaluation[V_P,V_T] {
     }
   };
   
-  override def set(newValue : ValueType, changed: AtomicBoolean = null) : Unit = {
+  override def set(newValue : ValueType) : Unit = {
     check(newValue);
-    super.set(newValue, changed);
+    super.set(newValue);
   }
   
   def recompute() : Unit = {
@@ -540,6 +536,18 @@ object P_AND {
 }
 
 trait StaticCircularEvaluation[V_P, V_T] extends CircularEvaluation[V_P, V_T] {
+  def assign(v: ValueType, changed: AtomicBoolean): Unit = {
+    this.set(v, changed)
+  }
+
+  def set(newValue : ValueType, changed: AtomicBoolean) : Unit = {
+    val prevValue = value;
+    super.set(newValue);
+    if (prevValue != value) {
+      changed.set(true);
+    }
+  }
+
   override def check(newValue : ValueType) : Unit = {
     if (value != null) {
       if (!lattice.v_equal(value, newValue)) {
@@ -552,4 +560,16 @@ trait StaticCircularEvaluation[V_P, V_T] extends CircularEvaluation[V_P, V_T] {
 
   // Needed to prevent TooLateError
   checkForLateUpdate = false;
+}
+
+trait ChangeTrackingAttribute[T_P <: Node, T_V] {
+  this: Attribute[T_P, T_V] =>
+
+  def set(n: T_P, v: T_V, changed: AtomicBoolean): Unit = checkNode(n).asInstanceOf[StaticCircularEvaluation[T_P, T_V]].set(v, changed);
+
+  def assign(n: T_P, v: T_V, changed: AtomicBoolean): Unit = {
+    Debug.begin(t_P.v_string(n) + "." + name + ":=" + v);
+    this.set(n, v, changed);
+    Debug.end();
+  }
 }

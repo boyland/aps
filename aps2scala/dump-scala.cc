@@ -744,6 +744,7 @@ void dump_some_attribute(Declaration d, string i,
     oss << indent() << "private object a" << i << "_" << name
 	<< " extends Attribute" << tmps.str() 
 	<< "(" << as_val(nt) << "," << as_val(vt) << ",\"" << name << "\")"
+  << (activate_static_circular && is_cir ? " with ChangeTrackingAttribute" + tmps.str() : "")
 	<< " {\n";
     ++nesting_level;
     
@@ -1625,6 +1626,7 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
 	  if (!def_is_constant(value_decl_def(d))) {
 	    Default init = value_decl_default(d);
 	    Direction dir = value_decl_direction(d);
+      bool is_circular = direction_is_circular(dir);
 	    Type type = value_decl_type(d);
 	    dump_some_attribute(d,"",0,
 				value_decl_type(d),
@@ -1638,7 +1640,7 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
 	      oss << indent() << "def s_" << n << "(value:" << type
 		  << ") = " << "a_" << n
 		  << ".set(value";
-        if (s->loop_required) {
+        if (s->loop_required && is_circular) {
           oss << ", changed";
         }
         oss << ");\n";
@@ -1663,13 +1665,16 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
 		<< infer_formal_type(f) << " => " << value_decl_type(rdecl)
 		<< " = a_" << n << ".get _;\n";
 	    
-	    if (direction_is_input(attribute_decl_direction(d))) {
+      bool is_input =direction_is_input(attribute_decl_direction(d));
+      bool is_circular = direction_is_circular(attribute_decl_direction(d));
+
+	    if (is_input) {
 	      oss << indent() << "def s_" << n << "(node:"
 		  << infer_formal_type(f)
 		  << ", value:" << value_decl_type(rdecl)
 		  << ") = " << "a_" << n
 		  << ".assign(node, value";
-        if (s->loop_required) {
+        if (s->loop_required && is_circular) {
           oss << ", changed";
         }
         oss << ");\n";

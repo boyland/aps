@@ -253,13 +253,30 @@ static bool implement_visit_function(
 
   for (; cto; cto = cto->cto_next) {
     INSTANCE* in = cto->cto_instance;
+    bool is_conditional = in != NULL && if_rule_p(in->fibered_attr.attr);
+    bool is_circular = false;
+
+    if (in == NULL || is_conditional) {
+      is_circular = false;
+    } else {
+      switch (Declaration_KEY(in->fibered_attr.attr)) {
+        case KEYvalue_decl:
+          is_circular = direction_is_circular(value_decl_direction(in->fibered_attr.attr));
+          break;
+        case KEYattribute_decl:
+          is_circular = direction_is_circular(attribute_decl_direction(in->fibered_attr.attr));
+          break;
+        default:
+          break;
+      }
+    }
+
     int ch = cto->child_phase.ch;
     int ph = cto->child_phase.ph;
     bool chunk_changed = chunk_index != -1 && cto->chunk_index != chunk_index;
     PHY_GRAPH* pg_parent =
         Declaration_info(aug_graph->lhs_decl)->node_phy_graph;
 
-    bool is_conditional = in != NULL && if_rule_p(in->fibered_attr.attr);
 
     Declaration ad = in != NULL ? in->fibered_attr.attr : NULL;
     void* ad_parent = ad != NULL ? tnode_parent(ad) : NULL;
@@ -426,6 +443,7 @@ static bool implement_visit_function(
       ow->get_outstream() << indent() << "visit_" << n << "_" << ph << "(";
 #ifdef APS2SCALA
       ow->get_outstream() << "v_" << decl_name(cto->child_decl);
+
       if (s->loop_required) {
         ow->get_outstream() << ", changed";
       }
@@ -673,7 +691,7 @@ static bool implement_visit_function(
               ow->get_outstream() << "set";
             ow->get_outstream() << "(" << rhs;
             
-            if (s->loop_required) {
+            if (s->loop_required && is_circular) {
               ow->get_outstream() << ", changed";
             }
             
@@ -707,7 +725,7 @@ static bool implement_visit_function(
             ow->get_outstream()
                 << "(" << field_ref_object(lhs) << "," << rhs;
             
-            if (s->loop_required) {
+            if (s->loop_required && is_circular) {
               ow->get_outstream() << ", changed";
             }
 
@@ -730,7 +748,7 @@ static bool implement_visit_function(
             else
               ow->get_outstream() << "set";
             ow->get_outstream() << "(anchor," << rhs;
-            if (s->loop_required) {
+            if (s->loop_required && is_circular) {
               ow->get_outstream() << ", changed";
             }
             ow->get_outstream() << ");\n";
@@ -806,7 +824,7 @@ static bool implement_visit_function(
             ow->get_outstream()
                 << "(v_" << decl_name(in->node) << "," << rhs;
 
-            if (s->loop_required) {
+            if (s->loop_required && is_circular) {
               ow->get_outstream() << ", changed";
             }
             ow->get_outstream() << ");\n";
@@ -830,7 +848,7 @@ static bool implement_visit_function(
             ow->get_outstream() << "set";
           ow->get_outstream()
               << "(v_" << decl_name(in->node) << "," << rhs;
-          if (s->loop_required) {
+          if (s->loop_required && is_circular) {
             ow->get_outstream() << ", changed";
           }
           ow->get_outstream() << ");\n";
