@@ -1626,7 +1626,7 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
 	  if (!def_is_constant(value_decl_def(d))) {
 	    Default init = value_decl_default(d);
 	    Direction dir = value_decl_direction(d);
-      bool is_circular = direction_is_circular(dir);
+	    bool is_circular = direction_is_circular(dir);
 	    Type type = value_decl_type(d);
 	    dump_some_attribute(d,"",0,
 				value_decl_type(d),
@@ -1640,10 +1640,10 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
 	      oss << indent() << "def s_" << n << "(value:" << type
 		  << ") = " << "a_" << n
 		  << ".set(value";
-        if (s->loop_required && is_circular) {
-          oss << ", changed";
-        }
-        oss << ");\n";
+		  if (s->loop_required && is_circular) {
+            oss << ", changed";
+		  }
+		  oss << ");\n";
 	    }
 	    oss << std::endl;
 	  }
@@ -1674,10 +1674,10 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
 		  << ", value:" << value_decl_type(rdecl)
 		  << ") = " << "a_" << n
 		  << ".assign(node, value";
-        if (s->loop_required && is_circular) {
-          oss << ", changed";
-        }
-        oss << ");\n";
+	      if (s->loop_required && is_circular) {
+            oss << ", changed";
+	      }
+	      oss << ");\n";
 	    }
 	    oss << std::endl;
       
