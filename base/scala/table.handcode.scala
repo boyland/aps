@@ -27,10 +27,10 @@ class M_TABLE[T_KeyType, T_ValueType]
 extends I_TYPE[TreeMap[T_KeyType,T_ValueType]](name)
 with C_TABLE[TreeMap[T_KeyType,T_ValueType],T_KeyType,T_ValueType]
 {
-  implicit def key_order(x : T_KeyType) = new Ordered[T_KeyType] {
+  implicit def key_order(x : T_KeyType): Ordered[T_KeyType] = new Ordered[T_KeyType] {
     def compare(y : T_KeyType) : Int = key_ordering.compare(x,y);
   };
-  implicit val key_ordering = new Ordering[T_KeyType] {
+  implicit val key_ordering: Ordering[T_KeyType] = new Ordering[T_KeyType] {
     def compare(x : T_KeyType, y : T_KeyType) : Int = {
       if (t_KeyType.v_equal(x,y)) return 0;
       if (t_KeyType.v_less(x,y)) return -1;
@@ -44,10 +44,10 @@ with C_TABLE[TreeMap[T_KeyType,T_ValueType],T_KeyType,T_ValueType]
 
   val v_table_entry = f_table_entry _;
   def f_table_entry(v_key : T_KeyType, v_val : T_ValueType):T_Result = 
-    v_empty_table.insert(v_key,v_val);
+    v_empty_table.updated(v_key,v_val);
 
   def u_table_entry(x:Any) : Option[(T_Result,T_KeyType,T_ValueType)] = x match {
-    case m:Table => {
+    case m:Table @unchecked => {
       if (m.size == 1) {
 	val k = m.firstKey;
 	Some((m,k,m(k)))
@@ -66,7 +66,7 @@ with C_TABLE[TreeMap[T_KeyType,T_ValueType],T_KeyType,T_ValueType]
       if (result.isDefinedAt(k)) {
 	result = result.updated(k,t_ValueType.v_combine(result(k),v)).asInstanceOf[Table]
       } else {
-	result = result.insert(k,v);
+	result = result.updated(k,v);
       }
     };
     result
