@@ -649,7 +649,7 @@ with C_SEQUENCE[T_SEQUENCE[T_ElemType],T_ElemType]
     case c_none() => List()
   };
   def u__op_AC(x:Any) : Option[(T_Result,Seq[T_ElemType])] = x match {
-    case x : T_Result => Some((x,toList(x)));
+    case x : T_Result @unchecked => Some((x,toList(x)));
     case _ => None
   };
   val p__op_AC = new PatternSeqFunction[T_Result,T_ElemType](u__op_AC);
@@ -746,7 +746,7 @@ with C_BAG[List[T_ElemType],T_ElemType]
   
   val p__op_AC = new PatternSeqFunction[T_Result,T_ElemType](u__op_AC);
   def u__op_AC(x:Any) : Option[(T_Result,Seq[T_ElemType])] = x match {
-    case x:T_Result => Some((x,x))
+    case x:T_Result @unchecked => Some((x,x))
     case _ => None
   };
   
@@ -757,7 +757,7 @@ with C_BAG[List[T_ElemType],T_ElemType]
   val v_append = f_append _;
   def f_append(v_l1 : T_Result, v_l2 : T_Result):T_Result = v_l1 ++ v_l2;
   def u_append(x:Any) : Option[(T_Result,T_Result,T_Result)] = x match {
-    case x:T_Result => x match {
+    case x:T_Result @unchecked => x match {
       case x1::x2::l => Some((x,List(x1),x2::l))
       case _ => None 
     };
@@ -768,7 +768,7 @@ with C_BAG[List[T_ElemType],T_ElemType]
   val v_single = f_single _;
   def f_single(v_x : T_ElemType):T_Result = List(v_x);
   def u_single(x:Any) : Option[(T_Result,T_ElemType)] = x match {
-    case x:T_Result => x match {
+    case x:T_Result @unchecked => x match {
       case v_x::Nil => Some((x,v_x));
       case _ => None };
     case _ => None };
@@ -871,7 +871,7 @@ with C_SET[Set[T_ElemType],T_ElemType]
   
   val p__op_AC = new PatternSeqFunction[T_Result,T_ElemType](u__op_AC);
   def u__op_AC(x:Any) : Option[(T_Result,Seq[T_ElemType])] = x match {
-    case x:T_Result => Some((x,x.toSeq));
+    case x:T_Result @unchecked => Some((x,x.toSeq));
     case _ => None
   };
   
@@ -883,7 +883,7 @@ with C_SET[Set[T_ElemType],T_ElemType]
   def f_append(v_l1 : T_Result, v_l2 : T_Result):T_Result =
     v_l1 ++ v_l2;
   def u_append(x:Any) : Option[(T_Result,T_Result,T_Result)] = x match {
-    case x:T_Result =>
+    case x:T_Result @unchecked =>
     if (x.size > 1) {
       val y : T_ElemType = x.iterator.next();
       Some((x,ListSet(y),x - y))
@@ -897,7 +897,7 @@ with C_SET[Set[T_ElemType],T_ElemType]
   val v_single = f_single _;
   def f_single(v_x : T_ElemType):T_Result = ListSet(v_x);
   def u_single(x:Any) : Option[(T_Result,T_ElemType)] = x match {
-    case x:T_Result => if (x.size == 1) Some(x,x.iterator.next()) else None;
+    case x:T_Result @unchecked => if (x.size == 1) Some(x,x.iterator.next()) else None;
     case _ => None
   };
   val p_single = new PatternFunction[(T_Result,T_ElemType)](u_single);
@@ -905,7 +905,7 @@ with C_SET[Set[T_ElemType],T_ElemType]
   val v_none = f_none _;
   def f_none():T_Result = ListSet();
   def u_none(x:Any) : Option[T_Result] = x match {
-    case x:T_Result =>
+    case x:T_Result @unchecked =>
     if (x.size == 0) Some(x) else None;
     case _ => None
   };
@@ -1303,7 +1303,7 @@ with C_STRING[String]
   override def f_assert(v__88 : T_Result) : Unit = {};
   
   val v__op_AC = f__op_AC _;
-  def f__op_AC(v_l : Char*):T_Result = (v_l foldRight "")((c,s) => c + s);
+  def f__op_AC(v_l : Char*):T_Result = (v_l foldRight "")((c,s) => s"$c$s");
   
   val p__op_AC = new PatternSeqFunction[T_Result,Char](u__op_AC);
   def u__op_AC(x:Any) : Option[(T_Result,Seq[Char])] = x match {
@@ -1345,7 +1345,7 @@ with C_STRING[String]
   val p_none = new PatternFunction[T_Result](u_none);
   
   val v_cons = f_cons _;
-  def f_cons(x : Char, s : String) : String = x + s;
+  def f_cons(x : Char, s : String) : String = s"$x$s";
   val v_concatenate : (T_Result,T_Result) => T_Result = v_append;
   val v_nth = f_nth _;
   def f_nth(v_i : T_Integer, v_l : T_Result):Char = v_l.charAt(v_i);

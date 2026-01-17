@@ -29,6 +29,6 @@ class M_SYMBOL(name : String)
   val v_less_equal = f_less_equal _;
   def f_less_equal(v__8 : T_Result, v__9 : T_Result):T_Boolean =
     v__8.hashCode() <= v__9.hashCode();
-  var v_null:T_Result = 'nil;
+  var v_null:T_Result = Symbol("nil");
 }
 
