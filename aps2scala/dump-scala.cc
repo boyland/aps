@@ -181,11 +181,12 @@ void dump_formal(Declaration formal, ostream&os)
   if (KEYseq_formal == Declaration_KEY(formal)) os << "*";
 }
 
-void dump_function_prototype(string name, Type ft, ostream& oss)
+void dump_function_prototype(string name, Type ft, bool dump_anchor_actual, ostream& oss)
 {
   oss << indent() << "val v_" << name << " = f_" << name << " _;\n";
   oss << indent() << "def f_" << name << "(";
 
+  bool started = false;
   Declarations formals = function_type_formals(ft);
   for (Declaration formal = first_Declaration(formals);
        formal != NULL;
@@ -193,6 +194,13 @@ void dump_function_prototype(string name, Type ft, ostream& oss)
     if (formal != first_Declaration(formals))
       oss << ", ";
     dump_formal(formal,oss);
+    started = true;
+  }
+  if (dump_anchor_actual) {
+    if (started) {
+      oss << ", ";
+    }
+    oss << "anchor: Any";
   }
   oss << ")";
 
@@ -1302,6 +1310,26 @@ static void dump_scala_pattern_function(
   Declarations rdecls = function_type_return_values(ft);
   Type rt = value_decl_type(first_Declaration(rdecls));
 
+  bool dump_anchor_actual = false;
+  if (should_include_ast_for_objects()) {
+    switch (Declaration_KEY(decl))
+    {
+    case KEYconstructor_decl: {
+      Declaration cdecl = constructor_decl_base_type_decl(decl);
+      switch (Declaration_KEY(cdecl)) {
+        case KEYphylum_decl:
+          dump_anchor_actual = true;
+          break;
+        default:
+          break;
+      }
+      break;
+    }
+    default:
+      break;
+    }
+  }
+
   // helper: "(v_a1,v_a2)" and "(x,v_a1,v_a2)"
   std::ostringstream argss;
   bool started = false;
@@ -1310,9 +1338,20 @@ static void dump_scala_pattern_function(
     if (started) argss << ","; else started = true;
     argss << "v_" << decl_name(f);
   }
+
+  std::ostringstream cloned_oss;
+  cloned_oss << argss.str();
+  if (dump_anchor_actual) {
+    if (started) {
+      argss << ", ";
+    }
+    argss << "anchor";
+  }
   argss << ")";
+  cloned_oss << ")";
   string args = argss.str();
-  string uargs = started ? ("(x," + args.substr(1)) : "x";
+  string args_without_anchor = cloned_oss.str();
+  string uargs = started ? ("(x," + cloned_oss.str().substr(1)) : "x";
   
   // helper: "(T_Result,T_A1,T_A2)"
   std::ostringstream typess;
@@ -1353,7 +1392,7 @@ static void dump_scala_pattern_function(
   
   if (!body) {
     // the constructor function:
-    dump_function_prototype(name,ft,oss);
+    dump_function_prototype(name,ft,dump_anchor_actual,oss);
     oss << " = c_" << name << args;
     if (is_syntax) oss << ".register";
     oss << ";\n";
@@ -1737,6 +1776,15 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
 	if (started) oss << ","; else started = true;
 	dump_formal(f,oss);
       }
+
+      if (should_include_ast_for_objects()) {
+        if (is_syntax) {
+          if (started) {
+            oss << ", ";
+          }
+          oss << "ast: Any";
+        }
+      }
       oss << ") extends " << rt << "(" << as_val(rt) << ") {\n";
       ++nesting_level;
       if (is_syntax) {
@@ -1874,7 +1922,7 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
       Type fty = function_decl_type(decl);
       Declaration rdecl = first_Declaration(function_type_return_values(fty));
       Block b = function_decl_body(decl);
-      dump_function_prototype(name,fty,oss);
+      dump_function_prototype(name,fty,false /* dump_anchor_actual */,oss);
 
       // three kinds of definitions:
       // 1. the whole thing: a non-empty body:
@@ -2109,6 +2157,29 @@ void dump_Type(Type t, ostream& o)
     break;
   case KEYfunction_type:
     {
+      bool dump_anchor = false;
+
+      if (should_include_ast_for_objects()) {
+        Type rtype = function_type_return_type(t);
+        switch (Type_KEY(rtype)) {
+        case KEYtype_use: {
+          Declaration udecl = USE_DECL(type_use_use(rtype));
+          
+          switch (Declaration_KEY(udecl)) {
+          case KEYphylum_decl: {
+            dump_anchor = true;
+            break;
+          }
+          default:
+            break;
+          }
+          break;
+        }
+        default:
+          break;
+        }
+      }
+
       o << "(";
       bool started = false;
       for (Declaration f=first_Declaration(function_type_formals(t));
@@ -2117,6 +2188,12 @@ void dump_Type(Type t, ostream& o)
 	dump_Type(formal_type(f),o);
 	if (Declaration_KEY(f) == KEYseq_formal)
 	  o << "*";
+      }
+      if (dump_anchor) {
+        if (started) {
+          o << ", ";
+        }
+        o << "Any";
       }
       o << ") => ";
       Declaration rdecl = first_Declaration(function_type_return_values(t));
@@ -2263,11 +2340,43 @@ void dump_Expression(Expression e, ostream& o)
     o << string_const_token(e);
     break;
   case KEYfuncall:
+  {
     if (funcall_is_collection_construction(e)) {
       // inline code to call append, single and null constructors
       dump_collect_Actuals(infer_expr_type(e),funcall_actuals(e),o);
       return;
     }
+    bool dump_anchor_actual = false;
+    if (should_include_ast_for_objects()) {
+      Expression fexpr = funcall_f(e);
+      switch (Expression_KEY(fexpr)) {
+        case KEYvalue_use: {
+          Declaration udecl = USE_DECL(value_use_use(fexpr));
+          switch (Declaration_KEY(udecl)) {
+            case KEYconstructor_decl: {
+              Declaration tdecl = constructor_decl_base_type_decl(udecl);
+              switch (Declaration_KEY(tdecl)) {
+                case KEYphylum_decl:
+                  dump_anchor_actual = true;
+                  break;
+                default:
+                  break;
+              }
+              break;
+            }
+            default:
+              break;
+          }
+          break;
+        }
+        default:
+          break;
+      }
+    }
+
+    Declaration tplm;
+    bool inside_top_level_match = check_surrounding_decl(e, KEYtop_level_match, &tplm);
+
     dump_Expression(funcall_f(e),o);
     o << "(";
     {
@@ -2282,9 +2391,23 @@ void dump_Expression(Expression e, ostream& o)
 	  if (start) start = false; else o << ",";
 	  o << "0";
 	}
+
+    if (dump_anchor_actual) {
+      if (first_Actual(funcall_actuals(e)) != NULL) {
+        o << ", ";
+      }
+      if (inside_top_level_match) {
+        o << "anchor";
+      } else {
+        o << "null";
+      }
     }
+
     o << ")";
+
+    }
     break;
+  }
   case KEYvalue_use:
     {
       Use u = value_use_use(e);
@@ -2455,3 +2578,19 @@ string operator+(string s, int i)
 }
 
 string indent(int nl) { return string(indent_multiple*nl,' '); }
+
+bool check_surrounding_decl(void* node, KEYTYPE_Declaration decl_key, Declaration* result_decl) {
+  while (node != NULL) {
+    if (ABSTRACT_APS_tnode_phylum(node) == KEYDeclaration) {
+      Declaration decl = (Declaration)node;
+      if (Declaration_KEY(decl) == decl_key) {
+        *result_decl = decl;
+        return true;
+      }
+    }
+    node = tnode_parent(node);
+  }
+
+  *result_decl = NULL;
+  return false;
+}
