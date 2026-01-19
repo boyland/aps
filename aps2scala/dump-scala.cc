@@ -744,7 +744,7 @@ void dump_some_attribute(Declaration d, string i,
     oss << indent() << "private object a" << i << "_" << name
 	<< " extends Attribute" << tmps.str() 
 	<< "(" << as_val(nt) << "," << as_val(vt) << ",\"" << name << "\")"
-  << (activate_static_circular && is_cir ? " with ChangeTrackingAttribute" + tmps.str() : "")
+	<< (activate_static_circular && is_cir ? " with ChangeTrackingAttribute" + tmps.str() : "")
 	<< " {\n";
     ++nesting_level;
     
