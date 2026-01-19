@@ -198,10 +198,7 @@ static void dump_loop_end(AUG_GRAPH* aug_graph,
     std::replace(suffix.begin(), suffix.end(), '-', '_');
     --nesting_level;
     os << "\n";
-    os << indent() << "} while(changed.get);"
-       << "\n";
-    os << indent() << "changed.set(prevChanged_" << suffix << ");\n"
-       << "\n";
+    os << indent() << "} while(newChanged.get);" << "\n";
   } else {
     ow->clear_since(loop_id);
   }
@@ -210,14 +207,16 @@ static void dump_loop_end(AUG_GRAPH* aug_graph,
 
 static void dump_loop_start_helper(int loop_id, std::ostream& os)
 {
+#ifdef APS2SCALA
   // ABS value of component_index because initially it is -1
   string suffix = any_to_string(loop_id);
   std::replace(suffix.begin(), suffix.end(), '-', '_');
 
-  os << indent() << "val prevChanged_" << suffix << " = changed.get;\n";
+  os << indent() << "val newChanged = new AtomicBoolean(false);\n";
   os << indent() << "do {\n";
   ++nesting_level;
-  os << indent() << "changed.set(false);\n";
+  os << indent() << "newChanged.set(false);\n";
+#endif /* APS2SCALA */
 }
 
 static void dump_loop_start(AUG_GRAPH* aug_graph,
@@ -230,6 +229,13 @@ static void dump_loop_start(AUG_GRAPH* aug_graph,
       loop_id,
       dump_loop_start_helper);
 
+#endif /* APS2SCALA */
+}
+
+static void dump_changed(int loop_id, std::ostream& os)
+{
+#ifdef APS2SCALA
+  os << (loop_id == -1 ? "changed" : "newChanged");
 #endif /* APS2SCALA */
 }
 
@@ -276,7 +282,6 @@ static bool implement_visit_function(
     bool chunk_changed = chunk_index != -1 && cto->chunk_index != chunk_index;
     PHY_GRAPH* pg_parent =
         Declaration_info(aug_graph->lhs_decl)->node_phy_graph;
-
 
     Declaration ad = in != NULL ? in->fibered_attr.attr : NULL;
     void* ad_parent = ad != NULL ? tnode_parent(ad) : NULL;
@@ -445,7 +450,8 @@ static bool implement_visit_function(
       ow->get_outstream() << "v_" << decl_name(cto->child_decl);
 
       if (s->loop_required) {
-        ow->get_outstream() << ", changed";
+        ow->get_outstream() << ", ";
+        dump_changed(loop_id, ow->get_outstream());
       }
 #else  /* APS2SCALA */
       ow->get_outstream() << "v_" << decl_name(cto->child_decl);
@@ -692,7 +698,8 @@ static bool implement_visit_function(
             ow->get_outstream() << "(" << rhs;
             
             if (s->loop_required && is_circular) {
-              ow->get_outstream() << ", changed";
+              ow->get_outstream() << ", ";
+              dump_changed(loop_id, ow->get_outstream());
             }
             
             ow->get_outstream() << ");\n";
@@ -726,7 +733,8 @@ static bool implement_visit_function(
                 << "(" << field_ref_object(lhs) << "," << rhs;
             
             if (s->loop_required && is_circular) {
-              ow->get_outstream() << ", changed";
+              ow->get_outstream() << ", ";
+              dump_changed(loop_id, ow->get_outstream());
             }
 
             ow->get_outstream() << ");\n";
@@ -749,7 +757,8 @@ static bool implement_visit_function(
               ow->get_outstream() << "set";
             ow->get_outstream() << "(anchor," << rhs;
             if (s->loop_required && is_circular) {
-              ow->get_outstream() << ", changed";
+              ow->get_outstream() << ", ";
+              dump_changed(loop_id, ow->get_outstream());
             }
             ow->get_outstream() << ");\n";
           } else {
@@ -825,7 +834,8 @@ static bool implement_visit_function(
                 << "(v_" << decl_name(in->node) << "," << rhs;
 
             if (s->loop_required && is_circular) {
-              ow->get_outstream() << ", changed";
+              ow->get_outstream() << ", ";
+              dump_changed(loop_id, ow->get_outstream());
             }
             ow->get_outstream() << ");\n";
           }

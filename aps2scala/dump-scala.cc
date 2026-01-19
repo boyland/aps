@@ -1640,9 +1640,6 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
 	      oss << indent() << "def s_" << n << "(value:" << type
 		  << ") = " << "a_" << n
 		  << ".set(value";
-		  if (s->loop_required && is_circular) {
-            oss << ", changed";
-		  }
 		  oss << ");\n";
 	    }
 	    oss << std::endl;
@@ -1674,9 +1671,6 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
 		  << ", value:" << value_decl_type(rdecl)
 		  << ") = " << "a_" << n
 		  << ".assign(node, value";
-	      if (s->loop_required && is_circular) {
-            oss << ", changed";
-	      }
 	      oss << ");\n";
 	    }
 	    oss << std::endl;
