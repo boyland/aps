@@ -1,6 +1,8 @@
 import Evaluation._;
 
 object basic_implicit {
+  type AtomicBoolean = java.util.concurrent.atomic.AtomicBoolean;
+
   private object Conversions {
     implicit def lazyToEager[T](f: (=>T, =>T) => T): (T, T) => T = (a: T, b: T) => f(a, b)
   }
