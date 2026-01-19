@@ -94,42 +94,6 @@ static string program_id(string name)
   return result;
 }
 
-/**
- * @brief function to dump static circular evaluation trait.
- * 
- * Introduces changed boolean variable (accessible globally) that is
- *   ORed with its previous value if the attribute instance value has been changed.
- * 
- * By-pass CircularEvaluation limitation that prevents re-evaluation of
- *   attribute instance, hence checkForLateUpdate=false and in aps-impl.scala
- *   TooLateError is not thrown in case of re-evaluation if checkForLateUpdate
- *   is set to false.
- */
-void dump_static_circular_trait(std::ostream& oss)
-{
-  oss << "\n";
-  oss << indent(nesting_level) << "private var changed: Boolean = false;\n";
-  oss << indent(nesting_level) << "trait StaticCircularEvaluation[V_P, V_T] extends CircularEvaluation[V_P, V_T] {\n";
-  oss << indent(nesting_level + 1) << "override def set(newValue : ValueType) : Unit = {\n";
-  oss << indent(nesting_level + 2) << "val prevValue = value;\n";
-  oss << indent(nesting_level + 2) << "super.set(newValue);\n";
-  oss << indent(nesting_level + 2) << "changed |= prevValue != value;\n";
-  oss << indent(nesting_level + 1) << "}\n\n";
-  oss << indent(nesting_level + 1) << "override def check(newValue : ValueType) : Unit = {\n";
-  // value is null during the first check() invocation
-  oss << indent(nesting_level + 2) << "if (value != null) {\n";
-  oss << indent(nesting_level + 3) << "if (!lattice.v_equal(value, newValue)) {\n";
-  oss << indent(nesting_level + 4) << "if (!lattice.v_compare(value, newValue)) {\n";
-  oss << indent(nesting_level + 5) << "throw new Evaluation.CyclicAttributeException(\"non-monotonic \" + name);\n";
-  oss << indent(nesting_level + 4) << "}\n";
-  oss << indent(nesting_level + 3) << "}\n";
-  oss << indent(nesting_level + 2) << "}\n";
-  oss << indent(nesting_level + 1) << "}\n\n";
-  // Needed to prevent TooLateError
-  oss << indent(nesting_level + 1) << "checkForLateUpdate = false;\n";
-  oss << indent(nesting_level) << "}\n";
-}
-
 void dump_scala_Declaration_header(Declaration, std::ostream&);
 
 void dump_scala_Program(Program p,std::ostream&oss)
@@ -780,6 +744,7 @@ void dump_some_attribute(Declaration d, string i,
     oss << indent() << "private object a" << i << "_" << name
 	<< " extends Attribute" << tmps.str() 
 	<< "(" << as_val(nt) << "," << as_val(vt) << ",\"" << name << "\")"
+	<< (activate_static_circular && is_cir ? " with ChangeTrackingAttribute" + tmps.str() : "")
 	<< " {\n";
     ++nesting_level;
     
@@ -1608,11 +1573,6 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
       if (static_scc_schedule && s != NULL)
       {
         activate_static_circular = s->loop_required;
-        // Avoid unnecessary dump of static circular trait definition
-        if (activate_static_circular)
-        {
-          dump_static_circular_trait(oss);
-        }
       }
 
       if (result_typeval != "") {
@@ -1699,7 +1659,7 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
 	    oss << indent() << "val v_" << n << " : "
 		<< infer_formal_type(f) << " => " << value_decl_type(rdecl)
 		<< " = a_" << n << ".get _;\n";
-	    
+
 	    if (direction_is_input(attribute_decl_direction(d))) {
 	      oss << indent() << "def s_" << n << "(node:"
 		  << infer_formal_type(f)

@@ -4,6 +4,7 @@
 
 import scala.collection.mutable.Buffer;
 import scala.collection.mutable.ArrayBuffer;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 object Debug {
   private var depth : Int = 0;
@@ -533,3 +534,46 @@ class PatternSeqFunction[R,A](f : Any => Option[(R,Seq[A])]) {
 object P_AND {
   def unapply[T](x : T) : Option[(T,T)] = Some((x,x));
 }
+
+trait StaticCircularEvaluation[V_P, V_T] extends CircularEvaluation[V_P, V_T] {
+  def assign(v: ValueType, changed: AtomicBoolean): Unit = {
+    Debug.out(name + " := " + v);
+    this.set(v, changed)
+  }
+
+  def set(newValue: ValueType, changed: AtomicBoolean): Unit = {
+    val prevValue = value;
+    super.set(newValue);
+    if (prevValue != value) {
+      changed.set(true);
+    }
+  }
+
+  override def check(newValue: ValueType): Unit = {
+    if (value != null) {
+      if (!lattice.v_equal(value, newValue)) {
+        if (!lattice.v_compare(value, newValue)) {
+          throw new Evaluation.CyclicAttributeException("non-monotonic " + name);
+        }
+      }
+    }
+  }
+
+  // Needed to prevent TooLateError
+  checkForLateUpdate = false;
+}
+
+trait ChangeTrackingAttribute[T_P <: Node, T_V] {
+  this: Attribute[T_P, T_V] =>
+
+  def assign(n: T_P, v: T_V, changed: AtomicBoolean): Unit = {
+    Debug.begin(t_P.v_string(n) + "." + name + ":=" + v);
+    this.set(n, v, changed);
+    Debug.end();
+  }
+
+  def set(n: T_P, v: T_V, changed: AtomicBoolean): Unit = checkNode(n)
+    .asInstanceOf[StaticCircularEvaluation[T_P, T_V]]
+    .set(v, changed);
+}
+
