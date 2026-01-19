@@ -1625,8 +1625,7 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
 	case KEYvalue_decl:
 	  if (!def_is_constant(value_decl_def(d))) {
 	    Default init = value_decl_default(d);
-	    Direction dir = value_decl_direction(d);
-	    bool is_circular = direction_is_circular(dir);
+      Direction dir = value_decl_direction(d);
 	    Type type = value_decl_type(d);
 	    dump_some_attribute(d,"",0,
 				value_decl_type(d),
@@ -1639,8 +1638,7 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
 	      // NB: the a_object handles combination, as appropriate
 	      oss << indent() << "def s_" << n << "(value:" << type
 		  << ") = " << "a_" << n
-		  << ".set(value";
-		  oss << ");\n";
+		  << ".set(value);\n";
 	    }
 	    oss << std::endl;
 	  }
@@ -1661,17 +1659,13 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
 	    oss << indent() << "val v_" << n << " : "
 		<< infer_formal_type(f) << " => " << value_decl_type(rdecl)
 		<< " = a_" << n << ".get _;\n";
-	    
-      bool is_input = direction_is_input(attribute_decl_direction(d));
-      bool is_circular = direction_is_circular(attribute_decl_direction(d));
 
-	    if (is_input) {
+	    if (direction_is_input(attribute_decl_direction(d))) {
 	      oss << indent() << "def s_" << n << "(node:"
 		  << infer_formal_type(f)
 		  << ", value:" << value_decl_type(rdecl)
 		  << ") = " << "a_" << n
-		  << ".assign(node, value";
-	      oss << ");\n";
+		  << ".assign(node,value);\n";
 	    }
 	    oss << std::endl;
       
