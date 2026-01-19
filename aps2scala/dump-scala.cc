@@ -1625,7 +1625,7 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
 	case KEYvalue_decl:
 	  if (!def_is_constant(value_decl_def(d))) {
 	    Default init = value_decl_default(d);
-      Direction dir = value_decl_direction(d);
+	    Direction dir = value_decl_direction(d);
 	    Type type = value_decl_type(d);
 	    dump_some_attribute(d,"",0,
 				value_decl_type(d),
