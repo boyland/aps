@@ -48,7 +48,7 @@ void dump_Expression(Expression,ostream&);
 void dump_Use(Use,const char *prefix,ostream&);
 void dump_vd_Default(Declaration,ostream&);
 
-void dump_function_prototype(string,Type ft, ostream& oss);
+void dump_function_prototype(string name, Type ft, bool dump_anchor_actual, ostream& oss)
 void dump_debug_end(ostream& os);
 
 // these two must always be called in pairs: the first
@@ -97,5 +97,9 @@ inline ostream& operator<<(ostream&os, INSTANCE*i) {
 }
 
 extern string operator+(string, int);
+
+extern bool check_surrounding_decl(void* node, KEYTYPE_Declaration decl_key, Declaration* result_decl);
+
+extern bool should_include_ast_for_objects();
 
 #endif

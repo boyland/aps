@@ -63,6 +63,7 @@ struct Declaration_info {
 #define UP_DOWN_FLAG (1<<16)
 #define MODULE_DECL_GENERATING (1<<17)
 #define MODULE_DECL_GENERATING_VALID (1<<18)
+#define DECL_RHS_SYNTAX_FLAG (1<<19)
 	OSET oset;				/* oset of the declaration */
 	USET uset;				/* uset of the declaration */
 	int	 index;			  /* represent the nodeis Qd and Qd(-) */
@@ -83,7 +84,7 @@ extern struct Declaration_info *Declaration_info(Declaration);
 #define DECL_IS_OBJECT(decl) \
   (Declaration_info(decl)->decl_flags&DECL_OBJECT_FLAG)
 #define DECL_IS_SYNTAX(decl) \
-  (Declaration_info(decl)->decl_flags&(DECL_LHS_FLAG|DECL_RHS_FLAG))
+  (Declaration_info(decl)->decl_flags&(DECL_LHS_FLAG|DECL_RHS_SYNTAX_FLAG))
 #define TYPE_FORMAL_IS_EXTENSION(decl) \
   (Declaration_info(decl)->decl_flags&TYPE_FORMAL_EXTENSION_FLAG)
 #define ATTR_DECL_IS_SYN(decl) \
