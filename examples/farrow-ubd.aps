@@ -69,7 +69,7 @@ module FARROW_UBD[T :: var FARROW_UBD_TREE[]] extends T begin
 
     case DeclPairLattice$select(ds.decls_defs, d.decl_name) begin
       match DeclPairLattice$table_entry(?,?value) begin
-        self.decls_errs := { "unknown identifier of " ++ symbol_name(d.decl_name) } \/ ds.decls_errs \/ d.decl_errs;
+        self.decls_errs := { "identifier " ++ symbol_name(d.decl_name) ++ " is multiply defined" } \/ ds.decls_errs \/ d.decl_errs;
       end;
       else
         self.decls_defs := d.decl_pair;

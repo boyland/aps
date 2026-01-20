@@ -95,42 +95,6 @@ static string program_id(string name)
   return result;
 }
 
-/**
- * @brief function to dump static circular evaluation trait.
- * 
- * Introduces changed boolean variable (accessible globally) that is
- *   ORed with its previous value if the attribute instance value has been changed.
- * 
- * By-pass CircularEvaluation limitation that prevents re-evaluation of
- *   attribute instance, hence checkForLateUpdate=false and in aps-impl.scala
- *   TooLateError is not thrown in case of re-evaluation if checkForLateUpdate
- *   is set to false.
- */
-void dump_static_circular_trait(std::ostream& oss)
-{
-  oss << "\n";
-  oss << indent(nesting_level) << "private var changed: Boolean = false;\n";
-  oss << indent(nesting_level) << "trait StaticCircularEvaluation[V_P, V_T] extends CircularEvaluation[V_P, V_T] {\n";
-  oss << indent(nesting_level + 1) << "override def set(newValue : ValueType) : Unit = {\n";
-  oss << indent(nesting_level + 2) << "val prevValue = value;\n";
-  oss << indent(nesting_level + 2) << "super.set(newValue);\n";
-  oss << indent(nesting_level + 2) << "changed |= prevValue != value;\n";
-  oss << indent(nesting_level + 1) << "}\n\n";
-  oss << indent(nesting_level + 1) << "override def check(newValue : ValueType) : Unit = {\n";
-  // value is null during the first check() invocation
-  oss << indent(nesting_level + 2) << "if (value != null) {\n";
-  oss << indent(nesting_level + 3) << "if (!lattice.v_equal(value, newValue)) {\n";
-  oss << indent(nesting_level + 4) << "if (!lattice.v_compare(value, newValue)) {\n";
-  oss << indent(nesting_level + 5) << "throw new Evaluation.CyclicAttributeException(\"non-monotonic \" + name);\n";
-  oss << indent(nesting_level + 4) << "}\n";
-  oss << indent(nesting_level + 3) << "}\n";
-  oss << indent(nesting_level + 2) << "}\n";
-  oss << indent(nesting_level + 1) << "}\n\n";
-  // Needed to prevent TooLateError
-  oss << indent(nesting_level + 1) << "checkForLateUpdate = false;\n";
-  oss << indent(nesting_level) << "}\n";
-}
-
 void dump_scala_Declaration_header(Declaration, std::ostream&);
 
 void dump_scala_Program(Program p,std::ostream&oss)
@@ -218,11 +182,12 @@ void dump_formal(Declaration formal, ostream&os)
   if (KEYseq_formal == Declaration_KEY(formal)) os << "*";
 }
 
-void dump_function_prototype(string name, Type ft, ostream& oss)
+void dump_function_prototype(string name, Type ft, bool dump_anchor_actual, ostream& oss)
 {
   oss << indent() << "val v_" << name << " = f_" << name << " _;\n";
   oss << indent() << "def f_" << name << "(";
 
+  bool started = false;
   Declarations formals = function_type_formals(ft);
   for (Declaration formal = first_Declaration(formals);
        formal != NULL;
@@ -230,6 +195,13 @@ void dump_function_prototype(string name, Type ft, ostream& oss)
     if (formal != first_Declaration(formals))
       oss << ", ";
     dump_formal(formal,oss);
+    started = true;
+  }
+  if (dump_anchor_actual) {
+    if (started) {
+      oss << ", ";
+    }
+    oss << "anchor: Any";
   }
   oss << ")";
 
@@ -781,6 +753,7 @@ void dump_some_attribute(Declaration d, string i,
     oss << indent() << "private object a" << i << "_" << name
 	<< " extends Attribute" << tmps.str() 
 	<< "(" << as_val(nt) << "," << as_val(vt) << ",\"" << name << "\")"
+	<< (activate_static_circular && is_cir ? " with ChangeTrackingAttribute" + tmps.str() : "")
 	<< " {\n";
     ++nesting_level;
     
@@ -1338,6 +1311,26 @@ static void dump_scala_pattern_function(
   Declarations rdecls = function_type_return_values(ft);
   Type rt = value_decl_type(first_Declaration(rdecls));
 
+  bool dump_anchor_actual = false;
+  if (should_include_ast_for_objects()) {
+    switch (Declaration_KEY(decl))
+    {
+    case KEYconstructor_decl: {
+      Declaration cdecl = constructor_decl_base_type_decl(decl);
+      switch (Declaration_KEY(cdecl)) {
+        case KEYphylum_decl:
+          dump_anchor_actual = true;
+          break;
+        default:
+          break;
+      }
+      break;
+    }
+    default:
+      break;
+    }
+  }
+
   // helper: "(v_a1,v_a2)" and "(x,v_a1,v_a2)"
   std::ostringstream argss;
   bool started = false;
@@ -1346,9 +1339,20 @@ static void dump_scala_pattern_function(
     if (started) argss << ","; else started = true;
     argss << "v_" << decl_name(f);
   }
+
+  std::ostringstream cloned_oss;
+  cloned_oss << argss.str();
+  if (dump_anchor_actual) {
+    if (started) {
+      argss << ", ";
+    }
+    argss << "anchor";
+  }
   argss << ")";
+  cloned_oss << ")";
   string args = argss.str();
-  string uargs = started ? ("(x," + args.substr(1)) : "x";
+  string args_without_anchor = cloned_oss.str();
+  string uargs = started ? ("(x," + cloned_oss.str().substr(1)) : "x";
   
   // helper: "(T_Result,T_A1,T_A2)"
   std::ostringstream typess;
@@ -1389,7 +1393,7 @@ static void dump_scala_pattern_function(
   
   if (!body) {
     // the constructor function:
-    dump_function_prototype(name,ft,oss);
+    dump_function_prototype(name,ft,dump_anchor_actual,oss);
     oss << " = c_" << name << args;
     if (is_syntax) oss << ".register";
     oss << ";\n";
@@ -1609,11 +1613,6 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
       if ((static_scc_schedule || anc_analysis) && s != NULL)
       {
         activate_static_circular = s->loop_required;
-        // Avoid unnecessary dump of static circular trait definition
-        if (activate_static_circular)
-        {
-          dump_static_circular_trait(oss);
-        }
       }
 
       if (result_typeval != "") {
@@ -1700,7 +1699,7 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
 	    oss << indent() << "val v_" << n << " : "
 		<< infer_formal_type(f) << " => " << value_decl_type(rdecl)
 		<< " = a_" << n << ".get _;\n";
-	    
+
 	    if (direction_is_input(attribute_decl_direction(d))) {
 	      oss << indent() << "def s_" << n << "(node:"
 		  << infer_formal_type(f)
@@ -1777,6 +1776,15 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
       for (Declaration f = first_Declaration(formals); f; f = DECL_NEXT(f)) {
 	if (started) oss << ","; else started = true;
 	dump_formal(f,oss);
+      }
+
+      if (should_include_ast_for_objects()) {
+        if (is_syntax) {
+          if (started) {
+            oss << ", ";
+          }
+          oss << "ast: Any";
+        }
       }
       oss << ") extends " << rt << "(" << as_val(rt) << ") {\n";
       ++nesting_level;
@@ -1915,7 +1923,7 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
       Type fty = function_decl_type(decl);
       Declaration rdecl = first_Declaration(function_type_return_values(fty));
       Block b = function_decl_body(decl);
-      dump_function_prototype(name,fty,oss);
+      dump_function_prototype(name,fty,false /* dump_anchor_actual */,oss);
 
       // three kinds of definitions:
       // 1. the whole thing: a non-empty body:
@@ -2150,6 +2158,29 @@ void dump_Type(Type t, ostream& o)
     break;
   case KEYfunction_type:
     {
+      bool dump_anchor = false;
+
+      if (should_include_ast_for_objects()) {
+        Type rtype = function_type_return_type(t);
+        switch (Type_KEY(rtype)) {
+        case KEYtype_use: {
+          Declaration udecl = USE_DECL(type_use_use(rtype));
+          
+          switch (Declaration_KEY(udecl)) {
+          case KEYphylum_decl: {
+            dump_anchor = true;
+            break;
+          }
+          default:
+            break;
+          }
+          break;
+        }
+        default:
+          break;
+        }
+      }
+
       o << "(";
       bool started = false;
       for (Declaration f=first_Declaration(function_type_formals(t));
@@ -2158,6 +2189,12 @@ void dump_Type(Type t, ostream& o)
 	dump_Type(formal_type(f),o);
 	if (Declaration_KEY(f) == KEYseq_formal)
 	  o << "*";
+      }
+      if (dump_anchor) {
+        if (started) {
+          o << ", ";
+        }
+        o << "Any";
       }
       o << ") => ";
       Declaration rdecl = first_Declaration(function_type_return_values(t));
@@ -2322,6 +2359,7 @@ void dump_Expression(Expression e, ostream& o)
     o << string_const_token(e);
     break;
   case KEYfuncall:
+  {
     if (funcall_is_collection_construction(e)) {
       // inline code to call append, single and null constructors
       dump_collect_Actuals(infer_expr_type(e),funcall_actuals(e),o);
@@ -2343,6 +2381,37 @@ void dump_Expression(Expression e, ostream& o)
       }
     }
 
+    bool dump_anchor_actual = false;
+    if (should_include_ast_for_objects()) {
+      Expression fexpr = funcall_f(e);
+      switch (Expression_KEY(fexpr)) {
+        case KEYvalue_use: {
+          Declaration udecl = USE_DECL(value_use_use(fexpr));
+          switch (Declaration_KEY(udecl)) {
+            case KEYconstructor_decl: {
+              Declaration tdecl = constructor_decl_base_type_decl(udecl);
+              switch (Declaration_KEY(tdecl)) {
+                case KEYphylum_decl:
+                  dump_anchor_actual = true;
+                  break;
+                default:
+                  break;
+              }
+              break;
+            }
+            default:
+              break;
+          }
+          break;
+        }
+        default:
+          break;
+      }
+    }
+
+    Declaration tplm;
+    bool inside_top_level_match = check_surrounding_decl(e, KEYtop_level_match, &tplm);
+
     dump_Expression(funcall_f(e),o);
     o << "(";
     {
@@ -2357,9 +2426,23 @@ void dump_Expression(Expression e, ostream& o)
 	  if (start) start = false; else o << ",";
 	  o << "0";
 	}
+
+    if (dump_anchor_actual) {
+      if (first_Actual(funcall_actuals(e)) != NULL) {
+        o << ", ";
+      }
+      if (inside_top_level_match) {
+        o << "anchor";
+      } else {
+        o << "null";
+      }
     }
+
     o << ")";
+
+    }
     break;
+  }
   case KEYvalue_use:
     {
       Use u = value_use_use(e);
@@ -2530,3 +2613,19 @@ string operator+(string s, int i)
 }
 
 string indent(int nl) { return string(indent_multiple*nl,' '); }
+
+bool check_surrounding_decl(void* node, KEYTYPE_Declaration decl_key, Declaration* result_decl) {
+  while (node != NULL) {
+    if (ABSTRACT_APS_tnode_phylum(node) == KEYDeclaration) {
+      Declaration decl = (Declaration)node;
+      if (Declaration_KEY(decl) == decl_key) {
+        *result_decl = decl;
+        return true;
+      }
+    }
+    node = tnode_parent(node);
+  }
+
+  *result_decl = NULL;
+  return false;
+}

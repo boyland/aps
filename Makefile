@@ -22,6 +22,9 @@ realclean:
 dockerbuild: install
 	sudo docker build . -t ${DOCKERTAG}
 
+cs854-dockerbuild:
+	sudo docker build . -t ${DOCKERTAG} -f cs854.Dockerfile
+
 dockerpush:
 	docker push ${DOCKERTAG}
 

@@ -115,10 +115,12 @@ static Expression default_init(Default def) {
 static vector<std::set<Expression> > make_instance_assignment(
     AUG_GRAPH* aug_graph,
     Block block,
-    vector<std::set<Expression> > from) {
+    vector<std::set<Expression> > from,
+    bool include_initial_defaults) {
   int n = aug_graph->instances.length;
   vector<std::set<Expression> > array(from);
 
+  if (include_initial_defaults) {
   for (int i = 0; i < n; ++i) {
     INSTANCE* in = &aug_graph->instances.array[i];
     Declaration ad = in->fibered_attr.attr;
@@ -136,6 +138,7 @@ static vector<std::set<Expression> > make_instance_assignment(
           break;
       }
     }
+  }
   }
 
   // Step #1 clear any existing assignments and insert normal assignments
@@ -195,10 +198,7 @@ static void dump_loop_end(AUG_GRAPH* aug_graph,
     std::replace(suffix.begin(), suffix.end(), '-', '_');
     --nesting_level;
     os << "\n";
-    os << indent() << "} while(changed);"
-       << "\n";
-    os << indent() << "changed = prevChanged_" << suffix << ";\n"
-       << "\n";
+    os << indent() << "} while(newChanged.get);" << "\n";
   } else {
     ow->clear_since(loop_id);
   }
@@ -207,14 +207,16 @@ static void dump_loop_end(AUG_GRAPH* aug_graph,
 
 static void dump_loop_start_helper(int loop_id, std::ostream& os)
 {
+#ifdef APS2SCALA
   // ABS value of component_index because initially it is -1
   string suffix = any_to_string(loop_id);
   std::replace(suffix.begin(), suffix.end(), '-', '_');
 
-  os << indent() << "val prevChanged_" << suffix << " = changed;\n";
+  os << indent() << "val newChanged = new AtomicBoolean(false);\n";
   os << indent() << "do {\n";
   ++nesting_level;
-  os << indent() << "changed = false;\n";
+  os << indent() << "newChanged.set(false);\n";
+#endif /* APS2SCALA */
 }
 
 static void dump_loop_start(AUG_GRAPH* aug_graph,
@@ -227,6 +229,13 @@ static void dump_loop_start(AUG_GRAPH* aug_graph,
       loop_id,
       dump_loop_start_helper);
 
+#endif /* APS2SCALA */
+}
+
+static void dump_changed(int loop_id, std::ostream& os)
+{
+#ifdef APS2SCALA
+  os << (loop_id == -1 ? "changed" : "newChanged");
 #endif /* APS2SCALA */
 }
 
@@ -245,15 +254,34 @@ static bool implement_visit_function(
     int loop_id,
     bool skip_previous_visit_code,
     OutputWriter* ow) {
+
+  STATE* s = aug_graph->global_state;
+
   for (; cto; cto = cto->cto_next) {
     INSTANCE* in = cto->cto_instance;
+    bool is_conditional = in != NULL && if_rule_p(in->fibered_attr.attr);
+    bool is_circular = false;
+
+    if (in == NULL || is_conditional) {
+      is_circular = false;
+    } else {
+      switch (Declaration_KEY(in->fibered_attr.attr)) {
+        case KEYvalue_decl:
+          is_circular = direction_is_circular(value_decl_direction(in->fibered_attr.attr));
+          break;
+        case KEYattribute_decl:
+          is_circular = direction_is_circular(attribute_decl_direction(in->fibered_attr.attr));
+          break;
+        default:
+          break;
+      }
+    }
+
     int ch = cto->child_phase.ch;
     int ph = cto->child_phase.ph;
     bool chunk_changed = chunk_index != -1 && cto->chunk_index != chunk_index;
     PHY_GRAPH* pg_parent =
         Declaration_info(aug_graph->lhs_decl)->node_phy_graph;
-
-    bool is_conditional = in != NULL && if_rule_p(in->fibered_attr.attr);
 
     Declaration ad = in != NULL ? in->fibered_attr.attr : NULL;
     void* ad_parent = ad != NULL ? tnode_parent(ad) : NULL;
@@ -343,6 +371,9 @@ static bool implement_visit_function(
 
         ow->get_outstream() << indent() << "visit_" << n << "_" << ph << "(";
         ow->get_outstream() << "root";
+        if (s->loop_required) {
+          ow->get_outstream() << ", new AtomicBoolean(false)";
+        }
         ow->get_outstream() << ");\n";
 
         --nesting_level;
@@ -417,6 +448,11 @@ static bool implement_visit_function(
       ow->get_outstream() << indent() << "visit_" << n << "_" << ph << "(";
 #ifdef APS2SCALA
       ow->get_outstream() << "v_" << decl_name(cto->child_decl);
+
+      if (s->loop_required) {
+        ow->get_outstream() << ", ";
+        dump_changed(loop_id, ow->get_outstream());
+      }
 #else  /* APS2SCALA */
       ow->get_outstream() << "v_" << decl_name(cto->child_decl);
 #endif /* APS2SCALA */
@@ -467,7 +503,7 @@ static bool implement_visit_function(
 #endif /* APS2SCALA */
 
       vector<std::set<Expression> > assignment =
-          make_instance_assignment(aug_graph, body, instance_assignment);
+          make_instance_assignment(aug_graph, body, instance_assignment, false /* defaults are already included */);
 
       bool cont = implement_visit_function(aug_graph, phase, cto->cto_next,
                                assignment, nch, cond, cto->chunk_index,
@@ -546,7 +582,7 @@ static bool implement_visit_function(
 
       int cmask = 1 << (if_rule_index(ad));
       vector<std::set<Expression> > true_assignment =
-          make_instance_assignment(aug_graph, if_true, instance_assignment);
+          make_instance_assignment(aug_graph, if_true, instance_assignment, false /* defaults are already included */);
 
       cond->positive |= cmask;
       implement_visit_function(aug_graph, phase, cto->cto_if_true,
@@ -569,7 +605,7 @@ static bool implement_visit_function(
       ++nesting_level;
       vector<std::set<Expression> > false_assignment =
           if_false ? make_instance_assignment(aug_graph, if_false,
-                                              instance_assignment)
+                                              instance_assignment, false /* defaults are already included */)
                    : instance_assignment;
 
       cond->negative |= cmask;
@@ -659,7 +695,14 @@ static bool implement_visit_function(
               ow->get_outstream() << "assign";
             else
               ow->get_outstream() << "set";
-            ow->get_outstream() << "(" << rhs << ");\n";
+            ow->get_outstream() << "(" << rhs;
+            
+            if (s->loop_required && is_circular) {
+              ow->get_outstream() << ", ";
+              dump_changed(loop_id, ow->get_outstream());
+            }
+            
+            ow->get_outstream() << ");\n";
 #else  /* APS2SCALA */
             ow->get_outstream() << "v_" << decl_name(field) << "=";
             switch (Default_KEY(value_decl_default(field))) {
@@ -687,7 +730,14 @@ static bool implement_visit_function(
             else
               ow->get_outstream() << "set";
             ow->get_outstream()
-                << "(" << field_ref_object(lhs) << "," << rhs << ");\n";
+                << "(" << field_ref_object(lhs) << "," << rhs;
+            
+            if (s->loop_required && is_circular) {
+              ow->get_outstream() << ", ";
+              dump_changed(loop_id, ow->get_outstream());
+            }
+
+            ow->get_outstream() << ");\n";
             break;
           default:
             fatal_error("what sort of assignment lhs: %d",
@@ -705,7 +755,12 @@ static bool implement_visit_function(
               ow->get_outstream() << "assign";
             else
               ow->get_outstream() << "set";
-            ow->get_outstream() << "(anchor," << rhs << ");\n";
+            ow->get_outstream() << "(anchor," << rhs;
+            if (s->loop_required && is_circular) {
+              ow->get_outstream() << ", ";
+              dump_changed(loop_id, ow->get_outstream());
+            }
+            ow->get_outstream() << ");\n";
           } else {
             int i = LOCAL_UNIQUE_PREFIX(ad);
             if (i == 0) {
@@ -776,7 +831,13 @@ static bool implement_visit_function(
             else
               ow->get_outstream() << "set";
             ow->get_outstream()
-                << "(v_" << decl_name(in->node) << "," << rhs << ");\n";
+                << "(v_" << decl_name(in->node) << "," << rhs;
+
+            if (s->loop_required && is_circular) {
+              ow->get_outstream() << ", ";
+              dump_changed(loop_id, ow->get_outstream());
+            }
+            ow->get_outstream() << ");\n";
           }
         } else {
           aps_warning(in->node, "Attribute %s.%s is apparently undefined",
@@ -796,7 +857,11 @@ static bool implement_visit_function(
           else
             ow->get_outstream() << "set";
           ow->get_outstream()
-              << "(v_" << decl_name(in->node) << "," << rhs << ");\n";
+              << "(v_" << decl_name(in->node) << "," << rhs;
+          if (s->loop_required && is_circular) {
+            ow->get_outstream() << ", changed";
+          }
+          ow->get_outstream() << ");\n";
         } else {
           if (include_comments) {
             ow->get_outstream()
@@ -857,7 +922,7 @@ static void dump_visit_functions(PHY_GRAPH* phy_graph,
   vector<std::set<Expression> > default_instance_assignments(
       aug_graph->instances.length, std::set<Expression>());
   vector<std::set<Expression> > instance_assignment =
-      make_instance_assignment(aug_graph, block, default_instance_assignments);
+      make_instance_assignment(aug_graph, block, default_instance_assignments, true /* include defaults */);
 
   // the following loop is controlled in two ways:
   // (1) if total order is zero, there are no visits at all.
@@ -867,8 +932,13 @@ static void dump_visit_functions(PHY_GRAPH* phy_graph,
   for (phase = 1; phase <= phy_graph->max_phase; phase++) {
 #ifdef APS2SCALA
     os << indent() << "def visit_" << pgn << "_" << phase << "_" << j
-       << "(anchor : T_" << decl_name(phy_graph->phylum)
-       << ") : Unit = anchor match {\n";
+       << "(anchor : T_" << decl_name(phy_graph->phylum);
+
+       if (s->loop_required) {
+         os << ", changed : AtomicBoolean";
+       }
+
+    os << ") : Unit = anchor match {\n";
     ++nesting_level;
     os << indent() << "case " << matcher_pat(m) << " => {\n";
 #else  /* APS2SCALA */
@@ -1008,7 +1078,13 @@ static void dump_visit_functions(PHY_GRAPH* pg, output_streams& oss)
   for (int ph = 1; ph <= pg->max_phase; ++ph) {
 #ifdef APS2SCALA
     os << indent() << "def visit_" << pgn << "_" << ph << "(node : T_"
-       << decl_name(pg->phylum) << ") : Unit = node match {\n";
+       << decl_name(pg->phylum);
+       
+    if (s->loop_required) {
+      os << ", changed : AtomicBoolean";
+    }
+
+    os << ") : Unit = node match {\n";
 #else  /* APS2SCALA */
     oss << header_return_type<Type>(0) << "void "
         << header_function_name("visit_") << pgn << "_" << ph
@@ -1032,11 +1108,21 @@ static void dump_visit_functions(PHY_GRAPH* pg, output_streams& oss)
       }
       os << ") => "
          << "visit_" << pgn << "_" << ph << "_"
-         << Declaration_info(cd)->instance_index << "(node);\n";
+         << Declaration_info(cd)->instance_index << "(node";
+
+      if (s->loop_required) {
+        os << ", changed";
+      }
+        
+      os << ");\n";
 #else  /* APS2SCALA */
       os << indent() << "case " << j << ":\n";
       ++nesting_level;
-      os << indent() << "visit_" << pgn << "_" << ph << "_" << j << "(node);\n";
+      os << indent() << "visit_" << pgn << "_" << ph << "_" << j << "(node";
+      if (s->loop_required) {
+        os << ", changed";
+      }
+      os << ");\n";
       os << indent() << "break;\n";
       --nesting_level;
 #endif /* APS2SCALA */
@@ -1116,7 +1202,7 @@ static void dump_visit_functions(STATE* s, output_streams& oss)
       s->global_dependencies.instances.length, std::set<Expression>());
   vector<std::set<Expression> > instance_assignment = make_instance_assignment(
       &s->global_dependencies, module_decl_contents(s->module),
-      default_instance_assignments);
+      default_instance_assignments, true /* include defaults */);
 
   CONDITION cond;
   cond.positive = 0;
@@ -1181,7 +1267,7 @@ static void dump_scheduled_function_body(Declaration fd, STATE* s, ostream& bs) 
   vector<std::set<Expression> > default_instance_assignments(
       aug_graph->instances.length, std::set<Expression>());
   vector<std::set<Expression> > instance_assignment = make_instance_assignment(
-      aug_graph, function_decl_body(fd), default_instance_assignments);
+      aug_graph, function_decl_body(fd), default_instance_assignments, true /* include defaults */);
 
   CONDITION cond;
   cond.positive = 0;

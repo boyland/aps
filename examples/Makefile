@@ -1,3 +1,4 @@
+DEBUG_FLAGS = -DCOTo
 APSSCHED=../bin/apssched
 APS2SCALA=../bin/aps2scala
 BASE=.:../base
@@ -6,10 +7,16 @@ default:
 	@echo "Try 'make simple-oag.sched' to schedule AG in simple-oag"
 
 %.sched : %.aps
-	${APSSCHED} -DCOT -p ${BASE} $*
+	${APSSCHED} ${DEBUG_FLAGS} -p ${BASE} $*
 
 %.scc.sched : %.aps
-	${APSSCHED} -C -DCOTo -p ${BASE} $*
+	${APSSCHED} -C ${DEBUG_FLAGS} -p ${BASE} $*
+
+%.scc.scala : %.aps
+	${APS2SCALA} -C ${DEBUG_FLAGS} -p ${BASE} $*
+
+%.scala : %.aps
+	${APS2SCALA} ${DEBUG_FLAGS} -p ${BASE} $*
 
 %.scc.sched : %.aps
 	${APSSCHED} -C -DCOTo -p ${BASE} $*
@@ -24,6 +31,6 @@ default:
 	${APS2SCALA} -p ${BASE} $*
 
 %.debug: %.aps
-	gdb --args "${APSSCHED}" "-DeFEfpa" "-p" "${BASE}" "$*"
+	gdb --args "${APSSCHED}" "${DEBUG_FLAGS}" "-p" "${BASE}" "$*"
 
 .PHONY: default %.sched
