@@ -1606,7 +1606,7 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
       ++nesting_level;
 
       STATE *s = (STATE*)Declaration_info(decl)->analysis_state;
-      if (static_scc_schedule && s != NULL)
+      if ((static_scc_schedule || anc_analysis) && s != NULL)
       {
         activate_static_circular = s->loop_required;
         // Avoid unnecessary dump of static circular trait definition
