@@ -1,4 +1,4 @@
-DEBUG_FLAGS = -DCOTo
+DEBUG_FLAGS = -DCOT
 APSSCHED=../bin/apssched
 APS2SCALA=../bin/aps2scala
 BASE=.:../base
@@ -15,20 +15,11 @@ default:
 %.scc.scala : %.aps
 	${APS2SCALA} -C ${DEBUG_FLAGS} -p ${BASE} $*
 
+%.synth.scala : %.aps
+	${APS2SCALA} -F ${DEBUG_FLAGS} -p ${BASE} $*
+
 %.scala : %.aps
 	${APS2SCALA} ${DEBUG_FLAGS} -p ${BASE} $*
-
-%.scc.sched : %.aps
-	${APSSCHED} -C -DCOTo -p ${BASE} $*
-
-%.scc.scala : %.aps
-	${APS2SCALA} -p ${BASE} $*
-
-%.synth.scala : %.aps
-	${APS2SCALA} -F -p ${BASE} $*
-
-%.scala : %.aps
-	${APS2SCALA} -p ${BASE} $*
 
 %.debug: %.aps
 	gdb --args "${APSSCHED}" "${DEBUG_FLAGS}" "-p" "${BASE}" "$*"
