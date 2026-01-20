@@ -1,4 +1,4 @@
-DEBUG_FLAGS = -DCOTo
+DEBUG_FLAGS = -DCOT
 APSSCHED=../bin/apssched
 APS2SCALA=../bin/aps2scala
 BASE=.:../base
@@ -14,6 +14,9 @@ default:
 
 %.scc.scala : %.aps
 	${APS2SCALA} -C ${DEBUG_FLAGS} -p ${BASE} $*
+
+%.synth.scala : %.aps
+	${APS2SCALA} -F ${DEBUG_FLAGS} -p ${BASE} $*
 
 %.scala : %.aps
 	${APS2SCALA} ${DEBUG_FLAGS} -p ${BASE} $*

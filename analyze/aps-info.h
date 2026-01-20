@@ -36,6 +36,7 @@ struct Declaration_info {
   Declaration dual_decl; /* a declaration created out of nowhere */
   Declaration copied_decl; /* pointer to copied version (scratch) */
   FIBERSETS decl_fibersets;
+  Declaration proxy_fdecl;  /* actual fdecl being proxied */
   int if_index; /* count of if_stmt within a top-level match */
 #define instance_index if_index
   CONDITION decl_cond; /* condition that must be satisfied to take effect */
