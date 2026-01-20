@@ -1,4 +1,4 @@
-DEBUG_FLAGS = -DCOT
+DEBUG_FLAGS = -DCOTo
 APSSCHED=../bin/apssched
 APS2SCALA=../bin/aps2scala
 BASE=.:../base
