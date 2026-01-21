@@ -40,6 +40,7 @@ extern int aps_yyparse(void);
 Implementation* impl;
 bool static_schedule = false;
 bool is_tree_only_program = false;
+bool synth_implementation = false;
 
 static void* program_is_tree_only(void *scope, void *node) {
   if (ABSTRACT_APS_tnode_phylum(node) == KEYDeclaration) {
@@ -135,6 +136,7 @@ int main(int argc,char **argv) {
     if (out.fail())
     {
       std::cerr << "Failed to open output file " << outfilename << std::endl;
+      dump_scala_Program(p,std::cout);
       exit(1);
     }
 

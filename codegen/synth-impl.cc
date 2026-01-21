@@ -517,7 +517,7 @@ static string instance_to_attr(INSTANCE* in) {
     ss << "a_";
   }
 
-  ss << in;
+  ss << attr_to_string(attr);
 
   return ss.str();
 }
@@ -1039,6 +1039,8 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
 
       bool is_circular = edgeset_kind(aug_graph->graph[aug_graph_instance->index * n + aug_graph_instance->index]) != 0;
       if (is_circular) {
+        os << indent() << "{\n";
+        nesting_level++;
         os << indent() << "var prevValue" << synth_functions_state->source->index << " = " << instance_to_attr(synth_functions_state->source) << ".get(node);\n";
         os << indent() << "var currentValue" << synth_functions_state->source->index << " = prevValue" << synth_functions_state->source->index << ";\n";
         os << indent() << "do {\n";
@@ -1053,11 +1055,14 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
 
       if (is_circular) {
         os << indent() << instance_to_attr(synth_functions_state->source) << ".assign(node, currentValue" << synth_functions_state->source->index << ");\n";
+        os << indent() << "prevValue" << synth_functions_state->source->index << " = currentValue" << synth_functions_state->source->index << ";\n";
         nesting_level--;
         os << indent() << "} while (prevValue" << synth_functions_state->source->index << " != currentValue" << synth_functions_state->source->index << ")\n";
         if (!synth_functions_state->is_fiber_evaluation) {
-          os << "currentValue" << synth_functions_state->source->index << "\n";
+          os << indent() << "currentValue" << synth_functions_state->source->index << "\n";
         }
+        nesting_level--;
+        os << indent() << "}\n";
       }
 
       current_blocks.clear();
@@ -1698,7 +1703,7 @@ virtual void dump_synth_instance(INSTANCE* instance, ostream& o) override {
         if (already_dumped) {
           o << "/** use the existing value for circular attribute instance: ";
           o << instance << " **/";
-          o << instance_to_attr(instance) << ".get(node)\n";
+          o << instance_to_attr(instance) << ".get(" << "v_" << decl_name(instance->node) << ")";
           return;
         }
       }
