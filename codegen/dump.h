@@ -205,4 +205,8 @@ extern STATE* current_state;
 extern std::vector<SYNTH_FUNCTION_STATE*> synth_functions_states;
 extern SYNTH_FUNCTION_STATE* current_synth_functions_state;
 
+// Common code generation utility functions
+extern bool check_surrounding_decl(void* node, KEYTYPE_Declaration decl_key, Declaration* result_decl);
+extern bool check_surrounding_node(void* node, KEYTYPE_ABSTRACT_APS_Phylum ast_key, void** result_node);
+
 #endif
