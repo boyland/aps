@@ -680,14 +680,6 @@ static int assign_instances(INSTANCE *array, int index,
   return index;
 }
 
-static Type infer_some_value_decl_type(Declaration d) {
-  if (Declaration_KEY(d) == KEYnormal_formal) {
-    return infer_formal_type(d);
-  } else {
-    return some_value_decl_type(d);
-  }
-}
-
 /** Count and then assign instances.
  * Called in two cases: <ul>
  * <li> one to set instance indices and count instances

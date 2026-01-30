@@ -2629,3 +2629,16 @@ bool check_surrounding_decl(void* node, KEYTYPE_Declaration decl_key, Declaratio
   *result_decl = NULL;
   return false;
 }
+
+bool check_surrounding_node(void* node, KEYTYPE_ABSTRACT_APS_Phylum ast_key, void** result_node) {
+  while (node != NULL) {
+    if (ABSTRACT_APS_tnode_phylum(node) == ast_key) {
+      *result_node = node;
+      return true;
+    }
+    node = tnode_parent(node);
+  }
+
+  *result_node = NULL;
+  return false;
+}

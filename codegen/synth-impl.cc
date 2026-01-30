@@ -652,7 +652,11 @@ static void destroy_synth_function_states(vector<SYNTH_FUNCTION_STATE*> states) 
 }
 
 static void dump_attribute_type(INSTANCE* in, ostream& os) {
-  CanonicalType* ctype = canonical_type(some_value_decl_type(in->fibered_attr.attr));
+  printf("decl_name: %s (%d)\n", decl_name(in->fibered_attr.attr), tnode_line_number(in->fibered_attr.attr));
+  print_Type(infer_some_value_decl_type(in->fibered_attr.attr), stdout);
+  printf("\n");
+
+  CanonicalType* ctype = canonical_type(infer_some_value_decl_type(in->fibered_attr.attr));
   switch (ctype->key) {
     case KEY_CANONICAL_USE: {
       os << "T_" << decl_name(canonical_type_decl(ctype));
@@ -976,6 +980,8 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
         os << instance_to_string(source_instance, false, true) << ": ";
       }
 
+      os << "\n";
+
       dump_attribute_type(source_instance, os);
     }
 
@@ -1193,11 +1199,19 @@ void implement_value_use(Declaration vd, ostream& os) {
     int n = current_aug_graph->instances.length;
     for (i = 0; i < n; i++) {
       DEPENDENCY dep = edgeset_kind(current_aug_graph->graph[i * n + instance_index]);
-      if (dep) {
-        INSTANCE* source_instance = &current_aug_graph->instances.array[i];
-        Declaration fibered_attr = source_instance->fibered_attr.attr;
+      INSTANCE* source_instance = &current_aug_graph->instances.array[i];
+      Declaration fibered_attr = source_instance->fibered_attr.attr;
+
+      if (dep && !if_rule_p(fibered_attr)) {
         bool is_shared_info = ATTR_DECL_IS_SHARED_INFO(fibered_attr);
         bool is_fiber_attr = source_instance->fibered_attr.fiber != NULL;
+
+        if (ABSTRACT_APS_tnode_phylum(fibered_attr) != KEYDeclaration) {
+          print_instance(source_instance, stdout);
+          printf("\n");
+          aps_error(fibered_attr, "internal_error: what is this attribute?");
+        }
+
         bool is_conditional = fibered_attr != NULL && Declaration_KEY(fibered_attr) == KEYif_stmt;
         bool is_result = !is_conditional && !strcmp("result", decl_name(source_instance->fibered_attr.attr));
         bool is_bad = source_instance->node != NULL && Declaration_KEY(source_instance->node) == KEYpragma_call;
@@ -1668,6 +1682,16 @@ void dump_rhs_instance_helper(AUG_GRAPH* aug_graph, BlockItem* item, INSTANCE* i
   }
 }
 
+static bool is_match_formal(void* node) {
+  Declaration formal_decl = NULL;
+  bool is_formal = check_surrounding_decl(node, KEYnormal_formal, &formal_decl);
+
+  void* match = NULL;
+  bool is_inside_match = check_surrounding_node(node, KEYMatch, &match);
+
+  return is_formal && is_inside_match;
+}
+
 virtual void dump_synth_instance(INSTANCE* instance, ostream& o) override {
   bool already_dumped = false;
   if (std::find(dumped_instances.begin(), dumped_instances.end(), instance) != dumped_instances.end()) {
@@ -1675,6 +1699,11 @@ virtual void dump_synth_instance(INSTANCE* instance, ostream& o) override {
   } else {
     dumped_instances.push_back(instance);
   }
+
+  printf("dumping synth instance: ");
+  print_instance(instance, stdout);
+  printf(" (attribute type: %d)", Declaration_KEY(instance->fibered_attr.attr));
+  printf("\n");
 
   AUG_GRAPH* aug_graph = current_aug_graph;
   BlockItem* block = find_surrounding_block(current_scope_block, instance);
@@ -1686,8 +1715,12 @@ virtual void dump_synth_instance(INSTANCE* instance, ostream& o) override {
   bool is_synthesized = instance_is_synthesized(instance);
   bool is_inherited = instance_is_inherited(instance);
   bool is_circular = edgeset_kind(current_aug_graph->graph[instance->index * current_aug_graph->instances.length + instance->index]);
+  bool is_formal = is_match_formal(instance->node);
 
-  if (is_inherited) {
+  if (is_formal) {
+    o << "v_" << instance_to_string(instance, false, !current_synth_functions_state->is_phylum_instance ? false : true);
+    dumped_instances.push_back(instance);
+  } else if (is_inherited) {
     if (is_parent_instance) {
       o << "v_" << instance_to_string(instance, false, !current_synth_functions_state->is_phylum_instance ? false : true);
       dumped_instances.push_back(instance);
