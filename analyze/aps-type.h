@@ -38,6 +38,7 @@ extern void check_default_type(Default,Type);
 extern void check_matchers_type(Matches,Type);
 
 extern Type infer_formal_type(Declaration formal);
+extern Type infer_some_value_decl_type(Declaration d);
 
 /* for the following functions, we don't assume the actuals
  * have been checked yet.

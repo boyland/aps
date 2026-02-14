@@ -23,6 +23,8 @@ typedef struct attribute_instance {
   int index;
 } INSTANCE;
 
+extern BOOL instance_equal(INSTANCE*, INSTANCE*);
+
 enum instance_direction {instance_local, instance_inward, instance_outward};
 enum instance_direction fibered_attr_direction(FIBERED_ATTRIBUTE *fa);
 enum instance_direction instance_direction(INSTANCE *);
@@ -109,6 +111,7 @@ typedef struct analysis_state {
   VECTOR(FIBER) fibers;
   CYCLES cycles;
   BOOL loop_required;
+  BOOL anc_analysis;
   DEPENDENCY original_state_dependency;  // This is value of analysis_state_cycle
                                          // before removing fiber cycle or
                                          // linearization of phases in summary graph
@@ -127,7 +130,7 @@ extern INSTANCE *get_instance(Declaration attr, FIBER fiber,
 
 extern void assert_closed(AUG_GRAPH*);
 extern void dnc_close(STATE *);
-extern STATE *compute_dnc(Declaration module);
+extern STATE *compute_dnc(Declaration module, bool anc_analysis);
 
 /* Low level routines: use with caution */
 extern void free_edge(EDGESET old, AUG_GRAPH *aug_graph);

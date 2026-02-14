@@ -14,6 +14,9 @@ int analysis_debug = 0;
 
 
 /*** FUNCTIONS FOR INSTANCES */
+BOOL instance_equal(INSTANCE *in1, INSTANCE *in2) {
+  return in1->node == in2->node && fibered_attr_equal(&in1->fibered_attr, &in2->fibered_attr);
+}
 
 BOOL fibered_attr_equal(FIBERED_ATTRIBUTE *fa1, FIBERED_ATTRIBUTE *fa2) {
   return fa1->attr == fa2->attr && fa1->fiber == fa2->fiber;
@@ -677,14 +680,6 @@ static int assign_instances(INSTANCE *array, int index,
   return index;
 }
 
-static Type infer_some_value_decl_type(Declaration d) {
-  if (Declaration_KEY(d) == KEYnormal_formal) {
-    return infer_formal_type(d);
-  } else {
-    return some_value_decl_type(d);
-  }
-}
-
 /** Count and then assign instances.
  * Called in two cases: <ul>
  * <li> one to set instance indices and count instances
@@ -881,6 +876,7 @@ static void *get_instances(void *vaug_graph, void *node) {
 			      nil_Expressions());
 	  Expression_info(e)->funcall_proxy = proxy;
 	  Declaration_info(proxy)->instance_index = index;
+	  Declaration_info(proxy)->proxy_fdecl = fdecl;
 	  Declaration_info(proxy)->node_phy_graph = 
 	    summary_graph_for(s,fdecl);
 	  Declaration_info(proxy)->decl_flags |= DECL_RHS_FLAG;
@@ -2446,6 +2442,22 @@ static void synchronize_dependency_graphs(AUG_GRAPH *aug_graph,
 
   phy_n = phy_graph->instances.length;
 
+  int index_of_lhs = -1;
+  for (i = 0; i < n; i++) {
+    if (aug_graph->instances.array[i].node == aug_graph->lhs_decl) {
+      index_of_lhs = i;
+      break;
+    }
+  }
+
+  if (index_of_lhs == -1) {
+    fatal_error("LHS %d not found in instances of %s", decl_name(aug_graph->lhs_decl), aug_graph_name(aug_graph));
+  } else {
+    if (analysis_debug & SUMMARY_EDGE) {
+      printf("LHS found at index %d for %s\n", index_of_lhs, aug_graph_name(aug_graph));
+    }
+  }
+
   /* discover when the instances for this node end.
    */
   max = start + phy_n;
@@ -2515,7 +2527,6 @@ static void augment_dependency_graph_for_node(AUG_GRAPH *aug_graph,
 					      Declaration node) {
   int start=Declaration_info(node)->instance_index;
   PHY_GRAPH *phy_graph = Declaration_info(node)->node_phy_graph;
-
   synchronize_dependency_graphs(aug_graph,start,phy_graph);
 }
 
@@ -2832,9 +2843,10 @@ void dnc_close(STATE*s) {
   }
 }
 
-STATE *compute_dnc(Declaration module) {
+STATE *compute_dnc(Declaration module, bool anc_analysis) {
   STATE *s=(STATE *)HALLOC(sizeof(STATE));
   Declaration_info(module)->analysis_state = s;
+  s->anc_analysis = anc_analysis;
   init_analysis_state(s,module);
   dnc_close(s);
   if (analysis_debug & (DNC_ITERATE|DNC_FINAL)) {
@@ -2876,6 +2888,7 @@ void print_dep_vertex(VERTEX *v, FILE *stream)
  
 void print_instance(INSTANCE *i, FILE *stream) {
   if (stream == 0) stream = stdout;
+  fprintf(stream,"[%d]", i->index);
   if (i->node != NULL) {
     if (ABSTRACT_APS_tnode_phylum(i->node) != KEYDeclaration) {
       fprintf(stream,"%d:?<%d>",tnode_line_number(i->node),
@@ -2919,6 +2932,8 @@ void print_instance(INSTANCE *i, FILE *stream) {
 
 void print_edge_helper(DEPENDENCY kind, CONDITION *cond, FILE* stream) {
   if (stream == 0) stream = stdout;
+
+  fprintf(stream,"direct");
 
   if (!(kind & SOME_DEPENDENCY))
   {

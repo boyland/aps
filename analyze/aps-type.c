@@ -16,6 +16,14 @@ static Type error_type;
 
 int remote_type_p(Type ty);
 
+Type infer_some_value_decl_type(Declaration d) {
+  if (Declaration_KEY(d) == KEYnormal_formal) {
+    return infer_formal_type(d);
+  } else {
+    return some_value_decl_type(d);
+  }
+}
+
 Type function_type_return_type(Type ft)
 {
   return value_decl_type(first_Declaration(function_type_return_values(ft)));

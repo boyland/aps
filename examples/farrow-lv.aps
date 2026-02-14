@@ -35,8 +35,8 @@ module FARROW_LV[T :: var FARROW_LV_TREE[]] extends T begin
   end;
 
   match ?self:Stmt=stmt_while(?e: Expression, ?s: Stmts) begin
-    self.stmt_live := self.stmt_out \/ (e.expression_inside \/ s.stmts_live);
-    s.stmts_out := self.stmt_out \/ (e.expression_inside \/ s.stmts_live);
+    self.stmt_live := self.stmt_out \/ e.expression_inside \/ s.stmts_live;
+    s.stmts_out := self.stmt_out \/ e.expression_inside \/ s.stmts_live;
   end;
 
   match ?self:Stmts=stmts_append(?s: Stmt, ?ss: Stmts) begin

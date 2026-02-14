@@ -9,6 +9,7 @@ void usage() {
   fprintf(stderr,"apsc: usage: %s [-DH] [-D...] [-p apspath] file...\n",argv0);
   fprintf(stderr,"             schedule APS files (omit '.aps' extension)\n");
   fprintf(stderr,"   -C        SCC chunk static scheduling\n");
+  fprintf(stderr,"   -F        ANC analysis\n");
   fprintf(stderr,"   -DH       print debug options\n");
   exit(1);
 }
@@ -26,6 +27,8 @@ int main(int argc,char **argv) {
 	set_aps_path(argv[++i]);
       } else if (*options == 'C') {
         static_scc_schedule = true;
+      } else if (*options == 'F') {
+        anc_analysis = true;
       } else usage();
     } else {
       Program p = find_Program(make_string(argv[i]));
