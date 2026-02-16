@@ -72,7 +72,7 @@ module FARROW_UBD[T :: var FARROW_UBD_TREE[]] extends T begin
         self.decls_errs := { "identifier " ++ symbol_name(d.decl_name) ++ " is multiply defined" } \/ ds.decls_errs \/ d.decl_errs;
       end;
       else
-        self.decls_defs := d.decl_pair;
+        self.decls_defs := DeclPairLattice$join(ds.decls_defs, d.decl_pair);
         self.decls_errs := ds.decls_errs \/ d.decl_errs;
     end;
   end;
