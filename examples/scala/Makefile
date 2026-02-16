@@ -18,6 +18,7 @@ MISCGEN = nested-cycles.scala SimpleParser.scala SimpleScanner.scala \
 	GrammarTokens.scala SimpleTokens.scala GrammarScanner.scala GrammarParser.scala \
 	FarrowLvTokens.scala FarrowLvTokens.scala FarrowLvScanner.scala FarrowLvParser.scala farrow-lv.scala \
 	FarrowUbdTokens.scala FarrowUbdTokens.scala FarrowUbdScanner.scala FarrowUbdParser.scala farrow-ubd.scala \
+	farrow-ubd-fiber.scala \
 	*.output *.lex *.y *.scala~
 
 .PHONY: all clean phony_explicit
@@ -32,6 +33,7 @@ all : test_use_coll_implicit.class TestUseCollDriver.class
 all : grammar_implicit.class GrammarDriver.class
 all : FarrowLv_implicit.class FarrowLvDriver.class
 all : FarrowUbd_implicit.class FarrowUbdDriver.class
+all : FarrowUbdFiber_implicit.class FarrowUbdFiberDriver.class
 all : nested_cycles_implicit.class NestedCyclesDriver.class
 all : broad_fiber_cycle_implicit.class BroadFiberCycleDriver.class
 
@@ -79,8 +81,14 @@ FarrowUbdTokens.class : FarrowUbdTokens.scala
 FarrowUbd_implicit.class : farrow-ubd-tree.scala farrow-ubd.scala
 	${SCALAC} ${SCALACFLAGS} $^
 
+FarrowUbdFiber_implicit.class : farrow-ubd-tree.scala farrow-ubd-fiber.scala
+	${SCALAC} ${SCALACFLAGS} $^
+
 FarrowUbdDriver.class : FarrowUbd_implicit.class FarrowUbdParser.class
 	${SCALAC} ${SCALACFLAGS} farrow-ubd-driver.scala
+
+FarrowUbdFiberDriver.class : FarrowUbdFiber_implicit.class FarrowUbdParser.class
+	${SCALAC} ${SCALACFLAGS} farrow-ubd-fiber-driver.scala
 
 FarrowLv.lex : ../farrow-lv.lex FarrowLv.lex.scala
 	cat FarrowLv.lex.scala ../farrow-lv.lex > $@
