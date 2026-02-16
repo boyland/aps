@@ -1,0 +1,134 @@
+with "symbol";
+with "table";
+with "flat";
+with "farrow-ubd-tree";
+
+-- Farrow use-before-declaration analysis
+module FARROW_UBD_FIBER[T :: var FARROW_UBD_TREE[]] extends T begin
+  
+  type IntegerLattice := FLAT_LATTICE[Integer];
+  type DeclPairLattice := TABLE_LATTICE[Symbol, IntegerLattice];
+
+  type Symbols := SET[Symbol];
+  type Messages := SET[String];
+
+  var circular defs : DeclPairLattice;
+
+  attribute Declaration.decl_name : Symbol;
+  attribute Declaration.decl_errs : Messages;
+  pragma synthesized(decl_name, decl_errs);
+
+  attribute Declarations.decls_names : Symbols;
+  attribute Declarations.decls_errs : Messages;
+  pragma synthesized(decls_names, decls_errs);
+
+  circular attribute Expression.expr_val : IntegerLattice;
+  attribute Expression.expr_errs : Messages;
+  pragma synthesized(expr_val, expr_errs);
+
+  circular attribute Term.term_val : IntegerLattice;
+  attribute Term.term_errs : Messages;
+  pragma synthesized(term_val, term_errs);
+
+  circular attribute Operation.op_val  : IntegerLattice;
+  circular attribute Operation.op_lval : IntegerLattice;
+  circular attribute Operation.op_rval : IntegerLattice;
+  pragma inherited(op_lval, op_rval);
+  pragma synthesized(op_val);
+
+  attribute Program.program_errs : Messages;
+  pragma synthesized(program_errs);
+
+  match ?self:Declarations=scope(?ds: Declarations) begin
+    self.decls_errs := ds.decls_errs;
+  end;
+
+  match ?self:Declaration=decl_assign(?s: Symbol, ?e: Expression) begin
+    defs :> DeclPairLattice$table_entry(s, e.expr_val);
+    self.decl_name := s;
+    self.decl_errs := e.expr_errs;
+  end;
+
+  match ?self:Declarations=decls_empty() begin
+    self.decls_errs := {};
+  end;
+
+  match ?self:Declarations=decls_append(?ds: Declarations, ?d: Declaration) begin
+    if d.decl_name in ds.decls_names then
+        self.decls_errs := { "identifier " ++ symbol_name(d.decl_name) ++ " is multiply defined" } \/ ds.decls_errs \/ d.decl_errs;
+    else
+        self.decls_names := {d.decl_name} \/ ds.decls_names;
+        self.decls_errs := ds.decls_errs \/ d.decl_errs;
+    endif;
+  end;
+
+  match ?self:Expression=expr_term(?t: Term) begin
+    self.expr_val := t.term_val;
+    self.expr_errs := t.term_errs;
+  end;
+
+  match ?self:Operation=op_add() begin
+    if self.op_lval = IntegerLattice$bottom or self.op_rval = IntegerLattice$bottom then
+      self.op_val := IntegerLattice$bottom;
+    else
+      self.op_val := IntegerLattice$applyf2(Integer$plus, self.op_lval, self.op_rval);
+    endif;
+  end;
+
+  match ?self:Operation=op_mul() begin
+    if self.op_lval = IntegerLattice$bottom or self.op_rval = IntegerLattice$bottom then
+      self.op_val := IntegerLattice$bottom;
+    else
+      self.op_val := IntegerLattice$applyf2(Integer$times, self.op_lval, self.op_rval);
+    endif;
+  end;
+
+  match ?self:Operation=op_sub() begin
+    if self.op_lval = IntegerLattice$bottom or self.op_rval = IntegerLattice$bottom then
+      self.op_val := IntegerLattice$bottom;
+    else
+      self.op_val := IntegerLattice$applyf2(Integer$minus, self.op_lval, self.op_rval);
+    endif;
+  end;
+
+  match ?self:Operation=op_div() begin
+    if self.op_lval = IntegerLattice$bottom or self.op_rval = IntegerLattice$bottom then
+      self.op_val := IntegerLattice$bottom;
+    else
+      self.op_val := IntegerLattice$applyf2(Integer$divide, self.op_lval, self.op_rval);
+    endif;
+  end;
+
+  match ?self:Expression=expr_apply(?e: Expression, ?op: Operation, ?t: Term) begin
+    self.expr_val := op.op_val;
+    op.op_lval := e.expr_val;
+    op.op_rval := t.term_val;
+    self.expr_errs := e.expr_errs \/ t.term_errs;
+  end;
+
+  match ?self:Term=term_variable(?s: Symbol) begin
+    circular variable_value: IntegerLattice := IntegerLattice$bottom;
+
+    case DeclPairLattice$select(defs, s) begin
+      match DeclPairLattice$table_entry(?,?value) begin
+        variable_value := value;
+      end;
+    end;
+
+    if variable_value = IntegerLattice$bottom then
+      self.term_errs := { "unknown identifier of " ++ symbol_name(s) };
+    else
+      self.term_errs := { };
+    endif;
+    self.term_val := variable_value;
+  end;
+
+  match ?self:Term=term_literal(?i: Integer) begin
+    self.term_val := IntegerLattice$lift(i);
+    self.term_errs := {};
+  end;
+
+  match ?self:Program=program(?ds: Declarations) begin
+    self.program_errs := ds.decls_errs;
+  end;
+end;
