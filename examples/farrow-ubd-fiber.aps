@@ -59,7 +59,7 @@ module FARROW_UBD_FIBER[T :: var FARROW_UBD_TREE[]] extends T begin
   match ?self:Declarations=decls_append(?ds: Declarations, ?d: Declaration) begin
     if d.decl_name in ds.decls_names then
         self.decls_errs := { "identifier " ++ symbol_name(d.decl_name) ++ " is multiply defined" } \/ ds.decls_errs \/ d.decl_errs;
-	      self.decls_names := ds.decls_names;
+        self.decls_names := ds.decls_names;
     else
         self.decls_names := {d.decl_name} \/ ds.decls_names;
         self.decls_errs := ds.decls_errs \/ d.decl_errs;
