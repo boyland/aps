@@ -24,7 +24,7 @@
 %%
 
 program : decls
-     { $$ = program($1); }
+     { $$ = program(scope($1)); }
         ;
 
 decls : /* NOTHING */

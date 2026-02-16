@@ -24,21 +24,21 @@ module FARROW_UBD[T :: var FARROW_UBD_TREE[]] extends T begin
   pragma inherited(decls_env);
   pragma synthesized(decls_defs, decls_errs);
 
-  attribute Expression.expr_val : IntegerLattice;
+  circular attribute Expression.expr_val : IntegerLattice;
   circular collection attribute Expression.expr_env : DeclPairLattice;
   attribute Expression.expr_errs : Messages;
   pragma inherited(expr_env);
   pragma synthesized(expr_val, expr_errs);
 
-  attribute Term.term_val : IntegerLattice;
+  circular attribute Term.term_val : IntegerLattice;
   circular collection attribute Term.term_env : DeclPairLattice;
   attribute Term.term_errs : Messages;
   pragma inherited(term_env);
   pragma synthesized(term_val, term_errs);
 
-  attribute Operation.op_val  : IntegerLattice;
-  attribute Operation.op_lval : IntegerLattice;
-  attribute Operation.op_rval : IntegerLattice;
+  circular attribute Operation.op_val  : IntegerLattice;
+  circular attribute Operation.op_lval : IntegerLattice;
+  circular attribute Operation.op_rval : IntegerLattice;
   pragma inherited(op_lval, op_rval);
   pragma synthesized(op_val);
 
@@ -72,7 +72,7 @@ module FARROW_UBD[T :: var FARROW_UBD_TREE[]] extends T begin
         self.decls_errs := { "identifier " ++ symbol_name(d.decl_name) ++ " is multiply defined" } \/ ds.decls_errs \/ d.decl_errs;
       end;
       else
-        self.decls_defs := d.decl_pair;
+        self.decls_defs := DeclPairLattice$join(ds.decls_defs, d.decl_pair);
         self.decls_errs := ds.decls_errs \/ d.decl_errs;
     end;
   end;
@@ -125,7 +125,7 @@ module FARROW_UBD[T :: var FARROW_UBD_TREE[]] extends T begin
   end;
 
   match ?self:Term=term_variable(?s: Symbol) begin
-    variable_value: IntegerLattice := IntegerLattice$bottom;
+    circular variable_value: IntegerLattice := IntegerLattice$bottom;
 
     case DeclPairLattice$select(self.term_env, s) begin
       match DeclPairLattice$table_entry(?,?value) begin
@@ -138,6 +138,7 @@ module FARROW_UBD[T :: var FARROW_UBD_TREE[]] extends T begin
     else
       self.term_errs := { };
     endif;
+    self.term_val := variable_value;
   end;
 
   match ?self:Term=term_literal(?i: Integer) begin
