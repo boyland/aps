@@ -199,6 +199,8 @@ static void dump_loop_end(AUG_GRAPH* aug_graph,
     --nesting_level;
     os << "\n";
     os << indent() << "} while(newChanged.get);" << "\n";
+    nesting_level--;
+    os << indent() << "}" << "\n";
   } else {
     ow->clear_since(loop_id);
   }
@@ -212,6 +214,8 @@ static void dump_loop_start_helper(int loop_id, std::ostream& os)
   string suffix = any_to_string(loop_id);
   std::replace(suffix.begin(), suffix.end(), '-', '_');
 
+  os << indent() << "{\n";
+  ++nesting_level;
   os << indent() << "val newChanged = new AtomicBoolean(false);\n";
   os << indent() << "do {\n";
   ++nesting_level;
@@ -372,7 +376,12 @@ static bool implement_visit_function(
         ow->get_outstream() << indent() << "visit_" << n << "_" << ph << "(";
         ow->get_outstream() << "root";
         if (s->loop_required) {
-          ow->get_outstream() << ", new AtomicBoolean(false)";
+          ow->get_outstream() << ", ";
+          if (loop_id == -1) {
+            ow->get_outstream() << "new AtomicBoolean(false)";
+          } else {
+            ow->get_outstream() << "newChanged";
+          }
         }
         ow->get_outstream() << ");\n";
 
