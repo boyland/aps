@@ -781,8 +781,7 @@ static bool applicable_for_circularity_check(INSTANCE *instance)
     {
     case KEYformal:
     {
-      if (func != NULL)
-      {
+      if (func != NULL) {
         // function formals can be involved in a cycle (see first.aps)
         return false;
       }
