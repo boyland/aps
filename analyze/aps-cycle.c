@@ -781,6 +781,11 @@ static bool applicable_for_circularity_check(INSTANCE *instance)
     {
     case KEYformal:
     {
+      if (func != NULL)
+      {
+        // function formals can be involved in a cycle (see first.aps)
+        return false;
+      }
       switch (ABSTRACT_APS_tnode_phylum(tnode_parent(node)))
       {
       case KEYPattern:
