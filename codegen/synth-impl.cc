@@ -1624,7 +1624,7 @@ void dump_rhs_instance_helper(AUG_GRAPH* aug_graph, BlockItem* item, INSTANCE* i
         Expression e = case_stmt_expr(header);
 #ifdef APS2SCALA
         // Type ty = infer_expr_type(e);
-        o << indent() << "val node" << instance->index << " = " << e << ";\n";
+        o << indent() << "{" << "val node" << instance->index << " = " << e << ";\n";
 #else  /* APS2SCALA */
         Type ty = infer_expr_type(e);
         o << indent() << ty << " node" << instance->index << " = " << e << ";\n";
@@ -1668,7 +1668,7 @@ void dump_rhs_instance_helper(AUG_GRAPH* aug_graph, BlockItem* item, INSTANCE* i
 
       --nesting_level;
 #ifdef APS2SCALA
-      o << indent() << "}}\n";
+      o << indent() << "}}}\n";
 #else  /* APS2SCALA */
       o << indent() << "}\n";
 #endif /* APS2SCALA */
@@ -1682,7 +1682,7 @@ void dump_rhs_instance_helper(AUG_GRAPH* aug_graph, BlockItem* item, INSTANCE* i
   }
 }
 
-static bool is_match_formal(void* node) {
+static bool check_is_match_formal(void* node) {
   Declaration formal_decl = NULL;
   bool is_formal = check_surrounding_decl(node, KEYnormal_formal, &formal_decl);
 
@@ -1700,11 +1700,6 @@ virtual void dump_synth_instance(INSTANCE* instance, ostream& o) override {
     dumped_instances.push_back(instance);
   }
 
-  printf("dumping synth instance: ");
-  print_instance(instance, stdout);
-  printf(" (attribute type: %d)", Declaration_KEY(instance->fibered_attr.attr));
-  printf("\n");
-
   AUG_GRAPH* aug_graph = current_aug_graph;
   BlockItem* block = find_surrounding_block(current_scope_block, instance);
 
@@ -1715,15 +1710,30 @@ virtual void dump_synth_instance(INSTANCE* instance, ostream& o) override {
   bool is_synthesized = instance_is_synthesized(instance);
   bool is_inherited = instance_is_inherited(instance);
   bool is_circular = edgeset_kind(current_aug_graph->graph[instance->index * current_aug_graph->instances.length + instance->index]);
-  bool is_formal = is_match_formal(instance->node);
+  bool is_match_formal = check_is_match_formal(instance->fibered_attr.attr);
 
-  if (is_formal) {
-    o << "v_" << instance_to_string(instance, false, !current_synth_functions_state->is_phylum_instance ? false : true);
-    dumped_instances.push_back(instance);
+  o << "/* dumping synth instance: ";
+  o << instance << " */";
+
+  if (is_circular && already_dumped) {
+    o << "/** use the existing value for circular attribute instance: ";
+    o << instance << " **/";
+    o << instance_to_attr(instance) << ".get(";
+    if (instance->node == NULL) {
+      o << "node";
+    } else {
+      o << "v_" << decl_name(instance->node);
+    }
+
+    o << ")";
+    return;
+  } else if (is_match_formal) {
+    o << "v_" << instance_to_string(instance, false, !current_synth_functions_state->is_phylum_instance ? false : true) << "\n";
+    // dumped_instances.push_back(instance);
   } else if (is_inherited) {
     if (is_parent_instance) {
       o << "v_" << instance_to_string(instance, false, !current_synth_functions_state->is_phylum_instance ? false : true);
-      dumped_instances.push_back(instance);
+      // dumped_instances.push_back(instance);
     } else {
       // we need to find the assignment and dump the RHS recursive call
       dump_rhs_instance_helper(aug_graph, block, instance, o);
@@ -1732,15 +1742,6 @@ virtual void dump_synth_instance(INSTANCE* instance, ostream& o) override {
     if (is_parent_instance) {
       dump_rhs_instance_helper(aug_graph, block, instance, o);
     } else {
-      if (is_circular) {
-        if (already_dumped) {
-          o << "/** use the existing value for circular attribute instance: ";
-          o << instance << " **/";
-          o << instance_to_attr(instance) << ".get(" << "v_" << decl_name(instance->node) << ")";
-          return;
-        }
-      }
-
       Type ty = infer_formal_type(node);
       Declaration ctype_decl = canonical_type_decl(canonical_type(ty));
       PHY_GRAPH* pgraph = summary_graph_for(current_state, ctype_decl);

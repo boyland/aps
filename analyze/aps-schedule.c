@@ -1107,8 +1107,9 @@ static void print_total_order(AUG_GRAPH* aug_graph,
     print_indent(indent, stream);
     print_instance(cto->cto_instance, stream);
     CONDITION cond = instance_condition(cto->cto_instance);
-    fprintf(stream, " (visit: %d, component: %d, lineno: %d)", cto->visit,
+    fprintf(stream, " (visit: %d, component: %d, circular: %s, lineno: %d)", cto->visit,
             cto->chunk_index,
+            cto->chunk_circular ? "circular" : "non-circular",
             tnode_line_number(cto->cto_instance->fibered_attr.attr));
 
     if (if_rule_p(cto->cto_instance->fibered_attr.attr)) {
@@ -2690,7 +2691,7 @@ static ChunkGraph* collect_aug_graph_chunks(AUG_GRAPH* aug_graph,
     for (i = 0; i < components->length; i++) {
       SCC_COMPONENT* comp = components->array[i];
 
-      printf("=> component #%d\n", i);
+      printf("=> component #%d (%s)\n", i, aug_graph->component_cycle[i] ? "circular" : "non-circular");
 
       for (j = 0; j < comp->length; j++) {
         Chunk* chunk = (Chunk*)comp->array[j];
