@@ -126,15 +126,21 @@ module FARROW_UBD[T :: var FARROW_UBD_TREE[]] extends T begin
 
   match ?self:Term=term_variable(?s: Symbol) begin
     circular variable_value: IntegerLattice := IntegerLattice$bottom;
+    circular variable_defined: OrLattice := false;
 
     case DeclPairLattice$select(self.term_env, s) begin
       match DeclPairLattice$table_entry(?,?value) begin
         variable_value := value;
+        variable_defined := true;
       end;
     end;
 
     if variable_value = IntegerLattice$bottom then
-      self.term_errs := { "unknown identifier of " ++ symbol_name(s) };
+      if variable_defined then
+        self.term_errs := { "identifier " ++ symbol_name(s) ++ " is defined but has an unknown value" };
+      else
+        self.term_errs := { "unknown identifier of " ++ symbol_name(s) };
+      endif;
     else
       self.term_errs := { };
     endif;
