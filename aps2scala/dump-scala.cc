@@ -729,7 +729,7 @@ void dump_some_attribute(Declaration d, string i,
   }
 
   if (is_cir) {
-    oss << indent() << "def lattice() : C_LATTICE[" << vt << "] = "
+    oss << indent() << "def lattice : C_LATTICE[" << vt << "] = "
 	<< as_val(vt) << ";\n" << std::endl;
   }
 
