@@ -24,7 +24,7 @@ object GrammarUtil {
     ls match {
       case Nil => m.v_none()
       case x :: Nil => m.v_single(x)
-      case (x: T) :: rest =>
+      case x :: rest =>
         m.v_append(
           asAPSSequence(List(x)),
           asAPSSequence(rest))
