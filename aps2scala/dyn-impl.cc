@@ -291,7 +291,6 @@ void dump_local_decl(void *, Declaration local, ostream& o)
   o << ";\n";
 }
 
-
 void dump_Matches(Matches ms, bool exclusive, ASSIGNFUNC f, void*arg, ostream&os)
 {
   FOR_SEQUENCE
@@ -324,13 +323,46 @@ void dump_Block(Block b,ASSIGNFUNC f,void*arg,ostream&os)
        pop_attr_context(os);
        break;
      case KEYcase_stmt:
-       push_attr_context(d);
-       //!! we implement case and for!!
-       dump_Matches(case_stmt_matchers(d),true,f,arg,os);
-       push_attr_context(case_stmt_default(d));
-       dump_Block(case_stmt_default(d),f,arg,os);
-       pop_attr_context(os);
-       pop_attr_context(os);
+       {
+        push_attr_context(d);
+        //!! we implement case and for!!
+        int context_before = attr_context_started;
+        dump_Matches(case_stmt_matchers(d),true,f,arg,os);
+        bool case_was_activated = attr_context_started > context_before;
+        push_attr_context(case_stmt_default(d));
+        // Only activate context for case statements when:
+        // 1. Computing a collection attribute
+        // 2. The case statement was actually opened
+        // 3. Default block is empty
+        {
+          Block default_block = case_stmt_default(d);
+          if (case_was_activated &&
+              default_block != NULL && 
+              first_Declaration(block_body(default_block)) == NULL) {
+            Declaration decl = (Declaration)arg;
+            bool is_collection_context = false;
+            if (ABSTRACT_APS_tnode_phylum(decl) == KEYDeclaration) {
+              switch (Declaration_KEY(decl)) {
+                case KEYattribute_decl:
+                  is_collection_context = direction_is_collection(attribute_decl_direction(decl));
+                  break;
+                case KEYvalue_decl:
+                  is_collection_context = direction_is_collection(value_decl_direction(decl));
+                  break;
+                default:
+                  break;
+              }
+            }
+            if (is_collection_context) {
+              // Generate case _ => {} for collection attributes to prevent MatchError
+              activate_attr_context(os);
+            }
+          }
+        }
+        dump_Block(case_stmt_default(d),f,arg,os);
+        pop_attr_context(os);
+        pop_attr_context(os);
+       }
        break;
      case KEYfor_stmt:
        push_attr_context(d);
