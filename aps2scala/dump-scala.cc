@@ -2025,7 +2025,7 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
         }
       }
 
-      dump_function_prototype(name, fty, override_needed, false /* dump_anchor_actual */,oss);
+      dump_function_prototype(name, fty, false /* dump_anchor_actual */, override_needed, oss);
 
       // three kinds of definitions:
       // 1. the whole thing: a non-empty body:
