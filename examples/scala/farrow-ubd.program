@@ -1,0 +1,5 @@
+// Validating Farrow's use-before-declaration
+x = 10;
+y = x + 20;
+x = z / 30;
+z = 4 + unkown;

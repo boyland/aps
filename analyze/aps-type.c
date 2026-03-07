@@ -196,7 +196,7 @@ static void* do_typechecking(void* ignore, void*node) {
       case KEYcollect_assign:
       {
         Expression lhs = assign_lhs(decl);
-        Declaration lhs_use_decl;
+        Declaration lhs_use_decl = NULL;
         switch (Expression_KEY(lhs))
         {
           case KEYfuncall:
@@ -213,6 +213,24 @@ static void* do_typechecking(void* ignore, void*node) {
             break;
           default:
             break;
+        }
+        
+        // Check if variable or attribute is declared as a collection to use collect_assign operator
+        if (lhs_use_decl != NULL && Declaration_KEY(decl) == KEYcollect_assign) {
+          switch (Declaration_KEY(lhs_use_decl)) {
+            case KEYvalue_decl:
+              if (!direction_is_collection(value_decl_direction(lhs_use_decl))) {
+                aps_error(lhs_use_decl, "Global variable \"%s\" must be declared as a collection to use :> operator", decl_name(lhs_use_decl));
+              }
+              break;
+            case KEYattribute_decl:
+              if (!direction_is_collection(attribute_decl_direction(lhs_use_decl))) {
+                aps_error(lhs_use_decl, "Attribute \"%s\" must be declared as a collection to use :> operator", decl_name(lhs_use_decl));
+              }
+              break;
+            default:
+              break;
+          }
         }
       }
 	check_expr_type(assign_rhs(decl),infer_expr_type(assign_lhs(decl)));
@@ -414,8 +432,29 @@ static void* validate_canonicals(void* ignore, void*node) {
         Expressions exprs = pragma_call_parameters(decl);
         Expression type_expr = first_Expression(exprs);
         Expression result_expr = Expression_info(type_expr)->next_expr;
+        Type type;
 
-        Type type = type_value_T(type_expr);
+        switch (Expression_KEY(type_expr)) {
+        case KEYtype_value:
+          type = type_value_T(type_expr);
+          break;
+        case KEYvalue_use: {
+          Use use = value_use_use(type_expr);
+          switch (Use_KEY(use)) {
+          case KEYqual_use:
+            type = qual_use_from(use);
+            break;
+          default:
+            aps_error(node, "only qual uses have a type that can be validated");
+            return NULL;
+          }
+          break;
+        }
+        default:
+          aps_error(node, "unknown AST type passed into canonical type validation");
+          return NULL;
+        }
+
         String expected_string = string_const_token(result_expr);
 
         char actual_to_string[BUFFER_SIZE];
