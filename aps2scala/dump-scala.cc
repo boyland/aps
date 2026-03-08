@@ -2001,19 +2001,25 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
         type_has_service_function(some_class_decl_result_type(mdecl), def_name(declaration_def(decl)), found_fdecls);
 
         auto cftype2 = (struct Canonical_function_type *)canonical_type(fty);
+        // Result declaration of the current (implementing) module
+        Declaration current_result = some_class_decl_result_type(mdecl);
         for (auto& found_fdecl : found_fdecls) {
           auto cftype1 = (struct Canonical_function_type *)canonical_type(some_function_decl_type(found_fdecl));
+          // Result declaration of the inherited (source) module
+          Declaration found_mdecl = get_enclosing_some_class_decl(found_fdecl);
+          Declaration ctype1_mdecl_result = found_mdecl ? some_class_decl_result_type(found_mdecl) : NULL;
           if (cftype1->num_formals == cftype2->num_formals) {
             bool formals_type_match = true;
-            // start from 1 to skip "this" (or Result) formal
-            for (int i = 1; i < cftype1->num_formals; ++i) {
-              if (canonical_type_compare(cftype1->param_types[i], cftype2->param_types[i]) != 0) {
+            for (int i = 0; i < cftype1->num_formals; ++i) {
+              if (canonical_type_compare2(cftype1->param_types[i], cftype2->param_types[i],
+                                         ctype1_mdecl_result, current_result) != 0) {
                 formals_type_match = false;
               }
             }
 
             if (formals_type_match) {
-              if (canonical_type_compare(cftype1->return_type, cftype2->return_type) == 0) {
+              if (canonical_type_compare2(cftype1->return_type, cftype2->return_type,
+                                         ctype1_mdecl_result, current_result) == 0) {
                 override_needed = true;
                 break;
               } else {

@@ -1006,9 +1006,12 @@ CanonicalType *canonical_type_join(CanonicalType *ctype_outer, CanonicalType *ct
  * Comparator for two canonical types
  * @param ctype1 first canonical type
  * @param ctype2 second canonical type
+ * @param ctype1_mdecl_result Result decl from the source (inherited) module, or NULL
+ * @param ctype2_mdecl_result Result decl from the target (implementing) module, or NULL
  * @return integer value representing the comparison
  */
-int canonical_type_compare(CanonicalType *ctype1, CanonicalType *ctype2)
+int canonical_type_compare2(CanonicalType *ctype1, CanonicalType *ctype2,
+                           Declaration ctype1_mdecl_result, Declaration ctype2_mdecl_result)
 {
   if (ctype1->key != ctype2->key)
   {
@@ -1022,19 +1025,23 @@ int canonical_type_compare(CanonicalType *ctype1, CanonicalType *ctype2)
     struct Canonical_use_type *canonical_use_type1 = (struct Canonical_use_type *)ctype1;
     struct Canonical_use_type *canonical_use_type2 = (struct Canonical_use_type *)ctype2;
 
-    return tnode_line_number(canonical_use_type1->decl) - tnode_line_number(canonical_use_type2->decl);
+    Declaration d1 = (ctype1_mdecl_result != NULL && canonical_use_type1->decl == ctype1_mdecl_result) ? ctype2_mdecl_result : canonical_use_type1->decl;
+    Declaration d2 = canonical_use_type2->decl;
+    return (d1 > d2) ? 1 : (d1 < d2) ? -1 : 0;
   }
   case KEY_CANONICAL_QUAL:
   {
     struct Canonical_qual_type *canonical_qual_type1 = (struct Canonical_qual_type *)ctype1;
     struct Canonical_qual_type *canonical_qual_type2 = (struct Canonical_qual_type *)ctype2;
 
-    if (tnode_line_number(canonical_qual_type1->decl) != tnode_line_number(canonical_qual_type2->decl))
+    Declaration d1 = (ctype1_mdecl_result != NULL && canonical_qual_type1->decl == ctype1_mdecl_result) ? ctype2_mdecl_result : canonical_qual_type1->decl;
+    Declaration d2 = canonical_qual_type2->decl;
+    if (d1 != d2)
     {
-      return tnode_line_number(canonical_qual_type1->decl) - tnode_line_number(canonical_qual_type2->decl);
+      return (d1 > d2) ? 1 : -1;
     }
 
-    return canonical_type_compare(canonical_qual_type1->source, canonical_qual_type2->source);
+    return canonical_type_compare2(canonical_qual_type1->source, canonical_qual_type2->source, ctype1_mdecl_result, ctype2_mdecl_result);
   }
   case KEY_CANONICAL_FUNC:
   {
@@ -1043,10 +1050,10 @@ int canonical_type_compare(CanonicalType *ctype1, CanonicalType *ctype2)
 
     if (canonical_function_type1->num_formals != canonical_function_type2->num_formals)
     {
-      return canonical_function_type1->num_formals - canonical_function_type2->num_formals > 0 ? 1 : -1;
+      return (canonical_function_type1->num_formals > canonical_function_type2->num_formals) ? 1 : -1;
     }
 
-    int return_type_comp = canonical_type_compare(canonical_function_type1->return_type, canonical_function_type2->return_type);
+    int return_type_comp = canonical_type_compare2(canonical_function_type1->return_type, canonical_function_type2->return_type, ctype1_mdecl_result, ctype2_mdecl_result);
     if (return_type_comp != 0)
     {
       return return_type_comp;
@@ -1055,7 +1062,7 @@ int canonical_type_compare(CanonicalType *ctype1, CanonicalType *ctype2)
     int i;
     for (i = 0; i < canonical_function_type1->num_formals; i++)
     {
-      int formal_type_comp = canonical_type_compare(canonical_function_type1->param_types[i], canonical_function_type2->param_types[i]);
+      int formal_type_comp = canonical_type_compare2(canonical_function_type1->param_types[i], canonical_function_type2->param_types[i], ctype1_mdecl_result, ctype2_mdecl_result);
       if (formal_type_comp != 0)
       {
         return formal_type_comp;
@@ -1065,7 +1072,7 @@ int canonical_type_compare(CanonicalType *ctype1, CanonicalType *ctype2)
     return 0;
   }
   default:
-    fatal_error("canonical_type_compare failed");
+    fatal_error("canonical_type_compare2 failed");
     return 0;
   }
 }
