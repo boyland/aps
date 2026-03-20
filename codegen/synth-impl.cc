@@ -652,10 +652,6 @@ static void destroy_synth_function_states(vector<SYNTH_FUNCTION_STATE*> states) 
 }
 
 static void dump_attribute_type(INSTANCE* in, ostream& os) {
-  printf("decl_name: %s (%d)\n", decl_name(in->fibered_attr.attr), tnode_line_number(in->fibered_attr.attr));
-  print_Type(infer_some_value_decl_type(in->fibered_attr.attr), stdout);
-  printf("\n");
-
   CanonicalType* ctype = canonical_type(infer_some_value_decl_type(in->fibered_attr.attr));
   switch (ctype->key) {
     case KEY_CANONICAL_USE: {
@@ -849,7 +845,6 @@ private:
       printf("\n");
 
       scheduled[in->index] = true;
-      os << in << "\n";
       os << indent();
       impl->dump_synth_instance(in, os);
       count_scheduled++;
@@ -946,8 +941,10 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
     SYNTH_FUNCTION_STATE* synth_functions_state = *state_it;
     current_synth_functions_state = synth_functions_state;
 
-    os << indent() << "// " << synth_functions_state->source << " ("
-       << (synth_functions_state->is_phylum_instance ? "phylum" : "auggraph") << ")\n";
+    if (include_comments) {
+      os << indent() << "// " << synth_functions_state->source << " ("
+         << (synth_functions_state->is_phylum_instance ? "phylum" : "auggraph") << ")\n";
+    }
     if (synth_functions_state->is_fiber_evaluation) {
       os << indent() << "val evaluated_map_" << synth_functions_state->fdecl_name
         //  << " = scala.collection.mutable.Map[T_" << decl_name(synth_functions_state->source_phy_graph->phylum)
@@ -972,15 +969,15 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
 
       // for locals, it needs prefix in formals, not for fibers or regular attributes
 
-      os << ", " << "/*" << source_instance << " (#" << source_instance->index << ") " << "*/ " << "v_";
+      os << ",\n";
+      os << indent() << "    ";
+      os << "v_";
 
       if (!synth_functions_state->is_phylum_instance) {
         os << instance_to_string(source_instance, false, false) << ": ";
       } else {
         os << instance_to_string(source_instance, false, true) << ": ";
       }
-
-      os << "\n";
 
       dump_attribute_type(source_instance, os);
     }
@@ -1057,7 +1054,11 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
       }
 
       impl->dump_synth_instance(aug_graph_instance, os);
-      os << "\n";
+      if (is_circular) {
+        os << ";\n";
+      } else {
+        os << "\n";
+      }
 
       if (is_circular) {
         os << indent() << instance_to_attr(synth_functions_state->source) << ".assign(node, currentValue" << synth_functions_state->source->index << ");\n";
@@ -1193,7 +1194,10 @@ void implement_value_use(Declaration vd, ostream& os) {
 
     Type ty = value_decl_type(vd);
     Declaration ctype_decl = canonical_type_decl(canonical_type(ty));
-    os << "eval_" << instance_to_string_with_nodetype(ctype_decl, instance) << "(node";
+    os << "eval_" << instance_to_string_with_nodetype(ctype_decl, instance) << "(\n";
+    int saved_nesting = nesting_level;
+    nesting_level = std::max(nesting_level + 2, 1);
+    os << indent() << "node";
 
     int i;
     int n = current_aug_graph->instances.length;
@@ -1215,18 +1219,17 @@ void implement_value_use(Declaration vd, ostream& os) {
         bool is_conditional = fibered_attr != NULL && Declaration_KEY(fibered_attr) == KEYif_stmt;
         bool is_result = !is_conditional && !strcmp("result", decl_name(source_instance->fibered_attr.attr));
         bool is_bad = source_instance->node != NULL && Declaration_KEY(source_instance->node) == KEYpragma_call;
-
-        // TODO: why value keeps getting dumped, why check_is_match_formal doesn't work for it?
         bool is_match_formal = check_is_match_formal(source_instance);
 
         if (source_instance->fibered_attr.fiber == NULL && !is_bad && !is_shared_info && !is_conditional && !is_result && !is_match_formal) {
-          os << ", ";
+          os << ",\n" << indent();
           impl->dump_synth_instance(source_instance, os);
         }
       }
     }
 
-    os << ")";
+    nesting_level = saved_nesting;
+    os << "\n" << indent() << ")";
   } else if (flags & ATTRIBUTE_DECL_FLAG) {
     if (ATTR_DECL_IS_INH(vd)) {
       os << "v_" << decl_name(vd);
@@ -1635,7 +1638,9 @@ void dump_rhs_instance_helper(AUG_GRAPH* aug_graph, BlockItem* item, INSTANCE* i
         Expression e = case_stmt_expr(header);
 #ifdef APS2SCALA
         // Type ty = infer_expr_type(e);
-        o << indent() << "{" << "val node" << instance->index << " = " << e << ";\n";
+        o << "{\n";
+        nesting_level++;
+        o << indent() << "val node" << instance->index << " = " << e << ";\n";
 #else  /* APS2SCALA */
         Type ty = infer_expr_type(e);
         o << indent() << ty << " node" << instance->index << " = " << e << ";\n";
@@ -1643,6 +1648,7 @@ void dump_rhs_instance_helper(AUG_GRAPH* aug_graph, BlockItem* item, INSTANCE* i
       }
 #ifdef APS2SCALA
       o << indent() << "node" << instance->index << " match {\n";
+      nesting_level++;
       o << indent() << "case " << p << " => {\n";
 #else  /* APS2SCALA */
       o << indent() << "if (";
@@ -1663,23 +1669,34 @@ void dump_rhs_instance_helper(AUG_GRAPH* aug_graph, BlockItem* item, INSTANCE* i
       }
 
       current_blocks.push_back(if_true);
+      o << indent();
       dump_rhs_instance_helper(aug_graph, cond->next_positive, instance, o);
+      o << "\n";
       current_blocks.pop_back();
 
 #ifdef APS2SCALA
+      nesting_level--;
       o << indent() << "}\n";
       o << indent() << "case _ => {\n";
+      nesting_level++;
 #else  /* APS2SCALA */
       o << "} else {\n";
 #endif /* APS2SCALA */
-      ++nesting_level;
       current_blocks.push_back(if_false);
+      o << indent();
       dump_rhs_instance_helper(aug_graph, cond->next_negative, instance, o);
+      o << "\n";
       current_blocks.pop_back();
 
-      --nesting_level;
+      nesting_level--;
 #ifdef APS2SCALA
-      o << indent() << "}}}\n";
+      o << indent() << "}\n";
+      nesting_level--;
+      o << indent() << "}\n";
+      if (m == first_Match(case_stmt_matchers(header))) {
+        nesting_level--;
+        o << indent() << "}";
+      }
 #else  /* APS2SCALA */
       o << indent() << "}\n";
 #endif /* APS2SCALA */
@@ -1692,6 +1709,7 @@ void dump_rhs_instance_helper(AUG_GRAPH* aug_graph, BlockItem* item, INSTANCE* i
     }
   }
 }
+
 
 static bool check_is_match_formal(void* node) {
   Declaration formal_decl = NULL;
@@ -1723,12 +1741,7 @@ virtual void dump_synth_instance(INSTANCE* instance, ostream& o) override {
   bool is_circular = edgeset_kind(current_aug_graph->graph[instance->index * current_aug_graph->instances.length + instance->index]);
   bool is_match_formal = check_is_match_formal(instance->fibered_attr.attr);
 
-  o << "/* dumping synth instance: ";
-  o << instance << " */";
-
   if (is_circular && already_dumped) {
-    o << "/** use the existing value for circular attribute instance: ";
-    o << instance << " **/";
     o << instance_to_attr(instance) << ".get(";
     if (instance->node == NULL) {
       o << "node";
@@ -1739,7 +1752,7 @@ virtual void dump_synth_instance(INSTANCE* instance, ostream& o) override {
     o << ")";
     return;
   } else if (is_match_formal) {
-    o << "v_" << instance_to_string(instance, false, !current_synth_functions_state->is_phylum_instance ? false : true) << "\n";
+    o << "v_" << instance_to_string(instance, false, !current_synth_functions_state->is_phylum_instance ? false : true);
     // dumped_instances.push_back(instance);
   } else if (is_inherited) {
     if (is_parent_instance) {
@@ -1760,7 +1773,10 @@ virtual void dump_synth_instance(INSTANCE* instance, ostream& o) override {
       for (auto it = synth_functions_states.begin(); it != synth_functions_states.end(); it++) {
         SYNTH_FUNCTION_STATE* synth_function_state = *it;
         if (fibered_attr_equal(&synth_function_state->source->fibered_attr, &instance->fibered_attr)) {
-          o << "eval_" << synth_function_state->fdecl_name << "(" << "v_" << decl_name(node);
+          o << "eval_" << synth_function_state->fdecl_name << "(\n";
+          int saved_nesting = nesting_level;
+          nesting_level = std::max(nesting_level + 2, 2);
+          o << indent() << "v_" << decl_name(node);
 
           std::vector<INSTANCE*> dependencies = synth_function_state->regular_dependencies;
           for (auto it = dependencies.begin(); it != dependencies.end(); it++) {
@@ -1773,20 +1789,14 @@ virtual void dump_synth_instance(INSTANCE* instance, ostream& o) override {
             for (int i = 0; i < current_aug_graph->instances.length; i++) {
               INSTANCE* in = &current_aug_graph->instances.array[i];
               if (in->node == node && fibered_attr_equal(&in->fibered_attr, &source_instance->fibered_attr)) {
-                o << ", ";
-                o << "/*" << source_instance << "*/ ";
-
-                if (!strcmp("value", decl_name(source_instance->fibered_attr.attr))) {
-                  printf("source_instance: ");
-                  print_instance(source_instance, stdout);
-                  printf("\n");
-                }
+                o << ",\n" << indent();
                 dump_synth_instance(in, o);
               }
             }
           }
+          nesting_level = saved_nesting;
 
-          o << ")";
+          o << "\n" << indent() << ")";
           return;
         }
       }
