@@ -558,6 +558,16 @@ static vector<INSTANCE*> collect_conditions_before_instance(BlockItem* item, INS
   return result;
 }
 
+static bool check_is_match_formal(void* node) {
+  Declaration formal_decl = NULL;
+  bool is_formal = check_surrounding_decl(node, KEYnormal_formal, &formal_decl);
+
+  void* match = NULL;
+  bool is_inside_match = check_surrounding_node(node, KEYMatch, &match);
+
+  return is_formal && is_inside_match;
+}
+
 static std::vector<SYNTH_FUNCTION_STATE*> build_synth_functions_state(STATE* s) {
   std::vector<SYNTH_FUNCTION_STATE*> synth_function_states;
   int i, j, k;
@@ -967,6 +977,15 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
         continue;
       }
 
+      Declaration fibered_attr = source_instance->fibered_attr.attr;
+      bool is_match_formal = check_is_match_formal(fibered_attr);
+
+      if (is_match_formal) {
+        print_instance(source_instance, stdout);
+        printf(" is a match formal, skipping it as a parameter\n");
+        continue;
+      }
+
       // for locals, it needs prefix in formals, not for fibers or regular attributes
 
       os << ",\n";
@@ -1199,6 +1218,10 @@ void implement_value_use(Declaration vd, ostream& os) {
     nesting_level = std::max(nesting_level + 2, 1);
     os << indent() << "node";
 
+    if (tnode_line_number(vd) == 128) {
+      printf("here\n");
+    }
+
     int i;
     int n = current_aug_graph->instances.length;
     for (i = 0; i < n; i++) {
@@ -1207,6 +1230,8 @@ void implement_value_use(Declaration vd, ostream& os) {
       Declaration fibered_attr = source_instance->fibered_attr.attr;
 
       if (dep && !if_rule_p(fibered_attr)) {
+        print_instance(source_instance, stdout);
+        printf("\n");
         bool is_shared_info = ATTR_DECL_IS_SHARED_INFO(fibered_attr);
         bool is_fiber_attr = source_instance->fibered_attr.fiber != NULL;
 
@@ -1219,7 +1244,14 @@ void implement_value_use(Declaration vd, ostream& os) {
         bool is_conditional = fibered_attr != NULL && Declaration_KEY(fibered_attr) == KEYif_stmt;
         bool is_result = !is_conditional && !strcmp("result", decl_name(source_instance->fibered_attr.attr));
         bool is_bad = source_instance->node != NULL && Declaration_KEY(source_instance->node) == KEYpragma_call;
-        bool is_match_formal = check_is_match_formal(source_instance);
+        bool is_match_formal = check_is_match_formal(fibered_attr);
+
+        if (is_match_formal) {
+          printf("value_decl %s\n", decl_name(vd));
+          printf("source instance:\n");
+          print_instance(source_instance, stdout);
+          printf("\n");
+        }
 
         if (source_instance->fibered_attr.fiber == NULL && !is_bad && !is_shared_info && !is_conditional && !is_result && !is_match_formal) {
           os << ",\n" << indent();
@@ -1234,7 +1266,6 @@ void implement_value_use(Declaration vd, ostream& os) {
     if (ATTR_DECL_IS_INH(vd)) {
       os << "v_" << decl_name(vd);
     } else {
-      // os << "eval_" << decl_name(vd);
       os << "a" << "_" << decl_name(vd) << DEREF << "get";
     }
 
@@ -1708,17 +1739,6 @@ void dump_rhs_instance_helper(AUG_GRAPH* aug_graph, BlockItem* item, INSTANCE* i
       break;
     }
   }
-}
-
-
-static bool check_is_match_formal(void* node) {
-  Declaration formal_decl = NULL;
-  bool is_formal = check_surrounding_decl(node, KEYnormal_formal, &formal_decl);
-
-  void* match = NULL;
-  bool is_inside_match = check_surrounding_node(node, KEYMatch, &match);
-
-  return is_formal && is_inside_match;
 }
 
 virtual void dump_synth_instance(INSTANCE* instance, ostream& o) override {
