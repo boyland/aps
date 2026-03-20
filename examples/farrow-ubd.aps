@@ -69,7 +69,7 @@ module FARROW_UBD[T :: var FARROW_UBD_TREE[]] extends T begin
 
     case DeclPairLattice$select(ds.decls_defs, d.decl_name) begin
       match DeclPairLattice$table_entry(?,?value) begin
-        self.decls_errs := { "identifier " ++ symbol_name(d.decl_name) ++ " is multiply defined" ++ IntegerLattice$string(value) } \/ ds.decls_errs \/ d.decl_errs;
+        self.decls_errs := { "identifier " ++ symbol_name(d.decl_name) ++ " is multiply defined" } \/ ds.decls_errs \/ d.decl_errs;
       end;
       else
         self.decls_defs := DeclPairLattice$join(ds.decls_defs, d.decl_pair);
@@ -125,14 +125,26 @@ module FARROW_UBD[T :: var FARROW_UBD_TREE[]] extends T begin
   end;
 
   match ?self:Term=term_variable(?s: Symbol) begin
-    circular variable_value: IntegerLattice := query(self.term_env, s);
-    self.term_val := variable_value;
+    circular variable_value: IntegerLattice := IntegerLattice$bottom;
+    circular variable_defined: OrLattice := false;
+
+    case DeclPairLattice$select(self.term_env, s) begin
+      match DeclPairLattice$table_entry(?,?value) begin
+        variable_value := value;
+        variable_defined := true;
+      end;
+    end;
 
     if variable_value = IntegerLattice$bottom then
-      self.term_errs := { "unknown identifier of " ++ symbol_name(s) };
+      if variable_defined then
+        self.term_errs := { "identifier " ++ symbol_name(s) ++ " is defined but has an unknown value" };
+      else
+        self.term_errs := { "unknown identifier of " ++ symbol_name(s) };
+      endif;
     else
       self.term_errs := { };
     endif;
+    self.term_val := variable_value;
   end;
 
   match ?self:Term=term_literal(?i: Integer) begin
@@ -143,15 +155,5 @@ module FARROW_UBD[T :: var FARROW_UBD_TREE[]] extends T begin
   match ?self:Program=program(?ds: Declarations) begin
     ds.decls_env := DeclPairLattice$bottom;
     self.program_errs := ds.decls_errs;
-  end;
-
-  var function query(source: DeclPairLattice; s: Symbol) result: IntegerLattice begin
-    case DeclPairLattice$select(source, s) begin
-      match DeclPairLattice$table_entry(?,?value) begin
-        result := value;
-      end;
-    else
-      result := IntegerLattice$bottom;
-    end;
   end;
 end;
