@@ -1216,7 +1216,10 @@ void implement_value_use(Declaration vd, ostream& os) {
         bool is_result = !is_conditional && !strcmp("result", decl_name(source_instance->fibered_attr.attr));
         bool is_bad = source_instance->node != NULL && Declaration_KEY(source_instance->node) == KEYpragma_call;
 
-        if (source_instance->fibered_attr.fiber == NULL && !is_bad && !is_shared_info && !is_conditional) {
+        // TODO: why value keeps getting dumped, why check_is_match_formal doesn't work for it?
+        bool is_match_formal = check_is_match_formal(source_instance);
+
+        if (source_instance->fibered_attr.fiber == NULL && !is_bad && !is_shared_info && !is_conditional && !is_result && !is_match_formal) {
           os << ", ";
           impl->dump_synth_instance(source_instance, os);
         }

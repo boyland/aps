@@ -2615,7 +2615,7 @@ string operator+(string s, int i)
 string indent(int nl) { return string(indent_multiple*nl,' '); }
 
 bool check_surrounding_decl(void* node, KEYTYPE_Declaration decl_key, Declaration* result_decl) {
-  while (node != NULL) {
+  while (node != NULL && ABSTRACT_APS_tnode_phylum(node) != KEY_ABSTRACT_APS_None) {
     if (ABSTRACT_APS_tnode_phylum(node) == KEYDeclaration) {
       Declaration decl = (Declaration)node;
       if (Declaration_KEY(decl) == decl_key) {
@@ -2631,11 +2631,12 @@ bool check_surrounding_decl(void* node, KEYTYPE_Declaration decl_key, Declaratio
 }
 
 bool check_surrounding_node(void* node, KEYTYPE_ABSTRACT_APS_Phylum ast_key, void** result_node) {
-  while (node != NULL) {
+  while (node != NULL && ABSTRACT_APS_tnode_phylum(node) != KEY_ABSTRACT_APS_None) {
     if (ABSTRACT_APS_tnode_phylum(node) == ast_key) {
       *result_node = node;
       return true;
     }
+    printf("check_surrounding_node: at %d, phylum = %d\n", tnode_line_number(node), ABSTRACT_APS_tnode_phylum(node));
     node = tnode_parent(node);
   }
 
