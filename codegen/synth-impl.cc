@@ -1497,6 +1497,7 @@ void dump_rhs_instance_helper(AUG_GRAPH* aug_graph, BlockItem* item, INSTANCE* i
     struct block_item_instance* bi = (struct block_item_instance*)item;
     vector<std::set<Expression> > all_assignments = make_instance_assignment();
     std::set<Expression> relevant_assignments = all_assignments[instance->index];
+    bool any_assignment_dump = false;
 
     if (bi->instance == instance || bi->next == NULL) {
       if (!relevant_assignments.empty()) {
@@ -1506,6 +1507,8 @@ void dump_rhs_instance_helper(AUG_GRAPH* aug_graph, BlockItem* item, INSTANCE* i
             continue;
           }
 
+          any_assignment_dump = true;
+
           if (instance->fibered_attr.fiber != NULL) {
             dump_assignment(instance, rhs, o);
           } else {
@@ -1514,6 +1517,11 @@ void dump_rhs_instance_helper(AUG_GRAPH* aug_graph, BlockItem* item, INSTANCE* i
           }
         }
 
+        return;
+      }
+
+      if (any_assignment_dump) {
+        fatal_error("should have dumped an assignment here");
         return;
       }
 
@@ -1764,6 +1772,12 @@ virtual void dump_synth_instance(INSTANCE* instance, ostream& o) override {
               if (in->node == node && fibered_attr_equal(&in->fibered_attr, &source_instance->fibered_attr)) {
                 o << ", ";
                 o << "/*" << source_instance << "*/ ";
+
+                if (!strcmp("value", decl_name(source_instance->fibered_attr.attr))) {
+                  printf("source_instance: ");
+                  print_instance(source_instance, stdout);
+                  printf("\n");
+                }
                 dump_synth_instance(in, o);
               }
             }
