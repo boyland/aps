@@ -2639,7 +2639,6 @@ bool check_surrounding_node(void* node, KEYTYPE_ABSTRACT_APS_Phylum ast_key, voi
       *result_node = node;
       return true;
     }
-    printf("check_surrounding_node: at %d, phylum = %d\n", tnode_line_number(node), ABSTRACT_APS_tnode_phylum(node));
     node = tnode_parent(node);
   }
 

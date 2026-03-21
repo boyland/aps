@@ -1534,6 +1534,10 @@ void dump_rhs_instance_helper(AUG_GRAPH* aug_graph, BlockItem* item, INSTANCE* i
         }
 
         if (!any_assignment_dump) {
+          printf("Warning: no relevant assignment found for instance ");
+          print_instance(instance, stdout);
+          printf(" in this block, but it is assigned in an outer block. This can happen for circular attributes or collection attributes that are assigned in a conditional branch.\n");
+        
           // All assignments were NULL (e.g., unassigned circular/collection attribute
           // in a conditional branch). Emit the current attribute value as fallback.
           Declaration ad = instance->fibered_attr.attr;
