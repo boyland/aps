@@ -76,7 +76,7 @@ with C_TABLE[TreeMap[T_KeyType,T_ValueType],T_KeyType,T_ValueType]
   def f_select(v_table : T_Result, v_key : T_KeyType):T_Result = {
     v_table.get(v_key) match {
       case Some(v) => f_table_entry(v_key,v)
-      case None => f_table_entry(v_key,t_ValueType.v_initial)
+      case None => v_initial
     }
   }
 }

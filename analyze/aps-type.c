@@ -204,7 +204,7 @@ static void* do_typechecking(void* ignore, void*node) {
       case KEYcollect_assign:
       {
         Expression lhs = assign_lhs(decl);
-        Declaration lhs_use_decl;
+        Declaration lhs_use_decl = NULL;
         switch (Expression_KEY(lhs))
         {
           case KEYfuncall:
@@ -221,6 +221,24 @@ static void* do_typechecking(void* ignore, void*node) {
             break;
           default:
             break;
+        }
+        
+        // Check if variable or attribute is declared as a collection to use collect_assign operator
+        if (lhs_use_decl != NULL && Declaration_KEY(decl) == KEYcollect_assign) {
+          switch (Declaration_KEY(lhs_use_decl)) {
+            case KEYvalue_decl:
+              if (!direction_is_collection(value_decl_direction(lhs_use_decl))) {
+                aps_error(lhs_use_decl, "Global variable \"%s\" must be declared as a collection to use :> operator", decl_name(lhs_use_decl));
+              }
+              break;
+            case KEYattribute_decl:
+              if (!direction_is_collection(attribute_decl_direction(lhs_use_decl))) {
+                aps_error(lhs_use_decl, "Attribute \"%s\" must be declared as a collection to use :> operator", decl_name(lhs_use_decl));
+              }
+              break;
+            default:
+              break;
+          }
         }
       }
 	check_expr_type(assign_rhs(decl),infer_expr_type(assign_lhs(decl)));

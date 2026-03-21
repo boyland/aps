@@ -38,7 +38,7 @@ struct cto_node {
   Declaration child_decl;  // child decl in case of visit marker
   short visit;             // parent phase number
   int chunk_index;         // SCC component index
-  BOOL chunk_circular;     // SCC component index
+  BOOL chunk_circular;     // flag to indicate chunk is circular (phylum phase is circular for visits or local attribute depending on itself)
 #define cto_if_false cto_next
 };
 
