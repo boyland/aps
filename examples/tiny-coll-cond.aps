@@ -23,6 +23,8 @@ begin
     if isEven(b.depth) then
       b.sum :> y.sum;
     endif;
+    x.depth := b.depth + 1;
+    y.depth := b.depth + 1;
   end;
 
   match ?p=root(?b) begin
