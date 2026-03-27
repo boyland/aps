@@ -968,7 +968,7 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
 
     if (include_comments) {
       os << indent() << "// " << synth_functions_state->source << " ("
-         << (synth_functions_state->is_phylum_instance ? "phylum" : "auggraph") << ")\n";
+         << (synth_functions_state->is_phylum_instance ? "phylum" : "aug-graph") << ")\n";
     }
     if (synth_functions_state->is_fiber_evaluation) {
       os << indent() << "val evaluated_map_" << synth_functions_state->fdecl_name
@@ -1215,7 +1215,7 @@ void implement_value_use(Declaration vd, ostream& os) {
 
     Type ty = value_decl_type(vd);
     Declaration ctype_decl = canonical_type_decl(canonical_type(ty));
-    os << "eval_" << instance_to_string_with_nodetype(ctype_decl, instance) << "(\n";
+    os << "/* 1218 */ eval_" << instance_to_string_with_nodetype(ctype_decl, instance) << "(\n";
     int saved_nesting = nesting_level;
     nesting_level = std::max(nesting_level + 2, 1);
     os << indent() << "node";
@@ -1534,26 +1534,7 @@ void dump_rhs_instance_helper(AUG_GRAPH* aug_graph, BlockItem* item, INSTANCE* i
         }
 
         if (!any_assignment_dump) {
-          printf("Warning: no relevant assignment found for instance ");
-          print_instance(instance, stdout);
-          printf(" in this block, but it is assigned in an outer block. This can happen for circular attributes or collection attributes that are assigned in a conditional branch.\n");
-        
-          // All assignments were NULL (e.g., unassigned circular/collection attribute
-          // in a conditional branch). Emit the current attribute value as fallback.
-          Declaration ad = instance->fibered_attr.attr;
-          if (ad != NULL && instance->fibered_attr.fiber == NULL &&
-              ABSTRACT_APS_tnode_phylum(ad) == KEYDeclaration &&
-              Declaration_KEY(ad) == KEYattribute_decl &&
-              (direction_is_collection(attribute_decl_direction(ad)) ||
-               direction_is_circular(attribute_decl_direction(ad)))) {
-            o << instance_to_attr(instance) << ".get(";
-            if (instance->node == NULL || instance->node == current_aug_graph->lhs_decl) {
-              o << "node";
-            } else {
-              o << "v_" << decl_name(instance->node);
-            }
-            o << ")";
-          }
+          fatal_error("should have dumped an assignment here");
         }
 
         return;
@@ -1749,6 +1730,7 @@ virtual void dump_synth_instance(INSTANCE* instance, ostream& o) override {
     already_dumped = true;
   } else {
     dumped_instances.push_back(instance);
+    o << "/* dumping instance " << instance_to_string(instance) << " */\n";
   }
 
   AUG_GRAPH* aug_graph = current_aug_graph;
@@ -1764,13 +1746,22 @@ virtual void dump_synth_instance(INSTANCE* instance, ostream& o) override {
   bool is_match_formal = check_is_match_formal(instance->fibered_attr.attr);
 
   if (is_circular && already_dumped) {
+    o << "/* circular attribute:" << instance_to_string(instance) << ", had no choice  ";
+
+    for (auto it = dumped_instances.begin(); it != dumped_instances.end(); it++) {
+      INSTANCE* dumped_instance = *it;
+      o << instance_to_string(dumped_instance) << ", ";
+    }
+
+    o << " */\n";
+
     o << instance_to_attr(instance) << ".get(";
     if (instance->node == NULL) {
       o << "node";
     } else {
       o << "v_" << decl_name(instance->node);
     }
-
+  
     o << ")";
     return;
   } else if (is_match_formal) {
@@ -1795,7 +1786,7 @@ virtual void dump_synth_instance(INSTANCE* instance, ostream& o) override {
       for (auto it = synth_functions_states.begin(); it != synth_functions_states.end(); it++) {
         SYNTH_FUNCTION_STATE* synth_function_state = *it;
         if (fibered_attr_equal(&synth_function_state->source->fibered_attr, &instance->fibered_attr)) {
-          o << "eval_" << synth_function_state->fdecl_name << "(\n";
+          o << "/* 1779 */ eval_" << synth_function_state->fdecl_name << "(\n";
           int saved_nesting = nesting_level;
           nesting_level = std::max(nesting_level + 2, 2);
           o << indent() << "v_" << decl_name(node);
