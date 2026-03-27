@@ -121,7 +121,7 @@ static vector<INSTANCE*> sort_instances(AUG_GRAPH* aug_graph) {
 
 // Given an augmented dependency graph, it linearize it recursively
 static BlockItem* linearize_block_helper(AUG_GRAPH* aug_graph,
-                                         vector<INSTANCE*> sorted_instances,
+                                         const vector<INSTANCE*>& sorted_instances,
                                          bool* scheduled,
                                          CONDITION* cond,
                                          BlockItem* prev,
@@ -132,7 +132,7 @@ static BlockItem* linearize_block_helper(AUG_GRAPH* aug_graph,
     return NULL;
   }
 
-  int i, j;
+  int j;
   int n = aug_graph->instances.length;
 
   for (auto it = sorted_instances.begin(); it != sorted_instances.end(); it++) {
@@ -340,7 +340,7 @@ static bool is_function_decl_attribute(INSTANCE* instance) {
         Declaration fdecl = Declaration_info(instance->node)->proxy_fdecl;
         switch (Declaration_KEY(fdecl)) {
           case KEYfunction_decl:
-            return fdecl;
+            return true;
           default:
             break;
         }
@@ -408,7 +408,6 @@ static vector<AUG_GRAPH*> collect_lhs_aug_graphs(STATE* state, PHY_GRAPH* pgraph
       switch (Declaration_KEY(aug_graph->lhs_decl)) {
         case KEYsome_function_decl:
           continue;
-          break;
         default:
           break;
       }
@@ -598,7 +597,6 @@ static std::vector<SYNTH_FUNCTION_STATE*> build_synth_functions_state(STATE* s) 
       INSTANCE* in = &pg->instances.array[j];
       bool is_fiber = in->fibered_attr.fiber != NULL;
       bool is_shared_info = ATTR_DECL_IS_SHARED_INFO(in->fibered_attr.attr);
-      bool is_pure_shareinfo = !is_fiber && is_shared_info;
 
       if (!instance_is_synthesized(in)) {
         printf("Skipping instance ");
@@ -626,7 +624,6 @@ static std::vector<SYNTH_FUNCTION_STATE*> build_synth_functions_state(STATE* s) 
     switch (Declaration_KEY(aug_graph->lhs_decl)) {
       case KEYsome_function_decl:
         continue;
-        break;
       default:
         break;
     }
@@ -641,7 +638,6 @@ static std::vector<SYNTH_FUNCTION_STATE*> build_synth_functions_state(STATE* s) 
         switch (Declaration_KEY(instance->fibered_attr.attr)) {
           case KEYformal:
             continue;
-            break;
           default:
             break;
         }
@@ -670,7 +666,7 @@ static std::vector<SYNTH_FUNCTION_STATE*> build_synth_functions_state(STATE* s) 
   return synth_function_states;
 }
 
-static void destroy_synth_function_states(vector<SYNTH_FUNCTION_STATE*> states) {
+static void destroy_synth_function_states(const vector<SYNTH_FUNCTION_STATE*>& states) {
   for (auto it = states.begin(); it != states.end(); it++) {
     delete (*it);
   }
@@ -835,9 +831,8 @@ private:
       return;
     }
 
-    int count_scheduled = 0;
     int n = aug_graph->instances.length;
-    if (count_scheduled == component->length) {
+    if (component->length == 0) {
       return;
     }
 
@@ -848,7 +843,7 @@ private:
         continue;
       }
 
-      int dependency_ready = true;
+      bool dependency_ready = true;
       for (int j = 0; j < component->length && dependency_ready; j++) {
         INSTANCE* dependency_instance = (INSTANCE*)component->array[j];
         if (dependency_instance == in) {
@@ -872,7 +867,6 @@ private:
       scheduled[in->index] = true;
       os << indent();
       impl->dump_synth_instance(in, os);
-      count_scheduled++;
       dumped_conditional_block_items.clear();
       dumped_instances.clear();
       os << "\n";
@@ -957,7 +951,7 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
 
   os << "\n";
 
-  int i, j, k;
+  int i, j;
   int aug_graph_count = s->match_rules.length;
   current_state = s;
   synth_functions_states = build_synth_functions_state(s);
@@ -1061,37 +1055,36 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
         FiberDependencyDumper::dump(aug_graph, aug_graph_instance, os);
       }
 
+      int src_idx = synth_functions_state->source->index;
+      string src_attr = instance_to_attr(synth_functions_state->source);
       bool is_circular = edgeset_kind(aug_graph->graph[aug_graph_instance->index * n + aug_graph_instance->index]) != 0;
       if (is_circular) {
         os << indent() << "{\n";
         nesting_level++;
-        os << indent() << "var prevValue" << synth_functions_state->source->index << " = " << instance_to_attr(synth_functions_state->source) << ".get(node);\n";
-        os << indent() << "var currentValue" << synth_functions_state->source->index << " = prevValue" << synth_functions_state->source->index << ";\n";
+        os << indent() << "var prevValue" << src_idx << " = " << src_attr << ".get(node);\n";
+        os << indent() << "var currentValue" << src_idx << " = prevValue" << src_idx << ";\n";
         os << indent() << "do {\n";
         nesting_level++;
-        os << indent() << "currentValue" << synth_functions_state->source->index << " = ";
+        os << indent() << "currentValue" << src_idx << " = ";
       } else {
         os << indent();
       }
 
-      impl->dump_synth_instance(aug_graph_instance, os); 
+      impl->dump_synth_instance(aug_graph_instance, os);
 
       if (is_circular) {
         os << ";\n";
-      } else {
-        os << "\n";
-      }
-
-      if (is_circular) {
-        os << indent() << instance_to_attr(synth_functions_state->source) << ".assign(node, currentValue" << synth_functions_state->source->index << ");\n";
-        os << indent() << "prevValue" << synth_functions_state->source->index << " = currentValue" << synth_functions_state->source->index << ";\n";
+        os << indent() << src_attr << ".assign(node, currentValue" << src_idx << ");\n";
+        os << indent() << "prevValue" << src_idx << " = currentValue" << src_idx << ";\n";
         nesting_level--;
-        os << indent() << "} while (prevValue" << synth_functions_state->source->index << " != currentValue" << synth_functions_state->source->index << ")\n";
+        os << indent() << "} while (prevValue" << src_idx << " != currentValue" << src_idx << ")\n";
         if (!synth_functions_state->is_fiber_evaluation) {
-          os << indent() << "currentValue" << synth_functions_state->source->index << "\n";
+          os << indent() << "currentValue" << src_idx << "\n";
         }
         nesting_level--;
         os << indent() << "}\n";
+      } else {
+        os << "\n";
       }
 
       current_blocks.clear();
@@ -1217,14 +1210,14 @@ void implement_value_use(Declaration vd, ostream& os) {
 
     Type ty = value_decl_type(vd);
     Declaration ctype_decl = canonical_type_decl(canonical_type(ty));
-    os << "/* 1218 */ eval_" << instance_to_string_with_nodetype(ctype_decl, instance) << "(\n";
+    string target_name = instance_to_string_with_nodetype(ctype_decl, instance);
+    os << "/* 1218 */ eval_" << target_name << "(\n";
     int saved_nesting = nesting_level;
     nesting_level = std::max(nesting_level + 2, 1);
     os << indent() << "node";
 
     // Find matching synth function state and use its dependencies
     // for consistent parameter passing with the function signature
-    string target_name = instance_to_string_with_nodetype(ctype_decl, instance);
     for (auto state_it = synth_functions_states.begin(); state_it != synth_functions_states.end(); state_it++) {
       SYNTH_FUNCTION_STATE* synth_function_state = *state_it;
       if (synth_function_state->fdecl_name == target_name) {
@@ -1542,11 +1535,6 @@ void dump_rhs_instance_helper(AUG_GRAPH* aug_graph, BlockItem* item, INSTANCE* i
         return;
       }
 
-      if (any_assignment_dump) {
-        fatal_error("should have dumped an assignment here");
-        return;
-      }
-
       if (instance->fibered_attr.fiber != NULL) {
         // Shared info attribute wasn't assigned in this block, dump its default
           auto direction = fibered_attr_direction(&instance->fibered_attr);
@@ -1572,9 +1560,7 @@ void dump_rhs_instance_helper(AUG_GRAPH* aug_graph, BlockItem* item, INSTANCE* i
         print_instance(instance, stdout);
         printf(" is a non-fiber instance, but no assignment found in this block. %d\n", if_rule_p(instance->fibered_attr.attr));
         fatal_error("crashed since non-fiber instance is missing an assignment");
-        return;
       }
-      return;
     } else {
       dump_rhs_instance_helper(aug_graph, bi->next, instance, o);
       return;
@@ -1739,7 +1725,6 @@ virtual void dump_synth_instance(INSTANCE* instance, ostream& o) override {
   BlockItem* block = find_surrounding_block(current_scope_block, instance);
 
   Declaration node = instance->node;
-  Declaration attr = instance->fibered_attr.attr;
   bool is_parent_instance = current_aug_graph->lhs_decl == instance->node;
 
   bool is_synthesized = instance_is_synthesized(instance);
@@ -1769,10 +1754,10 @@ virtual void dump_synth_instance(INSTANCE* instance, ostream& o) override {
     o << ")";
     return;
   } else if (is_match_formal) {
-    o << "v_" << instance_to_string(instance, false, !current_synth_functions_state->is_phylum_instance ? false : true);
+    o << "v_" << instance_to_string(instance, false, current_synth_functions_state->is_phylum_instance);
   } else if (is_inherited) {
     if (is_parent_instance) {
-      o << "v_" << instance_to_string(instance, false, !current_synth_functions_state->is_phylum_instance ? false : true);
+      o << "v_" << instance_to_string(instance, false, current_synth_functions_state->is_phylum_instance);
     } else {
       // we need to find the assignment and dump the RHS recursive call
       dump_rhs_instance_helper(aug_graph, block, instance, o);
@@ -1781,10 +1766,6 @@ virtual void dump_synth_instance(INSTANCE* instance, ostream& o) override {
     if (is_parent_instance) {
       dump_rhs_instance_helper(aug_graph, block, instance, o);
     } else {
-      Type ty = infer_formal_type(node);
-      Declaration ctype_decl = canonical_type_decl(canonical_type(ty));
-      PHY_GRAPH* pgraph = summary_graph_for(current_state, ctype_decl);
-
       for (auto it = synth_functions_states.begin(); it != synth_functions_states.end(); it++) {
         SYNTH_FUNCTION_STATE* synth_function_state = *it;
         if (fibered_attr_equal(&synth_function_state->source->fibered_attr, &instance->fibered_attr)) {
