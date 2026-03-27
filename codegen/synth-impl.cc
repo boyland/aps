@@ -1074,7 +1074,8 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
         os << indent();
       }
 
-      impl->dump_synth_instance(aug_graph_instance, os);
+      impl->dump_synth_instance(aug_graph_instance, os); 
+
       if (is_circular) {
         os << ";\n";
       } else {
@@ -1095,6 +1096,7 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
 
       current_blocks.clear();
       dumped_conditional_block_items.clear();
+      dumped_instances.clear();
 
       nesting_level--;
       os << indent() << "}\n";
@@ -1729,8 +1731,8 @@ virtual void dump_synth_instance(INSTANCE* instance, ostream& o) override {
   if (std::find(dumped_instances.begin(), dumped_instances.end(), instance) != dumped_instances.end()) {
     already_dumped = true;
   } else {
-    dumped_instances.push_back(instance);
     o << "/* dumping instance " << instance_to_string(instance) << " */\n";
+    dumped_instances.push_back(instance);
   }
 
   AUG_GRAPH* aug_graph = current_aug_graph;
@@ -1745,7 +1747,9 @@ virtual void dump_synth_instance(INSTANCE* instance, ostream& o) override {
   bool is_circular = edgeset_kind(current_aug_graph->graph[instance->index * current_aug_graph->instances.length + instance->index]);
   bool is_match_formal = check_is_match_formal(instance->fibered_attr.attr);
 
-  if (is_circular && already_dumped) {
+  bool is_available = is_match_formal || is_inherited;
+
+  if (is_circular && already_dumped && !is_available) {
     o << "/* circular attribute:" << instance_to_string(instance) << ", had no choice  ";
 
     for (auto it = dumped_instances.begin(); it != dumped_instances.end(); it++) {
@@ -1766,11 +1770,9 @@ virtual void dump_synth_instance(INSTANCE* instance, ostream& o) override {
     return;
   } else if (is_match_formal) {
     o << "v_" << instance_to_string(instance, false, !current_synth_functions_state->is_phylum_instance ? false : true);
-    // dumped_instances.push_back(instance);
   } else if (is_inherited) {
     if (is_parent_instance) {
       o << "v_" << instance_to_string(instance, false, !current_synth_functions_state->is_phylum_instance ? false : true);
-      // dumped_instances.push_back(instance);
     } else {
       // we need to find the assignment and dump the RHS recursive call
       dump_rhs_instance_helper(aug_graph, block, instance, o);
