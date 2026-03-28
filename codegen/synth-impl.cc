@@ -1002,9 +1002,7 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
           os << indent();
         }
 
-        os << "\n";
         impl->dump_synth_instance(aug_graph_instance, os);
-        os << "\n";
 
         if (dump_fixed_point_loop) {
           os << ";\n";

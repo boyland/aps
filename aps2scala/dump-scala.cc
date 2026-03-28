@@ -117,7 +117,7 @@ void dump_scala_Program(Program p,std::ostream&oss)
     switch(Unit_KEY(u)) {
     case KEYno_unit: break;
     case KEYwith_unit: 
-      oss << "import " << program_id((char*)(with_unit_name(u)))
+      oss << indent() << "import " << program_id((char*)(with_unit_name(u)))
 	  << "_implicit._;\n";
       break;
     case KEYdecl_unit: 
@@ -1434,7 +1434,7 @@ void dump_scala_Declaration_header(Declaration decl, ostream& oss)
       switch (Type_KEY(rut)) {
       case KEYno_type: break;
       default:
-	oss << "type T_" << name;
+	oss << indent() << "type T_" << name;
 	bool started = false;
 	for (Declaration tf = first_Declaration(tfs); tf; tf=DECL_NEXT(tf)) {
 	  if (started) oss << ",";
