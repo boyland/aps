@@ -32,8 +32,6 @@ extern "C" {
 // where n is the number of the phy_graph and m is the phase.
 // This does a dispatch to visit_n_m_p
 // where p is the production number (0-based constructor index)
-#define PHY_GRAPH_NUM(pg) (pg - pg->global_state->phy_graphs)
-
 #define KEY_BLOCK_ITEM_CONDITION 1
 #define KEY_BLOCK_ITEM_INSTANCE 2
 
@@ -373,28 +371,6 @@ static std::vector<INSTANCE*> collect_aug_graph_attr_dependencies(AUG_GRAPH* aug
   return result;
 }
 
-// only works for strict
-// APS fiber uses untracked, do this untracked
-static std::vector<INSTANCE*> collect_fiber_dependencies_to_finish(AUG_GRAPH* aug_graph,
-                                                                   INSTANCE* source_instance) {
-  std::vector<INSTANCE*> result;
-  int i;
-  int n = aug_graph->instances.length;
-  for (i = 0; i < n; i++) {
-    INSTANCE* sink_instance = &aug_graph->instances.array[i];
-    if (sink_instance->node == source_instance->node &&
-        sink_instance->fibered_attr.attr == source_instance->fibered_attr.attr &&
-        sink_instance->fibered_attr.fiber != NULL &&
-        // sink_instance->fibered_attr.fiber->shorter == base_fiber &&
-        fiber_is_reverse(sink_instance->fibered_attr.fiber)) {
-      auto dependencies = collect_aug_graph_attr_dependencies(aug_graph, sink_instance);
-      result.insert(result.end(), dependencies.begin(), dependencies.end());
-    }
-  }
-
-  return result;
-}
-
 static vector<AUG_GRAPH*> collect_lhs_aug_graphs(STATE* state, PHY_GRAPH* pgraph) {
   vector<AUG_GRAPH*> result;
 
@@ -527,42 +503,6 @@ static string instance_to_attr(INSTANCE* in) {
   return ss.str();
 }
 
-static vector<INSTANCE*> collect_conditions_before_instance(BlockItem* item, INSTANCE* instance) {
-  vector<INSTANCE*> result;
-
-  if (item == NULL) {
-    return result;
-  }
-
-  switch (item->key)
-  {
-  case KEY_BLOCK_ITEM_CONDITION:
-  {
-    struct block_item_condition* cond = (struct block_item_condition*)item;
-
-    vector<INSTANCE*> conditions_positive = collect_conditions_before_instance(cond->next_positive, instance);
-    vector<INSTANCE*> conditions_negative = collect_conditions_before_instance(cond->next_negative, instance);
-
-    result.push_back(cond->instance);
-    result.insert(result.end(), conditions_positive.begin(), conditions_positive.end());
-    result.insert(result.end(), conditions_negative.begin(), conditions_negative.end());
-
-    return result;
-  }
-  case KEY_BLOCK_ITEM_INSTANCE:
-    if (item->instance == instance) {
-      break;
-    } else {
-      struct block_item_instance* inst = (struct block_item_instance*)item;
-      return collect_conditions_before_instance(inst->next, instance);
-    }
-  default:
-    fatal_error("unknown block item key");
-  }
-
-  return result;
-}
-
 static bool check_is_match_formal(void* node) {
   Declaration formal_decl = NULL;
   bool is_formal = check_surrounding_decl(node, KEYnormal_formal, &formal_decl);
@@ -590,7 +530,7 @@ static bool should_skip_synth_dependency(INSTANCE* source_instance) {
 
 static std::vector<SYNTH_FUNCTION_STATE*> build_synth_functions_state(STATE* s) {
   std::vector<SYNTH_FUNCTION_STATE*> synth_function_states;
-  int i, j, k;
+  int i, j;
   int aug_graph_count = s->match_rules.length;
 
   for (i = 0; i < s->phyla.length; i++) {
@@ -700,35 +640,6 @@ static void dump_attribute_type(INSTANCE* in, ostream& os) {
     default:
       break;
   }
-}
-
-template <typename Callable>
-auto dump_fiber_attribute_assignment(INSTANCE* instance, string node, Callable func, ostream& os)
-    -> decltype(func()) {
-  char* field = decl_name(instance->fibered_attr.fiber->field);
-
-  std::string s = field;
-  s.erase(std::remove(s.begin(), s.end(), '!'), s.end());
-
-  os << "a_" << s << DEREF;
-
-  if (debug) {
-    os << "assign";
-  } else {
-    os << "set";
-  }
-
-  os << "(";
-
-  if (node != "") {
-    os << node << ", ";
-  }
-
-  bool result = func();
-
-  os << ")";
-
-  return result;
 }
 
 class FiberDependencyDumper {
@@ -964,7 +875,7 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
 
   os << "\n";
 
-  int i, j;
+  int i;
   int aug_graph_count = s->match_rules.length;
   current_state = s;
   synth_functions_states = build_synth_functions_state(s);
@@ -1597,9 +1508,6 @@ void dump_rhs_instance_helper(AUG_GRAPH* aug_graph, BlockItem* item, INSTANCE* i
     case KEYDeclaration:
     {
       Declaration if_stmt = (Declaration)cond->condition;
-      if (ABSTRACT_APS_tnode_phylum(cond->condition) != KEYDeclaration) {
-        fatal_error("expected declaration, got %s %d", decl_name(cond->condition), ABSTRACT_APS_tnode_phylum(cond->condition));
-      }
       if (Declaration_KEY(if_stmt) != KEYif_stmt) {
         fatal_error("expected if statement, got %s %d", decl_name(if_stmt), Declaration_info(if_stmt));
       }
