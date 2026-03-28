@@ -1658,15 +1658,9 @@ virtual void dump_synth_instance(INSTANCE* instance, ostream& o) override {
   bool is_inherited = instance_is_inherited(instance);
   bool is_circular = edgeset_kind(current_aug_graph->graph[instance->index * current_aug_graph->instances.length + instance->index]);
   bool is_match_formal = check_is_match_formal(instance->fibered_attr.attr);
-
   bool is_available = is_match_formal || is_inherited;
 
   if (is_circular && already_dumped && !is_available) {
-    for (auto it = dumped_instances.begin(); it != dumped_instances.end(); it++) {
-      INSTANCE* dumped_instance = *it;
-      o << instance_to_string(dumped_instance) << ", ";
-    }
-
     o << instance_to_attr(instance) << ".get(";
     if (instance->node == NULL) {
       o << "node";
