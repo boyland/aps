@@ -508,15 +508,24 @@ static string instance_to_string_with_nodetype(Declaration polymorphic, INSTANCE
 
 static string instance_to_attr(INSTANCE* in) {
   Declaration attr = in->fibered_attr.attr;
+  Declaration field = in->fibered_attr.fiber != NULL ? in->fibered_attr.fiber->field : NULL;
   std::stringstream ss;
 
   if (Declaration_KEY(attr) == KEYvalue_decl && LOCAL_UNIQUE_PREFIX(attr) != 0) {
-    ss << "a" << LOCAL_UNIQUE_PREFIX(attr) << "_";
+    ss << "a" << LOCAL_UNIQUE_PREFIX(attr);
   } else {
-    ss << "a_";
+    ss << "a";
   }
 
-  ss << attr_to_string(attr);
+  if (attr != NULL && !ATTR_DECL_IS_SHARED_INFO(attr)) {
+    ss << "_" << decl_name(attr);
+  }
+
+  if (field != NULL) {
+    std::string field_str = decl_name(field);
+    field_str.erase(std::remove(field_str.begin(), field_str.end(), '!'), field_str.end());
+    ss << "_" << field_str;
+  }
 
   return ss.str();
 }
@@ -611,6 +620,13 @@ static std::vector<SYNTH_FUNCTION_STATE*> build_synth_functions_state(STATE* s) 
       state->is_phylum_instance = true;
       state->source_phy_graph = pg;
       state->is_fiber_evaluation = is_fiber || is_shared_info;
+
+      if (state->is_fiber_evaluation && state->source->node != NULL) {
+        printf("Warning: Synthesizing fiber evaluation for instance with attributed node, which is not supported yet. Instance: ");
+        print_instance(in, stdout);
+        printf("\n");
+      }
+
       state->regular_dependencies = collect_phylum_graph_attr_dependencies(pg, in);
       state->aug_graphs = collect_lhs_aug_graphs(s, pg);
 
@@ -1057,11 +1073,17 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
 
       int src_idx = synth_functions_state->source->index;
       string src_attr = instance_to_attr(synth_functions_state->source);
+      print_instance(synth_functions_state->source, stdout);
+      printf("\n");
+
       bool is_circular = edgeset_kind(aug_graph->graph[aug_graph_instance->index * n + aug_graph_instance->index]) != 0;
-      if (is_circular) {
+      bool dump_fixed_point_loop = is_circular && !instance_is_pure_shared_info(synth_functions_state->source);
+      string node = ATTR_DECL_IS_SHARED_INFO(synth_functions_state->source->fibered_attr.attr) ? "" : "node, ";
+
+      if (dump_fixed_point_loop) {
         os << indent() << "{\n";
         nesting_level++;
-        os << indent() << "var prevValue" << src_idx << " = " << src_attr << ".get(node);\n";
+        os << indent() << "var prevValue" << src_idx << " = " << src_attr << ".get(" << node << ");\n";
         os << indent() << "var currentValue" << src_idx << " = prevValue" << src_idx << ";\n";
         os << indent() << "do {\n";
         nesting_level++;
@@ -1070,11 +1092,13 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
         os << indent();
       }
 
+      os << "\n";
       impl->dump_synth_instance(aug_graph_instance, os);
+      os << "\n";
 
-      if (is_circular) {
+      if (dump_fixed_point_loop) {
         os << ";\n";
-        os << indent() << src_attr << ".assign(node, currentValue" << src_idx << ");\n";
+        os << indent() << src_attr << ".assign(" << node << "currentValue" << src_idx << ");\n";
         os << indent() << "prevValue" << src_idx << " = currentValue" << src_idx << ";\n";
         nesting_level--;
         os << indent() << "} while (prevValue" << src_idx << " != currentValue" << src_idx << ")\n";
