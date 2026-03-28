@@ -450,10 +450,7 @@ string fiber_to_string(FIBER fiber) {
 
   while (fiber != NULL && fiber->field != NULL) {
     std::string field = decl_name(fiber->field);
-    size_t pos = field.find("!");
-    if (pos != std::string::npos) {
-      field.replace(pos, 1, "X");  // Replace "!" with X
-    }
+    field.erase(std::remove(field.begin(), field.end(), '!'), field.end());
 
     ss << field;
     fiber = fiber->shorter;
@@ -1078,37 +1075,38 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
 
       bool is_circular = edgeset_kind(aug_graph->graph[aug_graph_instance->index * n + aug_graph_instance->index]) != 0;
       bool dump_fixed_point_loop = is_circular && !instance_is_pure_shared_info(synth_functions_state->source);
-      string node = ATTR_DECL_IS_SHARED_INFO(synth_functions_state->source->fibered_attr.attr) ? "" : "node, ";
+      string node_get = ATTR_DECL_IS_SHARED_INFO(synth_functions_state->source->fibered_attr.attr) ? "" : "node";
+      string node_assign = ATTR_DECL_IS_SHARED_INFO(synth_functions_state->source->fibered_attr.attr) ? "" : "node, ";
 
-      if (dump_fixed_point_loop) {
-        os << indent() << "{\n";
-        nesting_level++;
-        os << indent() << "var prevValue" << src_idx << " = " << src_attr << ".get(" << node << ");\n";
-        os << indent() << "var currentValue" << src_idx << " = prevValue" << src_idx << ";\n";
-        os << indent() << "do {\n";
-        nesting_level++;
-        os << indent() << "currentValue" << src_idx << " = ";
-      } else {
-        os << indent();
-      }
-
-      os << "\n";
-      impl->dump_synth_instance(aug_graph_instance, os);
-      os << "\n";
-
-      if (dump_fixed_point_loop) {
-        os << ";\n";
-        os << indent() << src_attr << ".assign(" << node << "currentValue" << src_idx << ");\n";
-        os << indent() << "prevValue" << src_idx << " = currentValue" << src_idx << ";\n";
-        nesting_level--;
-        os << indent() << "} while (prevValue" << src_idx << " != currentValue" << src_idx << ")\n";
-        if (!synth_functions_state->is_fiber_evaluation) {
-          os << indent() << "currentValue" << src_idx << "\n";
+      if (!synth_functions_state->is_fiber_evaluation) {
+        if (dump_fixed_point_loop) {
+          os << indent() << "{\n";
+          nesting_level++;
+          os << indent() << "var prevValue" << src_idx << " = " << src_attr << ".get(" << node_get << ");\n";
+          os << indent() << "var currentValue" << src_idx << " = prevValue" << src_idx << ";\n";
+          os << indent() << "do {\n";
+          nesting_level++;
+          os << indent() << "currentValue" << src_idx << " = ";
+        } else {
+          os << indent();
         }
-        nesting_level--;
-        os << indent() << "}\n";
-      } else {
+
         os << "\n";
+        impl->dump_synth_instance(aug_graph_instance, os);
+        os << "\n";
+
+        if (dump_fixed_point_loop) {
+          os << ";\n";
+          os << indent() << src_attr << ".assign(" << node_assign << "currentValue" << src_idx << ");\n";
+          os << indent() << "prevValue" << src_idx << " = currentValue" << src_idx << ";\n";
+          nesting_level--;
+          os << indent() << "} while (prevValue" << src_idx << " != currentValue" << src_idx << ")\n";
+          os << indent() << "currentValue" << src_idx << "\n";
+          nesting_level--;
+          os << indent() << "}\n";
+        } else {
+          os << "\n";
+        }
       }
 
       current_blocks.clear();
