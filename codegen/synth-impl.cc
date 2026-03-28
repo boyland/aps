@@ -1144,7 +1144,7 @@ void implement_value_use(Declaration vd, ostream& os) {
     Type ty = value_decl_type(vd);
     Declaration ctype_decl = canonical_type_decl(canonical_type(ty));
     string target_name = instance_to_string_with_nodetype(ctype_decl, instance);
-    os << "/* 1218 */ eval_" << target_name << "(\n";
+    os << "eval_" << target_name << "(\n";
     int saved_nesting = nesting_level;
     nesting_level = std::max(nesting_level + 2, 1);
     os << indent() << "node";
@@ -1647,7 +1647,6 @@ virtual void dump_synth_instance(INSTANCE* instance, ostream& o) override {
   if (std::find(dumped_instances.begin(), dumped_instances.end(), instance) != dumped_instances.end()) {
     already_dumped = true;
   } else {
-    o << "/* dumping instance " << instance_to_string(instance) << " */\n";
     dumped_instances.push_back(instance);
   }
 
@@ -1665,14 +1664,10 @@ virtual void dump_synth_instance(INSTANCE* instance, ostream& o) override {
   bool is_available = is_match_formal || is_inherited;
 
   if (is_circular && already_dumped && !is_available) {
-    o << "/* circular attribute:" << instance_to_string(instance) << ", had no choice  ";
-
     for (auto it = dumped_instances.begin(); it != dumped_instances.end(); it++) {
       INSTANCE* dumped_instance = *it;
       o << instance_to_string(dumped_instance) << ", ";
     }
-
-    o << " */\n";
 
     o << instance_to_attr(instance) << ".get(";
     if (instance->node == NULL) {
@@ -1699,7 +1694,7 @@ virtual void dump_synth_instance(INSTANCE* instance, ostream& o) override {
       for (auto it = synth_functions_states.begin(); it != synth_functions_states.end(); it++) {
         SYNTH_FUNCTION_STATE* synth_function_state = *it;
         if (fibered_attr_equal(&synth_function_state->source->fibered_attr, &instance->fibered_attr)) {
-          o << "/* 1779 */ eval_" << synth_function_state->fdecl_name << "(\n";
+          o << "eval_" << synth_function_state->fdecl_name << "(\n";
           int saved_nesting = nesting_level;
           nesting_level = std::max(nesting_level + 2, 2);
           o << indent() << "v_" << decl_name(node);
