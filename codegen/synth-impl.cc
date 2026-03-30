@@ -921,7 +921,7 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
       dump_attribute_type(source_instance, os);
     }
 
-    os << "): ";
+    os << ")(changed: Atomic[Boolean]): ";
     if (synth_functions_state->is_fiber_evaluation) {
       os << "Unit";
     } else {
@@ -929,6 +929,8 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
     }
     os << " = {\n";
     nesting_level++;
+
+    // don't cache if we are in the loop.
 
     bool skip_dump_caching = !synth_functions_state->is_phylum_instance && 
                         edgeset_kind(synth_functions_state->aug_graphs[0]->graph[synth_functions_state->source->index * synth_functions_state->aug_graphs[0]->instances.length + synth_functions_state->source->index]) != 0;
@@ -948,6 +950,8 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
       
       os << indent(nesting_level + 1) << "case _ => ()\n";
       os << indent() << "};\n";
+    } else {
+      os << indent() << "// skipping caching for " << synth_functions_state->source << " since it's in a circular aug graph\n";
     }
 
     if (synth_functions_state->is_fiber_evaluation) {
@@ -1001,6 +1005,7 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
           os << indent() << "var prevValue" << src_idx << " = " << src_attr << ".get(" << node_get << ");\n";
           os << indent() << "var currentValue" << src_idx << " = prevValue" << src_idx << ";\n";
           os << indent() << "do {\n";
+          os << indent() << "println(f\"started a loop $node\");\n";
           nesting_level++;
           os << indent() << "currentValue" << src_idx << " = ";
         } else {
@@ -1015,6 +1020,7 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
           os << indent() << "prevValue" << src_idx << " = currentValue" << src_idx << ";\n";
           nesting_level--;
           os << indent() << "} while (prevValue" << src_idx << " != currentValue" << src_idx << ")\n";
+          os << indent() << "println(f\"ended a loop $node\");\n";
           os << indent() << "currentValue" << src_idx << "\n";
           nesting_level--;
           os << indent() << "}\n";
@@ -1672,6 +1678,8 @@ virtual void dump_synth_instance(INSTANCE* instance, ostream& o) override {
   bool is_available = is_match_formal || is_inherited;
 
   if (is_circular && already_dumped && !is_available) {
+    o << "/* circular dependency detected for " << instance << ", dumping as attribute access */";
+
     o << instance_to_attr(instance) << ".get(";
     if (instance->node == NULL) {
       o << "node";
