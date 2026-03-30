@@ -930,20 +930,25 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
     os << " = {\n";
     nesting_level++;
 
-    if (synth_functions_state->is_fiber_evaluation) {
-      os << indent() << "evaluated_map_" << synth_functions_state->fdecl_name
-         << ".getOrElse(node.nodeNumber, false) match {\n";
-      os << indent(nesting_level + 1) << "case true => ";
-      os << "return ()\n";
-    } else {
-      os << indent() << instance_to_attr(synth_functions_state->source)
-         << ".checkNode(node).status match {\n";
-      os << indent(nesting_level + 1) << "case Evaluation.ASSIGNED => ";
-      os << "return " << instance_to_attr(synth_functions_state->source) << ".get(node)\n";
-    }
+    bool skip_dump_caching = !synth_functions_state->is_phylum_instance && 
+                        edgeset_kind(synth_functions_state->aug_graphs[0]->graph[synth_functions_state->source->index * synth_functions_state->aug_graphs[0]->instances.length + synth_functions_state->source->index]) != 0;
 
-    os << indent(nesting_level + 1) << "case _ => ()\n";
-    os << indent() << "};\n";
+    if (!skip_dump_caching) {
+      if (synth_functions_state->is_fiber_evaluation) {
+        os << indent() << "evaluated_map_" << synth_functions_state->fdecl_name
+          << ".getOrElse(node.nodeNumber, false) match {\n";
+        os << indent(nesting_level + 1) << "case true => ";
+        os << "return ()\n";
+      } else {
+        os << indent() << instance_to_attr(synth_functions_state->source)
+          << ".checkNode(node).status match {\n";
+        os << indent(nesting_level + 1) << "case Evaluation.ASSIGNED => ";
+        os << "return " << instance_to_attr(synth_functions_state->source) << ".get(node)\n";
+      }
+      
+      os << indent(nesting_level + 1) << "case _ => ()\n";
+      os << indent() << "};\n";
+    }
 
     if (synth_functions_state->is_fiber_evaluation) {
       os << indent() << "node match {\n";
@@ -1031,13 +1036,19 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
     nesting_level--;
     os << indent() << "};\n";
 
-    if (synth_functions_state->is_fiber_evaluation) {
-      os << indent() << "evaluated_map_" << synth_functions_state->fdecl_name << ".update(node.nodeNumber, true);\n";
-    } else {
-      os << indent() << instance_to_attr(synth_functions_state->source) << ".assign(node, result);\n";
-      os << indent() << instance_to_attr(synth_functions_state->source) << ".get(node);\n";
+    if (!skip_dump_caching) {
+      if (synth_functions_state->is_fiber_evaluation) {
+        os << indent() << "evaluated_map_" << synth_functions_state->fdecl_name << ".update(node.nodeNumber, true);\n";
+      } else {
+        os << indent() << instance_to_attr(synth_functions_state->source) << ".assign(node, result);\n";
+        os << indent() << instance_to_attr(synth_functions_state->source) << ".get(node);\n";
+      }
+    }
+
+    if (!synth_functions_state->is_fiber_evaluation) {
       os << indent() << "result\n";
     }
+
     nesting_level--;
     os << indent() << "}\n\n";
   }
