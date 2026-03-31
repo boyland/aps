@@ -27,6 +27,9 @@ extern "C" {
 #define DEREF "->"
 #endif
 
+static const string LOOP_VAR = "isInsideFixedPoint";
+static const string PREV_LOOP_VAR = "prevIsInsideFixedPoint";
+
 // visit procedures are called:
 // visit_n_m
 // where n is the number of the phy_graph and m is the phase.
@@ -909,7 +912,7 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
       // for locals, it needs prefix in formals, not for fibers or regular attributes
 
       os << ",\n";
-      os << indent() << "    ";
+      os << indent(nesting_level+1);
       os << "v_";
 
       if (!synth_functions_state->is_phylum_instance) {
@@ -921,7 +924,14 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
       dump_attribute_type(source_instance, os);
     }
 
-    os << ")(changed: Atomic[Boolean]): ";
+    os << ")";
+
+    if (s->loop_required) {
+      os << "(implicit " << LOOP_VAR << ": Boolean)";
+    }
+
+    os << ": ";
+
     if (synth_functions_state->is_fiber_evaluation) {
       os << "Unit";
     } else {
@@ -931,27 +941,29 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
     nesting_level++;
 
     // don't cache if we are in the loop.
+    if (s->loop_required) {
+      os << indent() << "if (!" <<  LOOP_VAR << ") {\n";
+      nesting_level++;
+    }
 
-    bool skip_dump_caching = !synth_functions_state->is_phylum_instance && 
-                        edgeset_kind(synth_functions_state->aug_graphs[0]->graph[synth_functions_state->source->index * synth_functions_state->aug_graphs[0]->instances.length + synth_functions_state->source->index]) != 0;
-
-    if (!skip_dump_caching) {
-      if (synth_functions_state->is_fiber_evaluation) {
-        os << indent() << "evaluated_map_" << synth_functions_state->fdecl_name
-          << ".getOrElse(node.nodeNumber, false) match {\n";
-        os << indent(nesting_level + 1) << "case true => ";
-        os << "return ()\n";
-      } else {
-        os << indent() << instance_to_attr(synth_functions_state->source)
-          << ".checkNode(node).status match {\n";
-        os << indent(nesting_level + 1) << "case Evaluation.ASSIGNED => ";
-        os << "return " << instance_to_attr(synth_functions_state->source) << ".get(node)\n";
-      }
-      
-      os << indent(nesting_level + 1) << "case _ => ()\n";
-      os << indent() << "};\n";
+    if (synth_functions_state->is_fiber_evaluation) {
+      os << indent() << "evaluated_map_" << synth_functions_state->fdecl_name
+        << ".getOrElse(node.nodeNumber, false) match {\n";
+      os << indent(nesting_level + 1) << "case true => ";
+      os << "return ()\n";
     } else {
-      os << indent() << "// skipping caching for " << synth_functions_state->source << " since it's in a circular aug graph\n";
+      os << indent() << instance_to_attr(synth_functions_state->source)
+        << ".checkNode(node).status match {\n";
+      os << indent(nesting_level + 1) << "case Evaluation.ASSIGNED => ";
+      os << "return " << instance_to_attr(synth_functions_state->source) << ".get(node)\n";
+    }
+      
+    os << indent(nesting_level + 1) << "case _ => ()\n";
+    os << indent() << "};\n";
+
+    if (s->loop_required) {
+      nesting_level--;
+      os << indent() << "}\n";
     }
 
     if (synth_functions_state->is_fiber_evaluation) {
@@ -1005,8 +1017,10 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
           os << indent() << "var prevValue" << src_idx << " = " << src_attr << ".get(" << node_get << ");\n";
           os << indent() << "var currentValue" << src_idx << " = prevValue" << src_idx << ";\n";
           os << indent() << "do {\n";
-          os << indent() << "println(f\"started a loop $node\");\n";
           nesting_level++;
+          if (s->loop_required) {
+            os << indent() << "implicit val " << LOOP_VAR << ": Boolean = true;\n";
+          }
           os << indent() << "currentValue" << src_idx << " = ";
         } else {
           os << indent();
@@ -1020,7 +1034,6 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
           os << indent() << "prevValue" << src_idx << " = currentValue" << src_idx << ";\n";
           nesting_level--;
           os << indent() << "} while (prevValue" << src_idx << " != currentValue" << src_idx << ")\n";
-          os << indent() << "println(f\"ended a loop $node\");\n";
           os << indent() << "currentValue" << src_idx << "\n";
           nesting_level--;
           os << indent() << "}\n";
@@ -1042,13 +1055,21 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
     nesting_level--;
     os << indent() << "};\n";
 
-    if (!skip_dump_caching) {
-      if (synth_functions_state->is_fiber_evaluation) {
+    if (s->loop_required) {
+      os << indent() << "if (" << LOOP_VAR << ") {\n";
+      nesting_level++;
+    }
+
+    if (synth_functions_state->is_fiber_evaluation) {
         os << indent() << "evaluated_map_" << synth_functions_state->fdecl_name << ".update(node.nodeNumber, true);\n";
-      } else {
-        os << indent() << instance_to_attr(synth_functions_state->source) << ".assign(node, result);\n";
-        os << indent() << instance_to_attr(synth_functions_state->source) << ".get(node);\n";
-      }
+    } else {
+      os << indent() << instance_to_attr(synth_functions_state->source) << ".assign(node, result);\n";
+      os << indent() << instance_to_attr(synth_functions_state->source) << ".get(node);\n";
+    }
+
+    if (s->loop_required) {
+      nesting_level--;
+      os << indent() << "}\n";
     }
 
     if (!synth_functions_state->is_fiber_evaluation) {
@@ -1116,6 +1137,10 @@ class SynthScc : public Implementation {
     ++nesting_level;
 
     PHY_GRAPH* start_phy_graph = summary_graph_for(s, s->start_phylum);
+
+    if (s->loop_required) {
+      os << indent() << "implicit val " << LOOP_VAR << ": Boolean = false;\n";
+    }
     os << indent() << "for (root <- t_" << decl_name(s->start_phylum) << ".nodes) {\n";
     ++nesting_level;
     int i;
