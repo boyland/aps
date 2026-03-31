@@ -1,0 +1,34 @@
+with "tiny";
+
+module TINY_COLL_COND[T :: var TINY[]] extends T
+begin
+  attribute Wood.depth : Integer;
+  collection attribute Wood.sum : Integer :> 0, (+);
+
+  pragma inherited(depth);
+  pragma synthesized(sum);
+
+  function isEven(n : Integer) : Boolean := (n / 2) * 2 = n;
+  
+  match ?l=leaf(?x) begin
+    if l.depth > 2 then
+      l.sum :> x;
+    endif;
+  end;
+  
+  match ?b=branch(?x,?y) begin
+    if b.depth > 3 then
+      b.sum :> x.sum;
+    endif;
+    if isEven(b.depth) then
+      b.sum :> y.sum;
+    endif;
+    x.depth := b.depth + 1;
+    y.depth := b.depth + 1;
+  end;
+
+  match ?p=root(?b) begin
+    b.depth := 1;
+  end;
+
+end;
