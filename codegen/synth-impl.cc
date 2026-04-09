@@ -28,7 +28,6 @@ extern "C" {
 #endif
 
 static const string LOOP_VAR = "isInsideFixedPoint";
-static const string PREV_LOOP_VAR = "prevIsInsideFixedPoint";
 
 // visit procedures are called:
 // visit_n_m
@@ -314,6 +313,21 @@ static bool instance_is_inherited(INSTANCE* instance) {
 
 static bool instance_is_pure_shared_info(INSTANCE* instance) {
   return instance->fibered_attr.fiber == NULL && ATTR_DECL_IS_SHARED_INFO(instance->fibered_attr.attr);
+}
+
+static bool instance_has_circular_dependency(AUG_GRAPH* aug_graph, INSTANCE* instance) {
+  int n = aug_graph->instances.length;
+  int i;
+  for (i = 0; i < n; i++) {
+    INSTANCE* other_instance = &aug_graph->instances.array[i];
+    if (edgeset_kind(aug_graph->graph[other_instance->index * n + instance->index])) {
+      if (edgeset_kind(aug_graph->graph[other_instance->index * n + other_instance->index])) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 static std::vector<INSTANCE*> collect_phylum_graph_attr_dependencies(PHY_GRAPH* phylum_graph,
@@ -1005,8 +1019,28 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
       print_instance(synth_functions_state->source, stdout);
       printf("\n");
 
-      bool is_circular = edgeset_kind(aug_graph->graph[aug_graph_instance->index * n + aug_graph_instance->index]) != 0;
-      bool dump_fixed_point_loop = is_circular && !instance_is_pure_shared_info(synth_functions_state->source);
+      bool depends_on_itself = edgeset_kind(aug_graph->graph[aug_graph_instance->index * n + aug_graph_instance->index]) != 0;
+      bool declared_is_circular = decl_is_circular(aug_graph_instance->fibered_attr.attr);
+      bool dependency_is_circular = instance_has_circular_dependency(aug_graph, aug_graph_instance);
+
+      if (depends_on_itself && !declared_is_circular) {
+        printf("Warning: instance depends on itself but its declaration is not marked as circular. Instance: ");
+        print_instance(aug_graph_instance, stdout);
+        printf("\n");
+      } else if (!depends_on_itself && declared_is_circular) {
+        printf("Warning: instance is marked as circular but it does not have circular dependency. Instance: ");
+        print_instance(aug_graph_instance, stdout);
+        printf("\n");
+      }
+
+      if (dependency_is_circular && !declared_is_circular) {
+        printf("Warning: instance has circular dependency but its declaration is not marked as circular. Instance: ");
+        print_instance(aug_graph_instance, stdout);
+        printf("\n");
+        os << indent() << "// Warning: instance has circular dependency but its declaration is not marked as circular\n";
+      }
+      
+      bool dump_fixed_point_loop = (declared_is_circular || dependency_is_circular) && !instance_is_pure_shared_info(synth_functions_state->source);
       string node_get = ATTR_DECL_IS_SHARED_INFO(synth_functions_state->source->fibered_attr.attr) ? "" : "node";
       string node_assign = ATTR_DECL_IS_SHARED_INFO(synth_functions_state->source->fibered_attr.attr) ? "" : "node, ";
 
@@ -1033,7 +1067,7 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
           os << indent() << src_attr << ".assign(" << node_assign << "currentValue" << src_idx << ");\n";
           os << indent() << "prevValue" << src_idx << " = currentValue" << src_idx << ";\n";
           nesting_level--;
-          os << indent() << "} while (prevValue" << src_idx << " != currentValue" << src_idx << ")\n";
+          os << indent() << "} while (prevValue" << src_idx << " != currentValue" << src_idx << " && !isInsideFixedPoint)\n";
           os << indent() << "currentValue" << src_idx << "\n";
           nesting_level--;
           os << indent() << "}\n";
@@ -1055,21 +1089,11 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
     nesting_level--;
     os << indent() << "};\n";
 
-    if (s->loop_required) {
-      os << indent() << "if (" << LOOP_VAR << ") {\n";
-      nesting_level++;
-    }
-
     if (synth_functions_state->is_fiber_evaluation) {
         os << indent() << "evaluated_map_" << synth_functions_state->fdecl_name << ".update(node.nodeNumber, true);\n";
     } else {
       os << indent() << instance_to_attr(synth_functions_state->source) << ".assign(node, result);\n";
       os << indent() << instance_to_attr(synth_functions_state->source) << ".get(node);\n";
-    }
-
-    if (s->loop_required) {
-      nesting_level--;
-      os << indent() << "}\n";
     }
 
     if (!synth_functions_state->is_fiber_evaluation) {
@@ -1138,9 +1162,6 @@ class SynthScc : public Implementation {
 
     PHY_GRAPH* start_phy_graph = summary_graph_for(s, s->start_phylum);
 
-    if (s->loop_required) {
-      os << indent() << "implicit val " << LOOP_VAR << ": Boolean = false;\n";
-    }
     os << indent() << "for (root <- t_" << decl_name(s->start_phylum) << ".nodes) {\n";
     ++nesting_level;
     int i;
@@ -1150,9 +1171,16 @@ class SynthScc : public Implementation {
       if (!instance_is_synthesized(in))
         continue;
 
+      bool is_circular = start_phy_graph->mingraph[in->index * start_phy_graph->instances.length + in->index] != 0;
+
       os << indent() << "eval_"
          << instance_to_string_with_nodetype(s->start_phylum, &start_phy_graph->instances.array[i])
-         << "(root);\n";
+         << "(root)";
+
+      if (s->loop_required) {
+        os << "(" << LOOP_VAR << " = " << (is_circular ? "true" : "false") << ")";
+      }
+      os << ";\n";
     }
     --nesting_level;
     os << indent() << "}\n";
@@ -1703,7 +1731,7 @@ virtual void dump_synth_instance(INSTANCE* instance, ostream& o) override {
   bool is_available = is_match_formal || is_inherited;
 
   if (is_circular && already_dumped && !is_available) {
-    o << "/* circular dependency detected for " << instance << ", dumping as attribute access */";
+    o << "/* circular dependency detected for " << instance << ", dumping as attribute access */ ";
 
     o << instance_to_attr(instance) << ".get(";
     if (instance->node == NULL) {
@@ -1712,7 +1740,7 @@ virtual void dump_synth_instance(INSTANCE* instance, ostream& o) override {
       o << "v_" << decl_name(instance->node);
     }
   
-    o << ")";
+    o << ")\n";
     return;
   } else if (is_match_formal) {
     o << "v_" << instance_to_string(instance, false, current_synth_functions_state->is_phylum_instance);
