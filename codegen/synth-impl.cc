@@ -1010,6 +1010,10 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
       // that have nothing to do with this instance don't appear in linearization
       current_scope_block = linearize_block(aug_graph, aug_graph_instance);
 
+      if (include_comments) {
+        print_linearized_block(current_scope_block);
+      }
+
       if (synth_functions_state->is_fiber_evaluation) {
         FiberDependencyDumper::dump(aug_graph, aug_graph_instance, os);
       }
