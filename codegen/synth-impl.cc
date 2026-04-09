@@ -66,33 +66,27 @@ BlockItem* current_scope_block;
 vector<BlockItem*> dumped_conditional_block_items;
 vector<INSTANCE*> dumped_instances;
 
-// Given a block, it prints it linearized schedule.
-static void print_linearized_block(BlockItem* block) {
+// Given a block, it prints its linearized schedule as comments in the output stream.
+static void print_linearized_block(BlockItem* block, ostream& os) {
   if (block != NULL) {
-    printf("%s", indent().c_str());
-    print_instance(block->instance, stdout);
-    printf(" %d", block->instance->index);
-    printf("\n");
+    os << indent() << block->instance << "\n";
     if (block->key == KEY_BLOCK_ITEM_CONDITION) {
       struct block_item_condition* cond = (struct block_item_condition*)block;
 
       if (cond->prev != NULL && cond->prev->key != KEY_BLOCK_ITEM_CONDITION) {
-        printf("%s", indent().c_str());
-        print_instance(cond->prev->instance, stdout);
-        printf(" %d", cond->prev->instance->index);
-        printf("\n");
+        os << indent() << cond->prev->instance << "\n";
       }
 
-      printf("%spositive\n", indent().c_str());
+      os << indent() << "IF\n";
       nesting_level++;
-      print_linearized_block(cond->next_positive);
+      print_linearized_block(cond->next_positive, os);
       nesting_level--;
-      printf("%snegative\n", indent().c_str());
+      os << indent() << "ELSE\n";
       nesting_level++;
-      print_linearized_block(cond->next_negative);
+      print_linearized_block(cond->next_negative, os);
       nesting_level--;
     } else {
-      print_linearized_block(((struct block_item_instance*)block)->next);
+      print_linearized_block(((struct block_item_instance*)block)->next, os);
     }
   }
 }
@@ -168,25 +162,18 @@ static BlockItem* linearize_block_helper(AUG_GRAPH* aug_graph,
     for (j = 0; j < n && ready_to_schedule; j++) {
       INSTANCE* other_instance = &aug_graph->instances.array[j];
 
-      // printf("checking dependency: ");
-      // print_instance(other_instance, stdout);
-      // printf("\n");
-
       // already scheduled dependency
       if (scheduled[j]) {
-        // printf("already scheduled\n");
         continue;
       }
 
       // impossible merge condition, ignore this dependency
       if (MERGED_CONDITION_IS_IMPOSSIBLE(instance_condition(instance), instance_condition(other_instance))) {
-        // printf("impossible merge condition\n");
         continue;
       }
 
       // not a direct dependency
       if (!(edgeset_kind(aug_graph->graph[j * n + i]) & DEPENDENCY_MAYBE_DIRECT)) {
-        // printf("not a direct dependency\n");
         continue;
       }
 
@@ -313,21 +300,6 @@ static bool instance_is_inherited(INSTANCE* instance) {
 
 static bool instance_is_pure_shared_info(INSTANCE* instance) {
   return instance->fibered_attr.fiber == NULL && ATTR_DECL_IS_SHARED_INFO(instance->fibered_attr.attr);
-}
-
-static bool instance_has_circular_dependency(AUG_GRAPH* aug_graph, INSTANCE* instance) {
-  int n = aug_graph->instances.length;
-  int i;
-  for (i = 0; i < n; i++) {
-    INSTANCE* other_instance = &aug_graph->instances.array[i];
-    if (edgeset_kind(aug_graph->graph[other_instance->index * n + instance->index])) {
-      if (edgeset_kind(aug_graph->graph[other_instance->index * n + other_instance->index])) {
-        return true;
-      }
-    }
-  }
-
-  return false;
 }
 
 static std::vector<INSTANCE*> collect_phylum_graph_attr_dependencies(PHY_GRAPH* phylum_graph,
@@ -562,9 +534,6 @@ static std::vector<SYNTH_FUNCTION_STATE*> build_synth_functions_state(STATE* s) 
       bool is_shared_info = ATTR_DECL_IS_SHARED_INFO(in->fibered_attr.attr);
 
       if (!instance_is_synthesized(in)) {
-        printf("Skipping instance ");
-        print_instance(in, stdout);
-        printf("\n");
         continue;
       }
 
@@ -663,10 +632,6 @@ class FiberDependencyDumper {
 public:
   static void dump(AUG_GRAPH* aug_graph, INSTANCE* sink, ostream& os) {
 
-    printf("Fiber dependencies for ");
-    print_instance(sink, stdout);
-    printf("\n");
-
     int i, j;
     int n = aug_graph->instances.length;
 
@@ -721,16 +686,21 @@ public:
 
     SCC_COMPONENTS* components = scc_graph_components(&scc_graph);
 
-    for (i = 0; i < components->length; i++) {
-      SCC_COMPONENT* component = components->array[i];
-
-      printf("Component %d:\n", i);
-      for (j = 0; j < component->length; j++) {
-        INSTANCE* in = (INSTANCE*)component->array[j];
-        printf("  ");
-        print_instance(in, stdout);
-        printf("\n");
+    if (include_comments) {
+      os << indent() << "/* Fiber dependency SCC components:\n";
+      nesting_level++;
+      for (i = 0; i < components->length; i++) {
+        SCC_COMPONENT* component = components->array[i];
+        os << indent() << "Component " << i << ":\n";
+        nesting_level++;
+        for (j = 0; j < component->length; j++) {
+          INSTANCE* in = (INSTANCE*)component->array[j];
+          os << indent() << in << "\n";
+        }
+        nesting_level--;
       }
+      nesting_level--;
+      os << indent() << "*/\n";
     }
 
     dump_scc_helper(aug_graph, components, scheduled, os);
@@ -744,14 +714,6 @@ private:
     int i;
     for (i = 0; i < component_count; i++) {
       SCC_COMPONENT* component = find_next_ready_component(aug_graph, components, scheduled);
-
-      printf("\nScheduling component:\n");
-      for (int j = 0; j < component->length; j++) {
-        INSTANCE* in = (INSTANCE*)component->array[j];
-        printf("  ");
-        print_instance(in, stdout);
-        printf("\n");
-      }
 
       dump_scc_helper_dump(aug_graph, component, scheduled, os);
     }
@@ -768,7 +730,6 @@ private:
     int i;
 
     if (already_scheduled(aug_graph, component, scheduled)) {
-      printf("Component already scheduled\n");
       return;
     }
 
@@ -800,10 +761,6 @@ private:
       if (!dependency_ready) {
         continue;
       }
-      
-      printf("Scheduling instance ");
-      print_instance(in, stdout);
-      printf("\n");
 
       scheduled[in->index] = true;
       os << indent();
@@ -1011,17 +968,22 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
       current_scope_block = linearize_block(aug_graph, aug_graph_instance);
 
       if (include_comments) {
-        print_linearized_block(current_scope_block);
+        os << indent() << "/* Linearized schedule:\n";
+        nesting_level++;
+        print_linearized_block(current_scope_block, os);
+        nesting_level--;
+        os << indent() << "*/\n";
       }
 
       if (synth_functions_state->is_fiber_evaluation) {
+        if (include_comments) {
+          os << "\n";
+        }
         FiberDependencyDumper::dump(aug_graph, aug_graph_instance, os);
       }
 
       int src_idx = synth_functions_state->source->index;
       string src_attr = instance_to_attr(synth_functions_state->source);
-      print_instance(synth_functions_state->source, stdout);
-      printf("\n");
 
       bool declared_is_circular = decl_is_circular(aug_graph_instance->fibered_attr.attr);
 
