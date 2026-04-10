@@ -28,6 +28,7 @@ extern "C" {
 #endif
 
 static const string LOOP_VAR = "isInsideFixedPoint";
+static const string PREV_LOOP_VAR = "prevIsInsideFixedPoint";
 
 // visit procedures are called:
 // visit_n_m
@@ -986,13 +987,47 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
       string src_attr = instance_to_attr(synth_functions_state->source);
 
       bool declared_is_circular = decl_is_circular(aug_graph_instance->fibered_attr.attr);
+      bool depends_on_itself = edgeset_kind(aug_graph->graph[src_idx * n + src_idx]) != 0;
+
+      if (!declared_is_circular && depends_on_itself) {
+        aps_warning(aug_graph_instance->node, "Instance %s depends on itself but is not declared circular", instance_to_string(aug_graph_instance));
+      }
+
+      bool dump_fixed_point_loop = declared_is_circular && !instance_is_pure_shared_info(synth_functions_state->source);
+      string node_get = ATTR_DECL_IS_SHARED_INFO(synth_functions_state->source->fibered_attr.attr) ? "" : "node";
+      string node_assign = ATTR_DECL_IS_SHARED_INFO(synth_functions_state->source->fibered_attr.attr) ? "" : "node, ";
 
       if (!synth_functions_state->is_fiber_evaluation) {
-        os << indent();
+        if (dump_fixed_point_loop) {
+          os << indent() << "{\n";
+          nesting_level++;
+          os << indent() << "val " << PREV_LOOP_VAR << src_idx << " = " << LOOP_VAR << ";\n";
+          os << indent() << "var prevValue" << src_idx << " = " << src_attr << ".get(" << node_get << ");\n";
+          os << indent() << "var currentValue" << src_idx << " = prevValue" << src_idx << ";\n";
+          os << indent() << "do {\n";
+          nesting_level++;
+          if (s->loop_required) {
+            os << indent() << "implicit val " << LOOP_VAR << ": Boolean = true;\n";
+          }
+          os << indent() << "prevValue" << src_idx << " = currentValue" << src_idx << ";\n";
+          os << indent() << "currentValue" << src_idx << " = ";
+        } else {
+          os << indent();
+        }
 
         impl->dump_synth_instance(aug_graph_instance, os);
 
-        os << "\n";
+        if (dump_fixed_point_loop) {
+          os << ";\n";
+          os << indent() << src_attr << ".assign(" << node_assign << "currentValue" << src_idx << ");\n";
+          nesting_level--;
+          os << indent() << "} while (prevValue" << src_idx << " != currentValue" << src_idx << " && !" << PREV_LOOP_VAR << src_idx << ")\n";
+          os << indent() << "currentValue" << src_idx << "\n";
+          nesting_level--;
+          os << indent() << "}\n";
+        } else {
+          os << "\n";
+        }
       }
 
       current_blocks.clear();
@@ -1146,21 +1181,6 @@ void implement_value_use(Declaration vd, ostream& os) {
     Type ty = value_decl_type(vd);
     Declaration ctype_decl = canonical_type_decl(canonical_type(ty));
     string target_name = instance_to_string_with_nodetype(ctype_decl, instance);
-    bool target_is_circular = decl_is_circular(vd);
-
-    if (target_is_circular && current_state->loop_required) {
-      os << "{\n";
-      nesting_level++;
-      os << indent() << "var prevValue" << instance_index << " = " << instance_to_attr(instance) << ".get(node);\n";
-      os << indent() << "var currentValue" << instance_index << " = prevValue" << instance_index << ";\n";
-      os << indent() << "do {\n";
-      nesting_level++;
-      if (current_state->loop_required) {
-        os << indent() << "implicit val " << LOOP_VAR << ": Boolean = true;\n";
-      }
-      os << indent() << "prevValue" << instance_index << " = currentValue" << instance_index << ";\n";
-      os << indent() << "currentValue" << instance_index << " = ";
-    }
 
     os << "eval_" << target_name << "(\n";
     int saved_nesting = nesting_level;
@@ -1187,15 +1207,6 @@ void implement_value_use(Declaration vd, ostream& os) {
 
     nesting_level = saved_nesting;
     os << "\n" << indent() << ")";
-
-    if (target_is_circular && current_state->loop_required) {
-      os << ";\n";
-      nesting_level--;
-      os << indent() << "} while (prevValue" << instance_index << " != currentValue" << instance_index << ")\n";
-      os << indent() << "currentValue" << instance_index << "\n";
-      nesting_level--;
-      os << indent() << "}";
-    }
   } else if (flags & ATTRIBUTE_DECL_FLAG) {
     if (ATTR_DECL_IS_INH(vd)) {
       os << "v_" << decl_name(vd);
@@ -1717,25 +1728,6 @@ virtual void dump_synth_instance(INSTANCE* instance, ostream& o) override {
       for (auto it = synth_functions_states.begin(); it != synth_functions_states.end(); it++) {
         SYNTH_FUNCTION_STATE* synth_function_state = *it;
         if (fibered_attr_equal(&synth_function_state->source->fibered_attr, &instance->fibered_attr)) {
-          // Check if the target attribute depends on itself (circular)
-          bool target_is_circular = decl_is_circular(instance->fibered_attr.attr);
-          string target_attr = instance_to_attr(instance);
-
-          if (target_is_circular && current_state->loop_required) {
-            // Wrap in a fixed-point loop block expression
-            o << "{\n";
-            nesting_level++;
-            o << indent() << "var prevValue" << instance->index << " = " << target_attr << ".get(v_" << decl_name(node) << ");\n";
-            o << indent() << "var currentValue" << instance->index << " = prevValue" << instance->index << ";\n";
-            o << indent() << "do {\n";
-            nesting_level++;
-            if (current_state->loop_required) {
-              o << indent() << "implicit val " << LOOP_VAR << ": Boolean = true;\n";
-            }
-            o << indent() << "prevValue" << instance->index << " = currentValue" << instance->index << ";\n";
-            o << indent() << "currentValue" << instance->index << " = ";
-          }
-
           o << "eval_" << synth_function_state->fdecl_name << "(\n";
           int saved_nesting = nesting_level;
           nesting_level = std::max(nesting_level + 2, 2);
@@ -1760,15 +1752,6 @@ virtual void dump_synth_instance(INSTANCE* instance, ostream& o) override {
           nesting_level = saved_nesting;
 
           o << "\n" << indent() << ")";
-
-          if (target_is_circular && current_state->loop_required) {
-            o << ";\n";
-            nesting_level--;
-            o << indent() << "} while (prevValue" << instance->index << " != currentValue" << instance->index << ")\n";
-            o << indent() << "currentValue" << instance->index << "\n";
-            nesting_level--;
-            o << indent() << "}";
-          }
           return;
         }
       }
