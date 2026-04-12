@@ -66,6 +66,7 @@ vector<Block> current_blocks;
 BlockItem* current_scope_block;
 vector<BlockItem*> dumped_conditional_block_items;
 vector<INSTANCE*> dumped_instances;
+static bool tracking_fiber_convergence = false;
 
 // Given a block, it prints its linearized schedule as comments in the output stream.
 static void print_linearized_block(BlockItem* block, ostream& os) {
@@ -854,6 +855,7 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
   int aug_graph_count = s->match_rules.length;
   current_state = s;
   synth_functions_states = build_synth_functions_state(s);
+  bool needs_fixed_point = s->loop_required;
 
   for (auto state_it = synth_functions_states.begin(); state_it != synth_functions_states.end(); state_it++) {
     SYNTH_FUNCTION_STATE* synth_functions_state = *state_it;
@@ -898,8 +900,8 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
 
     os << ")";
 
-    if (s->loop_required) {
-      os << "(implicit " << LOOP_VAR << ": Boolean)";
+    if (needs_fixed_point) {
+      os << "(implicit " << LOOP_VAR << ": Boolean, changed: AtomicBoolean)";
     }
 
     os << ": ";
@@ -913,7 +915,7 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
     nesting_level++;
 
     // don't cache if we are in the loop.
-    if (s->loop_required) {
+    if (needs_fixed_point) {
       os << indent() << "if (!" <<  LOOP_VAR << ") {\n";
       nesting_level++;
     }
@@ -933,7 +935,7 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
     os << indent(nesting_level + 1) << "case _ => ()\n";
     os << indent() << "};\n";
 
-    if (s->loop_required) {
+    if (needs_fixed_point) {
       nesting_level--;
       os << indent() << "}\n";
     }
@@ -976,13 +978,6 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
         os << indent() << "*/\n";
       }
 
-      if (synth_functions_state->is_fiber_evaluation) {
-        if (include_comments) {
-          os << "\n";
-        }
-        FiberDependencyDumper::dump(aug_graph, aug_graph_instance, os);
-      }
-
       int src_idx = synth_functions_state->source->index;
       string src_attr = instance_to_attr(synth_functions_state->source);
 
@@ -997,37 +992,55 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
       string node_get = ATTR_DECL_IS_SHARED_INFO(synth_functions_state->source->fibered_attr.attr) ? "" : "node";
       string node_assign = ATTR_DECL_IS_SHARED_INFO(synth_functions_state->source->fibered_attr.attr) ? "" : "node, ";
 
-      if (!synth_functions_state->is_fiber_evaluation) {
-        if (dump_fixed_point_loop) {
-          os << indent() << "{\n";
-          nesting_level++;
-          os << indent() << "val " << PREV_LOOP_VAR << src_idx << " = " << LOOP_VAR << ";\n";
-          os << indent() << "var prevValue" << src_idx << " = " << src_attr << ".get(" << node_get << ");\n";
-          os << indent() << "var currentValue" << src_idx << " = prevValue" << src_idx << ";\n";
-          os << indent() << "do {\n";
-          nesting_level++;
-          if (s->loop_required) {
-            os << indent() << "implicit val " << LOOP_VAR << ": Boolean = true;\n";
-          }
-          os << indent() << "prevValue" << src_idx << " = currentValue" << src_idx << ";\n";
-          os << indent() << "currentValue" << src_idx << " = ";
-        } else {
-          os << indent();
+      // Open fixed-point loop using shared changed flag for convergence tracking
+      if (dump_fixed_point_loop) {
+        os << indent() << "{\n";
+        nesting_level++;
+        os << indent() << "val " << PREV_LOOP_VAR << src_idx << " = " << LOOP_VAR << ";\n";
+        os << indent() << "val prevChanged" << src_idx << " = changed;\n";
+        os << indent() << "val newChanged" << src_idx << " = new AtomicBoolean(false);\n";
+        os << indent() << "do {\n";
+        nesting_level++;
+        os << indent() << "newChanged" << src_idx << ".set(false);\n";
+        if (synth_functions_state->is_fiber_evaluation) {
+          tracking_fiber_convergence = true;
         }
+        os << indent() << "implicit val " << LOOP_VAR << ": Boolean = true;\n";
+        os << indent() << "implicit val changed: AtomicBoolean = newChanged" << src_idx << ";\n";
+      }
 
-        impl->dump_synth_instance(aug_graph_instance, os);
-
-        if (dump_fixed_point_loop) {
-          os << ";\n";
-          os << indent() << src_attr << ".assign(" << node_assign << "currentValue" << src_idx << ");\n";
-          nesting_level--;
-          os << indent() << "} while (prevValue" << src_idx << " != currentValue" << src_idx << " && !" << PREV_LOOP_VAR << src_idx << ")\n";
-          os << indent() << "currentValue" << src_idx << "\n";
-          nesting_level--;
-          os << indent() << "}\n";
-        } else {
+      // Fiber dependencies (inside loop when looping)
+      if (synth_functions_state->is_fiber_evaluation) {
+        if (include_comments && !dump_fixed_point_loop) {
           os << "\n";
         }
+        FiberDependencyDumper::dump(aug_graph, aug_graph_instance, os);
+      }
+
+      // Non-fiber instance computation
+      if (!synth_functions_state->is_fiber_evaluation) {
+        if (dump_fixed_point_loop) {
+          os << indent() << src_attr << ".assign(" << node_assign;
+          impl->dump_synth_instance(aug_graph_instance, os);
+          os << ", changed);\n";
+        } else {
+          os << indent();
+          impl->dump_synth_instance(aug_graph_instance, os);
+          os << "\n";
+        }
+      }
+
+      // Close fixed-point loop
+      if (dump_fixed_point_loop) {
+        tracking_fiber_convergence = false;
+        nesting_level--;
+        os << indent() << "} while (newChanged" << src_idx << ".get && !" << PREV_LOOP_VAR << src_idx << ")\n";
+        os << indent() << "prevChanged" << src_idx << ".compareAndSet(false, newChanged" << src_idx << ".get);\n";
+        if (!synth_functions_state->is_fiber_evaluation) {
+          os << indent() << src_attr << ".get(" << node_get << ")\n";
+        }
+        nesting_level--;
+        os << indent() << "}\n";
       }
 
       current_blocks.clear();
@@ -1100,6 +1113,8 @@ class SynthScc : public Implementation {
 
     dump_synth_functions(s, oss);
 
+    bool needs_fixed_point = s->original_state_dependency != 0;
+
     // Implement finish routine:
 #ifdef APS2SCALA
     os << indent() << "override def finish() : Unit = {\n";
@@ -1116,8 +1131,9 @@ class SynthScc : public Implementation {
 
     PHY_GRAPH* start_phy_graph = summary_graph_for(s, s->start_phylum);
 
-    if (s->loop_required) {
+    if (needs_fixed_point) {
       os << indent() << "implicit val " << LOOP_VAR << ": Boolean = false;\n";
+      os << indent() << "implicit val changed = new AtomicBoolean(false);\n";
     }
     os << indent() << "for (root <- t_" << decl_name(s->start_phylum) << ".nodes) {\n";
     ++nesting_level;
@@ -1128,28 +1144,8 @@ class SynthScc : public Implementation {
       if (!instance_is_synthesized(in))
         continue;
 
-      bool target_is_circular = decl_is_circular(in->fibered_attr.attr);
       string eval_name = instance_to_string_with_nodetype(s->start_phylum, &start_phy_graph->instances.array[i]);
-
-      if (target_is_circular && s->loop_required) {
-        os << indent() << "{\n";
-        ++nesting_level;
-        os << indent() << "var prevValue" << in->index << " = " << instance_to_attr(in) << ".get(root);\n";
-        os << indent() << "var currentValue" << in->index << " = prevValue" << in->index << ";\n";
-        os << indent() << "do {\n";
-        ++nesting_level;
-        if (s->loop_required) {
-          os << indent() << "implicit val " << LOOP_VAR << ": Boolean = true;\n";
-        }
-        os << indent() << "prevValue" << in->index << " = currentValue" << in->index << ";\n";
-        os << indent() << "currentValue" << in->index << " = eval_" << eval_name << "(root);\n";
-        --nesting_level;
-        os << indent() << "} while (prevValue" << in->index << " != currentValue" << in->index << ")\n";
-        --nesting_level;
-        os << indent() << "}\n";
-      } else {
-        os << indent() << "eval_" << eval_name << "(root);\n";
-      }
+      os << indent() << "eval_" << eval_name << "(root);\n";
     }
     --nesting_level;
     os << indent() << "}\n";
@@ -1342,7 +1338,11 @@ void dump_assignment(INSTANCE* in, Expression rhs, ostream& o) {
           o << "assign";
         else
           o << "set";
-        o << "(" << rhs << ")";
+        o << "(" << rhs;
+        if (tracking_fiber_convergence) {
+          o << ", changed";
+        }
+        o << ")";
 #else  /* APS2SCALA */
           o << "v_" << decl_name(field) << "=";
           switch (Default_KEY(value_decl_default(field))) {
@@ -1365,7 +1365,11 @@ void dump_assignment(INSTANCE* in, Expression rhs, ostream& o) {
           o << "assign";
         else
           o << "set";
-        o << "(" << field_ref_object(lhs) << "," << rhs << ");\n";
+        o << "(" << field_ref_object(lhs) << "," << rhs;
+        if (tracking_fiber_convergence) {
+          o << ", changed";
+        }
+        o << ");\n";
         break;
       default:
         fatal_error("what sort of assignment lhs: %d", tnode_line_number(assign));
