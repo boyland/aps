@@ -1038,7 +1038,7 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
         tracking_fiber_convergence = false;
         if (include_comments) {
           os << indent() << "iterCount" << src_idx << " += 1;\n";
-          os << indent() << "println(\"fixed-point " << synth_functions_state->fdecl_name
+          os << indent() << "Debug.out(\"fixed-point " << synth_functions_state->fdecl_name
              << " node=\" + node + \" iteration=\" + iterCount" << src_idx << ");\n";
         }
         nesting_level--;
@@ -1141,7 +1141,7 @@ class SynthScc : public Implementation {
 
     if (needs_fixed_point) {
       os << indent() << "implicit val " << LOOP_VAR << ": Boolean = false;\n";
-      os << indent() << "implicit val changed = new AtomicBoolean(false);\n";
+      os << indent() << "implicit val changed: AtomicBoolean = new AtomicBoolean(false);\n";
     }
     os << indent() << "for (root <- t_" << decl_name(s->start_phylum) << ".nodes) {\n";
     ++nesting_level;
