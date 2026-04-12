@@ -1537,7 +1537,7 @@ void dump_rhs_instance_helper(AUG_GRAPH* aug_graph, BlockItem* item, INSTANCE* i
             break;
           }
 
-          o << "/* did not find any assignment for this fiber attribute " << instance << " ->" << directionStr << "<-" <<" */";
+          o << "/* did not find any assignment for this fiber attribute " << instance << " -> " << directionStr << " <-" <<" */";
         return;
       } else {
         print_instance(instance, stdout);
