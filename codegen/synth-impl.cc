@@ -986,11 +986,11 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
       int src_idx = synth_functions_state->source->index;
       string src_attr = instance_to_attr(synth_functions_state->source);
 
-      bool declared_is_circular = decl_is_circular(aug_graph_instance->fibered_attr.attr);
+      bool declared_is_circular = instance_circular(aug_graph_instance);
       bool depends_on_itself = edgeset_kind(aug_graph->graph[src_idx * n + src_idx]) != 0;
 
       if (!declared_is_circular && depends_on_itself) {
-        aps_warning(aug_graph_instance->node, "Instance %s depends on itself but is not declared circular", instance_to_string(aug_graph_instance));
+        aps_warning(aug_graph_instance->node, "Instance %s depends on itself but is not declared circular", instance_to_string(aug_graph_instance).c_str());
       }
 
       bool dump_fixed_point_loop = declared_is_circular && !instance_is_pure_shared_info(synth_functions_state->source);
