@@ -1,4 +1,5 @@
 #ifndef DUMP_H
+#include "implement.h"
 #include <iostream>
 #include <string>
 #include <vector>
