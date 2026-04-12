@@ -141,6 +141,15 @@ extern void add_edge_to_graph(INSTANCE *source,
 			      DEPENDENCY kind,
 			      AUG_GRAPH *aug_graph);
 
+/* Low level routines: use with caution */
+extern void free_edge(EDGESET old, AUG_GRAPH *aug_graph);
+extern void free_edgeset(EDGESET es, AUG_GRAPH *aug_graph);
+extern void add_edge_to_graph(INSTANCE *source,
+			      INSTANCE *sink,
+			      CONDITION *cond,
+			      DEPENDENCY kind,
+			      AUG_GRAPH *aug_graph);
+
 /* The following routines return TRUE if a change occurs. */
 extern int close_augmented_dependency_graph(AUG_GRAPH *);
 extern int close_summary_dependency_graph(PHY_GRAPH *);

@@ -18,8 +18,6 @@ extern int verbose;
 extern int debug;
 extern bool include_comments;
 
-typedef struct synth_function_state SYNTH_FUNCTION_STATE;
-
 class Implementation;
 
 extern Implementation *impl;
