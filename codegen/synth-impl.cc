@@ -999,6 +999,9 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
         os << indent() << "val " << PREV_LOOP_VAR << src_idx << " = " << LOOP_VAR << ";\n";
         os << indent() << "val prevChanged" << src_idx << " = changed;\n";
         os << indent() << "val newChanged" << src_idx << " = new AtomicBoolean(false);\n";
+        if (include_comments) {
+          os << indent() << "var iterCount" << src_idx << " = 0;\n";
+        }
         os << indent() << "do {\n";
         nesting_level++;
         os << indent() << "newChanged" << src_idx << ".set(false);\n";
@@ -1033,6 +1036,11 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
       // Close fixed-point loop
       if (dump_fixed_point_loop) {
         tracking_fiber_convergence = false;
+        if (include_comments) {
+          os << indent() << "iterCount" << src_idx << " += 1;\n";
+          os << indent() << "println(\"fixed-point " << synth_functions_state->fdecl_name
+             << " node=\" + node + \" iteration=\" + iterCount" << src_idx << ");\n";
+        }
         nesting_level--;
         os << indent() << "} while (newChanged" << src_idx << ".get && !" << PREV_LOOP_VAR << src_idx << ")\n";
         os << indent() << "prevChanged" << src_idx << ".compareAndSet(false, newChanged" << src_idx << ".get);\n";
