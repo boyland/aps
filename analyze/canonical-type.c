@@ -4,6 +4,8 @@
 #include "aps-ag.h"
 #include "jbb-alloc.h"
 
+static int BUFFER_SIZE = 1000;
+
 /**
  * Joins two canonical type
  * @param ctype_outer outer canonical type
@@ -301,7 +303,7 @@ Declaration canonical_type_decl(CanonicalType *canonical_type)
     return canonical_qual_use_type->decl;
   }
   default:
-    aps_error(canonical_type, "Failed to find the decl for CanonicalType");
+    aps_error(canonical_type, "Failed to find the decl for CanonicalType key:%d", canonical_type->key);
     return NULL;
   }
 }
@@ -726,7 +728,24 @@ static CanonicalType *canonical_type_use_use_join(struct Canonical_use_type *cty
     break;
   }
   default:
-    fatal_error("Not sure what type of canonical type it is");
+  {
+    char outer_type_to_str[BUFFER_SIZE];
+    char inner_type_to_str[BUFFER_SIZE];
+    memset(outer_type_to_str, 0, sizeof(outer_type_to_str)); // Ensure null-termination
+    memset(inner_type_to_str, 0, sizeof(inner_type_to_str)); // Ensure null-termination
+    FILE *f;
+
+    f = fmemopen(outer_type_to_str, sizeof(outer_type_to_str), "w");
+    print_canonical_type(ctype_outer, f);
+    fclose(f);
+   
+    f = fmemopen(inner_type_to_str, sizeof(inner_type_to_str), "w");
+    print_canonical_type(ctype_inner, f);
+    fclose(f);
+
+    aps_warning(NULL, "Not sure how to handle this type of canonical type while joining use with use %s and %s", outer_type_to_str, inner_type_to_str);
+    return (CanonicalType *)ctype_inner;
+  }
   }
 
   Declaration decl = ctype_inner->decl;
