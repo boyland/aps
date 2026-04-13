@@ -14,7 +14,7 @@
 "}"	{ return CLS_BRACE; }
 
 [a-z][_A-Za-z0-9]*	{ return ID(yytext); }
-[1-9][0-9]* 	{ return LITERAL(yytext); }
+0|[1-9][0-9]* 	{ return LITERAL(yytext); }
 
 [\s\r\n]  { /* ignore spaces */ }
 
