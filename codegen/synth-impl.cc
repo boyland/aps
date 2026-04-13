@@ -646,6 +646,10 @@ public:
         continue;
       }
 
+      if (in->index == sink->index) {
+        continue;
+      }
+
       if (edgeset_kind(aug_graph->graph[in->index * n + sink->index])) {
         if (in->fibered_attr.fiber != NULL) {
           if (instance_is_synthesized(in) || instance_is_local(in)) {
@@ -1018,6 +1022,11 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
           os << "\n";
         }
         FiberDependencyDumper::dump(aug_graph, aug_graph_instance, os);
+        os << indent();
+        impl->dump_synth_instance(aug_graph_instance, os);
+        os << "\n";
+        dumped_conditional_block_items.clear();
+        dumped_instances.clear();
       }
 
       // Non-fiber instance computation
