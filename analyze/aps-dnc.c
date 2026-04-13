@@ -14,6 +14,9 @@ int analysis_debug = 0;
 
 
 /*** FUNCTIONS FOR INSTANCES */
+BOOL instance_equal(INSTANCE *in1, INSTANCE *in2) {
+  return in1->node == in2->node && fibered_attr_equal(&in1->fibered_attr, &in2->fibered_attr);
+}
 
 BOOL fibered_attr_equal(FIBERED_ATTRIBUTE *fa1, FIBERED_ATTRIBUTE *fa2) {
   return fa1->attr == fa2->attr && fa1->fiber == fa2->fiber;
@@ -677,14 +680,6 @@ static int assign_instances(INSTANCE *array, int index,
   return index;
 }
 
-static Type infer_some_value_decl_type(Declaration d) {
-  if (Declaration_KEY(d) == KEYnormal_formal) {
-    return infer_formal_type(d);
-  } else {
-    return some_value_decl_type(d);
-  }
-}
-
 /** Count and then assign instances.
  * Called in two cases: <ul>
  * <li> one to set instance indices and count instances
@@ -881,6 +876,7 @@ static void *get_instances(void *vaug_graph, void *node) {
 			      nil_Expressions());
 	  Expression_info(e)->funcall_proxy = proxy;
 	  Declaration_info(proxy)->instance_index = index;
+	  Declaration_info(proxy)->proxy_fdecl = fdecl;
 	  Declaration_info(proxy)->node_phy_graph = 
 	    summary_graph_for(s,fdecl);
 	  Declaration_info(proxy)->decl_flags |= DECL_RHS_FLAG;
