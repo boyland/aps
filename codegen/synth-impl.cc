@@ -933,7 +933,19 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
       os << indent() << instance_to_attr(synth_functions_state->source)
         << ".checkNode(node).status match {\n";
       os << indent(nesting_level + 1) << "case Evaluation.ASSIGNED => ";
+      if (include_comments) {
+        os << "{\n";
+        nesting_level++;
+        os << indent(nesting_level + 1) << "Debug.out(\"cache hit for \" + node + \" with value \" + " << instance_to_attr(synth_functions_state->source) << ".get(node));\n";
+        os << indent(nesting_level + 1);
+      }
+
       os << "return " << instance_to_attr(synth_functions_state->source) << ".get(node)\n";
+
+      if (include_comments) {
+        nesting_level--;
+        os << indent(nesting_level + 1) << "}\n";
+      }
     }
       
     os << indent(nesting_level + 1) << "case _ => ()\n";
