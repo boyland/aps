@@ -244,6 +244,8 @@ class Evaluation[T_P, T_V](val anchor : T_P, val name : String)
 	pending.pop();
 	if (inCycle != null) {
 	  evaluateCycle;
+	} else if (pending.exists(_.inCycle != null)) {
+	  status = UNEVALUATED
 	} else {
 	  status = EVALUATED;
 	}
