@@ -66,12 +66,28 @@ CanonicalType *canonical_type_join(CanonicalType *ctype_outer, CanonicalType *ct
 CanonicalType *new_canonical_type_use(Declaration decl);
 
 /**
- * Compares two canonical types
- * @param ctype1 Canonical type A
- * @param ctype2 Canonical type B
+ * Compares two canonical types with Result-decl substitution.
+ * The inherited module's Result maps to the implementing module's Result.
+ * @param ctype1 Canonical type to compare
+ * @param ctype2 Canonical type to compare against
+ * @param ctype1_mdecl_result Result decl of ctype1's enclosing module
+ * @param ctype2_mdecl_result Result decl of ctype2's enclosing module
  * @return Integer value representing comparison of two canonical types
  */
-int canonical_type_compare(CanonicalType *ctype1, CanonicalType *ctype2);
+int canonical_type_compare2(CanonicalType *ctype1, CanonicalType *ctype2,
+                            Declaration ctype1_mdecl_result,
+                            Declaration ctype2_mdecl_result);
+
+/**
+ * Compares two canonical types
+ * @param ctype1 Canonical type to compare
+ * @param ctype2 Canonical type to compare against
+ * @return Integer value representing comparison of two canonical types
+ */
+static inline int canonical_type_compare(CanonicalType *ctype1, CanonicalType *ctype2)
+{
+  return canonical_type_compare2(ctype1, ctype2, NULL, NULL);
+}
 
 /**
  * Given a canonical type, it returns a Declaration

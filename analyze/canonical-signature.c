@@ -10,8 +10,6 @@ static CanonicalSignatureSet from_declaration(Declaration decl);
 static CanonicalSignatureSet substitute_canonical_signature_set_actuals(CanonicalType* source, CanonicalSignatureSet sig_set);
 static int canonical_signature_compare(CanonicalSignature *sig1, CanonicalSignature *sig2);
 
-static Declaration module_TYPE;
-static Declaration module_PHYLUM;
 static bool initialized = false;
 
 /**
@@ -352,9 +350,9 @@ static int canonical_signature_compare(CanonicalSignature *sig1, CanonicalSignat
     return sig1->is_var - sig2->is_var;
   }
 
-  if (tnode_line_number(sig1->source_class) != tnode_line_number(sig2->source_class))
+  if (sig1->source_class != sig2->source_class)
   {
-    return tnode_line_number(sig1->source_class) - tnode_line_number(sig2->source_class);
+    return (sig1->source_class > sig2->source_class) ? 1 : -1;
   }
 
   if (sig1->num_actuals != sig2->num_actuals)
