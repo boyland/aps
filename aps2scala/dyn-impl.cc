@@ -204,6 +204,17 @@ static void dump_context_close(void *c, ostream& os) {
 static void pop_attr_context(ostream& os)
 {
   --attr_context_depth;
+  if (attr_context_started == attr_context_depth) {
+    void *c = attr_context[attr_context_depth];
+    if (ABSTRACT_APS_tnode_phylum(c) == KEYBlock) {
+      void *p = tnode_parent(c);
+      if (ABSTRACT_APS_tnode_phylum(p) == KEYDeclaration &&
+          Declaration_KEY((Declaration)p) == KEYcase_stmt &&
+          (Block)c == case_stmt_default((Declaration)p)) {
+        os << indent() << "case _ => {}\n";
+      }
+    }
+  }
   while (attr_context_started > attr_context_depth) {
     --attr_context_started;
     dump_context_close(attr_context[attr_context_started],os);
@@ -564,7 +575,7 @@ void implement_attributes(const vector<Declaration>& attrs,
     //  --nesting_level;
     //  oss << indent() << "}\n";
     //}
-    if (inh) {
+    if (inh && !is_col) {
       --nesting_level;
       oss << indent() << "}\n";
     }
