@@ -38,67 +38,67 @@ static void *analyze_thing(void *ignore, void *node)
         }
         d = (s->original_state_dependency = analysis_state_cycle(s));
         s->loop_required = !(d & DEPENDENCY_MAYBE_SIMPLE);
-      } else {
-        if (!(d = (s->original_state_dependency = analysis_state_cycle(s))))
+        break;
+      }
+      if (!(d = (s->original_state_dependency = analysis_state_cycle(s))))
+      {
+        // Do nothing; no cycle to remove
+        s->loop_required = false;
+      }
+      else if (!(d & DEPENDENCY_MAYBE_SIMPLE) || !(d & DEPENDENCY_NOT_JUST_FIBER))
+      {
+        printf("Fiber cycle detected (%d); cycle being removed\n", d);
+        if (cycle_debug & PRINT_CYCLE)
         {
-          // Do nothing; no cycle to remove
-          s->loop_required = false;
+          print_cycles(s, stdout);
         }
-        else if (!(d & DEPENDENCY_MAYBE_SIMPLE) || !(d & DEPENDENCY_NOT_JUST_FIBER))
+        break_fiber_cycles(decl, s, d);
+        s->loop_required = !(d & DEPENDENCY_MAYBE_SIMPLE);
+        d = no_dependency;  // clear dependency
+      }
+      else
+      {
+        aps_error(decl, "Unable to handle dependency (%d); Attribute grammar is not DNC", d);
+        return NULL;
+      }
+
+      // If SCC scheduling is in-progress
+      if (static_scc_schedule)
+      {
+        // Pure fiber cycles should have been broken when reaching this step
+        // If there is a non-monotone cycle, then scheduling is no longer possible
+        if (d & DEPENDENCY_MAYBE_SIMPLE)
         {
-          printf("Fiber cycle detected (%d); cycle being removed\n", d);
           if (cycle_debug & PRINT_CYCLE)
           {
             print_cycles(s, stdout);
           }
-          break_fiber_cycles(decl, s, d);
-          s->loop_required = !(d & DEPENDENCY_MAYBE_SIMPLE);
-          d = no_dependency;  // clear dependency
-        }
-        else
-        {
-          aps_error(decl, "Unable to handle dependency (%d); Attribute grammar is not DNC", d);
+
+          aps_error(decl, "Non-monotone Cycle detected (%d); Attribute grammar is not COAG", d);
           return NULL;
         }
 
-        // If SCC scheduling is in-progress
-        if (static_scc_schedule)
+        // SCC chunk scheduling supports CRAG without conditional cycles
+        compute_static_schedule(s);
+      }
+      else
+      {
+        if (!d)
         {
-          // Pure fiber cycles should have been broken when reaching this step
-          // If there is a non-monotone cycle, then scheduling is no longer possible
-          if (d & DEPENDENCY_MAYBE_SIMPLE)
-          {
-            if (cycle_debug & PRINT_CYCLE)
-            {
-              print_cycles(s, stdout);
-            }
-
-            aps_error(decl, "Non-monotone Cycle detected (%d); Attribute grammar is not COAG", d);
-            return NULL;
-          }
-
-          // SCC chunk scheduling supports CRAG without conditional cycles
-          compute_static_schedule(s);
+          // RAG scheduling with conditional cycles
+          compute_oag(decl, s);  // calculate OAG if grammar is DNC
+          d = analysis_state_cycle(s); // check again for type-3 errors
         }
-        else
+
+        if (d)
         {
-          if (!d)
+          if (cycle_debug & PRINT_CYCLE)
           {
-            // RAG scheduling with conditional cycles
-            compute_oag(decl, s);  // calculate OAG if grammar is DNC
-            d = analysis_state_cycle(s); // check again for type-3 errors
+            print_cycles(s, stdout);
           }
 
-          if (d)
-          {
-            if (cycle_debug & PRINT_CYCLE)
-            {
-              print_cycles(s, stdout);
-            }
-
-            aps_error(decl, "Cycle detected (%d); Attribute grammar is not OAG", d);
-            return NULL;
-          }
+          aps_error(decl, "Cycle detected (%d); Attribute grammar is not OAG", d);
+          return NULL;
         }
       }
 
