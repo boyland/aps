@@ -19,6 +19,22 @@ extern "C" {
 #include "dump.h"
 #include "implement.h"
 
+typedef struct synth_function_state {
+  std::string fdecl_name;
+  INSTANCE* source;
+  PHY_GRAPH* source_phy_graph;
+  std::vector<INSTANCE*> regular_dependencies;
+  std::vector<INSTANCE*> fiber_dependents;
+  std::vector<AUG_GRAPH*> aug_graphs;
+  bool is_phylum_instance;
+  bool is_fiber_evaluation;
+} SYNTH_FUNCTION_STATE;
+
+static STATE* current_state = NULL;
+static AUG_GRAPH* current_aug_graph = NULL;
+static std::vector<SYNTH_FUNCTION_STATE*> synth_functions_states;
+static SYNTH_FUNCTION_STATE* current_synth_functions_state = NULL;
+
 #define LOCAL_VALUE_FLAG (1 << 28)
 
 #ifdef APS2SCALA
@@ -29,6 +45,8 @@ extern "C" {
 
 static const string LOOP_VAR = "isInsideFixedPoint";
 static const string PREV_LOOP_VAR = "prevIsInsideFixedPoint";
+
+static SynthImplementation* synth_impl_ptr;
 
 // visit procedures are called:
 // visit_n_m
@@ -770,7 +788,7 @@ private:
 
       scheduled[in->index] = true;
       os << indent();
-      impl->dump_synth_instance(in, os);
+      synth_impl_ptr->dump_synth_instance(in, os);
       dumped_conditional_block_items.clear();
       dumped_instances.clear();
       os << "\n";
@@ -1035,7 +1053,7 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
         }
         FiberDependencyDumper::dump(aug_graph, aug_graph_instance, os);
         os << indent();
-        impl->dump_synth_instance(aug_graph_instance, os);
+        synth_impl_ptr->dump_synth_instance(aug_graph_instance, os);
         os << "\n";
         dumped_conditional_block_items.clear();
         dumped_instances.clear();
@@ -1045,11 +1063,11 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
       if (!synth_functions_state->is_fiber_evaluation) {
         if (dump_fixed_point_loop) {
           os << indent() << src_attr << ".assign(" << node_assign;
-          impl->dump_synth_instance(aug_graph_instance, os);
+          synth_impl_ptr->dump_synth_instance(aug_graph_instance, os);
           os << ", changed);\n";
         } else {
           os << indent();
-          impl->dump_synth_instance(aug_graph_instance, os);
+          synth_impl_ptr->dump_synth_instance(aug_graph_instance, os);
           os << "\n";
         }
       }
@@ -1103,7 +1121,7 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
   destroy_synth_function_states(synth_functions_states);
 }
 
-class SynthScc : public Implementation {
+class SynthImpl : public SynthImplementation {
  public:
   typedef Implementation::ModuleInfo Super;
   class ModuleInfo : public Super {
@@ -1224,7 +1242,7 @@ void implement_value_use(Declaration vd, ostream& os) {
             continue;
           }
           os << ",\n" << indent();
-          impl->dump_synth_instance(source_instance, os);
+          synth_impl_ptr->dump_synth_instance(source_instance, os);
         }
         break;
       }
@@ -1713,7 +1731,21 @@ void dump_rhs_instance_helper(AUG_GRAPH* aug_graph, BlockItem* item, INSTANCE* i
   }
 }
 
-virtual void dump_synth_instance(INSTANCE* instance, ostream& o) override {
+bool try_dump_funcall(Expression e, ostream& o) override {
+  Declaration attr = attr_ref_p(e);
+  if (attr == nullptr) return false;
+  Declaration node = USE_DECL(value_use_use(first_Actual(funcall_actuals(e))));
+  FIBERED_ATTRIBUTE fiber_attr = {attr, NULL};
+  INSTANCE* instance;
+  if (find_instance(current_aug_graph, node, fiber_attr, &instance)) {
+    dump_synth_instance(instance, o);
+    return true;
+  }
+  fatal_error("failed to find instance");
+  return false; // unreachable
+}
+
+void dump_synth_instance(INSTANCE* instance, ostream& o) {
   bool already_dumped = false;
   if (std::find(dumped_instances.begin(), dumped_instances.end(), instance) != dumped_instances.end()) {
     already_dumped = true;
@@ -1801,4 +1833,4 @@ virtual void dump_synth_instance(INSTANCE* instance, ostream& o) override {
 }
 ;
 
-Implementation* synth_impl = new SynthScc();
+Implementation* synth_impl = synth_impl_ptr = new SynthImpl();

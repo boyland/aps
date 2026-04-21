@@ -26,17 +26,6 @@ struct output_streams;
 
 #define LOCAL_UNIQUE_PREFIX(ld) Def_info(value_decl_def(ld))->unique_prefix
 
-typedef struct synth_function_state {
-  std::string fdecl_name;
-  INSTANCE* source;
-  PHY_GRAPH* source_phy_graph;
-  std::vector<INSTANCE*> regular_dependencies;
-  std::vector<INSTANCE*> fiber_dependents;
-  std::vector<AUG_GRAPH*> aug_graphs;
-  bool is_phylum_instance;
-  bool is_fiber_evaluation;
-} SYNTH_FUNCTION_STATE;
-
 // Abstract class:
 class Implementation {
  public:
@@ -79,10 +68,12 @@ class Implementation {
   // if a Declaration has an implementation mark on it,
   // this function is called to implement its use:
   virtual void implement_value_use(Declaration vd, ostream&) = 0;
+};
 
-  virtual void dump_synth_instance(INSTANCE*, ostream&) {
-    fatal_error("Only implemented for synth function codegen");
-  }
+class SynthImplementation : public Implementation {
+ public:
+  virtual bool try_dump_funcall(Expression, ostream&) = 0;
+  virtual void dump_synth_instance(INSTANCE*, ostream&) = 0;
 };
 
 extern Implementation *dynamic_impl;

@@ -2436,24 +2436,6 @@ void dump_collect_Actuals(Type ctype, Actuals as, ostream& o)
   }
 }
 
-STATE* current_state = NULL;
-AUG_GRAPH* current_aug_graph = NULL;
-std::vector<SYNTH_FUNCTION_STATE*> synth_functions_states;
-SYNTH_FUNCTION_STATE* current_synth_functions_state = NULL;
-
-static bool find_instance(AUG_GRAPH* aug_graph, Declaration node, Declaration attr, INSTANCE** instance_out) {
-  int i;
-  for (i = 0; i < aug_graph->instances.length; i++) {
-    INSTANCE* instance = &aug_graph->instances.array[i];
-    if (instance->node == node && instance->fibered_attr.attr == attr) {
-      *instance_out = instance;
-      return true;
-    }
-  }
-
-  return false;
-}
-
 void dump_Expression(Expression e, ostream& o)
 {
   switch (Expression_KEY(e)) {
@@ -2474,19 +2456,8 @@ void dump_Expression(Expression e, ostream& o)
       return;
     }
 
-    Declaration attr;
-    if (impl == synth_impl && (attr = attr_ref_p(e)) != nullptr) {
-      vector<INSTANCE*> visited;
-      struct Expression_info *  index = Expression_info(e);
-      Declaration node = USE_DECL(value_use_use(first_Actual(funcall_actuals(e))));
-      INSTANCE* instance;
-      if (find_instance(current_aug_graph, node, attr, &instance)) {
-        impl->dump_synth_instance(instance, o);
-        return;
-      } else {
-        fatal_error("failed to find instance");
-        return;
-      }
+    if (auto* synth = dynamic_cast<SynthImplementation*>(impl)) {
+      if (synth->try_dump_funcall(e, o)) return;
     }
 
     bool dump_anchor_actual = false;
