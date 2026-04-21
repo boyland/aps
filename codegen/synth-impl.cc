@@ -24,13 +24,11 @@ typedef struct synth_function_state {
   INSTANCE* source;
   PHY_GRAPH* source_phy_graph;
   std::vector<INSTANCE*> regular_dependencies;
-  std::vector<INSTANCE*> fiber_dependents;
   std::vector<AUG_GRAPH*> aug_graphs;
   bool is_phylum_instance;
   bool is_fiber_evaluation;
 } SYNTH_FUNCTION_STATE;
 
-static STATE* current_state = NULL;
 static AUG_GRAPH* current_aug_graph = NULL;
 static std::vector<SYNTH_FUNCTION_STATE*> synth_functions_states;
 static SYNTH_FUNCTION_STATE* current_synth_functions_state = NULL;
@@ -48,11 +46,6 @@ static const string PREV_LOOP_VAR = "prevIsInsideFixedPoint";
 
 static SynthImplementation* synth_impl_ptr;
 
-// visit procedures are called:
-// visit_n_m
-// where n is the number of the phy_graph and m is the phase.
-// This does a dispatch to visit_n_m_p
-// where p is the production number (0-based constructor index)
 #define KEY_BLOCK_ITEM_CONDITION 1
 #define KEY_BLOCK_ITEM_INSTANCE 2
 
@@ -80,10 +73,10 @@ struct block_item_instance {
   BlockItem* next;
 };
 
-vector<Block> current_blocks;
-BlockItem* current_scope_block;
-vector<BlockItem*> dumped_conditional_block_items;
-vector<INSTANCE*> dumped_instances;
+static vector<Block> current_blocks;
+static BlockItem* current_scope_block;
+static vector<BlockItem*> dumped_conditional_block_items;
+static vector<INSTANCE*> dumped_instances;
 static bool tracking_fiber_convergence = false;
 
 // Given a block, it prints its linearized schedule as comments in the output stream.
@@ -173,10 +166,6 @@ static BlockItem* linearize_block_helper(AUG_GRAPH* aug_graph,
       scheduled[i] = false;
       return result;
     }
-
-    // printf("trying to schedule: ");
-    // print_instance(instance, stdout);
-    // printf("\n");
 
     bool ready_to_schedule = true;
     for (j = 0; j < n && ready_to_schedule; j++) {
@@ -278,7 +267,7 @@ static BlockItem* find_surrounding_block(BlockItem* block, INSTANCE* instance) {
   return NULL;
 }
 
-enum instance_direction custom_instance_direction(INSTANCE* i) {
+static enum instance_direction custom_instance_direction(INSTANCE* i) {
   enum instance_direction dir = fibered_attr_direction(&i->fibered_attr);
   if (i->node == NULL) {
     return dir;
@@ -422,7 +411,7 @@ static bool find_instance(AUG_GRAPH* aug_graph,
   return false;
 }
 
-string attr_to_string(Declaration attr) {
+static string attr_to_string(Declaration attr) {
   if (ATTR_DECL_IS_SHARED_INFO(attr)) {
     return "sharedinfo";
   } else {
@@ -430,7 +419,7 @@ string attr_to_string(Declaration attr) {
   }
 }
 
-string fiber_to_string(FIBER fiber) {
+static string fiber_to_string(FIBER fiber) {
   std::stringstream ss;
 
   while (fiber != NULL && fiber->field != NULL) {
@@ -447,7 +436,7 @@ string fiber_to_string(FIBER fiber) {
   return ss.str();
 }
 
-string instance_to_string(INSTANCE* in, bool force_include_node_type = false, bool trim_node = false) {
+static string instance_to_string(INSTANCE* in, bool force_include_node_type = false, bool trim_node = false) {
   vector<string> result;
 
   Declaration node = in->node;
@@ -875,7 +864,6 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
 
   int i;
   int aug_graph_count = s->match_rules.length;
-  current_state = s;
   synth_functions_states = build_synth_functions_state(s);
   bool needs_fixed_point = s->loop_required;
 
@@ -889,7 +877,6 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
     }
     if (synth_functions_state->is_fiber_evaluation) {
       os << indent() << "val evaluated_map_" << synth_functions_state->fdecl_name
-        //  << " = scala.collection.mutable.Map[T_" << decl_name(synth_functions_state->source_phy_graph->phylum)
             << " = scala.collection.mutable.Map[Int"
          << ", Boolean]()"
          << "\n\n";
@@ -1155,7 +1142,6 @@ class SynthImpl : public SynthImplementation {
       ostream& hs = oss.hs;
       ostream& cpps = oss.cpps;
       ostream& os = inline_definitions ? hs : cpps;
-      // char *name = decl_name(module_decl);
 #endif /* APS2SCALA */
 
     dump_synth_functions(s, oss);
@@ -1256,8 +1242,6 @@ void implement_value_use(Declaration vd, ostream& os) {
     } else {
       os << "a" << "_" << decl_name(vd) << DEREF << "get";
     }
-
-    // os << "a" << "_" << decl_name(vd) << DEREF << "get";
   } else if (flags & LOCAL_VALUE_FLAG) {
     os << "v" << LOCAL_UNIQUE_PREFIX(vd) << "_" << decl_name(vd);
   } else {
@@ -1276,10 +1260,7 @@ static Expression default_init(Default def) {
   }
 }
 
-/* Return new array with instance assignments for block.
- * If "from" is not NULL, then initialize the new array
- * with it.
- */
+// Collects instance assignments from the current block scope.
 static vector<std::set<Expression> > make_instance_assignment() {
   int n = current_aug_graph->instances.length;
 
@@ -1658,7 +1639,6 @@ void dump_rhs_instance_helper(AUG_GRAPH* aug_graph, BlockItem* item, INSTANCE* i
       if (m == first_Match(case_stmt_matchers(header))) {
         Expression e = case_stmt_expr(header);
 #ifdef APS2SCALA
-        // Type ty = infer_expr_type(e);
         o << "{\n";
         nesting_level++;
         o << indent() << "val node" << instance->index << " = " << e << ";\n";
