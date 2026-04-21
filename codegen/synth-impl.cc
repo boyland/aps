@@ -1,5 +1,4 @@
 #include <string.h>
-#include <cstddef>
 
 #include <algorithm>
 #include <iostream>
@@ -9,11 +8,8 @@ extern "C" {
 
 #include "aps-ag.h"
 }
-#include <functional>
-#include <queue>
 #include <set>
 #include <sstream>
-#include <stack>
 #include <vector>
 
 #include "dump.h"
@@ -862,8 +858,6 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
 
   os << "\n";
 
-  int i;
-  int aug_graph_count = s->match_rules.length;
   synth_functions_states = build_synth_functions_state(s);
   bool needs_fixed_point = s->loop_required;
 
@@ -1106,6 +1100,7 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
   }
 
   destroy_synth_function_states(synth_functions_states);
+  synth_functions_states.clear();
 }
 
 class SynthImpl : public SynthImplementation {
@@ -1779,7 +1774,7 @@ void dump_synth_instance(INSTANCE* instance, ostream& o) {
           nesting_level = std::max(nesting_level + 2, 2);
           o << indent() << "v_" << decl_name(node);
 
-          std::vector<INSTANCE*> dependencies = synth_function_state->regular_dependencies;
+          const std::vector<INSTANCE*>& dependencies = synth_function_state->regular_dependencies;
           for (auto it = dependencies.begin(); it != dependencies.end(); it++) {
             INSTANCE* source_instance = *it;
 
