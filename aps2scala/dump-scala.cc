@@ -116,7 +116,7 @@ void dump_scala_Program(Program p,std::ostream&oss)
     switch(Unit_KEY(u)) {
     case KEYno_unit: break;
     case KEYwith_unit: 
-      oss << "import " << program_id((char*)(with_unit_name(u)))
+      oss << indent() << "import " << program_id((char*)(with_unit_name(u)))
 	  << "_implicit._;\n";
       break;
     case KEYdecl_unit: 
@@ -752,7 +752,7 @@ void dump_some_attribute(Declaration d, string i,
     oss << indent() << "private object a" << i << "_" << name
 	<< " extends Attribute" << tmps.str() 
 	<< "(" << as_val(nt) << "," << as_val(vt) << ",\"" << name << "\")"
-	<< (activate_static_circular && is_cir ? " with ChangeTrackingAttribute" + tmps.str() : "")
+	<< (activate_static_circular && is_cir ? "\n" + indent(nesting_level + 1) + "with ChangeTrackingAttribute" + tmps.str() : "")
 	<< " {\n";
     ++nesting_level;
     
@@ -1252,9 +1252,9 @@ static void dump_type_inst(string n, string nameArg, Declaration decl, Type ti, 
   }
   if (started) oss << "]";
 
-  oss << "(" << nameArg;
+  oss << "(\n" << indent(nesting_level + 1) << nameArg;
   for (Type ta = first_TypeActual(tas); ta ; ta = TYPE_NEXT(ta)) {
-    oss << ",";
+    oss << ",\n" << indent(nesting_level + 1);
     switch (Type_KEY(ta)) {
     default:
       oss << as_val(ta);
@@ -1267,9 +1267,9 @@ static void dump_type_inst(string n, string nameArg, Declaration decl, Type ti, 
     }
   }
   for (Expression a = first_Actual(as); a; a = EXPR_NEXT(a)) {
-    oss << "," << a;
+    oss << ",\n" << indent(nesting_level + 1) << a;
   }
-  oss << ")" << "\n";
+  oss << "\n" << indent() << ")\n";
   indent();
   dump_TypeDecl_Traits(decl,ti, n, oss);
   oss  << "\n";
@@ -1432,7 +1432,7 @@ void dump_scala_Declaration_header(Declaration decl, ostream& oss)
       switch (Type_KEY(rut)) {
       case KEYno_type: break;
       default:
-	oss << "type T_" << name;
+	oss << indent() << "type T_" << name;
 	bool started = false;
 	for (Declaration tf = first_Declaration(tfs); tf; tf=DECL_NEXT(tf)) {
 	  if (started) oss << ",";
@@ -1633,9 +1633,9 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
 
       // define extends
       if (result_typeval != "") {
-	oss << indent() << "  extends Module(name)\n";
+	oss << indent(nesting_level + 1) << "extends Module(name)\n";
       } else if (result_type != "") {
-	oss << indent() << "  extends I_"
+	oss << indent(nesting_level + 1) << "extends I_"
 	    << (rdecl_is_phylum ? "PHYLUM" : "TYPE")
 	    << "[" << result_type << "](name)\n";
       } else {
@@ -1645,7 +1645,7 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
 	  break;
 	case KEYtype_inst:
 	  {
-	    oss << indent() << "  ";
+	    oss << indent(nesting_level + 1);
 	    dump_Use(module_use_use(type_inst_module(rut)),"M_",oss);
 
 	    bool started = false;
@@ -1672,7 +1672,7 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
       }
 
       // define with
-      oss << indent() << "  with C_" << name << "[" << result_type;
+      oss << indent(nesting_level + 1) << "with C_" << name << "[" << result_type;
       for (Declaration tf=first_Declaration(tfs); tf ; tf = DECL_NEXT(tf)) {
 	oss << ",T_" << decl_name(tf);
       }
@@ -2171,7 +2171,7 @@ void dump_Signature(Signature s, string n, ostream& o)
   case KEYsig_inst:
     {
       Class c = sig_inst_class(s);
-      o << " with C_" << decl_name(USE_DECL(class_use_use(c))) << "[" << n;
+      o << "\n" << indent(nesting_level + 1) << "with C_" << decl_name(USE_DECL(class_use_use(c))) << "[" << n;
       TypeActuals tas = sig_inst_actuals(s);
       for (Type ta = first_TypeActual(tas); ta; ta=TYPE_NEXT(ta)) {
 	o << "," << ta;
@@ -2219,7 +2219,7 @@ void dump_Type_Signature(Type t, string name, ostream& o)
       Module m = type_inst_module(t);
       TypeActuals tas = type_inst_type_actuals(t);
       Declaration mdecl = USE_DECL(module_use_use(m));
-      o << "with C_" << decl_name(mdecl) << "[" << name;
+      o << "\n" << indent(nesting_level + 1) << "with C_" << decl_name(mdecl) << "[" << name;
       for (Type ta = first_TypeActual(tas); ta; ta = TYPE_NEXT(ta)) {
 	o << "," << ta;
       }
@@ -2490,9 +2490,10 @@ void dump_Expression(Expression e, ostream& o)
     o << "(";
     {
       bool start = true;
+      nesting_level++;
       FOR_SEQUENCE(Expression,arg,Actuals,funcall_actuals(e),
 		   if (start) start = false;
-		   else o << ",";
+		   else { o << ",\n"; o << indent(); }
 		   dump_Expression(arg,o));
       Declarations fs = function_type_formals(infer_expr_type(funcall_f(e)));
       for (Declaration f=first_Declaration(fs); f; f=DECL_NEXT(f))
@@ -2512,6 +2513,7 @@ void dump_Expression(Expression e, ostream& o)
       }
     }
 
+    nesting_level--;
     o << ")";
 
     }
