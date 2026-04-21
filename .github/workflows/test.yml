@@ -1,0 +1,68 @@
+name: Test
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    
+    env:
+      SCALA_VERSION: "2.13.12"
+      SCALA_MAJOR: "2.13"
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up JDK 11
+      uses: actions/setup-java@v4
+      with:
+        java-version: '11'
+        distribution: 'temurin'
+        
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential flex bison gcc g++ make
+        
+    - name: Install Scala
+      run: |
+        wget -q "https://downloads.lightbend.com/scala/${SCALA_VERSION}/scala-${SCALA_VERSION}.tgz"
+        tar xzf "scala-${SCALA_VERSION}.tgz"
+        echo "$PWD/scala-${SCALA_VERSION}/bin" >> $GITHUB_PATH
+
+    - name: Build project
+      run: make
+
+    - name: Build aps-library jar and run base tests
+      run: |
+        cd base/scala
+        make aps-library.jar
+        cp aps-library.jar aps-library-$SCALA_MAJOR.jar
+        make SVERSION=$SCALA_MAJOR install
+        make SVERSION=$SCALA_MAJOR test
+
+    - name: Run utilities tests
+      run: |
+        cd utilities/tests
+        make all
+
+    - name: Run examples Scala tests
+      run: |
+        cd examples/scala/tests
+        make SCALAV=$SCALA_MAJOR all
+
+    - name: Run canonical types tests
+      run: |
+        cd examples
+        ../bin/aps2scala -DCOTo -G -p .:../base test-canonicals
+
+    - name: Clean up
+      if: always()
+      run: make clean
