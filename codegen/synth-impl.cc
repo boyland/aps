@@ -1509,64 +1509,65 @@ void dump_rhs_instance_helper(AUG_GRAPH* aug_graph, BlockItem* item, INSTANCE* i
 
   if (item->key == KEY_BLOCK_ITEM_INSTANCE) {
     struct block_item_instance* bi = (struct block_item_instance*)item;
+
+    if (bi->instance != instance && bi->next != NULL) {
+      dump_rhs_instance_helper(aug_graph, bi->next, instance, o);
+      return;
+    }
+
     vector<std::set<Expression> > all_assignments = make_instance_assignment();
     std::set<Expression> relevant_assignments = all_assignments[instance->index];
     bool any_assignment_dump = false;
 
-    if (bi->instance == instance || bi->next == NULL) {
-      if (!relevant_assignments.empty()) {
-        for (auto it = relevant_assignments.begin(); it != relevant_assignments.end(); it++) {
-          Expression rhs = *it;
-          if (rhs == NULL) {
-            continue;
-          }
-
-          any_assignment_dump = true;
-
-          if (instance->fibered_attr.fiber != NULL) {
-            dump_assignment(instance, rhs, o);
-          } else {
-            // just dump RHS since synth functions are only interested in RHS, not side-effect
-            dump_Expression(rhs, o);
-          }
+    if (!relevant_assignments.empty()) {
+      for (auto it = relevant_assignments.begin(); it != relevant_assignments.end(); it++) {
+        Expression rhs = *it;
+        if (rhs == NULL) {
+          continue;
         }
 
-        if (!any_assignment_dump) {
-          fatal_error("should have dumped an assignment here");
+        any_assignment_dump = true;
+
+        if (instance->fibered_attr.fiber != NULL) {
+          dump_assignment(instance, rhs, o);
+        } else {
+          // just dump RHS since synth functions are only interested in RHS, not side-effect
+          dump_Expression(rhs, o);
         }
-
-        return;
       }
 
-      if (instance->fibered_attr.fiber != NULL) {
-        // Shared info attribute wasn't assigned in this block, dump its default
-          auto direction = fibered_attr_direction(&instance->fibered_attr);
-          auto directionStr = "";
-          switch (direction)
-          {
-          case instance_inward:
-            directionStr = "instance_inward";
-            break;
-          case instance_outward:
-            directionStr = "instance_outward";
-            break;
-          case instance_local:
-            directionStr = "instance_local";
-            break;
-          default:
-            break;
-          }
-
-          o << "/* did not find any assignment for this fiber attribute " << instance << " -> " << directionStr << " <-" <<" */";
-        return;
-      } else {
-        print_instance(instance, stdout);
-        printf(" is a non-fiber instance, but no assignment found in this block. %d\n", if_rule_p(instance->fibered_attr.attr));
-        fatal_error("crashed since non-fiber instance is missing an assignment");
+      if (!any_assignment_dump) {
+        fatal_error("should have dumped an assignment here");
       }
-    } else {
-      dump_rhs_instance_helper(aug_graph, bi->next, instance, o);
+
       return;
+    }
+
+    if (instance->fibered_attr.fiber != NULL) {
+      // Shared info attribute wasn't assigned in this block, dump its default
+      auto direction = fibered_attr_direction(&instance->fibered_attr);
+      auto directionStr = "";
+      switch (direction)
+      {
+      case instance_inward:
+        directionStr = "instance_inward";
+        break;
+      case instance_outward:
+        directionStr = "instance_outward";
+        break;
+      case instance_local:
+        directionStr = "instance_local";
+        break;
+      default:
+        break;
+      }
+
+      o << "/* did not find any assignment for this fiber attribute " << instance << " -> " << directionStr << " <-" <<" */";
+      return;
+    } else {
+      print_instance(instance, stdout);
+      printf(" is a non-fiber instance, but no assignment found in this block. %d\n", if_rule_p(instance->fibered_attr.attr));
+      fatal_error("crashed since non-fiber instance is missing an assignment");
     }
   } else if (item->key == KEY_BLOCK_ITEM_CONDITION) {
     struct block_item_condition* cond = (struct block_item_condition*)item;
