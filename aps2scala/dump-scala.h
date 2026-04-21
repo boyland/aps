@@ -17,6 +17,7 @@ extern int verbose;
 extern int debug;
 extern bool include_comments;
 extern bool static_scc_schedule;
+extern bool anc_analysis;
 
 class Implementation;
 
