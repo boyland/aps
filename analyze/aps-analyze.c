@@ -17,6 +17,7 @@ Several phases:
 
 // Boolean indicating whether to use SCC chunk scheduling
 bool static_scc_schedule = false;
+bool anc_analysis = false;
 
 static void *analyze_thing(void *ignore, void *node)
 {
@@ -29,7 +30,16 @@ static void *analyze_thing(void *ignore, void *node)
     {
     default: break;
     case KEYmodule_decl:
-      s = compute_dnc(decl);
+      s = compute_dnc(decl, anc_analysis);
+      if (anc_analysis) {
+        if (cycle_debug & PRINT_CYCLE)
+        {
+          print_cycles(s, stdout);
+        }
+        d = (s->original_state_dependency = analysis_state_cycle(s));
+        s->loop_required = !(d & DEPENDENCY_MAYBE_SIMPLE);
+        break;
+      }
       if (!(d = (s->original_state_dependency = analysis_state_cycle(s))))
       {
         // Do nothing; no cycle to remove
