@@ -1282,6 +1282,7 @@ static vector<std::set<Expression> > make_instance_assignment() {
   // start from the outer-most and override it with the most inner scope
   for (auto it = current_blocks.begin(); it != current_blocks.end(); it++) {
     Block block = *it;
+    bool is_outermost = (it == current_blocks.begin());
     vector<std::set<Expression> > array(from);
 
     // Step #1 clear any existing assignments and insert normal assignments
@@ -1311,9 +1312,9 @@ static vector<std::set<Expression> > make_instance_assignment() {
                 fatal_error("bad index [collection_assign] for instance");
               }
 
-              if (step == 1) {
+              if (step == 1 && is_outermost) {
                 array[in->index].clear();
-              } else {
+              } else if (step == 2) {
                 array[in->index].insert(assign_rhs(d));
               }
             }
