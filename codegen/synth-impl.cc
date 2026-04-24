@@ -1516,19 +1516,39 @@ void dump_rhs_instance_helper(AUG_GRAPH* aug_graph, BlockItem* item, INSTANCE* i
     bool any_assignment_dump = false;
 
     if (!relevant_assignments.empty()) {
+      // Filter out NULLs first
+      vector<Expression> valid_rhs;
       for (auto it = relevant_assignments.begin(); it != relevant_assignments.end(); it++) {
-        Expression rhs = *it;
-        if (rhs == NULL) {
-          continue;
-        }
+        if (*it != NULL) valid_rhs.push_back(*it);
+      }
 
+      if (!valid_rhs.empty()) {
         any_assignment_dump = true;
 
         if (instance->fibered_attr.fiber != NULL) {
-          dump_assignment(instance, rhs, o);
+          for (auto it = valid_rhs.begin(); it != valid_rhs.end(); it++) {
+            dump_assignment(instance, *it, o);
+          }
+        } else if (valid_rhs.size() == 1) {
+          dump_Expression(valid_rhs[0], o);
         } else {
-          // just dump RHS since synth functions are only interested in RHS, not side-effect
-          dump_Expression(rhs, o);
+          // Multiple RHS entries only occur from collect_assign (:>) contributions.
+          // Combine them pairwise using the type's v_combine.
+          Declaration attr = instance->fibered_attr.attr;
+          if (!direction_is_collection(value_decl_direction(attr))) {
+            fatal_error("Multiple RHS for non-collection attribute %s", decl_name(attr));
+          }
+          Type vt = value_decl_type(attr);
+          // Nest v_combine calls for all contributions
+          for (size_t i = 0; i < valid_rhs.size() - 1; i++) {
+            o << as_val(vt) << ".v_combine(";
+          }
+          dump_Expression(valid_rhs[0], o);
+          for (size_t i = 1; i < valid_rhs.size(); i++) {
+            o << ", ";
+            dump_Expression(valid_rhs[i], o);
+            o << ")";
+          }
         }
       }
 
