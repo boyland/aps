@@ -162,9 +162,9 @@ static vector<std::set<Expression> > make_instance_assignment(
             if (in->index >= n)
               fatal_error("bad index [collection_assign] for instance");
 
-            if (step == 1 && include_initial_defaults)
+            if (step == 1)
               array[in->index].clear();
-            else if (step == 2)
+            else
               array[in->index].insert(assign_rhs(d));
           }
           break;
