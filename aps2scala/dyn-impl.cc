@@ -92,7 +92,7 @@ static void dump_context_open(void *c, ostream& os) {
 	{
 	  Type ty = infer_pattern_type(matcher_pat(top_level_match_m(decl)));
 	  os << indent() << "for (anchor <- " << as_val(ty)
-	     << ".nodes) anchor match {\n";
+	     << ".nodes; if anchor.isRooted) anchor match {\n";
 	  ++nesting_level;
 	}
 	return;
