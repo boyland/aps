@@ -478,6 +478,25 @@ trait CircularEvaluation[V_P, V_T] extends Evaluation[V_P,V_T] {
     }
   }
 
+  override def get : ValueType = {
+    // If this circular attribute has already been evaluated, but is now being
+    // accessed from another cycle, re-open it by joining
+    // that cycle.
+    if (status == Evaluation.EVALUATED) {
+      for (e <- pending) {
+        e.inCycle match {
+          case ce: CircularEvaluation[_,_] if ce != null => {
+            setInCycle(ce);
+            status = Evaluation.CYCLE;
+            return value;
+          }
+          case _ => ()
+        }
+      }
+    }
+    super.get
+  }
+
   override def evaluateCycle : Unit = {
     if (cycleParent == this) {
       // we're in charge
