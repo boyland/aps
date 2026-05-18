@@ -137,7 +137,7 @@ NestedUbdParserBase.class : NestedUbdParserBase.scala NestedUbd_implicit.class
 NestedUbdTokens.class : NestedUbdTokens.scala
 	${SCALAC} ${SCALACFLAGS} $<
 
-NestedUbd_implicit.class : nested-ubd-tree.scala nested-ubd.static.scala
+NestedUbd_implicit.class : nested-ubd-tree.scala nested-ubd${IMPL_SUFFIX}
 	${SCALAC} ${SCALACFLAGS} $^
 
 NestedUbdDriver.class : NestedUbd_implicit.class NestedUbdParser.class
