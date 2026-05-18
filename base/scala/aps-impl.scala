@@ -250,6 +250,14 @@ class Evaluation[T_P, T_V](val anchor : T_P, val name : String)
 	pending.pop();
 	if (inCycle != null) {
 	  evaluateCycle;
+	} else if (pendingCycleActive) {
+	  // A non-circular attribute was evaluated while a circular
+	  // fixed-point iteration is in progress on the pending stack.
+	  // Its value may depend (transitively/indirectly) on circular attributes
+	  // that have not yet converged, so we must NOT freeze it as
+	  // EVALUATED. Instead, mark it UNEVALUATED so it will be
+	  // recomputed on the next access evaluation, once the cycle has advanced.
+	  status = UNEVALUATED;
 	} else {
 	  status = EVALUATED;
 	}
@@ -257,6 +265,16 @@ class Evaluation[T_P, T_V](val anchor : T_P, val name : String)
       }
       case _ => value
     }
+  }
+
+  // Returns true if any evaluation currently on the pending stack is
+  // part of an active circular fixed-point iteration. This indicates
+  // that attribute values read during this computation may still change.
+  private def pendingCycleActive : Boolean = {
+    for (e <- pending) {
+      if (e.inCycle != null) return true;
+    }
+    false
   }
 
   def get : ValueType = {
@@ -483,6 +501,12 @@ trait CircularEvaluation[V_P, V_T] extends Evaluation[V_P,V_T] {
       if (e == this) {
         // Skip self on the pending stack — we were pushed during
         // the first doEvaluate call and shouldn't stop the search.
+      } else if (!e.isInstanceOf[CircularEvaluation[_,_]]) {
+        // Non-circular evaluations can appear on the pending stack as
+        // intermediate steps between two circular evaluations in a
+        // dependency chain. They do not participate in the cycle
+        // themselves - they will complete normally once the circular
+        // attributes they depend on converge.
       }
       else if (e.inCycle == cycle) return
       else e.setInCycle(cycle);
@@ -586,4 +610,3 @@ trait ChangeTrackingAttribute[T_P <: Node, T_V] {
     .asInstanceOf[StaticCircularEvaluation[T_P, T_V]]
     .set(v, changed);
 }
-
