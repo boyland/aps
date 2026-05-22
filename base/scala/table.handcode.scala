@@ -61,6 +61,8 @@ with C_TABLE[TreeMap[T_KeyType,T_ValueType],T_KeyType,T_ValueType]
 
   val v_combine = f_combine _;
   def f_combine(v_t1 : T_Result, v_t2 : T_Result):T_Result = {
+    if (v_t2 == null) return v_t1;
+    if (v_t1 == null) return v_t2;
     var result : Table = v_t1;
     for ((k,v) <- v_t2) {
       if (result.isDefinedAt(k)) {
