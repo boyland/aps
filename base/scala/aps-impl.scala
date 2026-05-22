@@ -558,7 +558,7 @@ trait CircularEvaluation[V_P, V_T] extends Evaluation[V_P,V_T] {
 	  helper.invalidateNonCircularDependents();
 	  if (cycleParent != this) {
 		  cycleIterating = false;
-		  return;
+		  return; // no longer our responsibility
 	  }
 	  c = c.cycleNext;
 	} while (c != null);
