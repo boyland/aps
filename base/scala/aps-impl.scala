@@ -432,6 +432,7 @@ trait CollectionEvaluation[V_P, V_T] extends Evaluation[V_P,V_T] {
 
 class CircularHelper(var cycleLast : CircularEvaluation[_,_]) {
   var modified : Boolean = false;
+
   // Non-circular evals that read from this cycle during iteration;
   // must be invalidated between recomputes so they see fresh values.
   val nonCircularDependents : Buffer[Evaluation[_,_]] = new ArrayBuffer();
