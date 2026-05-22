@@ -281,8 +281,8 @@ class Evaluation[T_P, T_V](val anchor : T_P, val name : String)
   private def pendingHasCircular : Boolean = {
     for (e <- pending) {
       if (e.isInstanceOf[CircularEvaluation[_,_]]) {
-		    return true;
-	    }
+        return true;
+      }
     }
     false
   }
@@ -440,13 +440,15 @@ class CircularHelper(var cycleLast : CircularEvaluation[_,_]) {
     Debug.out("Created cycle helper " + this + " for " + cycleLast.name);
   }
 
-  def addNonCircularDependent(e : Evaluation[_,_]) : Unit = nonCircularDependents += e;
+  def addNonCircularDependent(e : Evaluation[_,_]) : Unit = {
+    nonCircularDependents += e
+  };
 
   def invalidateNonCircularDependents() : Unit = {
     import Evaluation._;
     for (e <- nonCircularDependents) {
-		  e.status = UNEVALUATED;
-	  }
+      e.status = UNEVALUATED;
+    }
     nonCircularDependents.clear();
   }
 
