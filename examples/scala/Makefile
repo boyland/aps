@@ -3,6 +3,7 @@ SCALAC= scalac
 SCALA= scala
 SCALAV= 2.12
 APSLIB = ${APSTOP}/lib/aps-library-${SCALAV}.jar
+JVMFLAGS= -J-Xss64m -J-Xmx16g 
 SCALAFLAGS= -cp .:${APSLIB}
 SCALACFLAGS= ${SCALAFLAGS}
 APS2SCALA = ${APSTOP}/bin/aps2scala
@@ -72,6 +73,7 @@ phony_explicit:
 
 %_implicit.class : %.scala
 	${SCALAC} ${SCALACFLAGS} $*.scala
+	@touch $@
 
 FarrowUbd.lex : ../farrow-ubd.lex FarrowUbd.lex.scala
 	cat FarrowUbd.lex.scala ../farrow-ubd.lex > $@
@@ -101,9 +103,11 @@ FarrowUbdTokens.class : FarrowUbdTokens.scala
 
 FarrowUbd_implicit.class : farrow-ubd-tree.scala farrow-ubd${IMPL_SUFFIX}
 	${SCALAC} ${SCALACFLAGS} $^
+	@touch $@
 
 FarrowUbdFiber_implicit.class : farrow-ubd-tree.scala farrow-ubd-fiber${IMPL_SUFFIX}
 	${SCALAC} ${SCALACFLAGS} $^
+	@touch $@
 
 FarrowUbdDriver.class : FarrowUbd_implicit.class FarrowUbdParser.class
 	${SCALAC} ${SCALACFLAGS} farrow-ubd-driver.scala
@@ -139,12 +143,14 @@ NestedUbdTokens.class : NestedUbdTokens.scala
 
 NestedUbd_implicit.class : nested-ubd-tree.scala nested-ubd${IMPL_SUFFIX}
 	${SCALAC} ${SCALACFLAGS} $^
+	@touch $@
 
 NestedUbdDriver.class : NestedUbd_implicit.class NestedUbdParser.class
 	${SCALAC} ${SCALACFLAGS} nested-ubd-driver.scala
 
 NestedUbdFiber_implicit.class : nested-ubd-tree.scala nested-ubd-fiber.static.scala
 	${SCALAC} ${SCALACFLAGS} $^
+	@touch $@
 
 NestedUbdFiberDriver.class : NestedUbdFiber_implicit.class NestedUbdParser.class
 	${SCALAC} ${SCALACFLAGS} nested-ubd-fiber-driver.scala
@@ -177,6 +183,7 @@ FarrowLvTokens.class : FarrowLvTokens.scala
 
 FarrowLv_implicit.class : farrow-lv-tree.scala farrow-lv${IMPL_SUFFIX}
 	${SCALAC} ${SCALACFLAGS} $^
+	@touch $@
 
 FarrowLvDriver.class : FarrowLv_implicit.class FarrowLvParser.class
 	${SCALAC} ${SCALACFLAGS} farrow-lv-driver.scala
@@ -244,6 +251,7 @@ NestedCyclesDriver.class: nested_cycles_implicit.class SimpleParser.class
 
 classic_binding_implicit.class : classic-binding${IMPL_SUFFIX}
 	${SCALAC} ${SCALACFLAGS} $<
+	@touch $@
 
 Classic.class : classic-driver.scala SimpleParser.class
 	${SCALAC} ${SCALACFLAGS} $<
@@ -253,9 +261,11 @@ Classic.class : classic_binding_implicit.class
 
 test_coll_implicit.class : test-coll${IMPL_SUFFIX} tiny_implicit.class
 	${SCALAC} ${SCALACFLAGS} $<
+	@touch $@
 
 test_use_coll_implicit.class : test-use-coll${IMPL_SUFFIX}
 	${SCALAC} ${SCALACFLAGS} $<
+	@touch $@
 
 TestCollDriver.class : test_coll_implicit.class test-coll-driver.scala
 	${SCALAC} ${SCALACFLAGS}  test-coll-driver.scala
@@ -265,12 +275,14 @@ TestUseCollDriver.class : test_use_coll_implicit.class test-use-coll-driver.scal
 
 test_cycle_implicit.class : test-cycle${IMPL_SUFFIX}
 	${SCALAC} ${SCALACFLAGS} $<
+	@touch $@
 
 TestCycleDriver.class : test_cycle_implicit.class test-cycle-driver.scala
 	${SCALAC} ${SCALACFLAGS}  test-cycle-driver.scala
 
 grammar_implicit.class : grammar.scala first${IMPL_SUFFIX} follow${IMPL_SUFFIX} nullable${IMPL_SUFFIX}
 	${SCALAC} ${SCALACFLAGS} $^
+	@touch $@
 
 GrammarDriver.class : grammar_implicit.class GrammarParser.class
 	${SCALAC} ${SCALACFLAGS} grammar-driver.scala
@@ -280,6 +292,7 @@ TinyParser.class : tiny-parser.handcode.scala tiny_implicit.class
 
 use_global_implicit.class : use-global${IMPL_SUFFIX} tiny_implicit.class
 	${SCALAC} ${SCALACFLAGS} $<
+	@touch $@
 
 UseGlobal.class : use_global_implicit.class TinyParser.class
 UseGlobal.class : use-global-driver.scala
@@ -288,6 +301,7 @@ UseGlobal.class : use-global-driver.scala
 broad_fiber_cycle_implicit.class : tiny_implicit.class
 broad_fiber_cycle_implicit.class : broad-fiber-cycle${IMPL_SUFFIX}
 	${SCALAC} ${SCALACFLAGS} $<
+	@touch $@
 
 BroadFiberCycleDriver.class : broad_fiber_cycle_implicit.class tiny_implicit.class
 BroadFiberCycleDriver.class : broad-fiber-cycle-driver.scala
@@ -296,7 +310,7 @@ BroadFiberCycleDriver.class : broad-fiber-cycle-driver.scala
 .PHONY: %.run
 
 %.run : %.class
-	scala ${SCALAFLAGS} $* ${ARGS}
+	scala ${JVMFLAGS} ${SCALAFLAGS} $* ${ARGS}
 
 clean:
 	rm -f *.class ${SCALAGEN} ${MISCGEN}
