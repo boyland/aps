@@ -13,14 +13,14 @@ module NESTED_UBD[T :: var NESTED_UBD_TREE[]] extends T begin
   type Messages := SET[String];
 
   attribute Declaration.decl_name : Symbol;
-  circular collection attribute Declaration.decl_pair : DeclPairLattice;
-  circular collection attribute Declaration.decl_env : DeclPairLattice;
+  circular attribute Declaration.decl_pair : DeclPairLattice;
+  circular attribute Declaration.decl_env : DeclPairLattice;
   attribute Declaration.decl_errs : Messages;
   pragma inherited(decl_env);
   pragma synthesized(decl_name, decl_pair, decl_errs);
 
-  circular collection attribute Declarations.decls_defs : DeclPairLattice;
-  circular collection attribute Declarations.decls_env : DeclPairLattice;
+  circular attribute Declarations.decls_defs : DeclPairLattice;
+  circular attribute Declarations.decls_env : DeclPairLattice;
   attribute Declarations.decls_errs : Messages;
   pragma inherited(decls_env);
   pragma synthesized(decls_defs, decls_errs);
@@ -31,13 +31,13 @@ module NESTED_UBD[T :: var NESTED_UBD_TREE[]] extends T begin
   pragma synthesized (block_errs);
   
   circular attribute Expression.expr_val : IntegerLattice;
-  circular collection attribute Expression.expr_env : DeclPairLattice;
+  circular attribute Expression.expr_env : DeclPairLattice;
   attribute Expression.expr_errs : Messages;
   pragma inherited(expr_env);
   pragma synthesized(expr_val, expr_errs);
 
   circular attribute Term.term_val : IntegerLattice;
-  circular collection attribute Term.term_env : DeclPairLattice;
+  circular attribute Term.term_env : DeclPairLattice;
   attribute Term.term_errs : Messages;
   pragma inherited(term_env);
   pragma synthesized(term_val, term_errs);
@@ -52,13 +52,12 @@ module NESTED_UBD[T :: var NESTED_UBD_TREE[]] extends T begin
   pragma synthesized(program_errs);
 
   match ?self:Block=scope(?ds: Declarations) begin
-    ds.decls_env :> self.block_env;
-    ds.decls_env :> ds.decls_defs;
+    ds.decls_env := DeclPairLattice$join(self.block_env, ds.decls_defs);
     self.block_errs := ds.decls_errs;
   end;
 
   match ?self:Declaration=decl_assign(?s: Symbol, ?e: Expression) begin
-    self.decl_pair :> DeclPairLattice$table_entry(s, e.expr_val);
+    self.decl_pair := DeclPairLattice$table_entry(s, e.expr_val);
     self.decl_name := s;
     e.expr_env := self.decl_env;
     self.decl_errs := e.expr_errs;
@@ -98,35 +97,19 @@ module NESTED_UBD[T :: var NESTED_UBD_TREE[]] extends T begin
   end;
 
   match ?self:Operation=op_add() begin
-    if self.op_lval = IntegerLattice$bottom or self.op_rval = IntegerLattice$bottom then
-      self.op_val := IntegerLattice$bottom;
-    else
-      self.op_val := IntegerLattice$applyf2(Integer$plus, self.op_lval, self.op_rval);
-    endif;
+    self.op_val := IntegerLattice$applyf2(Integer$plus, self.op_lval, self.op_rval);
   end;
 
   match ?self:Operation=op_mul() begin
-    if self.op_lval = IntegerLattice$bottom or self.op_rval = IntegerLattice$bottom then
-      self.op_val := IntegerLattice$bottom;
-    else
-      self.op_val := IntegerLattice$applyf2(Integer$times, self.op_lval, self.op_rval);
-    endif;
+    self.op_val := IntegerLattice$applyf2(Integer$times, self.op_lval, self.op_rval);
   end;
 
   match ?self:Operation=op_sub() begin
-    if self.op_lval = IntegerLattice$bottom or self.op_rval = IntegerLattice$bottom then
-      self.op_val := IntegerLattice$bottom;
-    else
-      self.op_val := IntegerLattice$applyf2(Integer$minus, self.op_lval, self.op_rval);
-    endif;
+    self.op_val := IntegerLattice$applyf2(Integer$minus, self.op_lval, self.op_rval);
   end;
 
   match ?self:Operation=op_div() begin
-    if self.op_lval = IntegerLattice$bottom or self.op_rval = IntegerLattice$bottom then
-      self.op_val := IntegerLattice$bottom;
-    else
-      self.op_val := IntegerLattice$applyf2(Integer$divide, self.op_lval, self.op_rval);
-    endif;
+    self.op_val := IntegerLattice$applyf2(Integer$divide, self.op_lval, self.op_rval);
   end;
 
   match ?self:Expression=expr_apply(?e: Expression, ?op: Operation, ?t: Term) begin
