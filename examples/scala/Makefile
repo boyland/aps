@@ -1,9 +1,11 @@
 APSTOP= ../..
 SCALAC= scalac
 SCALA= scala
-SCALAV= 2.12
-APSLIB = ${APSTOP}/lib/aps-library-${SCALAV}.jar
+SCALAV= 2.13
 JVMFLAGS= -J-Xss64m -J-Xmx16g 
+APSLIB = ${APSTOP}/lib/aps-library.jar
+SCALAFLEX= ${APSTOP}/lib/JFlex+scala.jar
+SCALABISON= ${APSTOP}/lib/scala-bison.jar
 SCALAFLAGS= -cp .:${APSLIB}
 SCALACFLAGS= ${SCALAFLAGS}
 APS2SCALA = ${APSTOP}/bin/aps2scala
