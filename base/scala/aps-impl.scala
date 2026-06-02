@@ -412,7 +412,7 @@ class CircularHelper(var cycleLast : CircularEvaluation[_,_]) {
       Debug.out("Adding all from " + c.helper + " to cycle " + this);
       var p = c;
       while (p != null) {
-	Debug.out("  " + p.name);
+	Debug.out("  " + p + " " + p.name);
 	p = p.cycleNext;
       }
     }
@@ -466,7 +466,7 @@ trait CircularEvaluation[V_P, V_T] extends Evaluation[V_P,V_T] {
   override def getDefault : ValueType = lattice.v_bottom;
 
   override def detectedCycle : ValueType = {
-    Debug.out("Detected cycle for " + name);
+    Debug.out("Detected cycle for " + this + ": " + name);
     if (cycleParent == null) {
       value = getDefault;
       helper = new CircularHelper(this);
@@ -480,11 +480,7 @@ trait CircularEvaluation[V_P, V_T] extends Evaluation[V_P,V_T] {
     val cycle = inCycle;
     for (e <- pending) {
       Debug.out("Checking " + e + " in pending.");
-      if (e == this) {
-        // Skip self on the pending stack — we were pushed during
-        // the first doEvaluate call and shouldn't stop the search.
-      }
-      else if (e.inCycle == cycle) return
+      if (e.inCycle == cycle) return;
       else e.setInCycle(cycle);
     }
   }
