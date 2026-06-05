@@ -2360,11 +2360,11 @@ static void init_analysis_state(STATE *s, Declaration module) {
 	    !FIELD_DECL_P(decl)) {
 	  Direction dir = attribute_decl_direction(decl);
 	  if (direction_is_input(dir)) {
-	    aps_warning(decl, "%s not declared inherited; assuming inherited",
+	    aps_error(decl, "%s not declared inherited; assuming inherited",
 			decl_name(decl));
 	    Declaration_info(decl)->decl_flags |= ATTR_DECL_INH_FLAG;
 	  } else if (direction_is_circular(dir) || direction_is_collection(dir)) {
-	    aps_warning(decl, "%s not declared synthesized; assuming synthesized",
+	    aps_error(decl, "%s not declared synthesized; assuming synthesized",
 			decl_name(decl));
 	    Declaration_info(decl)->decl_flags |= ATTR_DECL_SYN_FLAG;
 	  } else {
