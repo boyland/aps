@@ -76,6 +76,7 @@ extern Type some_type_decl_type(Declaration);
                       case KEYconstructor_decl: \
 		      case KEYformal
 extern Type some_value_decl_type(Declaration);
+extern Direction some_value_decl_direction(Declaration);
 
 #define KEYassign KEYnormal_assign: case KEYcollect_assign
 extern Expression assign_lhs(Declaration);

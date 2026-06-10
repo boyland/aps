@@ -1681,7 +1681,7 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
       ++nesting_level;
 
       STATE *s = (STATE*)Declaration_info(decl)->analysis_state;
-      if (static_scc_schedule && s != NULL)
+      if ((static_scc_schedule || anc_analysis) && s != NULL)
       {
         activate_static_circular = s->loop_required;
       }
@@ -2455,6 +2455,11 @@ void dump_Expression(Expression e, ostream& o)
       dump_collect_Actuals(infer_expr_type(e),funcall_actuals(e),o);
       return;
     }
+
+    if (auto* synth = dynamic_cast<SynthImplementation*>(impl)) {
+      if (synth->try_dump_funcall(e, o)) return;
+    }
+
     bool dump_anchor_actual = false;
     if (should_include_ast_for_objects()) {
       Expression fexpr = funcall_f(e);
@@ -2691,7 +2696,7 @@ string operator+(string s, int i)
 string indent(int nl) { return string(indent_multiple*nl,' '); }
 
 bool check_surrounding_decl(void* node, KEYTYPE_Declaration decl_key, Declaration* result_decl) {
-  while (node != NULL) {
+  while (node != NULL && ABSTRACT_APS_tnode_phylum(node) != KEY_ABSTRACT_APS_None) {
     if (ABSTRACT_APS_tnode_phylum(node) == KEYDeclaration) {
       Declaration decl = (Declaration)node;
       if (Declaration_KEY(decl) == decl_key) {
@@ -2703,5 +2708,18 @@ bool check_surrounding_decl(void* node, KEYTYPE_Declaration decl_key, Declaratio
   }
 
   *result_decl = NULL;
+  return false;
+}
+
+bool check_surrounding_node(void* node, KEYTYPE_ABSTRACT_APS_Phylum ast_key, void** result_node) {
+  while (node != NULL && ABSTRACT_APS_tnode_phylum(node) != KEY_ABSTRACT_APS_None) {
+    if (ABSTRACT_APS_tnode_phylum(node) == ast_key) {
+      *result_node = node;
+      return true;
+    }
+    node = tnode_parent(node);
+  }
+
+  *result_node = NULL;
   return false;
 }

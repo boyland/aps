@@ -216,6 +216,15 @@ Type some_value_decl_type(Declaration _node) {
   }
 }
 
+Direction some_value_decl_direction(Declaration _node) {
+  switch (Declaration_KEY(_node)) {
+  default: fatal_error("some_value_decl_direction: called with %s",
+		       Declaration_constructors[Declaration_KEY(_node)]);
+  case KEYvalue_decl: return value_decl_direction(_node);
+  case KEYattribute_decl: return attribute_decl_direction(_node);
+  }
+}
+
 Expression assign_lhs(Declaration _node) {
   switch (Declaration_KEY(_node)) {
   default: fatal_error("assign_lhs: called with %s",
