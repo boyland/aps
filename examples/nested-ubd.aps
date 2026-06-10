@@ -25,7 +25,7 @@ module NESTED_UBD[T :: var NESTED_UBD_TREE[]] extends T begin
   pragma inherited(decls_env);
   pragma synthesized(decls_defs, decls_errs);
 
-  attribute Block.block_env : DeclPairLattice;
+  circular attribute Block.block_env : DeclPairLattice;
   attribute Block.block_errs : Messages;
   pragma inherited (block_env);
   pragma synthesized (block_errs);
