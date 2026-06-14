@@ -220,6 +220,9 @@ object Evaluation {
   }
 
   val pending : Stack[Evaluation[_,_]] = new Stack();
+
+  // True during fixed-point iteration; false during initial cycle discovery.
+  var cycleIterating : Boolean = false;
 }
 
 class Evaluation[T_P, T_V](val anchor : T_P, val name : String)
@@ -242,7 +245,17 @@ class Evaluation[T_P, T_V](val anchor : T_P, val name : String)
 
   private def doEvaluate : ValueType = {
     status match {
-      case CYCLE => detectedCycle
+      case CYCLE => {
+        if (this.isInstanceOf[CircularEvaluation[_,_]]) {
+          detectedCycle
+        } else if (pendingHasCircular) {
+          // Return current value; it will be recomputed after the
+          // cycle converges.
+          value
+        } else {
+          detectedCycle
+        }
+      }
       case UNINITIALIZED | UNEVALUATED => {
 	status = CYCLE;
 	pending.push(this);
@@ -250,12 +263,37 @@ class Evaluation[T_P, T_V](val anchor : T_P, val name : String)
 	pending.pop();
 	if (inCycle != null) {
 	  evaluateCycle;
+	} else if (!this.isInstanceOf[CircularEvaluation[_,_]] &&
+	           !cycleIterating && pendingHasCircular) {
+	  // Cycle is still being discovered; circular values have not
+	  // converged yet, so this result may be stale.
+	  status = UNEVALUATED;
 	} else {
 	  status = EVALUATED;
+	  registerWithActiveCycle();
 	}
 	value
       }
       case _ => value
+    }
+  }
+
+  private def pendingHasCircular : Boolean = {
+    for (e <- pending) {
+      if (e.isInstanceOf[CircularEvaluation[_,_]]) {
+        return true;
+      }
+    }
+    false
+  }
+
+  private def registerWithActiveCycle() : Unit = {
+    for (e <- pending) {
+      val c = e.inCycle;
+      if (c != null) {
+        c.helper.addNonCircularDependent(this);
+        return;
+      }
     }
   }
 
@@ -394,9 +432,25 @@ trait CollectionEvaluation[V_P, V_T] extends Evaluation[V_P,V_T] {
 
 class CircularHelper(var cycleLast : CircularEvaluation[_,_]) {
   var modified : Boolean = false;
+
+  // Non-circular evals that read from this cycle during iteration;
+  // must be invalidated between recomputes so they see fresh values.
+  val nonCircularDependents : Buffer[Evaluation[_,_]] = new ArrayBuffer();
   
   {
     Debug.out("Created cycle helper " + this + " for " + cycleLast.name);
+  }
+
+  def addNonCircularDependent(e : Evaluation[_,_]) : Unit = {
+    nonCircularDependents += e
+  };
+
+  def invalidateNonCircularDependents() : Unit = {
+    import Evaluation._;
+    for (e <- nonCircularDependents) {
+      e.status = UNEVALUATED;
+    }
+    nonCircularDependents.clear();
   }
 
   def add(c : CircularEvaluation[_,_]) : Unit = {
@@ -480,7 +534,11 @@ trait CircularEvaluation[V_P, V_T] extends Evaluation[V_P,V_T] {
     val cycle = inCycle;
     for (e <- pending) {
       Debug.out("Checking " + e + " in pending.");
-      if (e.inCycle == cycle) return;
+      if (!e.isInstanceOf[CircularEvaluation[_,_]]) {
+        // Non-circular evals may appear between circular ones on
+        // the pending stack; they don't participate in the cycle.
+      }
+      else if (e.inCycle == cycle) return
       else e.setInCycle(cycle);
     }
   }
@@ -488,6 +546,8 @@ trait CircularEvaluation[V_P, V_T] extends Evaluation[V_P,V_T] {
   override def evaluateCycle : Unit = {
     if (cycleParent == this) {
       // we're in charge
+      cycleIterating = true;
+      helper.invalidateNonCircularDependents();
       do {
 	helper.modified = false;
 	var c : CircularEvaluation[_,_] = this;
@@ -495,16 +555,22 @@ trait CircularEvaluation[V_P, V_T] extends Evaluation[V_P,V_T] {
 	  pending.push(c);
 	  c.recompute();
 	  pending.pop();
-	  if (cycleParent != this) return; // no longer our responsibility
+	  helper.invalidateNonCircularDependents();
+	  if (cycleParent != this) {
+		  cycleIterating = false;
+		  return; // no longer our responsibility
+	  }
 	  c = c.cycleNext;
 	} while (c != null);
       } while (helper.modified);
+      cycleIterating = false;
       // now freeze all values:
       var c : CircularEvaluation[_,_] = this;
       do {
 	c.status = EVALUATED;
 	c = c.cycleNext;
       } while (c != null);
+      helper.invalidateNonCircularDependents();
     }
   }
 
