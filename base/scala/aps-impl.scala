@@ -466,7 +466,7 @@ class CircularHelper(var cycleLast : CircularEvaluation[_,_]) {
       Debug.out("Adding all from " + c.helper + " to cycle " + this);
       var p = c;
       while (p != null) {
-	Debug.out("  " + p.name);
+	Debug.out("  " + p + " " + p.name);
 	p = p.cycleNext;
       }
     }
@@ -520,7 +520,7 @@ trait CircularEvaluation[V_P, V_T] extends Evaluation[V_P,V_T] {
   override def getDefault : ValueType = lattice.v_bottom;
 
   override def detectedCycle : ValueType = {
-    Debug.out("Detected cycle for " + name);
+    Debug.out("Detected cycle for " + this + ": " + name);
     if (cycleParent == null) {
       value = getDefault;
       helper = new CircularHelper(this);
@@ -578,7 +578,7 @@ trait CircularEvaluation[V_P, V_T] extends Evaluation[V_P,V_T] {
     if (!lattice.v_equal(value,newValue)) {
       inCycle.helper.modified = true;
       if (!lattice.v_compare(value,newValue)) {
-	throw new CyclicAttributeException("non-monotonic " + name);
+	throw new CyclicAttributeException("non-monotonic " + name + ": was " + value + ", now " + newValue);
       }
     }
   };
