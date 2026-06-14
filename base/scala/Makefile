@@ -8,7 +8,7 @@ LIB=../../lib
 
 all : aps-library-2.10.jar aps-library-2.11.jar aps-library-2.12.jar
 
-test: test-multiset.run test-set.run test-flat.run
+test: test-multiset.run test-set.run test-flat.run test-aps-eval.run
 
 flat.scala: ../flat.aps ../../bin/aps2scala
 	../../bin/aps2scala -p .. flat
