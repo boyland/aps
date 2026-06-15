@@ -55,5 +55,5 @@ aps-library.jar : ${SCALA}
 	jar cvf $@ *.class
 
 clean :
-	rm -f *.class *.jar *-2.*.scala
+	rm -f *.class *.jar *-2.*.scala flat.scala
 
