@@ -1,12 +1,14 @@
 .PHONY: all install clean
 
 SCALA= aps-impl.scala basic.handcode.scala table.handcode.scala symbol.scala symbol.handcode.scala flat.scala
-SVERSION=2.12
+SVERSION=2.13
 LIB=../../lib
 
 # We can't make 2.9 anymore because it doesn't understand Java 8
 
-all : aps-library-2.10.jar aps-library-2.11.jar aps-library-2.12.jar
+all : aps-library.jar
+
+# aps-library-2.10.jar aps-library-2.11.jar aps-library-2.12.jar
 
 test: test-multiset.run test-set.run test-flat.run test-aps-eval.run
 

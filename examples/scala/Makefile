@@ -10,6 +10,8 @@ SCALAFLAGS= -cp .:${APSLIB}
 SCALACFLAGS= ${SCALAFLAGS}
 APS2SCALA = ${APSTOP}/bin/aps2scala
 APS2SCALAFLAGS = -p ..:${APSTOP}/base -G
+SCALABISON= ${HOME}/git/scala-bison/scala-bison-2.13.jar
+SCALAFLEX= ${HOME}/Documents/Courses/sp26-cs654/etc/JFlex.jar
 
 EVALUATOR ?= DYNAMIC
 
