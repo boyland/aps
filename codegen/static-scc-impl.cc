@@ -1054,8 +1054,10 @@ static void dump_visit_functions(PHY_GRAPH* pg, output_streams& oss)
   int num_cons = aug_graphs.size();
 
   if (num_cons == 0) {
-    fatal_error("no top-level-match match for phylum %s",
+    aps_error(pg->phylum,
+              "no top-level-match match for phylum %s",
                 decl_name(pg->phylum));
+    return;
   }
 
   // The match clauses may be in a different order
