@@ -512,7 +512,7 @@ trait CircularEvaluation[V_P, V_T] extends Evaluation[V_P,V_T] {
     if (!lattice.v_equal(value,newValue)) {
       inCycle.helper.modified = true;
       if (!lattice.v_compare(value,newValue)) {
-	throw new CyclicAttributeException("non-monotonic " + name);
+	throw new CyclicAttributeException("non-monotonic " + name + ": was " + value + ", now " + newValue);
       }
     }
   };

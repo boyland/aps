@@ -2358,9 +2358,20 @@ static void init_analysis_state(STATE *s, Declaration module) {
       case KEYattribute_decl:
 	if (!ATTR_DECL_IS_SYN(decl) && !ATTR_DECL_IS_INH(decl) &&
 	    !FIELD_DECL_P(decl)) {
-	  aps_error(decl,"%s not declared either synthesized or inherited",
-		    decl_name(decl));
-	  Declaration_info(decl)->decl_flags |= ATTR_DECL_SYN_FLAG;
+	  Direction dir = attribute_decl_direction(decl);
+	  if (direction_is_input(dir)) {
+	    aps_error(decl, "%s not declared inherited; assuming inherited",
+			decl_name(decl));
+	    Declaration_info(decl)->decl_flags |= ATTR_DECL_INH_FLAG;
+	  } else if (direction_is_circular(dir) || direction_is_collection(dir)) {
+	    aps_error(decl, "%s not declared synthesized; assuming synthesized",
+			decl_name(decl));
+	    Declaration_info(decl)->decl_flags |= ATTR_DECL_SYN_FLAG;
+	  } else {
+	    aps_error(decl, "%s not declared either synthesized or inherited",
+		      decl_name(decl));
+	    Declaration_info(decl)->decl_flags |= ATTR_DECL_SYN_FLAG;
+	  }
 	}
 	{ Type ftype = attribute_decl_type(decl);
 	  Declaration formal = first_Declaration(function_type_formals(ftype));

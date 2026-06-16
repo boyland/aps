@@ -66,14 +66,13 @@ module FARROW_UBD[T :: var FARROW_UBD_TREE[]] extends T begin
   match ?self:Declarations=decls_append(?ds: Declarations, ?d: Declaration) begin
     ds.decls_env := self.decls_env;
     d.decl_env := self.decls_env;
+    self.decls_defs := DeclPairLattice$join(ds.decls_defs, d.decl_pair);
 
     case DeclPairLattice$select(ds.decls_defs, d.decl_name) begin
       match DeclPairLattice$table_entry(?,?value) begin
         self.decls_errs := { "identifier " ++ symbol_name(d.decl_name) ++ " is multiply defined" } \/ ds.decls_errs \/ d.decl_errs;
-        self.decls_defs := ds.decls_defs;
       end;
       else
-        self.decls_defs := DeclPairLattice$join(ds.decls_defs, d.decl_pair);
         self.decls_errs := ds.decls_errs \/ d.decl_errs;
     end;
   end;
@@ -85,35 +84,19 @@ module FARROW_UBD[T :: var FARROW_UBD_TREE[]] extends T begin
   end;
 
   match ?self:Operation=op_add() begin
-    if self.op_lval = IntegerLattice$bottom or self.op_rval = IntegerLattice$bottom then
-      self.op_val := IntegerLattice$bottom;
-    else
-      self.op_val := IntegerLattice$applyf2(Integer$plus, self.op_lval, self.op_rval);
-    endif;
+    self.op_val := IntegerLattice$applyf2(Integer$plus, self.op_lval, self.op_rval);
   end;
 
   match ?self:Operation=op_mul() begin
-    if self.op_lval = IntegerLattice$bottom or self.op_rval = IntegerLattice$bottom then
-      self.op_val := IntegerLattice$bottom;
-    else
-      self.op_val := IntegerLattice$applyf2(Integer$times, self.op_lval, self.op_rval);
-    endif;
+    self.op_val := IntegerLattice$applyf2(Integer$times, self.op_lval, self.op_rval);
   end;
 
   match ?self:Operation=op_sub() begin
-    if self.op_lval = IntegerLattice$bottom or self.op_rval = IntegerLattice$bottom then
-      self.op_val := IntegerLattice$bottom;
-    else
-      self.op_val := IntegerLattice$applyf2(Integer$minus, self.op_lval, self.op_rval);
-    endif;
+    self.op_val := IntegerLattice$applyf2(Integer$minus, self.op_lval, self.op_rval);
   end;
 
   match ?self:Operation=op_div() begin
-    if self.op_lval = IntegerLattice$bottom or self.op_rval = IntegerLattice$bottom then
-      self.op_val := IntegerLattice$bottom;
-    else
-      self.op_val := IntegerLattice$applyf2(Integer$divide, self.op_lval, self.op_rval);
-    endif;
+    self.op_val := IntegerLattice$applyf2(Integer$divide, self.op_lval, self.op_rval);
   end;
 
   match ?self:Expression=expr_apply(?e: Expression, ?op: Operation, ?t: Term) begin
