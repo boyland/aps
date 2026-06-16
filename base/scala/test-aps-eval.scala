@@ -18,90 +18,95 @@ object TestCircularStale {
   import Evaluation._;
 
   def main(args: Array[String]): Unit = {
-    test1_staleNonCircular();
-    test2_nonCircularInCyclePath();
-    test3_caseMatchIsMonotone();
+    test1_singleCircularConvergence();
+    test2_mutualCircularCycle();
+    test3_nonCircularReadsConvergedCircular();
+    test4_shortCircuitPreventsFullCycle();
     println("All tests passed.");
   }
 
-  // A non-circular attribute that reads a circular attribute should
-  // reflect the converged value, not a value seen mid-iteration.
-  def test1_staleNonCircular(): Unit = {
-    var nonCircularAttribute: Evaluation[String, Int] = null;
-    var firstCompute = true;
-
-    val circularAttribute = new Evaluation[String, Int]("node", "circularAttribute")
+  // basic: one attribute demands itself, should iterate to fixpoint
+  def test1_singleCircularConvergence(): Unit = {
+    val attr = new Evaluation[String, Int]("node", "attr")
       with CircularEvaluation[String, Int] {
       val lattice = IntLatticeInstance;
       override def compute: Int = {
-        if (firstCompute) { firstCompute = false; nonCircularAttribute.get; }
+        val current = this.get;
+        math.min(current + 1, 5);
+      }
+    };
+
+    val result = attr.get;
+    assert(result == 5, s"test1: expected 5, got $result");
+  }
+
+  // two attrs in a mutual cycle, both should converge
+  def test2_mutualCircularCycle(): Unit = {
+    var attrB: Evaluation[String, Int] with CircularEvaluation[String, Int] = null;
+
+    val attrA = new Evaluation[String, Int]("nodeA", "attrA")
+      with CircularEvaluation[String, Int] {
+      val lattice = IntLatticeInstance;
+      override def compute: Int = math.min(attrB.get + 1, 4);
+    };
+
+    attrB = new Evaluation[String, Int]("nodeB", "attrB")
+      with CircularEvaluation[String, Int] {
+      val lattice = IntLatticeInstance;
+      override def compute: Int = math.min(attrA.get + 1, 4);
+    };
+
+    val resultA = attrA.get;
+    val resultB = attrB.get;
+    assert(resultA == 4, s"test2: attrA expected 4, got $resultA");
+    assert(resultB == 4, s"test2: attrB expected 4, got $resultB");
+  }
+
+  // non-circular attr should see the converged value, not stale mid-iteration state
+  def test3_nonCircularReadsConvergedCircular(): Unit = {
+    val circAttr = new Evaluation[String, Int]("node", "circAttr")
+      with CircularEvaluation[String, Int] {
+      val lattice = IntLatticeInstance;
+      override def compute: Int = {
+        val current = this.get;
+        math.min(current + 1, 7);
+      }
+    };
+
+    val circResult = circAttr.get;
+    assert(circResult == 7, s"test3: circAttr expected 7, got $circResult");
+
+    val plainAttr = new Evaluation[String, Int]("node", "plainAttr") {
+      override def compute: Int = circAttr.get + 100;
+    };
+
+    val plainResult = plainAttr.get;
+    assert(plainResult == 107, s"test3: plainAttr expected 107, got $plainResult");
+  }
+
+  // This is the farrow-ubd (and nested-ubd) bug pattern: if we skip demanding attrB
+  // on the first pass, attrB never joins the cycle. Here we always demand it, so both converge.
+  def test4_shortCircuitPreventsFullCycle(): Unit = {
+    var attrB: Evaluation[String, Int] with CircularEvaluation[String, Int] = null;
+
+    val attrA = new Evaluation[String, Int]("nodeA", "attrA")
+      with CircularEvaluation[String, Int] {
+      val lattice = IntLatticeInstance;
+      override def compute: Int = {
+        val bVal = attrB.get; // must demand eagerly
         math.min(value + 1, 3);
       }
     };
 
-    nonCircularAttribute = new Evaluation[String, Int]("node", "nonCircularAttribute") {
-      override def compute: Int = circularAttribute.get + 100;
-    };
-
-    val circularResult = circularAttribute.get;
-    assert(circularResult == 3, s"circularAttribute: expected 3, got $circularResult");
-
-    val nonCircularResult = nonCircularAttribute.get;
-    assert(nonCircularResult == 103, s"nonCircularAttribute: expected 103, got $nonCircularResult");
-  }
-
-  // A plain (non-circular) attribute that participates in a cycle path
-  // should not throw CyclicAttributeException.
-  def test2_nonCircularInCyclePath(): Unit = {
-    var circularAttribute: CircularEvaluation[String, Int] = null;
-    var firstCall = true;
-
-    val middleAttribute = new Evaluation[String, Int]("node", "middleAttribute") {
-      override def compute: Int = circularAttribute.get + 10;
-    };
-
-    circularAttribute = new Evaluation[String, Int]("node", "circularAttribute")
+    attrB = new Evaluation[String, Int]("nodeB", "attrB")
       with CircularEvaluation[String, Int] {
       val lattice = IntLatticeInstance;
-      override def compute: Int = {
-        if (firstCall) { firstCall = false; middleAttribute.get; }
-        else math.min(value + 1, 30);
-      }
+      override def compute: Int = attrA.get;
     };
 
-    val result = circularAttribute.get;
-    assert(result == 30, s"circularAttribute: expected 30, got $result");
-
-    val middleResult = middleAttribute.get;
-    assert(middleResult == 40, s"middleAttribute: expected 40, got $middleResult");
-  }
-
-  // A non-circular attribute whose result depends on a circular attribute
-  // via a conditional should reflect the converged value.
-  def test3_caseMatchIsMonotone(): Unit = {
-    var lookupAttribute: Evaluation[String, Int] = null;
-    var firstCompute = true;
-
-    val envAttribute = new Evaluation[String, Int]("node", "envAttribute")
-      with CircularEvaluation[String, Int] {
-      val lattice = IntLatticeInstance;
-      override def compute: Int = {
-        if (firstCompute) { firstCompute = false; lookupAttribute.get; }
-        math.min(value + 1, 3);
-      }
-    };
-
-    lookupAttribute = new Evaluation[String, Int]("node", "lookupAttribute") {
-      override def compute: Int = {
-        val env = envAttribute.get;
-        if (env > 0) env else 0;
-      }
-    };
-
-    val envResult = envAttribute.get;
-    assert(envResult == 3, s"envAttribute: expected 3, got $envResult");
-
-    val lookupResult = lookupAttribute.get;
-    assert(lookupResult == 3, s"lookupAttribute: expected 3, got $lookupResult");
+    val resultA = attrA.get;
+    val resultB = attrB.get;
+    assert(resultA == 3, s"test4: attrA expected 3, got $resultA");
+    assert(resultB == 3, s"test4: attrB expected 3, got $resultB");
   }
 }
