@@ -16,10 +16,11 @@ object NestedUbdDriver extends App {
   val m_nested_ubd_tree = nested_ubd_tree;
   val m_nested_ubd = new M_NESTED_UBD[m_nested_ubd_tree.T_Result]("NestedUbd", m_nested_ubd_tree.t_Result);
 
-  Debug.activate();
+  // Debug.activate();
 
   m_nested_ubd_tree.finish();
   m_nested_ubd.finish();
 
-  println(m_nested_ubd.v_program_errs(m_nested_ubd.t_Program.nodes(0)));
+  println("Results:");
+  m_nested_ubd.v_program_errs(m_nested_ubd.t_Program.nodes(0)).toSeq.sorted.foreach(println);
 }
