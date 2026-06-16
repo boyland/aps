@@ -1161,8 +1161,11 @@ class SynthImpl : public SynthImplementation {
     PHY_GRAPH* start_phy_graph = summary_graph_for(s, s->start_phylum);
 
     if (needs_fixed_point) {
-      os << indent() << "implicit val " << LOOP_VAR << ": Boolean = false;\n";
       os << indent() << "implicit val changed: AtomicBoolean = new AtomicBoolean(false);\n";
+      os << indent() << "implicit val " << LOOP_VAR << ": Boolean = true;\n";
+      os << indent() << "do {\n";
+      ++nesting_level;
+      os << indent() << "changed.set(false);\n";
     }
     os << indent() << "for (root <- t_" << decl_name(s->start_phylum) << ".nodes) {\n";
     ++nesting_level;
@@ -1178,6 +1181,11 @@ class SynthImpl : public SynthImplementation {
     }
     --nesting_level;
     os << indent() << "}\n";
+
+    if (needs_fixed_point) {
+      --nesting_level;
+      os << indent() << "} while (changed.get)\n";
+    }
 
 #ifdef APS2SCALA
     os << indent() << "super.finish();\n";
