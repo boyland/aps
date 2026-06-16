@@ -8,3 +8,5 @@ make EVALUATOR=STATIC Classic.run
 make EVALUATOR=STATIC TestCollDriver.run
 make EVALUATOR=STATIC TestUseCollDriver.run
 make EVALUATOR=STATIC NestedCyclesDriver.run
+make EVALUATOR=STATIC ARGS="nested-ubd.program" NestedUbdDriver.run
+make EVALUATOR=STATIC ARGS="nested-ubd.program" NestedUbdFiberDriver.run
