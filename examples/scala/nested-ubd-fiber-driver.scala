@@ -16,7 +16,7 @@ object NestedUbdFiberDriver extends App {
   val m_nested_ubd_tree = nested_ubd_tree;
   val m_nested_ubd = new M_NESTED_UBD_FIBER[m_nested_ubd_tree.T_Result]("NestedUbdFiber", m_nested_ubd_tree.t_Result);
 
-  // Debug.activate();
+  if (args.contains("--debug")) Debug.activate();
 
   m_nested_ubd_tree.finish();
   m_nested_ubd.finish();

@@ -16,7 +16,7 @@ object FarrowUbdFiberDriver extends App {
   val m_farrow_ubd_tree = farrow_ubd_tree;
   val m_farrow_ubd = new M_FARROW_UBD_FIBER[m_farrow_ubd_tree.T_Result]("FarrowUbdFiber", m_farrow_ubd_tree.t_Result);
 
-  // Debug.activate();
+  if (args.contains("--debug")) Debug.activate();
 
   m_farrow_ubd_tree.finish();
   m_farrow_ubd.finish();
