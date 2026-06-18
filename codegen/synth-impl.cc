@@ -1,6 +1,7 @@
 #include <string.h>
 
 #include <algorithm>
+#include <functional>
 #include <iostream>
 #include <numeric>
 extern "C" {
@@ -29,6 +30,9 @@ typedef struct synth_function_state {
 static AUG_GRAPH* current_aug_graph = NULL;
 static std::vector<SYNTH_FUNCTION_STATE*> synth_functions_states;
 static SYNTH_FUNCTION_STATE* current_synth_functions_state = NULL;
+// Set while dumping; read in finish(). True if a cycle closes through a
+// fiber/shared-global collection. Currently informational only (see finish()).
+static bool module_needs_global_loop = false;
 
 #define LOCAL_VALUE_FLAG (1 << 28)
 
@@ -841,6 +845,150 @@ private:
   }
 };
 
+// True if this synth function computes a circular attribute. Such attributes
+// assign through the change-tracking overload so the fixed-point loop can detect
+// when they stop changing.
+static bool synth_function_is_circular(SYNTH_FUNCTION_STATE* st) {
+  if (st->is_fiber_evaluation) {
+    return false;
+  }
+  if (instance_is_pure_shared_info(st->source)) {
+    return false;
+  }
+  for (auto it = st->aug_graphs.begin(); it != st->aug_graphs.end(); it++) {
+    AUG_GRAPH* aug_graph = *it;
+    INSTANCE* inst = NULL;
+    if (st->is_phylum_instance) {
+      if (!find_instance(aug_graph, aug_graph->lhs_decl, st->source->fibered_attr, &inst)) {
+        continue;
+      }
+    } else {
+      inst = st->source;
+    }
+    if (instance_circular(inst)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// A synthesized, circular, non-fiber attribute on a child node -- a candidate
+// whose local iteration can converge a cycle.
+static bool is_cycle_closing_candidate(INSTANCE* instance, AUG_GRAPH* aug_graph) {
+  bool on_child_node = instance->node != NULL && instance->node != aug_graph->lhs_decl;
+  return on_child_node &&
+         instance->fibered_attr.fiber == NULL &&
+         !if_rule_p(instance->fibered_attr.attr) &&
+         instance_is_synthesized(instance) &&
+         instance_circular(instance);
+}
+
+// True if `inherited` is the inherited circular attribute on the same child node
+// that `instance` directly feeds -- the edge that closes the cycle here.
+static bool closes_cycle_with(INSTANCE* inherited, INSTANCE* instance, AUG_GRAPH* aug_graph) {
+  int n = aug_graph->instances.length;
+  bool instance_feeds_inherited =
+      edgeset_kind(aug_graph->graph[instance->index * n + inherited->index]) & DEPENDENCY_MAYBE_DIRECT;
+  return inherited != instance &&
+         inherited->node == instance->node &&
+         inherited->fibered_attr.fiber == NULL &&
+         instance_is_inherited(inherited) &&
+         instance_circular(inherited) &&
+         instance_feeds_inherited;
+}
+
+// Child attributes that close a cycle at this production. A synthesized circular
+// child instance that directly feeds its own inherited circular attribute closes
+// the cycle here, so we can iterate it to a fixed point locally instead of
+// program-wide. Productions that only forward an inherited attribute are skipped.
+static std::vector<INSTANCE*> collect_child_cycle_instances(AUG_GRAPH* aug_graph) {
+  std::vector<INSTANCE*> result;
+  int n = aug_graph->instances.length;
+  for (int index = 0; index < n; index++) {
+    INSTANCE* instance = &aug_graph->instances.array[index];
+    if (!is_cycle_closing_candidate(instance, aug_graph)) continue;
+
+    for (int inner_index = 0; inner_index < n; inner_index++) {
+      INSTANCE* inherited = &aug_graph->instances.array[inner_index];
+      if (closes_cycle_with(inherited, instance, aug_graph)) {
+        result.push_back(instance);
+        break;
+      }
+    }
+  }
+  return result;
+}
+
+// True if a cycle closes through a fiber/shared-global collection rather than a
+// child's inherited attribute -- i.e. no local child instance can close it.
+static bool module_has_fiber_cycle(const std::vector<SYNTH_FUNCTION_STATE*>& states) {
+  for (auto it = states.begin(); it != states.end(); it++) {
+    SYNTH_FUNCTION_STATE* st = *it;
+    if (!st->is_fiber_evaluation) continue;
+    if (instance_is_pure_shared_info(st->source) && st->is_phylum_instance) {
+      // pure shared-info has no fixed-point loop of its own; skip
+      continue;
+    }
+    for (auto ag = st->aug_graphs.begin(); ag != st->aug_graphs.end(); ag++) {
+      AUG_GRAPH* aug_graph = *ag;
+      INSTANCE* inst = NULL;
+      if (st->is_phylum_instance) {
+        if (!find_instance(aug_graph, aug_graph->lhs_decl, st->source->fibered_attr, &inst)) {
+          continue;
+        }
+      } else {
+        inst = st->source;
+      }
+      if (!instance_circular(inst)) continue;
+
+      // A local child instance closes this cycle at its production, so no
+      // module-wide loop is needed. Count it as a fiber cycle only when none does.
+      std::vector<INSTANCE*> child_cycle_instances = collect_child_cycle_instances(aug_graph);
+      if (child_cycle_instances.empty()) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+// Emits the two implicits every fixed-point loop body opens with: isInsideFixedPoint
+// (disables caching) and `changed` bound to this loop's convergence flag.
+static void emit_loop_implicits(ostream& os, const string& flag) {
+  os << indent() << "implicit val " << LOOP_VAR << ": Boolean = true;\n";
+  os << indent() << "implicit val changed: AtomicBoolean = " << flag << ";\n";
+}
+
+// Emits a local successive-approximation loop, guarded so it is skipped when
+// already inside an outer fixed point (that loop drives convergence instead):
+//
+//   if (!isInsideFixedPoint) {
+//     val <flag> = new AtomicBoolean(true);
+//     while (<flag>.get) {
+//       <flag>.set(false);
+//       implicit val isInsideFixedPoint = true; implicit val changed = <flag>;
+//       <body>
+//     }
+//   }
+//
+// `emit_body` writes the body at the current indentation.
+static void emit_local_fixed_point_loop(ostream& os,
+                                        const string& flag,
+                                        const std::function<void()>& emit_body) {
+  os << indent() << "if (!" << LOOP_VAR << ") {\n";
+  ++nesting_level;
+  os << indent() << "val " << flag << " = new AtomicBoolean(true);\n";
+  os << indent() << "while (" << flag << ".get) {\n";
+  ++nesting_level;
+  os << indent() << flag << ".set(false);\n";
+  emit_loop_implicits(os, flag);
+  emit_body();
+  --nesting_level;
+  os << indent() << "}\n";
+  --nesting_level;
+  os << indent() << "}\n";
+}
+
 #ifdef APS2SCALA
 static void dump_synth_functions(STATE* s, ostream& os)
 #else  /* APS2SCALA */
@@ -861,6 +1009,10 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
 
   synth_functions_states = build_synth_functions_state(s);
   bool needs_fixed_point = s->loop_required;
+
+  // Module-wide loop needed only when a cycle closes through a fiber/shared
+  // collection; inherited cycles converge locally at their productions.
+  module_needs_global_loop = needs_fixed_point && module_has_fiber_cycle(synth_functions_states);
 
   for (auto state_it = synth_functions_states.begin(); state_it != synth_functions_states.end(); state_it++) {
     SYNTH_FUNCTION_STATE* synth_functions_state = *state_it;
@@ -953,7 +1105,8 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
 
     if (needs_fixed_point) {
       nesting_level--;
-      os << indent() << "}\n";
+      os << indent() << "}";
+      os << "\n";
     }
 
     if (synth_functions_state->is_fiber_evaluation) {
@@ -962,6 +1115,11 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
       os << indent() << "val result = node match {\n";
     }
     nesting_level++;
+
+    // True if this attribute is circular anywhere. Then every assignment uses the
+    // change-tracking overload so the closure-site loop can see it settle; only
+    // the closure site emits the do/while.
+    bool source_circular = needs_fixed_point && synth_function_is_circular(synth_functions_state);
 
     for (auto it = synth_functions_state->aug_graphs.begin(); it != synth_functions_state->aug_graphs.end(); it++) {
       AUG_GRAPH* aug_graph = *it;
@@ -1004,9 +1162,37 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
         aps_warning(aug_graph_instance->node, "Instance %s depends on itself but is not declared circular", instance_to_string(aug_graph_instance).c_str());
       }
 
-      bool dump_fixed_point_loop = declared_is_circular && !instance_is_pure_shared_info(synth_functions_state->source);
+      // Non-fiber cycles loop at the closing child (collect_child_cycle_instances,
+      // above); everywhere else we compute once and report changes via `changed`.
+      // We do NOT emit a per-attribute do/while for them: the LHS self-edge marks
+      // them circular at every production, so looping at each one nests loops down
+      // the tree -> exponential in depth (Farrow 1986 sec.4: loop at the closure
+      // only). Fiber/shared cycles aren't local to a production, so they loop here.
+      bool dump_fixed_point_loop = synth_functions_state->is_fiber_evaluation && declared_is_circular && !instance_is_pure_shared_info(synth_functions_state->source);
       string node_get = ATTR_DECL_IS_SHARED_INFO(synth_functions_state->source->fibered_attr.attr) ? "" : "node";
       string node_assign = ATTR_DECL_IS_SHARED_INFO(synth_functions_state->source->fibered_attr.attr) ? "" : "node, ";
+
+      // Converge any child cycle that closes here before computing this value, so
+      // the cached body below reads settled values. Replaces a whole-program loop.
+      if (!synth_functions_state->is_fiber_evaluation) {
+        std::vector<INSTANCE*> child_cycle_instances = collect_child_cycle_instances(aug_graph);
+        for (auto it2 = child_cycle_instances.begin(); it2 != child_cycle_instances.end(); it2++) {
+          INSTANCE* cycle_instance = *it2;
+          // Skipped when already inside an outer fixed point (see helper): nesting
+          // a do/while per scope would re-converge this child every outer pass,
+          // which is exponential in nesting depth. The outer loop revisits this
+          // production each round; here we just do one step and report via `changed`.
+          emit_local_fixed_point_loop(os, "localChanged", [&] {
+            dumped_conditional_block_items.clear();
+            dumped_instances.clear();
+            os << indent();
+            synth_impl_ptr->dump_synth_instance(cycle_instance, os);
+            os << ";\n";
+          });
+        }
+        dumped_conditional_block_items.clear();
+        dumped_instances.clear();
+      }
 
       // Open fixed-point loop using shared changed flag for convergence tracking
       if (dump_fixed_point_loop) {
@@ -1024,8 +1210,7 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
         if (synth_functions_state->is_fiber_evaluation) {
           tracking_fiber_convergence = true;
         }
-        os << indent() << "implicit val " << LOOP_VAR << ": Boolean = true;\n";
-        os << indent() << "implicit val changed: AtomicBoolean = newChanged" << src_idx << ";\n";
+        emit_loop_implicits(os, "newChanged" + std::to_string(src_idx));
       }
 
       // Fiber dependencies (inside loop when looping)
@@ -1088,7 +1273,11 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
     if (synth_functions_state->is_fiber_evaluation) {
         os << indent() << "evaluated_map_" << synth_functions_state->fdecl_name << ".update(node.nodeNumber, true);\n";
     } else {
-      os << indent() << instance_to_attr(synth_functions_state->source) << ".assign(node, result);\n";
+      if (source_circular) {
+        os << indent() << instance_to_attr(synth_functions_state->source) << ".assign(node, result, changed);\n";
+      } else {
+        os << indent() << instance_to_attr(synth_functions_state->source) << ".assign(node, result);\n";
+      }
       os << indent() << instance_to_attr(synth_functions_state->source) << ".get(node);\n";
     }
 
@@ -1161,11 +1350,19 @@ class SynthImpl : public SynthImplementation {
     PHY_GRAPH* start_phy_graph = summary_graph_for(s, s->start_phylum);
 
     if (needs_fixed_point) {
+      // Demand each root once with caching on (isInsideFixedPoint = false).
+      // Inherited cycles converged at their productions; fiber/shared cycles
+      // converge via the per-production loops inside their *_sharedinfo_* evals,
+      // so one cached pass reaches the fixed point for every grammar we handle.
+      //
+      // A module-wide do/while (caching off, re-traverse until `changed` stays
+      // false) would cover cycles whose state is purely module-global, but it
+      // disables caching across the whole traversal -> re-descends the tree
+      // uncached every round -> super-linear, non-terminating at depth ~10. No
+      // grammar needs it. If one ever does, iterate only the circular collection,
+      // not the whole tree.
       os << indent() << "implicit val changed: AtomicBoolean = new AtomicBoolean(false);\n";
-      os << indent() << "implicit val " << LOOP_VAR << ": Boolean = true;\n";
-      os << indent() << "do {\n";
-      ++nesting_level;
-      os << indent() << "changed.set(false);\n";
+      os << indent() << "implicit val " << LOOP_VAR << ": Boolean = false;\n";
     }
     os << indent() << "for (root <- t_" << decl_name(s->start_phylum) << ".nodes) {\n";
     ++nesting_level;
@@ -1182,10 +1379,7 @@ class SynthImpl : public SynthImplementation {
     --nesting_level;
     os << indent() << "}\n";
 
-    if (needs_fixed_point) {
-      --nesting_level;
-      os << indent() << "} while (changed.get)\n";
-    }
+    (void)module_needs_global_loop;
 
 #ifdef APS2SCALA
     os << indent() << "super.finish();\n";
@@ -1588,17 +1782,14 @@ void dump_rhs_instance_helper(AUG_GRAPH* aug_graph, BlockItem* item, INSTANCE* i
       o << "/* did not find any assignment for this fiber attribute " << instance << " -> " << directionStr << " <-" <<" */";
       return;
     } else {
-      // Check if this is a local collection attribute (value_decl with collection direction)
-      // whose type is also COMBINABLE per its canonical signature.
-      // Such attributes may have conditional assignments (inside case/match blocks) that are
-      // not found by make_instance_assignment() at this level - they are handled elsewhere.
+      // A local collection attribute may be assigned only inside a case/match
+      // block, which make_instance_assignment() doesn't see at this level.
       Declaration attr = instance->fibered_attr.attr;
       bool is_local_collection = direction_is_collection(some_value_decl_direction(attr));
       if (is_local_collection) {
-        // Verify via canonical signature that the type implements COMBINABLE -
-        // i.e., some source_class in its signature set has a "combine" declaration
-        // in its body (handles COMBINABLE directly, MAKE_LATTICE, and any other
-        // combinable module, without needing to walk parent signature chains).
+        // Check the type is combinable: look for a "combine" declaration in any
+        // class in its canonical signature set. This covers COMBINABLE,
+        // MAKE_LATTICE, etc. without walking parent signature chains.
         Type vt = infer_some_value_decl_type(attr);
         CanonicalType* ctype = canonical_type(vt);
         CanonicalSignatureSet csig_set = infer_canonical_signatures(ctype);
@@ -1614,9 +1805,8 @@ void dump_rhs_instance_helper(AUG_GRAPH* aug_graph, BlockItem* item, INSTANCE* i
           }
         }
         if (is_combinable) {
-          // A local collection attribute with no direct assignment in this block
-          // (e.g., assigned only inside a conditional/case block) should return
-          // the type's initial/bottom value for this branch.
+          // No direct assignment in this block (it's inside a conditional/case),
+          // so this branch contributes the type's initial/bottom value.
           o << as_val(vt) << ".v_initial";
           if (include_comments) {
             o << " /* local collection " << decl_name(attr) << ": no direct assignment, using initial */";
