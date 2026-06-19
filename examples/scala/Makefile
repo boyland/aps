@@ -273,7 +273,7 @@ test_coll_implicit.class : test-coll${IMPL_SUFFIX} tiny_implicit.class
 	${SCALAC} ${SCALACFLAGS} $<
 	@touch $@
 
-test_use_coll_implicit.class : test-use-coll${IMPL_SUFFIX}
+test_use_coll_implicit.class : test-use-coll${IMPL_SUFFIX} tiny_implicit.class
 	${SCALAC} ${SCALACFLAGS} $<
 	@touch $@
 
@@ -283,7 +283,7 @@ TestCollDriver.class : test_coll_implicit.class TinyParser.class test-coll-drive
 TestUseCollDriver.class : test_use_coll_implicit.class TinyParser.class test-use-coll-driver.scala tiny_implicit.class
 	${SCALAC} ${SCALACFLAGS}  test-use-coll-driver.scala
 
-test_cycle_implicit.class : test-cycle${IMPL_SUFFIX}
+test_cycle_implicit.class : test-cycle${IMPL_SUFFIX} tiny_implicit.class
 	${SCALAC} ${SCALACFLAGS} $<
 	@touch $@
 
