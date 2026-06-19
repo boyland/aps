@@ -297,11 +297,8 @@ grammar_implicit.class : grammar.scala first${IMPL_SUFFIX} follow${IMPL_SUFFIX} 
 GrammarDriver.class : grammar_implicit.class GrammarParser.class
 	${SCALAC} ${SCALACFLAGS} grammar-driver.scala
 
-TinyScanner.class : TinyScanner.scala
-	${SCALAC} ${SCALACFLAGS} $<
-
-TinyParser.class : TinyParser.scala TinyScanner.class tiny_implicit.class
-	${SCALAC} ${SCALACFLAGS} $<
+TinyParser.class : tiny-parser.handcode.scala tiny_implicit.class
+	${SCALAC} ${SCALACFLAGS} tiny-parser.handcode.scala
 
 use_global_implicit.class : use-global${IMPL_SUFFIX} tiny_implicit.class
 	${SCALAC} ${SCALACFLAGS} $<
