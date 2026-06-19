@@ -1,4 +1,4 @@
-object TestCycleDriver extends App
+object BelowSingleFiberCycleDriver extends App
 {
     val m = new M_TINY("Tiny");
     val t_Tiny = m.t_Result;
@@ -14,11 +14,11 @@ object TestCycleDriver extends App
 
     m.finish();
 
-    val m2 = new M_TEST_CYCLE("Test Cycle",m);
+    val m2 = new M_BELOW_SINGLE_FIBER_CYCLE("Test below single",m);
     val w2 = w.asInstanceOf[m2.T_Root];
 
     m2.finish();
 
     println("Results:");
-    println("leaves is " + m2.v_leaves);
+    println("answer is " + m2.v_answer);
 }

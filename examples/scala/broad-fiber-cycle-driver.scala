@@ -1,12 +1,16 @@
 object BroadFiberCycleDriver extends App
 {
     val m = new M_TINY("Tiny");
-    type T_Tiny = m.T_Result;
     val t_Tiny = m.t_Result;
+    val p = new TinyParser(m);
 
-    val w = t_Tiny.v_root(t_Tiny.v_branch(t_Tiny.v_leaf(3),t_Tiny.v_leaf(4)));
+    val w = if (args.length > 0) {
+      p.parseFile(args(0))
+    } else {
+      t_Tiny.f_root(t_Tiny.f_branch(t_Tiny.f_leaf(3),t_Tiny.f_leaf(4)))
+    };
 
-    Debug.activate();
+    if (args.contains("--debug")) Debug.activate();
 
     m.finish();
 
@@ -15,5 +19,6 @@ object BroadFiberCycleDriver extends App
 
     m2.finish();
 
+    println("Results:");
     println("answer is " + m2.v_answer);
 }

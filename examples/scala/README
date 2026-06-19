@@ -4,9 +4,21 @@ make EVALUATOR=STATIC ARGS="farrow-ubd.program" FarrowUbdDriver.run
 make EVALUATOR=STATIC ARGS="farrow-ubd.program" FarrowUbdFiberDriver.run
 make EVALUATOR=STATIC ARGS="grammar.cfg" GrammarDriver.run
 make EVALUATOR=STATIC BroadFiberCycleDriver.run
+make EVALUATOR=STATIC ARGS="tiny.program" BroadFiberCycleDriver.run
+make EVALUATOR=STATIC BelowFiberCycleDriver.run
+make EVALUATOR=STATIC ARGS="tiny.program" BelowFiberCycleDriver.run
+make EVALUATOR=STATIC BelowSingleFiberCycleDriver.run
+make EVALUATOR=STATIC ARGS="tiny.program" BelowSingleFiberCycleDriver.run
+make EVALUATOR=STATIC LocalFiberCycleDriver.run
+make EVALUATOR=STATIC ARGS="tiny.program" LocalFiberCycleDriver.run
 make EVALUATOR=STATIC Classic.run
 make EVALUATOR=STATIC TestCollDriver.run
+make EVALUATOR=STATIC ARGS="tiny.program" TestCollDriver.run
 make EVALUATOR=STATIC TestUseCollDriver.run
+make EVALUATOR=STATIC ARGS="tiny.program" TestUseCollDriver.run
+make EVALUATOR=STATIC TestCycleDriver.run
+make EVALUATOR=STATIC ARGS="tiny.program" TestCycleDriver.run
+make EVALUATOR=STATIC ARGS="tiny.program" UseGlobal.run
 make EVALUATOR=STATIC NestedCyclesDriver.run
 make EVALUATOR=STATIC ARGS="nested-ubd.program" NestedUbdDriver.run
 make EVALUATOR=STATIC ARGS="nested-ubd.program" NestedUbdFiberDriver.run
