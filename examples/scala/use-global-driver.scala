@@ -1,15 +1,27 @@
 object UseGlobal
 {
 	def main(args : Array[String]) : Unit = {
-		if (args.length == 0) {
-			println("Usage: UseGlobal <file.program>");
-			System.exit(1);
+		val debug = args.contains("--debug");
+		val files = args.filter(_ != "--debug")
+		if (files.isEmpty) {
+			doWith("3,(1,4)", debug)
 		} else {
-			val debug = args.contains("--debug");
-			for (arg <- args if arg != "--debug") {
+			for (arg <- files) {
 				doWithFile(arg, debug)
 			};
 		}
+	};
+
+	def doWith(s : String, debug : Boolean) : Unit = {
+		val t = new M_TINY("Tiny");
+		val p = new TinyParser(t);
+		val m = new M_USE_GLOBAL("UseGlobal",t);
+		val r = p.asRoot(s).asInstanceOf[m.t_Result.T_Root];
+		t.finish();
+		if (debug) Debug.activate();
+		m.finish();
+		println("Results:");
+		println("done is " + m.v_done(r));
 	};
 
 	def doWithFile(filename : String, debug : Boolean) : Unit = {
