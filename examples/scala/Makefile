@@ -22,11 +22,14 @@ IMPL_SUFFIX = .scala
 endif
 
 SCALAGEN = simple.scala classic-binding.scala tiny.scala broad-fiber-cycle.scala \
+	below-fiber-cycle.scala below-single-fiber-cycle.scala local-fiber-cycle.scala \
 	test-coll.scala test-use-coll.scala test-cycle.scala use-global.scala \
 	grammar.scala first.scala follow.scala nullable.scala	\
 	farrow-lv-tree.scala farrow-lv.static.scala \
 	farrow-ubd-tree.scala farrow-ubd.static.scala farrow-ubd-fiber.static.scala \
-	broad-fiber-cycle.static.scala classic-binding.static.scala \
+	broad-fiber-cycle.static.scala below-fiber-cycle.static.scala \
+	below-single-fiber-cycle.static.scala local-fiber-cycle.static.scala \
+	classic-binding.static.scala \
 	grammar.scala first.static.scala follow.static.scala nullable.static.scala \
 	nested-cycles.static.scala \
 	test-coll.static.scala test-use-coll.static.scala test-cycle.static.scala use-global.static.scala
@@ -57,6 +60,9 @@ all : NestedUbd_implicit.class NestedUbdDriver.class
 all : NestedUbdFiber_implicit.class NestedUbdFiberDriver.class
 all : nested_cycles_implicit.class NestedCyclesDriver.class
 all : broad_fiber_cycle_implicit.class BroadFiberCycleDriver.class
+all : below_fiber_cycle_implicit.class BelowFiberCycleDriver.class
+all : below_single_fiber_cycle_implicit.class BelowSingleFiberCycleDriver.class
+all : local_fiber_cycle_implicit.class LocalFiberCycleDriver.class
 
 .PHONY: run
 
@@ -267,21 +273,21 @@ test_coll_implicit.class : test-coll${IMPL_SUFFIX} tiny_implicit.class
 	${SCALAC} ${SCALACFLAGS} $<
 	@touch $@
 
-test_use_coll_implicit.class : test-use-coll${IMPL_SUFFIX}
+test_use_coll_implicit.class : test-use-coll${IMPL_SUFFIX} tiny_implicit.class
 	${SCALAC} ${SCALACFLAGS} $<
 	@touch $@
 
-TestCollDriver.class : test_coll_implicit.class test-coll-driver.scala
+TestCollDriver.class : test_coll_implicit.class TinyParser.class test-coll-driver.scala
 	${SCALAC} ${SCALACFLAGS}  test-coll-driver.scala
 
-TestUseCollDriver.class : test_use_coll_implicit.class test-use-coll-driver.scala tiny_implicit.class
+TestUseCollDriver.class : test_use_coll_implicit.class TinyParser.class test-use-coll-driver.scala tiny_implicit.class
 	${SCALAC} ${SCALACFLAGS}  test-use-coll-driver.scala
 
-test_cycle_implicit.class : test-cycle${IMPL_SUFFIX}
+test_cycle_implicit.class : test-cycle${IMPL_SUFFIX} tiny_implicit.class
 	${SCALAC} ${SCALACFLAGS} $<
 	@touch $@
 
-TestCycleDriver.class : test_cycle_implicit.class test-cycle-driver.scala
+TestCycleDriver.class : test_cycle_implicit.class TinyParser.class test-cycle-driver.scala
 	${SCALAC} ${SCALACFLAGS}  test-cycle-driver.scala
 
 grammar_implicit.class : grammar.scala first${IMPL_SUFFIX} follow${IMPL_SUFFIX} nullable${IMPL_SUFFIX}
@@ -307,8 +313,35 @@ broad_fiber_cycle_implicit.class : broad-fiber-cycle${IMPL_SUFFIX}
 	${SCALAC} ${SCALACFLAGS} $<
 	@touch $@
 
-BroadFiberCycleDriver.class : broad_fiber_cycle_implicit.class tiny_implicit.class
+BroadFiberCycleDriver.class : broad_fiber_cycle_implicit.class tiny_implicit.class TinyParser.class
 BroadFiberCycleDriver.class : broad-fiber-cycle-driver.scala
+	${SCALAC} ${SCALACFLAGS} $<
+
+below_fiber_cycle_implicit.class : tiny_implicit.class
+below_fiber_cycle_implicit.class : below-fiber-cycle${IMPL_SUFFIX}
+	${SCALAC} ${SCALACFLAGS} $<
+	@touch $@
+
+BelowFiberCycleDriver.class : below_fiber_cycle_implicit.class tiny_implicit.class TinyParser.class
+BelowFiberCycleDriver.class : below-fiber-cycle-driver.scala
+	${SCALAC} ${SCALACFLAGS} $<
+
+below_single_fiber_cycle_implicit.class : tiny_implicit.class
+below_single_fiber_cycle_implicit.class : below-single-fiber-cycle${IMPL_SUFFIX}
+	${SCALAC} ${SCALACFLAGS} $<
+	@touch $@
+
+BelowSingleFiberCycleDriver.class : below_single_fiber_cycle_implicit.class tiny_implicit.class TinyParser.class
+BelowSingleFiberCycleDriver.class : below-single-fiber-cycle-driver.scala
+	${SCALAC} ${SCALACFLAGS} $<
+
+local_fiber_cycle_implicit.class : tiny_implicit.class
+local_fiber_cycle_implicit.class : local-fiber-cycle${IMPL_SUFFIX}
+	${SCALAC} ${SCALACFLAGS} $<
+	@touch $@
+
+LocalFiberCycleDriver.class : local_fiber_cycle_implicit.class tiny_implicit.class TinyParser.class
+LocalFiberCycleDriver.class : local-fiber-cycle-driver.scala
 	${SCALAC} ${SCALACFLAGS} $<
 
 .PHONY: %.run

@@ -13,6 +13,15 @@ class TinyParser(m_tree : M_TINY) {
 		parseRoot(tok)
 	};
 
+	def parseFile(filename : String) : t_Tree.T_Root = {
+		val source = scala.io.Source.fromFile(filename)
+		try {
+			asRoot(source.mkString.trim)
+		} finally {
+			source.close()
+		}
+	};
+
 	def parseRoot(t : StringTokenizer) : t_Tree.T_Root =
 		t_Tree.f_root(parseWood(t));
 
