@@ -20,5 +20,5 @@ object LocalFiberCycleDriver extends App
     m2.finish();
 
     println("Results:");
-    println("answer is " + m2.v_answer);
+    println("answer is " + m2.v_answer(w2));
 }
