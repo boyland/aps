@@ -1,4 +1,4 @@
-object TestUseCollDriver extends App
+object BelowSingleFiberCycleDriver extends App
 {
     val m = new M_TINY("Tiny");
     val t_Tiny = m.t_Result;
@@ -14,13 +14,11 @@ object TestUseCollDriver extends App
 
     m.finish();
 
-    val m2 = new M_TEST_USE_COLL("Test Use Coll",m);
+    val m2 = new M_BELOW_SINGLE_FIBER_CYCLE("Test below single",m);
     val w2 = w.asInstanceOf[m2.T_Root];
 
     m2.finish();
 
     println("Results:");
-    println("sum is " + m2.v_sum);
-    println("leaves is " + m2.v_leaves.toSeq.sorted);
-    println("result is " + m2.v_result(w2));
+    println("answer is " + m2.v_answer(w2));
 }

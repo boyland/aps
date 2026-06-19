@@ -8,13 +8,14 @@ module TEST_CYCLE[T :: var TINY[]] extends T begin
   circular attribute Wood.partial : IntegerLattice;
   pragma synthesized(partial);
 
-  match root(?) begin
+  match ?r=root(?w) begin
   end;
 
   match ?l=leaf(?x) begin
     l.partial := (leaves \ x) \/ {x+1} ;
     leaves :> {x-1};
   end;
+
   match ?b=branch(?x,?y) begin
     b.partial := x.partial \/ y.partial;
     leaves :> x.partial;
