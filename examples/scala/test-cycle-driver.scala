@@ -20,5 +20,5 @@ object TestCycleDriver extends App
     m2.finish();
 
     println("Results:");
-    println("leaves is " + m2.v_leaves);
+    println("leaves is " + m2.v_leaves.toSeq.sorted);
 }

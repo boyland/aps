@@ -15,6 +15,8 @@ jobs:
     env:
       SCALA_VERSION: "2.13.12"
       SCALA_MAJOR: "2.13"
+      JFLEX_URL: "https://github.com/boyland/JFlex/releases/download/v1.5+scala.1/JFlex.jar"
+      SCALA_BISON_URL: "https://github.com/boyland/scala-bison/releases/download/v1.2/scala-bison-2.13.jar"
 
     steps:
     - name: Checkout code
@@ -53,6 +55,13 @@ jobs:
         cd utilities/tests
         make all
 
+    - name: Download JFlex and scala-bison
+      run: |
+        mkdir -p "$HOME/git/scala-bison"
+        mkdir -p "$HOME/Documents/Courses/sp26-cs654/etc"
+        wget -q -O "$HOME/git/scala-bison/scala-bison-2.13.jar" "$SCALA_BISON_URL"
+        wget -q -O "$HOME/Documents/Courses/sp26-cs654/etc/JFlex.jar" "$JFLEX_URL"
+
     - name: Run examples Scala tests
       run: |
         cd examples/scala/tests
@@ -62,6 +71,12 @@ jobs:
       run: |
         cd examples
         ../bin/aps2scala -DCOTo -G -p .:../base test-canonicals
+
+    - name: Run compare-evaluators
+      if: github.event_name == 'push'
+      run: |
+        cd examples/scala
+        ./compare-evaluators.sh
 
     - name: Clean up
       if: always()

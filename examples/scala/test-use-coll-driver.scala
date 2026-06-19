@@ -21,6 +21,6 @@ object TestUseCollDriver extends App
 
     println("Results:");
     println("sum is " + m2.v_sum);
-    println("leaves is " + m2.v_leaves);
+    println("leaves is " + m2.v_leaves.toSeq.sorted);
     println("result is " + m2.v_result(w2));
 }
