@@ -3,7 +3,7 @@
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
-EVALUATORS=(DYNAMIC STATIC)
+EVALUATORS=(DYNAMIC STATIC SYNTH)
 
 extract_results() {
   sed -n '/^Results:$/,$p'
@@ -19,7 +19,11 @@ run_with_evaluator() {
   if ! make EVALUATOR="$evaluator" "$driver.class" > /dev/null 2>&1; then
     return 1
   fi
+  local start end
+  start=$(date +%s.%N)
   make EVALUATOR="$evaluator" ARGS="$args" "$driver.run" 2>&1 | extract_results > "$outfile"
+  end=$(date +%s.%N)
+  printf "  -> finished in %.2fs\n" "$(echo "$end - $start" | bc)"
 }
 
 run_driver() {

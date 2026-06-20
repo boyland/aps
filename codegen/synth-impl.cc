@@ -127,6 +127,43 @@ static vector<INSTANCE*> sort_instances(AUG_GRAPH* aug_graph) {
   return result;
 }
 
+// Strongly-connected components of the direct-edge subgraph. Each cycle becomes
+// one group; everything else is a singleton. linearize_block uses these to break
+// direct dependency cycles (e.g. c1.ptr2:=c2; c2.ptr1:=c1) that a plain topological
+// sort cannot order. Only direct edges count here; indirect ones must not affect
+// the schedule.
+static std::vector<std::vector<INSTANCE*> > direct_cycle_groups(AUG_GRAPH* aug_graph) {
+  int n = aug_graph->instances.length;
+
+  SccGraph scc_graph;
+  scc_graph_initialize(&scc_graph, n);
+  for (int i = 0; i < n; i++) {
+    scc_graph_add_vertex(&scc_graph, &aug_graph->instances.array[i]);
+  }
+  for (int i = 0; i < n; i++) {
+    for (int j = 0; j < n; j++) {
+      if (i != j && (edgeset_kind(aug_graph->graph[i * n + j]) & DEPENDENCY_MAYBE_DIRECT)) {
+        scc_graph_add_edge(&scc_graph, &aug_graph->instances.array[i],
+                           &aug_graph->instances.array[j]);
+      }
+    }
+  }
+
+  SCC_COMPONENTS* components = scc_graph_components(&scc_graph);
+  std::vector<std::vector<INSTANCE*> > groups;
+  for (int c = 0; c < components->length; c++) {
+    SCC_COMPONENT* comp = components->array[c];
+    std::vector<INSTANCE*> group;
+    for (int k = 0; k < comp->length; k++) {
+      group.push_back((INSTANCE*)comp->array[k]);
+    }
+    groups.push_back(group);
+  }
+  scc_graph_destroy(&scc_graph);
+
+  return groups;
+}
+
 // Given an augmented dependency graph, it linearize it recursively
 static BlockItem* linearize_block_helper(AUG_GRAPH* aug_graph,
                                          const vector<INSTANCE*>& sorted_instances,
@@ -134,7 +171,8 @@ static BlockItem* linearize_block_helper(AUG_GRAPH* aug_graph,
                                          CONDITION* cond,
                                          BlockItem* prev,
                                          int remaining,
-                                         INSTANCE* aug_graph_instance) {
+                                         INSTANCE* aug_graph_instance,
+                                         const std::vector<int>& component_of) {
   // impossible merge condition
   if (CONDITION_IS_IMPOSSIBLE(*cond)) {
     return NULL;
@@ -154,7 +192,7 @@ static BlockItem* linearize_block_helper(AUG_GRAPH* aug_graph,
     // impossible merge condition, cannot schedule this instance
     if (MERGED_CONDITION_IS_IMPOSSIBLE(*cond, instance_condition(instance))) {
       scheduled[i] = true;
-      BlockItem* result = linearize_block_helper(aug_graph, sorted_instances, scheduled, cond, prev, remaining - 1, aug_graph_instance);
+      BlockItem* result = linearize_block_helper(aug_graph, sorted_instances, scheduled, cond, prev, remaining - 1, aug_graph_instance, component_of);
       scheduled[i] = false;
       return result;
     }
@@ -163,7 +201,7 @@ static BlockItem* linearize_block_helper(AUG_GRAPH* aug_graph,
     // then this instance should not be included in the linearization linked-list
     if (aug_graph_instance != instance && !edgeset_kind(aug_graph->graph[instance->index * n + aug_graph_instance->index])) {
       scheduled[i] = true;
-      BlockItem* result = linearize_block_helper(aug_graph, sorted_instances, scheduled, cond, prev, remaining - 1, aug_graph_instance);
+      BlockItem* result = linearize_block_helper(aug_graph, sorted_instances, scheduled, cond, prev, remaining - 1, aug_graph_instance, component_of);
       scheduled[i] = false;
       return result;
     }
@@ -184,6 +222,12 @@ static BlockItem* linearize_block_helper(AUG_GRAPH* aug_graph,
 
       // not a direct dependency
       if (!(edgeset_kind(aug_graph->graph[j * n + i]) & DEPENDENCY_MAYBE_DIRECT)) {
+        continue;
+      }
+
+      // don't wait on a dependency in the same cycle group, that's the cycle we
+      // break here; cross-group edges still enforce the order
+      if (component_of[j] == component_of[i]) {
         continue;
       }
 
@@ -210,10 +254,10 @@ static BlockItem* linearize_block_helper(AUG_GRAPH* aug_graph,
 
       int cmask = 1 << (if_rule_index(instance->fibered_attr.attr));
       cond->positive |= cmask;
-      item->next_positive = linearize_block_helper(aug_graph, sorted_instances, scheduled, cond, item_base, remaining - 1, aug_graph_instance);
+      item->next_positive = linearize_block_helper(aug_graph, sorted_instances, scheduled, cond, item_base, remaining - 1, aug_graph_instance, component_of);
       cond->positive &= ~cmask;
       cond->negative |= cmask;
-      item->next_negative = linearize_block_helper(aug_graph, sorted_instances, scheduled, cond, item_base, remaining - 1, aug_graph_instance);
+      item->next_negative = linearize_block_helper(aug_graph, sorted_instances, scheduled, cond, item_base, remaining - 1, aug_graph_instance, component_of);
       cond->negative &= ~cmask;
     } else {
       struct block_item_instance* item = (struct block_item_instance*)malloc(sizeof(struct block_item_instance));
@@ -221,7 +265,7 @@ static BlockItem* linearize_block_helper(AUG_GRAPH* aug_graph,
       item->key = KEY_BLOCK_ITEM_INSTANCE;
       item->instance = instance;
       item->prev = prev;
-      item->next = linearize_block_helper(aug_graph, sorted_instances, scheduled, cond, item_base, remaining - 1, aug_graph_instance);
+      item->next = linearize_block_helper(aug_graph, sorted_instances, scheduled, cond, item_base, remaining - 1, aug_graph_instance, component_of);
     }
 
     scheduled[i] = false;
@@ -246,7 +290,16 @@ static BlockItem* linearize_block(AUG_GRAPH* aug_graph, INSTANCE* aug_graph_inst
   CONDITION cond = {0, 0};
   vector<INSTANCE*> sorted_instances = sort_instances(aug_graph);
 
-  return linearize_block_helper(aug_graph, sorted_instances, scheduled, &cond, NULL, n, aug_graph_instance);
+  // map each instance to its cycle group so the schedule can skip same-group edges
+  std::vector<std::vector<INSTANCE*> > groups = direct_cycle_groups(aug_graph);
+  std::vector<int> component_of(n, -1);
+  for (size_t g = 0; g < groups.size(); g++) {
+    for (auto it = groups[g].begin(); it != groups[g].end(); it++) {
+      component_of[(*it)->index] = (int)g;
+    }
+  }
+
+  return linearize_block_helper(aug_graph, sorted_instances, scheduled, &cond, NULL, n, aug_graph_instance, component_of);
 }
 
 // Given an instance it traverses the direct dependency schedule
@@ -989,6 +1042,39 @@ static void emit_local_fixed_point_loop(ostream& os,
   os << indent() << "}\n";
 }
 
+// Collects the field assignments of a locally-built object, e.g. for
+// `c : Context := context(...)` it returns c.ptr1 := ..., c.ptr2 := ... .
+// Each entry keeps the field, the rhs, and the instance the rhs computes (used to
+// linearize the rhs). These fields are read directly via a_field.get by remote
+// access (index_scope), so we have to assign them while evaluating the object.
+struct ObjectFieldAssign {
+  Declaration field;
+  Expression rhs;
+  INSTANCE* instance;
+};
+
+static std::vector<ObjectFieldAssign>
+collect_object_field_assignments(AUG_GRAPH* aug_graph, Declaration obj_decl) {
+  std::vector<ObjectFieldAssign> result;
+  Block body = matcher_body(top_level_match_m(aug_graph->match_rule));
+  for (Declaration d = first_Declaration(block_body(body)); d; d = DECL_NEXT(d)) {
+    if (Declaration_KEY(d) != KEYnormal_assign) continue;
+    Expression lhs = assign_lhs(d);
+    if (Expression_KEY(lhs) != KEYfuncall) continue;
+    Declaration field = field_ref_p(lhs);
+    if (field == 0) continue;
+    Expression obj = field_ref_object(lhs);
+    if (Expression_KEY(obj) != KEYvalue_use) continue;
+    if (USE_DECL(value_use_use(obj)) != obj_decl) continue;
+    ObjectFieldAssign fa;
+    fa.field = field;
+    fa.rhs = assign_rhs(d);
+    fa.instance = Expression_info(assign_rhs(d))->value_for;
+    result.push_back(fa);
+  }
+  return result;
+}
+
 #ifdef APS2SCALA
 static void dump_synth_functions(STATE* s, ostream& os)
 #else  /* APS2SCALA */
@@ -1281,6 +1367,52 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
       os << indent() << instance_to_attr(synth_functions_state->source) << ".get(node);\n";
     }
 
+    // Assign a locally-built object's fields (c.ptr1 := ..., c.ptr2 := ...) once
+    // the object itself is in `result`. Done after the cache write so a rhs that
+    // refers back to this object reuses the cached value. Re-assigning is fine:
+    // the attribute is ASSIGNED, not EVALUATED, so set() won't throw.
+    if (!synth_functions_state->is_fiber_evaluation &&
+        !synth_functions_state->is_phylum_instance) {
+      Declaration obj_decl = synth_functions_state->source->fibered_attr.attr;
+      for (auto ag_it = synth_functions_state->aug_graphs.begin();
+           ag_it != synth_functions_state->aug_graphs.end(); ag_it++) {
+        AUG_GRAPH* aug_graph = *ag_it;
+        std::vector<ObjectFieldAssign> field_assigns =
+            collect_object_field_assignments(aug_graph, obj_decl);
+        if (field_assigns.empty()) continue;
+
+        current_aug_graph = aug_graph;
+        current_blocks.clear();
+        current_blocks.push_back(matcher_body(top_level_match_m(aug_graph->match_rule)));
+
+        os << indent() << "node match {\n";
+        nesting_level++;
+        os << indent() << "case " << matcher_pat(top_level_match_m(aug_graph->match_rule)) << " => {\n";
+        nesting_level++;
+        for (auto fa = field_assigns.begin(); fa != field_assigns.end(); fa++) {
+          // skip a bare alias of a parent attr (e.g. newEnv.outer := self.block_env):
+          // FiberDependencyDumper handles those and the parent attr isn't in scope here
+          if (fa->instance == NULL) continue;
+          // linearize for this field's instance so its rhs dependencies resolve
+          current_scope_block = linearize_block(aug_graph, fa->instance);
+          dumped_conditional_block_items.clear();
+          dumped_instances.clear();
+          os << indent() << "a_" << decl_name(fa->field) << DEREF;
+          if (debug) os << "assign"; else os << "set";
+          os << "(result, " << fa->rhs << ");\n";
+        }
+        nesting_level--;
+        os << indent() << "}\n";
+        os << indent() << "case _ => ()\n";
+        nesting_level--;
+        os << indent() << "};\n";
+
+        current_blocks.clear();
+        dumped_conditional_block_items.clear();
+        dumped_instances.clear();
+      }
+    }
+
     if (!synth_functions_state->is_fiber_evaluation) {
       os << indent() << "result\n";
     }
@@ -1331,7 +1463,9 @@ class SynthImpl : public SynthImplementation {
 
     dump_synth_functions(s, oss);
 
-    bool needs_fixed_point = s->original_state_dependency != 0;
+    // same flag dump_synth_functions uses to gate the implicit params, so finish()
+    // brings the matching implicits into scope for the eval calls below
+    bool needs_fixed_point = s->loop_required;
 
     // Implement finish routine:
 #ifdef APS2SCALA
