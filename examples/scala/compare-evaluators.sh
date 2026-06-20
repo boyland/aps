@@ -15,11 +15,14 @@ run_with_evaluator() {
   local args="$3"
   local outfile="$4"
 
-  rm -f *_implicit.class "${driver}.class"
   if ! make EVALUATOR="$evaluator" "$driver.class" > /dev/null 2>&1; then
     return 1
   fi
+  local start end
+  start=$(date +%s.%N)
   make EVALUATOR="$evaluator" ARGS="$args" "$driver.run" 2>&1 | extract_results > "$outfile"
+  end=$(date +%s.%N)
+  printf "  %s finished in %.2fs\n" "$evaluator" "$(echo "$end - $start" | bc)"
 }
 
 run_driver() {
