@@ -30,9 +30,6 @@ typedef struct synth_function_state {
 static AUG_GRAPH* current_aug_graph = NULL;
 static std::vector<SYNTH_FUNCTION_STATE*> synth_functions_states;
 static SYNTH_FUNCTION_STATE* current_synth_functions_state = NULL;
-// Set while dumping; read in finish(). True if a cycle closes through a
-// fiber/shared-global collection. Currently informational only (see finish()).
-static bool module_needs_global_loop = false;
 
 #define LOCAL_VALUE_FLAG (1 << 28)
 
@@ -292,6 +289,8 @@ static BlockItem* linearize_block(AUG_GRAPH* aug_graph, INSTANCE* aug_graph_inst
 
   // map each instance to its cycle group so the schedule can skip same-group edges
   std::vector<std::vector<INSTANCE*> > groups = direct_cycle_groups(aug_graph);
+
+  // TODO: std::vector<int> component_of(n, -1) is hacky, do something cleaner here
   std::vector<int> component_of(n, -1);
   for (size_t g = 0; g < groups.size(); g++) {
     for (auto it = groups[g].begin(); it != groups[g].end(); it++) {
@@ -321,6 +320,8 @@ static BlockItem* find_surrounding_block(BlockItem* block, INSTANCE* instance) {
   return NULL;
 }
 
+// Used only by instance_is_local, instance_is_synthesized and instance_is_inherited
+// to determine the direction of an instance that does not have a fiber.
 static enum instance_direction custom_instance_direction(INSTANCE* i) {
   enum instance_direction dir = fibered_attr_direction(&i->fibered_attr);
   if (i->node == NULL) {
@@ -928,6 +929,7 @@ static bool synth_function_is_circular(SYNTH_FUNCTION_STATE* st) {
 // A synthesized, circular, non-fiber attribute on a child node -- a candidate
 // whose local iteration can converge a cycle.
 static bool is_cycle_closing_candidate(INSTANCE* instance, AUG_GRAPH* aug_graph) {
+  // TODO: create a function instance_is_child and instance_is_parent and use it instead
   bool on_child_node = instance->node != NULL && instance->node != aug_graph->lhs_decl;
   return on_child_node &&
          instance->fibered_attr.fiber == NULL &&
@@ -1012,19 +1014,7 @@ static void emit_loop_implicits(ostream& os, const string& flag) {
   os << indent() << "implicit val changed: AtomicBoolean = " << flag << ";\n";
 }
 
-// Emits a local successive-approximation loop, guarded so it is skipped when
-// already inside an outer fixed point (that loop drives convergence instead):
-//
-//   if (!isInsideFixedPoint) {
-//     val <flag> = new AtomicBoolean(true);
-//     while (<flag>.get) {
-//       <flag>.set(false);
-//       implicit val isInsideFixedPoint = true; implicit val changed = <flag>;
-//       <body>
-//     }
-//   }
-//
-// `emit_body` writes the body at the current indentation.
+// Emits a local fixed-point loop
 static void emit_local_fixed_point_loop(ostream& os,
                                         const string& flag,
                                         const std::function<void()>& emit_body) {
@@ -1058,6 +1048,7 @@ collect_object_field_assignments(AUG_GRAPH* aug_graph, Declaration obj_decl) {
   std::vector<ObjectFieldAssign> result;
   Block body = matcher_body(top_level_match_m(aug_graph->match_rule));
   for (Declaration d = first_Declaration(block_body(body)); d; d = DECL_NEXT(d)) {
+    // TODO: make sure all IF statements have curly braces
     if (Declaration_KEY(d) != KEYnormal_assign) continue;
     Expression lhs = assign_lhs(d);
     if (Expression_KEY(lhs) != KEYfuncall) continue;
@@ -1095,10 +1086,6 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
 
   synth_functions_states = build_synth_functions_state(s);
   bool needs_fixed_point = s->loop_required;
-
-  // Module-wide loop needed only when a cycle closes through a fiber/shared
-  // collection; inherited cycles converge locally at their productions.
-  module_needs_global_loop = needs_fixed_point && module_has_fiber_cycle(synth_functions_states);
 
   for (auto state_it = synth_functions_states.begin(); state_it != synth_functions_states.end(); state_it++) {
     SYNTH_FUNCTION_STATE* synth_functions_state = *state_it;
@@ -1252,14 +1239,13 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
       // above); everywhere else we compute once and report changes via `changed`.
       // We do NOT emit a per-attribute do/while for them: the LHS self-edge marks
       // them circular at every production, so looping at each one nests loops down
-      // the tree -> exponential in depth (Farrow 1986 sec.4: loop at the closure
-      // only). Fiber/shared cycles aren't local to a production, so they loop here.
+      // the tree -> exponential in depth. Fiber/shared cycles aren't local to a production, so they loop here.
       bool dump_fixed_point_loop = synth_functions_state->is_fiber_evaluation && declared_is_circular && !instance_is_pure_shared_info(synth_functions_state->source);
       string node_get = ATTR_DECL_IS_SHARED_INFO(synth_functions_state->source->fibered_attr.attr) ? "" : "node";
       string node_assign = ATTR_DECL_IS_SHARED_INFO(synth_functions_state->source->fibered_attr.attr) ? "" : "node, ";
 
       // Converge any child cycle that closes here before computing this value, so
-      // the cached body below reads settled values. Replaces a whole-program loop.
+      // the cached body below reads settled values. This trick replaces a whole-program fixed-point loop.
       if (!synth_functions_state->is_fiber_evaluation) {
         std::vector<INSTANCE*> child_cycle_instances = collect_child_cycle_instances(aug_graph);
         for (auto it2 = child_cycle_instances.begin(); it2 != child_cycle_instances.end(); it2++) {
@@ -1413,6 +1399,7 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
       }
     }
 
+    // TODO: "result" variable needs to be a constant string variable at the beginning of the file.
     if (!synth_functions_state->is_fiber_evaluation) {
       os << indent() << "result\n";
     }
@@ -1464,7 +1451,7 @@ class SynthImpl : public SynthImplementation {
     dump_synth_functions(s, oss);
 
     // same flag dump_synth_functions uses to gate the implicit params, so finish()
-    // brings the matching implicits into scope for the eval calls below
+    // brings the matching implicit into scope for the eval calls below
     bool needs_fixed_point = s->loop_required;
 
     // Implement finish routine:
@@ -1484,17 +1471,6 @@ class SynthImpl : public SynthImplementation {
     PHY_GRAPH* start_phy_graph = summary_graph_for(s, s->start_phylum);
 
     if (needs_fixed_point) {
-      // Demand each root once with caching on (isInsideFixedPoint = false).
-      // Inherited cycles converged at their productions; fiber/shared cycles
-      // converge via the per-production loops inside their *_sharedinfo_* evals,
-      // so one cached pass reaches the fixed point for every grammar we handle.
-      //
-      // A module-wide do/while (caching off, re-traverse until `changed` stays
-      // false) would cover cycles whose state is purely module-global, but it
-      // disables caching across the whole traversal -> re-descends the tree
-      // uncached every round -> super-linear, non-terminating at depth ~10. No
-      // grammar needs it. If one ever does, iterate only the circular collection,
-      // not the whole tree.
       os << indent() << "implicit val changed: AtomicBoolean = new AtomicBoolean(false);\n";
       os << indent() << "implicit val " << LOOP_VAR << ": Boolean = false;\n";
     }
@@ -1512,8 +1488,6 @@ class SynthImpl : public SynthImplementation {
     }
     --nesting_level;
     os << indent() << "}\n";
-
-    (void)module_needs_global_loop;
 
 #ifdef APS2SCALA
     os << indent() << "super.finish();\n";
@@ -1649,6 +1623,8 @@ static vector<std::set<Expression> > make_instance_assignment() {
                 fatal_error("bad index [collection_assign] for instance");
               }
 
+              // TODO: anything we can learn from this PR:
+              // https://github.com/boyland/aps/pull/166
               if (step == 1 && is_outermost) {
                 array[in->index].clear();
               } else if (step == 2) {
@@ -1891,6 +1867,7 @@ void dump_rhs_instance_helper(AUG_GRAPH* aug_graph, BlockItem* item, INSTANCE* i
         }
         return;
       }
+      // TODO: do not use non ASCII characters like —
       // valid_rhs is empty (all NULL defaults) — fall through to default handling
     }
 
@@ -2134,7 +2111,7 @@ bool try_dump_funcall(Expression e, ostream& o) override {
     return true;
   }
   fatal_error("failed to find instance");
-  return false; // unreachable
+  return false;
 }
 
 void dump_synth_instance(INSTANCE* instance, ostream& o) {
