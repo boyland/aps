@@ -62,6 +62,11 @@ jobs:
         wget -q -O "$HOME/git/scala-bison/scala-bison-2.13.jar" "$SCALA_BISON_URL"
         wget -q -O "$HOME/Documents/Courses/sp26-cs654/etc/JFlex.jar" "$JFLEX_URL"
 
+    - name: Sanity check
+      run: |
+        cd examples/scala
+        make
+
     - name: Run examples Scala tests
       run: |
         cd examples/scala/tests
