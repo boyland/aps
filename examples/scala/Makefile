@@ -349,5 +349,5 @@ ${OUT}/LocalFiberCycleDriver.class : local-fiber-cycle-driver.scala
 
 clean:
 	rm -rf ${OUT_BASE}
-	rm -f *.class ${SCALAGEN} ${MISCGEN} *.static.scala
+	rm -f *.class ${SCALAGEN} ${MISCGEN}
 
