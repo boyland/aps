@@ -974,39 +974,6 @@ static std::vector<INSTANCE*> collect_child_cycle_instances(AUG_GRAPH* aug_graph
   return result;
 }
 
-// True if a cycle closes through a fiber/shared-global collection rather than a
-// child's inherited attribute -- i.e. no local child instance can close it.
-static bool module_has_fiber_cycle(const std::vector<SYNTH_FUNCTION_STATE*>& states) {
-  for (auto it = states.begin(); it != states.end(); it++) {
-    SYNTH_FUNCTION_STATE* st = *it;
-    if (!st->is_fiber_evaluation) continue;
-    if (instance_is_pure_shared_info(st->source) && st->is_phylum_instance) {
-      // pure shared-info has no fixed-point loop of its own; skip
-      continue;
-    }
-    for (auto ag = st->aug_graphs.begin(); ag != st->aug_graphs.end(); ag++) {
-      AUG_GRAPH* aug_graph = *ag;
-      INSTANCE* inst = NULL;
-      if (st->is_phylum_instance) {
-        if (!find_instance(aug_graph, aug_graph->lhs_decl, st->source->fibered_attr, &inst)) {
-          continue;
-        }
-      } else {
-        inst = st->source;
-      }
-      if (!instance_circular(inst)) continue;
-
-      // A local child instance closes this cycle at its production, so no
-      // module-wide loop is needed. Count it as a fiber cycle only when none does.
-      std::vector<INSTANCE*> child_cycle_instances = collect_child_cycle_instances(aug_graph);
-      if (child_cycle_instances.empty()) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
 // Emits the two implicits every fixed-point loop body opens with: isInsideFixedPoint
 // (disables caching) and `changed` bound to this loop's convergence flag.
 static void emit_loop_implicits(ostream& os, const string& flag) {
@@ -1066,6 +1033,10 @@ collect_object_field_assignments(AUG_GRAPH* aug_graph, Declaration obj_decl) {
   return result;
 }
 
+// TODO: if we are in our independent cycle, then we shouldn't blindly say don't run your own do-while
+// loop because your parent is in a do-while loop.
+// if you are in an independent cycle, then you should get your own do-while loop
+// See, if it's related, local-cycle inside a local-cycle may be a proble.
 #ifdef APS2SCALA
 static void dump_synth_functions(STATE* s, ostream& os)
 #else  /* APS2SCALA */

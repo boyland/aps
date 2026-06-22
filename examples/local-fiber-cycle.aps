@@ -23,6 +23,8 @@ module LOCAL_FIBER_CYCLE[T :: var TINY[]] extends T begin
     w.scope := c;
   end;
   
+  -- TODO: create an example of local cycle, inside a local cycle
+  -- more complicated examples
   match ?this=branch(?w1,?w2) begin
     this.syn := w1.syn + w2.syn;
     c1 : Context := context(scope_depth(this.scope));
