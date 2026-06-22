@@ -28,15 +28,8 @@ $(shell mkdir -p ${OUT})
 SCALAGEN = simple.scala classic-binding.scala tiny.scala broad-fiber-cycle.scala \
 	below-fiber-cycle.scala below-single-fiber-cycle.scala local-fiber-cycle.scala \
 	test-coll.scala test-use-coll.scala test-cycle.scala use-global.scala \
-	grammar.scala first.scala follow.scala nullable.scala	\
-	farrow-lv-tree.scala farrow-lv.static.scala \
-	farrow-ubd-tree.scala farrow-ubd.static.scala farrow-ubd-fiber.static.scala \
-	broad-fiber-cycle.static.scala below-fiber-cycle.static.scala \
-	below-single-fiber-cycle.static.scala local-fiber-cycle.static.scala \
-	classic-binding.static.scala \
-	grammar.scala first.static.scala follow.static.scala nullable.static.scala \
-	nested-cycles.static.scala \
-	test-coll.static.scala test-use-coll.static.scala test-cycle.static.scala use-global.static.scala
+	grammar.scala first.scala follow.scala nullable.scala \
+	farrow-lv-tree.scala farrow-ubd-tree.scala
 
 MISCGEN = nested-cycles.scala SimpleParser.scala SimpleScanner.scala \
 	GrammarTokens.scala SimpleTokens.scala GrammarScanner.scala GrammarParser.scala \
@@ -44,7 +37,7 @@ MISCGEN = nested-cycles.scala SimpleParser.scala SimpleScanner.scala \
 	FarrowUbdTokens.scala FarrowUbdTokens.scala FarrowUbdScanner.scala FarrowUbdParser.scala farrow-ubd.scala \
 	farrow-ubd-fiber.scala \
 	NestedUbdTokens.scala NestedUbdScanner.scala NestedUbdParser.scala nested-ubd.scala \
-	nested-ubd-fiber.scala \
+	nested-ubd-fiber.scala nested-ubd-tree.scala \
 	*.output *.lex *.y *.scala~
 
 .PHONY: all clean phony_explicit
@@ -79,10 +72,6 @@ phony_explicit:
 
 %.static.scala : ../%.aps ${APS2SCALA}
 	${APS2SCALA} ${APS2SCALAFLAGS} -S -C $*
-	mv $*.scala $@
-
-%.synth.scala : ../%.aps ${APS2SCALA}
-	${APS2SCALA} ${APS2SCALAFLAGS} -F $*
 	mv $*.scala $@
 
 %.scala : ../%.aps ${APS2SCALA}
@@ -360,5 +349,5 @@ ${OUT}/LocalFiberCycleDriver.class : local-fiber-cycle-driver.scala
 
 clean:
 	rm -rf ${OUT_BASE}
-	rm -f *.class ${SCALAGEN} ${MISCGEN}
+	rm -f *.class ${SCALAGEN} ${MISCGEN} *.static.scala
 
