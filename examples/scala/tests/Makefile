@@ -1,7 +1,7 @@
 SPECS=FirstSpec FollowSpec NullableSpec NTupleLatticeSpec TestSynthSpec
 EXAMPLES_PATH=../..
 ROOT_PATH=../${EXAMPLES_PATH}
-SCALAV=2.12
+SCALAV=2.13
 APSLIB=${ROOT_PATH}/lib/aps-library-${SCALAV}.jar
 SCALA_FLAGS=.:${APSLIB}
 APS2SCALA=${ROOT_PATH}/bin/aps2scala
