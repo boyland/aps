@@ -41,6 +41,7 @@ static SYNTH_FUNCTION_STATE* current_synth_functions_state = NULL;
 
 static const string LOOP_VAR = "isInsideFixedPoint";
 static const string PREV_LOOP_VAR = "prevIsInsideFixedPoint";
+static const string RESULT_VAR_PREFIX = "result";
 
 static SynthImplementation* synth_impl_ptr;
 
@@ -290,7 +291,8 @@ static BlockItem* linearize_block(AUG_GRAPH* aug_graph, INSTANCE* aug_graph_inst
   // map each instance to its cycle group so the schedule can skip same-group edges
   std::vector<std::vector<INSTANCE*> > groups = direct_cycle_groups(aug_graph);
 
-  // TODO: std::vector<int> component_of(n, -1) is hacky, do something cleaner here
+  // -1 = singleton (not part of any multi-node cycle), so the
+  // same-group check in the scheduler won't match anything.
   std::vector<int> component_of(n, -1);
   for (size_t g = 0; g < groups.size(); g++) {
     for (auto it = groups[g].begin(); it != groups[g].end(); it++) {
@@ -926,11 +928,21 @@ static bool synth_function_is_circular(SYNTH_FUNCTION_STATE* st) {
   return false;
 }
 
-// A synthesized, circular, non-fiber attribute on a child node -- a candidate
-// whose local iteration can converge a cycle.
-static bool is_cycle_closing_candidate(INSTANCE* instance, AUG_GRAPH* aug_graph) {
-  // TODO: create a function instance_is_child and instance_is_parent and use it instead
-  bool on_child_node = instance->node != NULL && instance->node != aug_graph->lhs_decl;
+static bool instance_is_child(INSTANCE* instance, AUG_GRAPH* aug_graph) {
+  return instance->node != NULL && instance->node != aug_graph->lhs_decl;
+}
+
+static bool instance_is_parent(INSTANCE* instance, AUG_GRAPH* aug_graph) {
+  return instance->node != NULL && instance->node == aug_graph->lhs_decl;
+}
+
+// Can this instance participate in a local cycle?
+// Must be: on a child node, synthesized, circular, non-fiber, not an if-rule.
+//
+// Example: in `match ?self:Block = scope(?ds:Declarations)`, ds.decls_defs
+// passes this check if it is declared circular.
+static bool is_local_cycle_candidate(INSTANCE* instance, AUG_GRAPH* aug_graph) {
+  bool on_child_node = instance_is_child(instance, aug_graph);
   return on_child_node &&
          instance->fibered_attr.fiber == NULL &&
          !if_rule_p(instance->fibered_attr.attr) &&
@@ -938,9 +950,12 @@ static bool is_cycle_closing_candidate(INSTANCE* instance, AUG_GRAPH* aug_graph)
          instance_circular(instance);
 }
 
-// True if `inherited` is the inherited circular attribute on the same child node
-// that `instance` directly feeds -- the edge that closes the cycle here.
-static bool closes_cycle_with(INSTANCE* inherited, INSTANCE* instance, AUG_GRAPH* aug_graph) {
+// Is `inherited` in the same cycle as `instance`?
+// Same child node, inherited direction, circular, and `instance` feeds it directly.
+//
+// Pattern: child.synth -> parent -> child.inherited -> child.synth (loop)
+// If we find this pair we can iterate locally at this production.
+static bool is_in_same_cycle(INSTANCE* inherited, INSTANCE* instance, AUG_GRAPH* aug_graph) {
   int n = aug_graph->instances.length;
   bool instance_feeds_inherited =
       edgeset_kind(aug_graph->graph[instance->index * n + inherited->index]) & DEPENDENCY_MAYBE_DIRECT;
@@ -952,20 +967,59 @@ static bool closes_cycle_with(INSTANCE* inherited, INSTANCE* instance, AUG_GRAPH
          instance_feeds_inherited;
 }
 
-// Child attributes that close a cycle at this production. A synthesized circular
-// child instance that directly feeds its own inherited circular attribute closes
-// the cycle here, so we can iterate it to a fixed point locally instead of
-// program-wide. Productions that only forward an inherited attribute are skipped.
+// Check if child cycle has no connection to any fiber/shared-info cycle.
+// If no edge exists (both directions) between child cycle and fiber instances,
+// then it is independent. aug_graph edges are transitive so one check is enough.
+static bool is_child_cycle_independent(AUG_GRAPH* aug_graph, INSTANCE* cycle_instance) {
+  int n = aug_graph->instances.length;
+
+  // collect instances in this child cycle (synth instance + inherited it feeds)
+  std::vector<int> child_cycle_indices;
+  child_cycle_indices.push_back(cycle_instance->index);
+  for (int i = 0; i < n; i++) {
+    INSTANCE* inst = &aug_graph->instances.array[i];
+    if (is_in_same_cycle(inst, cycle_instance, aug_graph)) {
+      child_cycle_indices.push_back(inst->index);
+    }
+  }
+
+  // if any fiber/shared-info circular instance has edge to/from our cycle,
+  // then they are related -> not independent
+  for (int i = 0; i < n; i++) {
+    INSTANCE* inst = &aug_graph->instances.array[i];
+    // Only consider fiber or shared-info instances that are circular
+    if (inst->fibered_attr.fiber == NULL && !ATTR_DECL_IS_SHARED_INFO(inst->fibered_attr.attr)) {
+      continue;
+    }
+    if (!instance_circular(inst)) {
+      continue;
+    }
+    for (size_t k = 0; k < child_cycle_indices.size(); k++) {
+      int idx = child_cycle_indices[k];
+      if (edgeset_kind(aug_graph->graph[i * n + idx]) ||
+          edgeset_kind(aug_graph->graph[idx * n + i])) {
+        return false;  // related to a fiber/shared-info cycle
+      }
+    }
+  }
+
+  return true;
+}
+
+// Find child instances that have a cycle at this production.
+// A synth circular child that feeds its own inherited circular attr = local cycle.
 static std::vector<INSTANCE*> collect_child_cycle_instances(AUG_GRAPH* aug_graph) {
   std::vector<INSTANCE*> result;
   int n = aug_graph->instances.length;
-  for (int index = 0; index < n; index++) {
-    INSTANCE* instance = &aug_graph->instances.array[index];
-    if (!is_cycle_closing_candidate(instance, aug_graph)) continue;
+  for (int i = 0; i < n; i++) {
+    INSTANCE* instance = &aug_graph->instances.array[i];
+    if (!is_local_cycle_candidate(instance, aug_graph)) {
+      continue;
+    }
 
-    for (int inner_index = 0; inner_index < n; inner_index++) {
-      INSTANCE* inherited = &aug_graph->instances.array[inner_index];
-      if (closes_cycle_with(inherited, instance, aug_graph)) {
+    for (int j = 0; j < n; j++) {
+      INSTANCE* inherited = &aug_graph->instances.array[j];
+      if (is_in_same_cycle(inherited, instance, aug_graph)) {
         result.push_back(instance);
         break;
       }
@@ -981,12 +1035,18 @@ static void emit_loop_implicits(ostream& os, const string& flag) {
   os << indent() << "implicit val changed: AtomicBoolean = " << flag << ";\n";
 }
 
-// Emits a local fixed-point loop
+// Emit a local while-loop. If is_independent, no isInsideFixedPoint guard
+// because independent cycles need their own loop always.
 static void emit_local_fixed_point_loop(ostream& os,
                                         const string& flag,
-                                        const std::function<void()>& emit_body) {
-  os << indent() << "if (!" << LOOP_VAR << ") {\n";
-  ++nesting_level;
+                                        const std::function<void()>& emit_body,
+                                        bool is_independent = false) {
+  if (is_independent) {
+    os << indent() << "// Independent cycle: always converge locally\n";
+  } else {
+    os << indent() << "if (!" << LOOP_VAR << ") {\n";
+    ++nesting_level;
+  }
   os << indent() << "val " << flag << " = new AtomicBoolean(true);\n";
   os << indent() << "while (" << flag << ".get) {\n";
   ++nesting_level;
@@ -995,8 +1055,10 @@ static void emit_local_fixed_point_loop(ostream& os,
   emit_body();
   --nesting_level;
   os << indent() << "}\n";
-  --nesting_level;
-  os << indent() << "}\n";
+  if (!is_independent) {
+    --nesting_level;
+    os << indent() << "}\n";
+  }
 }
 
 // Collects the field assignments of a locally-built object, e.g. for
@@ -1015,15 +1077,24 @@ collect_object_field_assignments(AUG_GRAPH* aug_graph, Declaration obj_decl) {
   std::vector<ObjectFieldAssign> result;
   Block body = matcher_body(top_level_match_m(aug_graph->match_rule));
   for (Declaration d = first_Declaration(block_body(body)); d; d = DECL_NEXT(d)) {
-    // TODO: make sure all IF statements have curly braces
-    if (Declaration_KEY(d) != KEYnormal_assign) continue;
+    if (Declaration_KEY(d) != KEYnormal_assign) {
+      continue;
+    }
     Expression lhs = assign_lhs(d);
-    if (Expression_KEY(lhs) != KEYfuncall) continue;
+    if (Expression_KEY(lhs) != KEYfuncall) {
+      continue;
+    }
     Declaration field = field_ref_p(lhs);
-    if (field == 0) continue;
+    if (field == 0) {
+      continue;
+    }
     Expression obj = field_ref_object(lhs);
-    if (Expression_KEY(obj) != KEYvalue_use) continue;
-    if (USE_DECL(value_use_use(obj)) != obj_decl) continue;
+    if (Expression_KEY(obj) != KEYvalue_use) {
+      continue;
+    }
+    if (USE_DECL(value_use_use(obj)) != obj_decl) {
+      continue;
+    }
     ObjectFieldAssign fa;
     fa.field = field;
     fa.rhs = assign_rhs(d);
@@ -1033,10 +1104,6 @@ collect_object_field_assignments(AUG_GRAPH* aug_graph, Declaration obj_decl) {
   return result;
 }
 
-// TODO: if we are in our independent cycle, then we shouldn't blindly say don't run your own do-while
-// loop because your parent is in a do-while loop.
-// if you are in an independent cycle, then you should get your own do-while loop
-// See, if it's related, local-cycle inside a local-cycle may be a proble.
 #ifdef APS2SCALA
 static void dump_synth_functions(STATE* s, ostream& os)
 #else  /* APS2SCALA */
@@ -1061,6 +1128,9 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
   for (auto state_it = synth_functions_states.begin(); state_it != synth_functions_states.end(); state_it++) {
     SYNTH_FUNCTION_STATE* synth_functions_state = *state_it;
     current_synth_functions_state = synth_functions_state;
+
+    // result var has instance index suffix so each function has unique name
+    string result_var = RESULT_VAR_PREFIX + std::to_string(synth_functions_state->source->index);
 
     if (include_comments) {
       os << indent() << "// " << synth_functions_state->source << " ("
@@ -1156,7 +1226,7 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
     if (synth_functions_state->is_fiber_evaluation) {
       os << indent() << "node match {\n";
     } else {
-      os << indent() << "val result = node match {\n";
+      os << indent() << "val " << result_var << " = node match {\n";
     }
     nesting_level++;
 
@@ -1206,32 +1276,27 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
         aps_warning(aug_graph_instance->node, "Instance %s depends on itself but is not declared circular", instance_to_string(aug_graph_instance).c_str());
       }
 
-      // Non-fiber cycles loop at the closing child (collect_child_cycle_instances,
-      // above); everywhere else we compute once and report changes via `changed`.
-      // We do NOT emit a per-attribute do/while for them: the LHS self-edge marks
-      // them circular at every production, so looping at each one nests loops down
-      // the tree -> exponential in depth. Fiber/shared cycles aren't local to a production, so they loop here.
+      // Non-fiber cycles: we iterate at the child level (collect_child_cycle_instances).
+      // We do NOT emit per-attribute do/while because that would nest loops
+      // down the tree and become exponential. Fiber cycles are different, they loop here.
       bool dump_fixed_point_loop = synth_functions_state->is_fiber_evaluation && declared_is_circular && !instance_is_pure_shared_info(synth_functions_state->source);
       string node_get = ATTR_DECL_IS_SHARED_INFO(synth_functions_state->source->fibered_attr.attr) ? "" : "node";
       string node_assign = ATTR_DECL_IS_SHARED_INFO(synth_functions_state->source->fibered_attr.attr) ? "" : "node, ";
 
-      // Converge any child cycle that closes here before computing this value, so
-      // the cached body below reads settled values. This trick replaces a whole-program fixed-point loop.
+      // converge child cycles first, so the value below sees stable results
       if (!synth_functions_state->is_fiber_evaluation) {
         std::vector<INSTANCE*> child_cycle_instances = collect_child_cycle_instances(aug_graph);
         for (auto it2 = child_cycle_instances.begin(); it2 != child_cycle_instances.end(); it2++) {
           INSTANCE* cycle_instance = *it2;
-          // Skipped when already inside an outer fixed point (see helper): nesting
-          // a do/while per scope would re-converge this child every outer pass,
-          // which is exponential in nesting depth. The outer loop revisits this
-          // production each round; here we just do one step and report via `changed`.
+          // independent = always loop, related = skip if already in outer loop
+          bool independent = is_child_cycle_independent(aug_graph, cycle_instance);
           emit_local_fixed_point_loop(os, "localChanged", [&] {
             dumped_conditional_block_items.clear();
             dumped_instances.clear();
             os << indent();
             synth_impl_ptr->dump_synth_instance(cycle_instance, os);
             os << ";\n";
-          });
+          }, /* is_independent= */independent);
         }
         dumped_conditional_block_items.clear();
         dumped_instances.clear();
@@ -1317,9 +1382,9 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
         os << indent() << "evaluated_map_" << synth_functions_state->fdecl_name << ".update(node.nodeNumber, true);\n";
     } else {
       if (source_circular) {
-        os << indent() << instance_to_attr(synth_functions_state->source) << ".assign(node, result, changed);\n";
+        os << indent() << instance_to_attr(synth_functions_state->source) << ".assign(node, " << result_var << ", changed);\n";
       } else {
-        os << indent() << instance_to_attr(synth_functions_state->source) << ".assign(node, result);\n";
+        os << indent() << instance_to_attr(synth_functions_state->source) << ".assign(node, " << result_var << ");\n";
       }
       os << indent() << instance_to_attr(synth_functions_state->source) << ".get(node);\n";
     }
@@ -1336,7 +1401,9 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
         AUG_GRAPH* aug_graph = *ag_it;
         std::vector<ObjectFieldAssign> field_assigns =
             collect_object_field_assignments(aug_graph, obj_decl);
-        if (field_assigns.empty()) continue;
+        if (field_assigns.empty()) {
+          continue;
+        }
 
         current_aug_graph = aug_graph;
         current_blocks.clear();
@@ -1349,14 +1416,20 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
         for (auto fa = field_assigns.begin(); fa != field_assigns.end(); fa++) {
           // skip a bare alias of a parent attr (e.g. newEnv.outer := self.block_env):
           // FiberDependencyDumper handles those and the parent attr isn't in scope here
-          if (fa->instance == NULL) continue;
+          if (fa->instance == NULL) {
+            continue;
+          }
           // linearize for this field's instance so its rhs dependencies resolve
           current_scope_block = linearize_block(aug_graph, fa->instance);
           dumped_conditional_block_items.clear();
           dumped_instances.clear();
           os << indent() << "a_" << decl_name(fa->field) << DEREF;
-          if (debug) os << "assign"; else os << "set";
-          os << "(result, " << fa->rhs << ");\n";
+          if (debug) {
+            os << "assign";
+          } else {
+            os << "set";
+          }
+          os << "(" << result_var << ", " << fa->rhs << ");\n";
         }
         nesting_level--;
         os << indent() << "}\n";
@@ -1370,9 +1443,8 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
       }
     }
 
-    // TODO: "result" variable needs to be a constant string variable at the beginning of the file.
     if (!synth_functions_state->is_fiber_evaluation) {
-      os << indent() << "result\n";
+      os << indent() << result_var << "\n";
     }
 
     nesting_level--;
@@ -1451,8 +1523,9 @@ class SynthImpl : public SynthImplementation {
     for (i = 0; i < start_phy_graph->instances.length; i++) {
       INSTANCE* in = &start_phy_graph->instances.array[i];
 
-      if (!instance_is_synthesized(in))
+      if (!instance_is_synthesized(in)) {
         continue;
+      }
 
       string eval_name = instance_to_string_with_nodetype(s->start_phylum, &start_phy_graph->instances.array[i]);
       os << indent() << "eval_" << eval_name << "(root);\n";
@@ -1642,10 +1715,11 @@ void dump_assignment(INSTANCE* in, Expression rhs, ostream& o) {
         field = USE_DECL(value_use_use(lhs));
 #ifdef APS2SCALA
         o << "a_" << decl_name(field) << ".";
-        if (debug)
+        if (debug) {
           o << "assign";
-        else
+        } else {
           o << "set";
+        }
         o << "(" << rhs;
         if (tracking_fiber_convergence) {
           o << ", changed";
@@ -1666,13 +1740,15 @@ void dump_assignment(INSTANCE* in, Expression rhs, ostream& o) {
         break;
       case KEYfuncall:
         field = field_ref_p(lhs);
-        if (field == 0)
+        if (field == 0) {
           fatal_error("what sort of assignment lhs: %d", tnode_line_number(assign));
+        }
         o << "a_" << decl_name(field) << DEREF;
-        if (debug)
+        if (debug) {
           o << "assign";
-        else
+        } else {
           o << "set";
+        }
         o << "(" << field_ref_object(lhs) << "," << rhs;
         if (tracking_fiber_convergence) {
           o << ", changed";
@@ -1689,10 +1765,11 @@ void dump_assignment(INSTANCE* in, Expression rhs, ostream& o) {
     if (rhs) {
       if (Declaration_info(ad)->decl_flags & LOCAL_ATTRIBUTE_FLAG) {
         o << "a" << LOCAL_UNIQUE_PREFIX(ad) << "_" << asym << DEREF;
-        if (debug)
+        if (debug) {
           o << "assign";
-        else
+        } else {
           o << "set";
+        }
         o << "(anchor," << rhs << ");\n";
       } else {
         int i = LOCAL_UNIQUE_PREFIX(ad);
@@ -1740,17 +1817,19 @@ void dump_assignment(INSTANCE* in, Expression rhs, ostream& o) {
           o << "v_" << asym << " = somehow_combine(v_" << asym << "," << rhs << ");\n";
         } else {
           int i = LOCAL_UNIQUE_PREFIX(ad);
-          if (i == 0)
+          if (i == 0) {
             o << "v_" << asym << " = " << rhs << "; // function\n";
-          else
+          } else {
             o << "v" << i << "_" << asym << " = " << rhs << ";\n";
+          }
         }
       } else {
         o << "a_" << asym << DEREF;
-        if (debug)
+        if (debug) {
           o << "assign";
-        else
+        } else {
           o << "set";
+        }
         o << "(v_" << decl_name(in->node) << "," << rhs << ");\n";
       }
     } else {
@@ -1766,10 +1845,11 @@ void dump_assignment(INSTANCE* in, Expression rhs, ostream& o) {
     if (rhs) {
       // assigning field of object
       o << "a_" << asym << DEREF;
-      if (debug)
+      if (debug) {
         o << "assign";
-      else
+      } else {
         o << "set";
+      }
       o << "(v_" << decl_name(in->node) << "," << rhs << ");\n";
     } else {
       if (include_comments) {
@@ -1804,7 +1884,9 @@ void dump_rhs_instance_helper(AUG_GRAPH* aug_graph, BlockItem* item, INSTANCE* i
       // Filter out NULLs first
       vector<Expression> valid_rhs;
       for (auto it = relevant_assignments.begin(); it != relevant_assignments.end(); it++) {
-        if (*it != NULL) valid_rhs.push_back(*it);
+        if (*it != NULL) {
+          valid_rhs.push_back(*it);
+        }
       }
 
       if (!valid_rhs.empty()) {
@@ -1838,8 +1920,7 @@ void dump_rhs_instance_helper(AUG_GRAPH* aug_graph, BlockItem* item, INSTANCE* i
         }
         return;
       }
-      // TODO: do not use non ASCII characters like —
-      // valid_rhs is empty (all NULL defaults) — fall through to default handling
+      // valid_rhs is empty (all NULL defaults) -- fall through to default handling
     }
 
     if (instance->fibered_attr.fiber != NULL) {
@@ -2073,7 +2154,9 @@ bool try_dump_funcall(Expression e, ostream& o) override {
   }
 
   Declaration attr = attr_ref_p(e);
-  if (attr == nullptr) return false;
+  if (attr == nullptr) {
+    return false;
+  }
   Declaration node = USE_DECL(value_use_use(first_Actual(funcall_actuals(e))));
   FIBERED_ATTRIBUTE fiber_attr = {attr, NULL};
   INSTANCE* instance;
@@ -2097,7 +2180,7 @@ void dump_synth_instance(INSTANCE* instance, ostream& o) {
   BlockItem* block = find_surrounding_block(current_scope_block, instance);
 
   Declaration node = instance->node;
-  bool is_parent_instance = current_aug_graph->lhs_decl == instance->node;
+  bool is_parent_instance = instance_is_parent(instance, current_aug_graph);
 
   bool is_synthesized = instance_is_synthesized(instance);
   bool is_inherited = instance_is_inherited(instance);
