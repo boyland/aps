@@ -89,6 +89,10 @@ phony_explicit:
 	${APS2SCALA} ${APS2SCALAFLAGS} -S -C $*
 	mv $*.scala $@
 
+%.synth.scala : ../%.aps ${APS2SCALA}
+	${APS2SCALA} ${APS2SCALAFLAGS} -F $*
+	mv $*.scala $@
+
 %.scala : ../%.aps ${APS2SCALA}
 	${APS2SCALA} ${APS2SCALAFLAGS} $*
 
