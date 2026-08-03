@@ -2154,6 +2154,8 @@ bool try_dump_funcall(Expression e, ostream& o) override {
         Type return_type = value_decl_type(retdecl);
         Declaration tdecl = USE_DECL(type_use_use(return_type));
         if (Declaration_KEY(tdecl) == KEYphylum_decl) {
+          Declaration tplm;
+          bool inside_match = check_surrounding_decl(e, KEYtop_level_match, &tplm);
           dump_Expression(fexpr, o);
           o << "(";
           bool start = true;
@@ -2161,7 +2163,7 @@ bool try_dump_funcall(Expression e, ostream& o) override {
             if (start) start = false; else o << ",\n";
             dump_Expression(arg, o));
           if (first_Actual(funcall_actuals(e)) != NULL) o << ", ";
-          o << "node)";
+          o << (inside_match ? "node" : "null") << ")";
           return true;
         }
       }
