@@ -1037,12 +1037,22 @@ static void emit_loop_implicits(ostream& os, const string& flag) {
 
 // Emit a local while-loop. If is_independent, no isInsideFixedPoint guard
 // because independent cycles need their own loop always.
+// cycle_instance (optional): when provided for independent cycles, emits a guard
+// that skips the loop if the child has already converged (ASSIGNED).
 static void emit_local_fixed_point_loop(ostream& os,
                                         const string& flag,
                                         const std::function<void()>& emit_body,
-                                        bool is_independent = false) {
+                                        bool is_independent = false,
+                                        INSTANCE* cycle_instance = NULL) {
   if (is_independent) {
     os << indent() << "// Independent cycle: always converge locally\n";
+    if (cycle_instance != NULL && cycle_instance->node != NULL) {
+      // Skip the loop if this child cycle already converged
+      os << indent() << "if (" << instance_to_attr(cycle_instance)
+         << ".checkNode(v_" << decl_name(cycle_instance->node)
+         << ").status != Evaluation.ASSIGNED) {\n";
+      ++nesting_level;
+    }
   } else {
     os << indent() << "if (!" << LOOP_VAR << ") {\n";
     ++nesting_level;
@@ -1055,7 +1065,12 @@ static void emit_local_fixed_point_loop(ostream& os,
   emit_body();
   --nesting_level;
   os << indent() << "}\n";
-  if (!is_independent) {
+  if (is_independent) {
+    if (cycle_instance != NULL && cycle_instance->node != NULL) {
+      --nesting_level;
+      os << indent() << "}\n";
+    }
+  } else {
     --nesting_level;
     os << indent() << "}\n";
   }
@@ -1296,7 +1311,7 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
             os << indent();
             synth_impl_ptr->dump_synth_instance(cycle_instance, os);
             os << ";\n";
-          }, /* is_independent= */independent);
+          }, /* is_independent= */independent, /* cycle_instance= */independent ? cycle_instance : NULL);
         }
         dumped_conditional_block_items.clear();
         dumped_instances.clear();
