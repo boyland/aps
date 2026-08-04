@@ -2565,7 +2565,7 @@ void *augment_dependency_graph_func_calls(void *paug_graph, void *node) {
       case KEYassign:
 	{ Declaration pdecl = proc_call_p(assign_rhs(decl));
 	  if (pdecl != NULL) {
-      // XXX: procedure calls are not implemented fully yet
+      // XXX: procedure calls are not fully implemented yet
 	    augment_dependency_graph_for_node(aug_graph,decl, true, true);
 	  }
 	}
