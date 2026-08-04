@@ -2577,9 +2577,7 @@ void *augment_dependency_graph_func_calls(void *paug_graph, void *node) {
   return paug_graph;
 }
 
-/* copy in (and out!) summary dependencies.
- * DOn't do a full dnc close: don't copy dependencies from parent to child.
- */
+/* copy in (and out!) summary dependencies */
 void augment_dependency_graph(AUG_GRAPH *aug_graph, bool anc_analysis) {
   Declaration rhs_decl;
   switch (Declaration_KEY(aug_graph->match_rule)) {
@@ -2595,8 +2593,8 @@ void augment_dependency_graph(AUG_GRAPH *aug_graph, bool anc_analysis) {
   case KEYtop_level_match:
     augment_dependency_graph_for_node(aug_graph,aug_graph->lhs_decl, !anc_analysis, true);
     for (rhs_decl = aug_graph->first_rhs_decl;
-      rhs_decl != NULL;
-      rhs_decl = Declaration_info(rhs_decl)->next_decl) {
+	 rhs_decl != NULL;
+	 rhs_decl = Declaration_info(rhs_decl)->next_decl) {
       augment_dependency_graph_for_node(aug_graph,rhs_decl, true, !anc_analysis);
     }
     break;
