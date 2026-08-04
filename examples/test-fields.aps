@@ -6,20 +6,20 @@ with "tiny";
 module TEST_FIELDS[T :: var TINY[]] extends T begin
 	phylum Object;
 	constructor con() : Object;
-        type Ref := remote Object;
+	type Ref := remote Object;
 	
-        attribute Wood.s : Integer;
+	attribute Wood.s : Integer;
 	attribute Wood.ri : Ref;
 	attribute Wood.rs : Ref;
-        attribute Root.r : Integer;
+	attribute Root.r : Integer;
 
-        attribute Object.init : Integer;
+	attribute Object.init : Integer;
 	collection attribute Object.later : Integer :> 0, (+);
 	attribute Object.middle : Integer;
 	collection attribute Object.later2 : Integer :> 0, (+);
 
-        pragma inherited(ri);
-        pragma synthesized(s, rs, r);
+	pragma inherited(ri);
+	pragma synthesized(s, rs, r);
 
 	match ?self=root(?t) begin
 		t.ri := nil;
@@ -43,12 +43,13 @@ module TEST_FIELDS[T :: var TINY[]] extends T begin
 		o : Object := con();
 		o.init := n;
 		if l.ri = nil then
-			o.middle := o.later; 
+			o.middle := o.init + o.later; 
 		else
 			l.ri.later :> n;
-			o.middle := o.later + l.ri.init;
-			l.ri.later2 :> o.later;
+			o.middle := o.init + o.later + l.ri.init;
+			l.ri.later2 :> o.middle;
 		endif;
+		l.rs := o;
 		l.s := o.later2;
 	end;
 end;
