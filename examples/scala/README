@@ -15,3 +15,4 @@ make EVALUATOR=STATIC ARGS="tiny.program" UseGlobal.run
 make EVALUATOR=STATIC NestedCyclesDriver.run
 make EVALUATOR=STATIC ARGS="nested-ubd.program" NestedUbdDriver.run
 make EVALUATOR=STATIC ARGS="nested-ubd.program" NestedUbdFiberDriver.run
+make EVALUATOR=STATIC ARGS="tiny.program" TestFieldsDriver.run
