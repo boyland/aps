@@ -2441,8 +2441,8 @@ static void init_analysis_state(STATE *s, Declaration module) {
 static void synchronize_dependency_graphs(AUG_GRAPH *aug_graph,
 					  int start,
 					  PHY_GRAPH *phy_graph,
-            bool copy_from_summary,
-            bool copy_to_summary) {
+					  bool copy_from_summary,
+					  bool copy_to_summary) {
   int n=aug_graph->instances.length;
   int max;
   int phy_n;
@@ -2522,8 +2522,8 @@ static void synchronize_dependency_graphs(AUG_GRAPH *aug_graph,
 
 static void augment_dependency_graph_for_node(AUG_GRAPH *aug_graph,
 					      Declaration node,
-                bool copy_from_summary,
-                bool copy_to_summary) {
+					      bool copy_from_summary,
+					      bool copy_to_summary) {
   int start=Declaration_info(node)->instance_index;
   PHY_GRAPH *phy_graph = Declaration_info(node)->node_phy_graph;
 
