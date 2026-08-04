@@ -49,6 +49,7 @@ module TEST_FIELDS[T :: var TINY[]] extends T begin
 			o.middle := o.later + l.ri.init;
 			l.ri.later2 :> o.later;
 		endif;
+		l.rs := o;
 		l.s := o.later2;
 	end;
 end;
