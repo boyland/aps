@@ -52,16 +52,11 @@ module SIMPLE_SNC[T :: var SIMPLE[]] extends T begin
   end;
 
   match ?s:Stmt=block_stmt(?b:Block) begin
-    s.total := 0;
   end;
   
   match ?e:Expr=strconstant(?:String) begin
-    e.s1 := 0;
-    e.s2 := 0;
   end;
 
   match ?e:Expr=variable(?id:String) begin
-    e.s1 := 0;
-    e.s2 := 0;
   end;
 end;
