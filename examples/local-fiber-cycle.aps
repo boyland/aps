@@ -22,7 +22,7 @@ module LOCAL_FIBER_CYCLE[T :: var TINY[]] extends T begin
     c.ptr2 := nil;
     w.scope := c;
   end;
-  
+
   match ?this=branch(?w1,?w2) begin
     this.syn := w1.syn + w2.syn;
     c1 : Context := context(scope_depth(this.scope));

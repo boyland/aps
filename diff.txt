@@ -1,0 +1,244 @@
+diff --git a/analyze/aps-dnc.c b/analyze/aps-dnc.c
+index e1af302..9bdeba4 100644
+--- a/analyze/aps-dnc.c
++++ b/analyze/aps-dnc.c
+@@ -2440,7 +2440,9 @@ static void init_analysis_state(STATE *s, Declaration module) {
+ 
+ static void synchronize_dependency_graphs(AUG_GRAPH *aug_graph,
+ 					  int start,
+-					  PHY_GRAPH *phy_graph) {
++					  PHY_GRAPH *phy_graph,
++            bool copy_from_summary,
++            bool copy_to_summary) {
+   int n=aug_graph->instances.length;
+   int max;
+   int phy_n;
+@@ -2475,7 +2477,7 @@ static void synchronize_dependency_graphs(AUG_GRAPH *aug_graph,
+       int aug_index = i*n + j;
+       int sum_index = (i-start)*phy_n + (j-start);
+       DEPENDENCY kind=edgeset_kind(aug_graph->graph[aug_index]);
+-      if (!AT_MOST(dependency_indirect(kind),
++      if (copy_to_summary && !AT_MOST(dependency_indirect(kind),
+ 		   phy_graph->mingraph[sum_index])) {
+ 	kind = dependency_indirect(kind); //! more precisely DNC artificial
+ 	kind = dependency_join(kind,phy_graph->mingraph[sum_index]);
+@@ -2500,7 +2502,7 @@ static void synchronize_dependency_graphs(AUG_GRAPH *aug_graph,
+ 	}
+ 	phy_graph->mingraph[sum_index] = kind;
+ 	/*?? put on a worklist somehow ? */
+-      } else if (!AT_MOST(phy_graph->mingraph[sum_index],
++      } else if (copy_from_summary && !AT_MOST(phy_graph->mingraph[sum_index],
+ 			  edgeset_lowerbound(aug_graph->graph[aug_index]))) {
+ 	CONDITION cond;
+ 	cond.positive=0; cond.negative=0;
+@@ -2519,11 +2521,13 @@ static void synchronize_dependency_graphs(AUG_GRAPH *aug_graph,
+ }
+ 
+ static void augment_dependency_graph_for_node(AUG_GRAPH *aug_graph,
+-					      Declaration node) {
++					      Declaration node,
++                bool copy_from_summary,
++                bool copy_to_summary) {
+   int start=Declaration_info(node)->instance_index;
+   PHY_GRAPH *phy_graph = Declaration_info(node)->node_phy_graph;
+ 
+-  synchronize_dependency_graphs(aug_graph,start,phy_graph);
++  synchronize_dependency_graphs(aug_graph,start,phy_graph, copy_from_summary, copy_to_summary);
+ }
+ 
+ /** Augment the dependencies between edges associated with a procedure call,
+@@ -2544,7 +2548,8 @@ void *augment_dependency_graph_func_calls(void *paug_graph, void *node) {
+ 	Declaration proxy = Expression_info(e)->funcall_proxy;
+ 	if (proxy == NULL)
+ 	  fatal_error("missing funcall proxy");
+-	augment_dependency_graph_for_node(aug_graph,proxy);
++    // XXX: no change for function calls
++	augment_dependency_graph_for_node(aug_graph,proxy, true, true);
+       }
+     }
+     break;
+@@ -2560,7 +2565,8 @@ void *augment_dependency_graph_func_calls(void *paug_graph, void *node) {
+       case KEYassign:
+ 	{ Declaration pdecl = proc_call_p(assign_rhs(decl));
+ 	  if (pdecl != NULL) {
+-	    augment_dependency_graph_for_node(aug_graph,decl);
++      // XXX: procedure calls are not implemented fully yet
++	    augment_dependency_graph_for_node(aug_graph,decl, true, true);
+ 	  }
+ 	}
+ 	break;
+@@ -2572,24 +2578,24 @@ void *augment_dependency_graph_func_calls(void *paug_graph, void *node) {
+ }
+ 
+ /* copy in (and out!) summary dependencies */
+-void augment_dependency_graph(AUG_GRAPH *aug_graph) {
++/* copy in (and out!) summary dependencies.
++ * DOn't do a full dnc close: don't copy dependencies from parent to child.
++ */
++void augment_dependency_graph(AUG_GRAPH *aug_graph, bool anc_analysis) {
+   Declaration rhs_decl;
+   switch (Declaration_KEY(aug_graph->match_rule)) {
+   default:
+     fatal_error("unexpected match rule");
+     break;
+   case KEYmodule_decl:
+-    augment_dependency_graph_for_node(aug_graph,aug_graph->match_rule);
++    augment_dependency_graph_for_node(aug_graph,aug_graph->match_rule, !anc_analysis, true);
+     break;
+   case KEYsome_function_decl:
+-    augment_dependency_graph_for_node(aug_graph,aug_graph->match_rule);
++    augment_dependency_graph_for_node(aug_graph,aug_graph->match_rule, !anc_analysis, true);
+     break;
+   case KEYtop_level_match:
+-    augment_dependency_graph_for_node(aug_graph,aug_graph->lhs_decl);
++    augment_dependency_graph_for_node(aug_graph,aug_graph->lhs_decl, !anc_analysis, true);
+     for (rhs_decl = aug_graph->first_rhs_decl;
+-	 rhs_decl != NULL;
+-	 rhs_decl = Declaration_info(rhs_decl)->next_decl) {
+-      augment_dependency_graph_for_node(aug_graph,rhs_decl);
++      rhs_decl != NULL;
++      rhs_decl = Declaration_info(rhs_decl)->next_decl) {
++      augment_dependency_graph_for_node(aug_graph,rhs_decl, true, !anc_analysis);
+     }
+     break;
+   }
+@@ -2706,8 +2712,8 @@ void assert_closed(AUG_GRAPH *aug_graph) {
+ }
+ 
+ /* return whether any changes were noticed */
+-BOOL close_augmented_dependency_graph(AUG_GRAPH *aug_graph) {
+-  augment_dependency_graph(aug_graph);
++BOOL close_augmented_dependency_graph(AUG_GRAPH *aug_graph, bool anc_analysis) {
++  augment_dependency_graph(aug_graph, anc_analysis);
+   if (aug_graph->worklist_head == NULL) {
+     if (analysis_debug & DNC_ITERATE)
+       printf("Worklist is empty\n");
+@@ -2728,7 +2734,7 @@ BOOL close_augmented_dependency_graph(AUG_GRAPH *aug_graph) {
+       close_using_edge(aug_graph,edge);
+     }
+     
+-    augment_dependency_graph(aug_graph);
++    augment_dependency_graph(aug_graph, anc_analysis);
+   }
+ 
+   if (analysis_debug & ASSERT_CLOSED) assert_closed(aug_graph);
+@@ -2825,9 +2831,9 @@ void dnc_close(STATE*s) {
+       if (analysis_debug & DNC_ITERATE) {
+ 	printf("Checking rule %d\n",j);
+       }
+-      changed |= close_augmented_dependency_graph(&s->aug_graphs[j]);
++      changed |= close_augmented_dependency_graph(&s->aug_graphs[j], s->anc_analysis);
+     }
+-    changed |= close_augmented_dependency_graph(&s->global_dependencies);
++    changed |= close_augmented_dependency_graph(&s->global_dependencies, s->anc_analysis);
+     for (j=0; j < s->phyla.length; ++j) {
+       if (analysis_debug & DNC_ITERATE) {
+ 	printf("Checking phylum %s\n",
+diff --git a/analyze/aps-dnc.h b/analyze/aps-dnc.h
+index 8552667..6c20f38 100644
+--- a/analyze/aps-dnc.h
++++ b/analyze/aps-dnc.h
+@@ -142,7 +142,7 @@ extern void add_edge_to_graph(INSTANCE *source,
+ 			      AUG_GRAPH *aug_graph);
+ 
+ /* The following routines return TRUE if a change occurs. */
+-extern int close_augmented_dependency_graph(AUG_GRAPH *);
++extern int close_augmented_dependency_graph(AUG_GRAPH *, bool anc_analysis);
+ extern int close_summary_dependency_graph(PHY_GRAPH *);
+ extern DEPENDENCY analysis_state_cycle(STATE *);
+ 
+diff --git a/analyze/aps-oag.c b/analyze/aps-oag.c
+index c791a97..9aea33f 100644
+--- a/analyze/aps-oag.c
++++ b/analyze/aps-oag.c
+@@ -324,7 +324,7 @@ void schedule_augmented_dependency_graph(AUG_GRAPH *aug_graph) {
+   int i;
+   CONDITION cond;
+ 
+-  (void)close_augmented_dependency_graph(aug_graph);
++  (void)close_augmented_dependency_graph(aug_graph, false);
+ 
+   /** Now schedule graph: we need to generate a conditional total order. */
+ 
+diff --git a/analyze/aps-schedule.c b/analyze/aps-schedule.c
+index a640c0a..7938314 100644
+--- a/analyze/aps-schedule.c
++++ b/analyze/aps-schedule.c
+@@ -2735,7 +2735,7 @@ static void schedule_augmented_dependency_graph(
+   CONDITION cond;
+   int i, j, ch;
+ 
+-  (void)close_augmented_dependency_graph(aug_graph);
++  (void)close_augmented_dependency_graph(aug_graph, false);
+ 
+   // Find SCC components of instances given a augmented dependency graph
+   set_aug_graph_components(aug_graph);
+diff --git a/codegen/synth-impl.cc b/codegen/synth-impl.cc
+index 5a5fbf8..d43f6a5 100644
+--- a/codegen/synth-impl.cc
++++ b/codegen/synth-impl.cc
+@@ -1087,8 +1087,7 @@ struct ObjectFieldAssign {
+   INSTANCE* instance;
+ };
+ 
+-static std::vector<ObjectFieldAssign>
+-collect_object_field_assignments(AUG_GRAPH* aug_graph, Declaration obj_decl) {
++static std::vector<ObjectFieldAssign> collect_object_field_assignments(AUG_GRAPH* aug_graph, Declaration obj_decl) {
+   std::vector<ObjectFieldAssign> result;
+   Block body = matcher_body(top_level_match_m(aug_graph->match_rule));
+   for (Declaration d = first_Declaration(block_body(body)); d; d = DECL_NEXT(d)) {
+@@ -1100,7 +1099,7 @@ collect_object_field_assignments(AUG_GRAPH* aug_graph, Declaration obj_decl) {
+       continue;
+     }
+     Declaration field = field_ref_p(lhs);
+-    if (field == 0) {
++    if (field == NULL) {
+       continue;
+     }
+     Expression obj = field_ref_object(lhs);
+@@ -1414,8 +1413,7 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
+       for (auto ag_it = synth_functions_state->aug_graphs.begin();
+            ag_it != synth_functions_state->aug_graphs.end(); ag_it++) {
+         AUG_GRAPH* aug_graph = *ag_it;
+-        std::vector<ObjectFieldAssign> field_assigns =
+-            collect_object_field_assignments(aug_graph, obj_decl);
++        std::vector<ObjectFieldAssign> field_assigns = collect_object_field_assignments(aug_graph, obj_decl);
+         if (field_assigns.empty()) {
+           continue;
+         }
+diff --git a/examples/local-fiber-cycle.aps b/examples/local-fiber-cycle.aps
+index 3af92fb..23d2a88 100644
+--- a/examples/local-fiber-cycle.aps
++++ b/examples/local-fiber-cycle.aps
+@@ -22,9 +22,7 @@ module LOCAL_FIBER_CYCLE[T :: var TINY[]] extends T begin
+     c.ptr2 := nil;
+     w.scope := c;
+   end;
+-  
+-  -- TODO: create an example of local cycle, inside a local cycle
+-  -- more complicated examples
++
+   match ?this=branch(?w1,?w2) begin
+     this.syn := w1.syn + w2.syn;
+     c1 : Context := context(scope_depth(this.scope));
+diff --git a/examples/simple-snc.aps b/examples/simple-snc.aps
+index fb224df..3c6f993 100644
+--- a/examples/simple-snc.aps
++++ b/examples/simple-snc.aps
+@@ -52,11 +52,16 @@ module SIMPLE_SNC[T :: var SIMPLE[]] extends T begin
+   end;
+ 
+   match ?s:Stmt=block_stmt(?b:Block) begin
++    s.total := 0;
+   end;
+   
+   match ?e:Expr=strconstant(?:String) begin
++    e.s1 := 0;
++    e.s2 := 0;
+   end;
+ 
+   match ?e:Expr=variable(?id:String) begin
++    e.s1 := 0;
++    e.s2 := 0;
+   end;
+ end;
