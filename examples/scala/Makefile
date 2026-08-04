@@ -17,8 +17,6 @@ EVALUATOR ?= DYNAMIC
 
 ifeq (${EVALUATOR},STATIC)
 IMPL_SUFFIX = .static.scala
-else ifeq (${EVALUATOR},SYNTH)
-IMPL_SUFFIX = .synth.scala
 else
 IMPL_SUFFIX = .scala
 endif
@@ -27,32 +25,19 @@ OUT_BASE = obj
 OUT = ${OUT_BASE}/${EVALUATOR}
 $(shell mkdir -p ${OUT})
 
-SCALAGEN = simple.scala tiny.scala \
-	classic-binding.scala classic-binding.static.scala classic-binding.synth.scala \
-	grammar.scala \
-	first.scala first.static.scala first.synth.scala \
-	follow.scala follow.static.scala follow.synth.scala \
-	nullable.scala nullable.static.scala nullable.synth.scala \
-	test-coll.scala test-coll.static.scala test-coll.synth.scala \
-	test-use-coll.scala test-use-coll.static.scala test-use-coll.synth.scala \
-	test-cycle.scala test-cycle.static.scala test-cycle.synth.scala \
-	use-global.scala use-global.static.scala use-global.synth.scala \
-	broad-fiber-cycle.scala broad-fiber-cycle.static.scala broad-fiber-cycle.synth.scala \
-	below-fiber-cycle.scala below-fiber-cycle.static.scala below-fiber-cycle.synth.scala \
-	below-single-fiber-cycle.scala below-single-fiber-cycle.static.scala below-single-fiber-cycle.synth.scala \
-	local-fiber-cycle.scala local-fiber-cycle.static.scala local-fiber-cycle.synth.scala \
-	nested-cycles.scala nested-cycles.static.scala nested-cycles.synth.scala \
-	farrow-lv-tree.scala farrow-lv.scala farrow-lv.static.scala farrow-lv.synth.scala \
-	farrow-ubd-tree.scala farrow-ubd.scala farrow-ubd.static.scala farrow-ubd.synth.scala \
-	farrow-ubd-fiber.scala farrow-ubd-fiber.static.scala farrow-ubd-fiber.synth.scala \
-	nested-ubd-tree.scala nested-ubd.scala nested-ubd.static.scala nested-ubd.synth.scala \
-	nested-ubd-fiber.scala nested-ubd-fiber.static.scala nested-ubd-fiber.synth.scala
+SCALAGEN = simple.scala classic-binding.scala tiny.scala broad-fiber-cycle.scala \
+	below-fiber-cycle.scala below-single-fiber-cycle.scala local-fiber-cycle.scala \
+	test-coll.scala test-use-coll.scala test-cycle.scala use-global.scala \
+	grammar.scala first.scala follow.scala nullable.scala \
+	farrow-lv-tree.scala farrow-ubd-tree.scala
 
-MISCGEN = SimpleParser.scala SimpleScanner.scala \
+MISCGEN = nested-cycles.scala SimpleParser.scala SimpleScanner.scala \
 	GrammarTokens.scala SimpleTokens.scala GrammarScanner.scala GrammarParser.scala \
-	FarrowLvTokens.scala FarrowLvScanner.scala FarrowLvParser.scala \
-	FarrowUbdTokens.scala FarrowUbdScanner.scala FarrowUbdParser.scala \
-	NestedUbdTokens.scala NestedUbdScanner.scala NestedUbdParser.scala \
+	FarrowLvTokens.scala FarrowLvTokens.scala FarrowLvScanner.scala FarrowLvParser.scala farrow-lv.scala \
+	FarrowUbdTokens.scala FarrowUbdTokens.scala FarrowUbdScanner.scala FarrowUbdParser.scala farrow-ubd.scala \
+	farrow-ubd-fiber.scala \
+	NestedUbdTokens.scala NestedUbdScanner.scala NestedUbdParser.scala nested-ubd.scala \
+	nested-ubd-fiber.scala nested-ubd-tree.scala \
 	*.output *.lex *.y *.scala~
 
 .PHONY: all clean phony_explicit
@@ -87,11 +72,7 @@ phony_explicit:
 
 %.static.scala : ../%.aps ${APS2SCALA}
 	${APS2SCALA} ${APS2SCALAFLAGS} -S -C $*
-	cp $*.scala $@
-
-%.synth.scala : ../%.aps ${APS2SCALA}
-	${APS2SCALA} ${APS2SCALAFLAGS} -F $*
-	cp $*.scala $@
+	mv $*.scala $@
 
 %.scala : ../%.aps ${APS2SCALA}
 	${APS2SCALA} ${APS2SCALAFLAGS} $*

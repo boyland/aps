@@ -1,8 +1,6 @@
 #ifndef DUMP_H
-#include "implement.h"
 #include <iostream>
 #include <string>
-#include <vector>
 
 using std::ostream;
 using std::string;
@@ -197,9 +195,5 @@ inline const output_streams& operator<< <header_end>
   return oss;
 }
 #endif /* APS2SCALA */
-
-// Common code generation utility functions
-extern bool check_surrounding_decl(void* node, KEYTYPE_Declaration decl_key, Declaration* result_decl);
-extern bool check_surrounding_node(void* node, KEYTYPE_ABSTRACT_APS_Phylum ast_key, void** result_node);
 
 #endif

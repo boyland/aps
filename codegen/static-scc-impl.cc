@@ -1444,4 +1444,3 @@ void implement_value_use(Declaration vd, ostream& os) {
 ;
 
 Implementation* static_scc_impl = new StaticScc();
-Implementation* synth_impl = NULL;
