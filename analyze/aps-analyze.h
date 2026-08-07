@@ -7,6 +7,7 @@
 	(STATE*)(Declaration_info(md)->analysis_state)
 
 extern bool static_scc_schedule;
+extern bool anc_analysis;
 
 extern void analyze_Program(Program); /* decorate modules with STATE */
 

@@ -324,7 +324,7 @@ void schedule_augmented_dependency_graph(AUG_GRAPH *aug_graph) {
   int i;
   CONDITION cond;
 
-  (void)close_augmented_dependency_graph(aug_graph);
+  (void)close_augmented_dependency_graph(aug_graph, false);
 
   /** Now schedule graph: we need to generate a conditional total order. */
 
