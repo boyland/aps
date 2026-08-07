@@ -28,6 +28,7 @@ $(shell mkdir -p ${OUT})
 SCALAGEN = simple.scala classic-binding.scala tiny.scala broad-fiber-cycle.scala \
 	below-fiber-cycle.scala below-single-fiber-cycle.scala local-fiber-cycle.scala \
 	test-coll.scala test-use-coll.scala test-cycle.scala use-global.scala \
+	test-fields.scala \
 	grammar.scala first.scala follow.scala nullable.scala \
 	farrow-lv-tree.scala farrow-ubd-tree.scala
 
@@ -63,6 +64,7 @@ all : ${OUT}/broad_fiber_cycle_implicit.class ${OUT}/BroadFiberCycleDriver.class
 all : ${OUT}/below_fiber_cycle_implicit.class ${OUT}/BelowFiberCycleDriver.class
 all : ${OUT}/below_single_fiber_cycle_implicit.class ${OUT}/BelowSingleFiberCycleDriver.class
 all : ${OUT}/local_fiber_cycle_implicit.class ${OUT}/LocalFiberCycleDriver.class
+all : ${OUT}/test_fields_implicit.class ${OUT}/TestFieldsDriver.class
 
 .PHONY: run
 
@@ -277,6 +279,13 @@ ${OUT}/test_use_coll_implicit.class : test-use-coll${IMPL_SUFFIX} ${OUT}/tiny_im
 
 ${OUT}/TestCollDriver.class : ${OUT}/test_coll_implicit.class ${OUT}/TinyParser.class test-coll-driver.scala
 	${SCALAC} ${SCALACFLAGS}  test-coll-driver.scala
+
+${OUT}/test_fields_implicit.class : test-fields${IMPL_SUFFIX} ${OUT}/tiny_implicit.class
+	${SCALAC} ${SCALACFLAGS} $<
+	@touch $@
+
+${OUT}/TestFieldsDriver.class : ${OUT}/test_fields_implicit.class ${OUT}/TinyParser.class test-fields-driver.scala
+	${SCALAC} ${SCALACFLAGS}  test-fields-driver.scala
 
 ${OUT}/TestUseCollDriver.class : ${OUT}/test_use_coll_implicit.class ${OUT}/TinyParser.class test-use-coll-driver.scala ${OUT}/tiny_implicit.class
 	${SCALAC} ${SCALACFLAGS}  test-use-coll-driver.scala
