@@ -2440,7 +2440,9 @@ static void init_analysis_state(STATE *s, Declaration module) {
 
 static void synchronize_dependency_graphs(AUG_GRAPH *aug_graph,
 					  int start,
-					  PHY_GRAPH *phy_graph) {
+					  PHY_GRAPH *phy_graph,
+					  bool copy_from_summary,
+					  bool copy_to_summary) {
   int n=aug_graph->instances.length;
   int max;
   int phy_n;
@@ -2475,7 +2477,7 @@ static void synchronize_dependency_graphs(AUG_GRAPH *aug_graph,
       int aug_index = i*n + j;
       int sum_index = (i-start)*phy_n + (j-start);
       DEPENDENCY kind=edgeset_kind(aug_graph->graph[aug_index]);
-      if (!AT_MOST(dependency_indirect(kind),
+      if (copy_to_summary && !AT_MOST(dependency_indirect(kind),
 		   phy_graph->mingraph[sum_index])) {
 	kind = dependency_indirect(kind); //! more precisely DNC artificial
 	kind = dependency_join(kind,phy_graph->mingraph[sum_index]);
@@ -2500,7 +2502,7 @@ static void synchronize_dependency_graphs(AUG_GRAPH *aug_graph,
 	}
 	phy_graph->mingraph[sum_index] = kind;
 	/*?? put on a worklist somehow ? */
-      } else if (!AT_MOST(phy_graph->mingraph[sum_index],
+      } else if (copy_from_summary && !AT_MOST(phy_graph->mingraph[sum_index],
 			  edgeset_lowerbound(aug_graph->graph[aug_index]))) {
 	CONDITION cond;
 	cond.positive=0; cond.negative=0;
@@ -2519,11 +2521,13 @@ static void synchronize_dependency_graphs(AUG_GRAPH *aug_graph,
 }
 
 static void augment_dependency_graph_for_node(AUG_GRAPH *aug_graph,
-					      Declaration node) {
+					      Declaration node,
+					      bool copy_from_summary,
+					      bool copy_to_summary) {
   int start=Declaration_info(node)->instance_index;
   PHY_GRAPH *phy_graph = Declaration_info(node)->node_phy_graph;
 
-  synchronize_dependency_graphs(aug_graph,start,phy_graph);
+  synchronize_dependency_graphs(aug_graph,start,phy_graph, copy_from_summary, copy_to_summary);
 }
 
 /** Augment the dependencies between edges associated with a procedure call,
@@ -2544,7 +2548,8 @@ void *augment_dependency_graph_func_calls(void *paug_graph, void *node) {
 	Declaration proxy = Expression_info(e)->funcall_proxy;
 	if (proxy == NULL)
 	  fatal_error("missing funcall proxy");
-	augment_dependency_graph_for_node(aug_graph,proxy);
+    // XXX: no change for function calls
+	augment_dependency_graph_for_node(aug_graph,proxy, true, true);
       }
     }
     break;
@@ -2560,7 +2565,8 @@ void *augment_dependency_graph_func_calls(void *paug_graph, void *node) {
       case KEYassign:
 	{ Declaration pdecl = proc_call_p(assign_rhs(decl));
 	  if (pdecl != NULL) {
-	    augment_dependency_graph_for_node(aug_graph,decl);
+	    // XXX: procedure calls are not fully implemented yet
+	    augment_dependency_graph_for_node(aug_graph,decl, true, true);
 	  }
 	}
 	break;
@@ -2572,24 +2578,24 @@ void *augment_dependency_graph_func_calls(void *paug_graph, void *node) {
 }
 
 /* copy in (and out!) summary dependencies */
-void augment_dependency_graph(AUG_GRAPH *aug_graph) {
+void augment_dependency_graph(AUG_GRAPH *aug_graph, bool anc_analysis) {
   Declaration rhs_decl;
   switch (Declaration_KEY(aug_graph->match_rule)) {
   default:
     fatal_error("unexpected match rule");
     break;
   case KEYmodule_decl:
-    augment_dependency_graph_for_node(aug_graph,aug_graph->match_rule);
+    augment_dependency_graph_for_node(aug_graph,aug_graph->match_rule, !anc_analysis, true);
     break;
   case KEYsome_function_decl:
-    augment_dependency_graph_for_node(aug_graph,aug_graph->match_rule);
+    augment_dependency_graph_for_node(aug_graph,aug_graph->match_rule, !anc_analysis, true);
     break;
   case KEYtop_level_match:
-    augment_dependency_graph_for_node(aug_graph,aug_graph->lhs_decl);
+    augment_dependency_graph_for_node(aug_graph,aug_graph->lhs_decl, !anc_analysis, true);
     for (rhs_decl = aug_graph->first_rhs_decl;
 	 rhs_decl != NULL;
 	 rhs_decl = Declaration_info(rhs_decl)->next_decl) {
-      augment_dependency_graph_for_node(aug_graph,rhs_decl);
+      augment_dependency_graph_for_node(aug_graph,rhs_decl, true, !anc_analysis);
     }
     break;
   }
@@ -2706,8 +2712,8 @@ void assert_closed(AUG_GRAPH *aug_graph) {
 }
 
 /* return whether any changes were noticed */
-BOOL close_augmented_dependency_graph(AUG_GRAPH *aug_graph) {
-  augment_dependency_graph(aug_graph);
+BOOL close_augmented_dependency_graph(AUG_GRAPH *aug_graph, bool anc_analysis) {
+  augment_dependency_graph(aug_graph, anc_analysis);
   if (aug_graph->worklist_head == NULL) {
     if (analysis_debug & DNC_ITERATE)
       printf("Worklist is empty\n");
@@ -2728,7 +2734,7 @@ BOOL close_augmented_dependency_graph(AUG_GRAPH *aug_graph) {
       close_using_edge(aug_graph,edge);
     }
     
-    augment_dependency_graph(aug_graph);
+    augment_dependency_graph(aug_graph, anc_analysis);
   }
 
   if (analysis_debug & ASSERT_CLOSED) assert_closed(aug_graph);
@@ -2825,9 +2831,9 @@ void dnc_close(STATE*s) {
       if (analysis_debug & DNC_ITERATE) {
 	printf("Checking rule %d\n",j);
       }
-      changed |= close_augmented_dependency_graph(&s->aug_graphs[j]);
+      changed |= close_augmented_dependency_graph(&s->aug_graphs[j], s->anc_analysis);
     }
-    changed |= close_augmented_dependency_graph(&s->global_dependencies);
+    changed |= close_augmented_dependency_graph(&s->global_dependencies, s->anc_analysis);
     for (j=0; j < s->phyla.length; ++j) {
       if (analysis_debug & DNC_ITERATE) {
 	printf("Checking phylum %s\n",

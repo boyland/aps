@@ -2735,7 +2735,7 @@ static void schedule_augmented_dependency_graph(
   CONDITION cond;
   int i, j, ch;
 
-  (void)close_augmented_dependency_graph(aug_graph);
+  (void)close_augmented_dependency_graph(aug_graph, false);
 
   // Find SCC components of instances given a augmented dependency graph
   set_aug_graph_components(aug_graph);

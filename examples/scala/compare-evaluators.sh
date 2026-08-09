@@ -102,6 +102,7 @@ TESTS=(
   "FarrowUbdFiberDriver|farrow-ubd.program"
   "NestedUbdDriver|nested-ubd.program"
   "NestedUbdFiberDriver|nested-ubd.program"
+  "TestFieldsDriver|tiny.program"
 )
 
 failures=0

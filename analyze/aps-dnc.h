@@ -142,7 +142,7 @@ extern void add_edge_to_graph(INSTANCE *source,
 			      AUG_GRAPH *aug_graph);
 
 /* The following routines return TRUE if a change occurs. */
-extern int close_augmented_dependency_graph(AUG_GRAPH *);
+extern int close_augmented_dependency_graph(AUG_GRAPH *, bool anc_analysis);
 extern int close_summary_dependency_graph(PHY_GRAPH *);
 extern DEPENDENCY analysis_state_cycle(STATE *);
 
