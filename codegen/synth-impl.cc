@@ -583,6 +583,35 @@ static bool should_skip_synth_dependency(INSTANCE* source_instance) {
   return false;
 }
 
+// Collect non-local dependencies of the field-assignment instances
+// belonging to the same local attribute, e.g. c.ptr1, c.ptr2 for local c.
+static std::vector<INSTANCE*> collect_field_assign_dependencies(AUG_GRAPH* aug_graph,
+                                                               INSTANCE* owner_instance) {
+  std::vector<INSTANCE*> result;
+  Declaration attr = owner_instance->fibered_attr.attr;
+  int n = aug_graph->instances.length;
+
+  for (int k = 0; k < n; k++) {
+    INSTANCE* field_instance = &aug_graph->instances.array[k];
+    if (field_instance->fibered_attr.attr != attr ||
+        field_instance->fibered_attr.fiber == NULL ||
+        field_instance->index == owner_instance->index) {
+      continue;
+    }
+    std::vector<INSTANCE*> field_deps = collect_aug_graph_attr_dependencies(aug_graph, field_instance);
+    for (auto fd = field_deps.begin(); fd != field_deps.end(); fd++) {
+      if ((*fd)->index != owner_instance->index &&
+          !should_skip_synth_dependency(*fd) &&
+          instance_direction(*fd) != instance_local &&
+          std::find(result.begin(), result.end(), *fd) == result.end()) {
+        result.push_back(*fd);
+      }
+    }
+  }
+
+  return result;
+}
+
 static std::vector<SYNTH_FUNCTION_STATE*> build_synth_functions_state(STATE* s) {
   std::vector<SYNTH_FUNCTION_STATE*> synth_function_states;
   int i, j;
@@ -658,6 +687,14 @@ static std::vector<SYNTH_FUNCTION_STATE*> build_synth_functions_state(STATE* s) 
         state->source_phy_graph = pg;
         state->is_fiber_evaluation = is_fiber || is_shared_info;
         state->regular_dependencies = collect_aug_graph_attr_dependencies(aug_graph, instance);
+
+        std::vector<INSTANCE*> field_deps = collect_field_assign_dependencies(aug_graph, instance);
+        for (auto fd = field_deps.begin(); fd != field_deps.end(); fd++) {
+          if (std::find(state->regular_dependencies.begin(),
+                        state->regular_dependencies.end(), *fd) == state->regular_dependencies.end()) {
+            state->regular_dependencies.push_back(*fd);
+          }
+        }
 
         vector<AUG_GRAPH*> aug_graphs;
         aug_graphs.push_back(aug_graph);
