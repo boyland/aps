@@ -27,27 +27,14 @@ OUT_BASE = obj
 OUT = ${OUT_BASE}/${EVALUATOR}
 $(shell mkdir -p ${OUT})
 
-SCALAGEN = simple.scala tiny.scala \
-	classic-binding.scala \
-	grammar.scala \
-	first.scala \
-	follow.scala \
-	nullable.scala \
-	test-coll.scala \
-	test-use-coll.scala \
-	test-cycle.scala \
-	test-fields.scala \
-	use-global.scala \
-	broad-fiber-cycle.scala \
-	below-fiber-cycle.scala \
-	below-single-fiber-cycle.scala \
-	local-fiber-cycle.scala \
-	nested-cycles.scala \
-	farrow-lv-tree.scala farrow-lv.scala \
-	farrow-ubd-tree.scala farrow-ubd.scala \
-	farrow-ubd-fiber.scala \
-	nested-ubd-tree.scala nested-ubd.scala \
-	nested-ubd-fiber.scala
+AST_TREE_SCALAGEN = simple.scala tiny.scala grammar.scala \
+	farrow-lv-tree.scala farrow-ubd-tree.scala
+EVALUATOR_EXAMPLES = classic-binding first follow nullable test-coll \
+	test-use-coll test-cycle test-fields use-global broad-fiber-cycle \
+	below-fiber-cycle below-single-fiber-cycle local-fiber-cycle nested-cycles \
+	farrow-lv farrow-ubd farrow-ubd-fiber nested-ubd nested-ubd-fiber
+SCALAGEN = ${AST_TREE_SCALAGEN} \
+	$(foreach example,${EVALUATOR_EXAMPLES},$(example).scala $(example).static.scala $(example).synth.scala)
 
 MISCGEN = SimpleParser.scala SimpleScanner.scala \
 	GrammarTokens.scala SimpleTokens.scala GrammarScanner.scala GrammarParser.scala \
@@ -61,7 +48,6 @@ MISCGEN = SimpleParser.scala SimpleScanner.scala \
 # keep generated .scala
 .SECONDARY:
 
-all : ${SCALAGEN}
 all : ${OUT}/grammar_implicit.class ${OUT}/simple_implicit.class ${OUT}/classic_binding_implicit.class ${OUT}/Classic.class
 all : ${OUT}/GrammarScanner.class ${OUT}/GrammarTokens.class ${OUT}/SimpleScanner.class ${OUT}/SimpleTokens.class
 all : ${OUT}/GrammarParserBase.class ${OUT}/GrammarParser.class ${OUT}/SimpleParserBase.class ${OUT}/SimpleParser.class
