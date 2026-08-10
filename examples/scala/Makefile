@@ -28,26 +28,26 @@ OUT = ${OUT_BASE}/${EVALUATOR}
 $(shell mkdir -p ${OUT})
 
 SCALAGEN = simple.scala tiny.scala \
-	classic-binding.scala classic-binding.static.scala classic-binding.synth.scala \
+	classic-binding.scala \
 	grammar.scala \
-	first.scala first.static.scala first.synth.scala \
-	follow.scala follow.static.scala follow.synth.scala \
-	nullable.scala nullable.static.scala nullable.synth.scala \
-	test-coll.scala test-coll.static.scala test-coll.synth.scala \
-	test-use-coll.scala test-use-coll.static.scala test-use-coll.synth.scala \
-	test-cycle.scala test-cycle.static.scala test-cycle.synth.scala \
-	test-fields.scala test-fields.static.scala test-fields.synth.scala \
-	use-global.scala use-global.static.scala use-global.synth.scala \
-	broad-fiber-cycle.scala broad-fiber-cycle.static.scala broad-fiber-cycle.synth.scala \
-	below-fiber-cycle.scala below-fiber-cycle.static.scala below-fiber-cycle.synth.scala \
-	below-single-fiber-cycle.scala below-single-fiber-cycle.static.scala below-single-fiber-cycle.synth.scala \
-	local-fiber-cycle.scala local-fiber-cycle.static.scala local-fiber-cycle.synth.scala \
-	nested-cycles.scala nested-cycles.static.scala nested-cycles.synth.scala \
-	farrow-lv-tree.scala farrow-lv.scala farrow-lv.static.scala farrow-lv.synth.scala \
-	farrow-ubd-tree.scala farrow-ubd.scala farrow-ubd.static.scala farrow-ubd.synth.scala \
-	farrow-ubd-fiber.scala farrow-ubd-fiber.static.scala farrow-ubd-fiber.synth.scala \
-	nested-ubd-tree.scala nested-ubd.scala nested-ubd.static.scala nested-ubd.synth.scala \
-	nested-ubd-fiber.scala nested-ubd-fiber.static.scala nested-ubd-fiber.synth.scala
+	first.scala \
+	follow.scala \
+	nullable.scala \
+	test-coll.scala \
+	test-use-coll.scala \
+	test-cycle.scala \
+	test-fields.scala \
+	use-global.scala \
+	broad-fiber-cycle.scala \
+	below-fiber-cycle.scala \
+	below-single-fiber-cycle.scala \
+	local-fiber-cycle.scala \
+	nested-cycles.scala \
+	farrow-lv-tree.scala farrow-lv.scala \
+	farrow-ubd-tree.scala farrow-ubd.scala \
+	farrow-ubd-fiber.scala \
+	nested-ubd-tree.scala nested-ubd.scala \
+	nested-ubd-fiber.scala
 
 MISCGEN = SimpleParser.scala SimpleScanner.scala \
 	GrammarTokens.scala SimpleTokens.scala GrammarScanner.scala GrammarParser.scala \
@@ -89,11 +89,11 @@ phony_explicit:
 
 %.static.scala : ../%.aps ${APS2SCALA}
 	${APS2SCALA} ${APS2SCALAFLAGS} -S -C $*
-	mv $*.scala $@
+	cp $*.scala $@
 
 %.synth.scala : ../%.aps ${APS2SCALA}
 	${APS2SCALA} ${APS2SCALAFLAGS} -F $*
-	mv $*.scala $@
+	cp $*.scala $@
 
 %.scala : ../%.aps ${APS2SCALA}
 	${APS2SCALA} ${APS2SCALAFLAGS} $*
