@@ -301,11 +301,8 @@ SCC_COMPONENTS* scc_graph_components(SccGraph* graph) {
     }
   } while (changed);
 
-  if (count_transitive_edges_added > 0) {
-    fprintf(stderr,
-        "Graph provided to SCC utility has not gone through "
-        "transitive closure (%d new transitive edges have been added)\n",
-        count_transitive_edges_added);
+  if (count_transitive_edges_added > 0 && (analysis_debug & WORKLIST_CHANGES)) {
+    printf("Transitive closure added %d edges\n", count_transitive_edges_added);
   }
 
   graph->neighbors = collect_neighbors(graph);
