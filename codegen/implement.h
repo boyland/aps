@@ -70,9 +70,16 @@ class Implementation {
   virtual void implement_value_use(Declaration vd, ostream&) = 0;
 };
 
+class SynthImplementation : public Implementation {
+ public:
+  virtual bool try_dump_funcall(Expression, ostream&) = 0;
+  virtual void dump_synth_instance(INSTANCE*, ostream&) = 0;
+};
+
 extern Implementation *dynamic_impl;
 extern Implementation *static_impl;
 extern Implementation *static_scc_impl;
+extern Implementation *synth_impl;
 
 #define IMPLEMENTATION_MARKS (127<<24)
 

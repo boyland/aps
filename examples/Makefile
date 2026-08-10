@@ -15,6 +15,9 @@ default:
 %.scc.scala : %.aps
 	${APS2SCALA} -C ${DEBUG_FLAGS} -p ${BASE} $*
 
+%.synth.scala : %.aps
+	${APS2SCALA} -F ${DEBUG_FLAGS} -p ${BASE} $*
+
 %.scala : %.aps
 	${APS2SCALA} ${DEBUG_FLAGS} -p ${BASE} $*
 
