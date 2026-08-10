@@ -46,7 +46,6 @@ MISCGEN = SimpleParser.scala SimpleScanner.scala \
 # keep generated .scala
 .SECONDARY:
 
-all : ${SCALAGEN}
 all : ${OUT}/grammar_implicit.class ${OUT}/simple_implicit.class ${OUT}/classic_binding_implicit.class ${OUT}/Classic.class
 all : ${OUT}/GrammarScanner.class ${OUT}/GrammarTokens.class ${OUT}/SimpleScanner.class ${OUT}/SimpleTokens.class
 all : ${OUT}/GrammarParserBase.class ${OUT}/GrammarParser.class ${OUT}/SimpleParserBase.class ${OUT}/SimpleParser.class
