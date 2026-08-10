@@ -14,6 +14,8 @@
 #include "hashtable.h"
 #include "stack.h"
 
+int scc_debug = 0;
+
 /**
  * Give a graph and vertex it returns the internal index
  * @param graph SCC graph
@@ -301,7 +303,7 @@ SCC_COMPONENTS* scc_graph_components(SccGraph* graph) {
     }
   } while (changed);
 
-  if (count_transitive_edges_added > 0 && (analysis_debug & WORKLIST_CHANGES)) {
+  if (count_transitive_edges_added > 0 && (scc_debug & SCC_ADDITIONS)) {
     printf("Transitive closure added %d edges\n", count_transitive_edges_added);
   }
 
