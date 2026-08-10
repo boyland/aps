@@ -64,7 +64,6 @@ jobs:
 
     - name: Sanity check
       run: |
-        ulimit -s unlimited
         cd examples/scala
         make
 

@@ -603,6 +603,7 @@ static std::vector<INSTANCE*> collect_field_assign_dependencies(AUG_GRAPH* aug_g
       if ((*fd)->index != owner_instance->index &&
           !should_skip_synth_dependency(*fd) &&
           instance_direction(*fd) != instance_local &&
+          !((*fd)->node != NULL && (*fd)->node != aug_graph->lhs_decl) &&
           std::find(result.begin(), result.end(), *fd) == result.end()) {
         result.push_back(*fd);
       }
@@ -2260,7 +2261,6 @@ void dump_synth_instance(INSTANCE* instance, ostream& o) {
     if (is_parent_instance) {
       o << "v_" << instance_to_string(instance, false, current_synth_functions_state->is_phylum_instance);
     } else {
-      // we need to find the assignment and dump the RHS recursive call
       dump_rhs_instance_helper(aug_graph, block, instance, o);
     }
   } else if (is_synthesized) {
