@@ -1,0 +1,19 @@
+{
+  int x;
+  int y;
+  string s;
+  int z;
+  x = 3;
+  y = 5;
+  x = y;
+  z = 10;
+  {
+    int a;
+    int b;
+    a = 7;
+    b = a;
+    a = 42;
+  }
+  y = z;
+  s = "hello";
+}
