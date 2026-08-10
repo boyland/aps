@@ -15,16 +15,16 @@ module SIMPLE_SNC[T :: var SIMPLE[]] extends T begin
   pragma synthesized(expr_s1, expr_s2, block_total, stmt_total, stmts_total, program_total);
 
   match ?s:Stmt=assign_stmt(?e1:Expr,?e2:Expr) begin
-    e1.expr_i1 := 0;
+    e1.expr_i1 := 1;
     e1.expr_i2 := e1.expr_s1;
-    e2.expr_i2 := 0;
+    e2.expr_i2 := 2;
     e2.expr_i1 := e2.expr_s2;
     s.stmt_total := e1.expr_s2 + e2.expr_s1;
   end;
   
   match ?e:Expr=intconstant(?i:Integer) begin
-    e.expr_s1 := e.expr_i1;
-    e.expr_s2 := e.expr_i2;
+    e.expr_s1 := e.expr_i1 + i + 1;
+    e.expr_s2 := e.expr_i2 + i + 2;
   end;
 
   match ?b:Block=block(?ds:Decls,?ss:Stmts) begin
@@ -59,7 +59,7 @@ module SIMPLE_SNC[T :: var SIMPLE[]] extends T begin
   end;
 
   match ?s:Stmt=block_stmt(?b:Block) begin
-    s.stmt_total := 0;
+    s.stmt_total := b.block_total;
   end;
   
   match ?e:Expr=strconstant(?:String) begin
