@@ -25,20 +25,20 @@ OUT_BASE = obj
 OUT = ${OUT_BASE}/${EVALUATOR}
 $(shell mkdir -p ${OUT})
 
-SCALAGEN = simple.scala classic-binding.scala tiny.scala broad-fiber-cycle.scala \
-	below-fiber-cycle.scala below-single-fiber-cycle.scala local-fiber-cycle.scala \
-	test-coll.scala test-use-coll.scala test-cycle.scala use-global.scala \
-	test-fields.scala \
-	grammar.scala first.scala follow.scala nullable.scala \
+AST_TREE_SCALAGEN = simple.scala tiny.scala grammar.scala \
 	farrow-lv-tree.scala farrow-ubd-tree.scala
+EVALUATOR_EXAMPLES = classic-binding first follow nullable test-coll \
+	test-use-coll test-cycle test-fields use-global broad-fiber-cycle \
+	below-fiber-cycle below-single-fiber-cycle local-fiber-cycle nested-cycles \
+	farrow-lv farrow-ubd farrow-ubd-fiber nested-ubd nested-ubd-fiber
+SCALAGEN = ${AST_TREE_SCALAGEN} \
+	$(foreach example,${EVALUATOR_EXAMPLES},$(example).scala $(example).static.scala)
 
-MISCGEN = nested-cycles.scala SimpleParser.scala SimpleScanner.scala \
+MISCGEN = SimpleParser.scala SimpleScanner.scala \
 	GrammarTokens.scala SimpleTokens.scala GrammarScanner.scala GrammarParser.scala \
-	FarrowLvTokens.scala FarrowLvTokens.scala FarrowLvScanner.scala FarrowLvParser.scala farrow-lv.scala \
-	FarrowUbdTokens.scala FarrowUbdTokens.scala FarrowUbdScanner.scala FarrowUbdParser.scala farrow-ubd.scala \
-	farrow-ubd-fiber.scala \
-	NestedUbdTokens.scala NestedUbdScanner.scala NestedUbdParser.scala nested-ubd.scala \
-	nested-ubd-fiber.scala nested-ubd-tree.scala \
+	FarrowLvTokens.scala FarrowLvScanner.scala FarrowLvParser.scala \
+	FarrowUbdTokens.scala FarrowUbdScanner.scala FarrowUbdParser.scala \
+	NestedUbdTokens.scala NestedUbdScanner.scala NestedUbdParser.scala \
 	*.output *.lex *.y *.scala~
 
 .PHONY: all clean phony_explicit
@@ -46,7 +46,6 @@ MISCGEN = nested-cycles.scala SimpleParser.scala SimpleScanner.scala \
 # keep generated .scala
 .SECONDARY:
 
-all : ${SCALAGEN}
 all : ${OUT}/grammar_implicit.class ${OUT}/simple_implicit.class ${OUT}/classic_binding_implicit.class ${OUT}/Classic.class
 all : ${OUT}/GrammarScanner.class ${OUT}/GrammarTokens.class ${OUT}/SimpleScanner.class ${OUT}/SimpleTokens.class
 all : ${OUT}/GrammarParserBase.class ${OUT}/GrammarParser.class ${OUT}/SimpleParserBase.class ${OUT}/SimpleParser.class

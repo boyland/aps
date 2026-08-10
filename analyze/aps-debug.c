@@ -4,6 +4,7 @@
 #include <string.h>
 #include <strings.h>
 #include "aps-ag.h"
+#include "utilities.h"
 
 static int aps_error_count = 0;
   
@@ -83,6 +84,7 @@ static void list_debug_flags() {
   fprintf(stderr,"\tO  TOTAL_ORDER\n");
   fprintf(stderr,"\tT  PROD_ORDER\n");
   fprintf(stderr,"\t3  TYPE_3_DEBUG\n");
+  fprintf(stderr,"\t4  SCC_ADDITIONS\n");
   exit(0);
 }
 
@@ -122,6 +124,7 @@ void set_debug_flags(const char *options)
     case 'v': oag_debug |= DEBUG_ORDER_VERBOSE; break;
     case 'T': oag_debug |= PROD_ORDER; break;
     case '3': oag_debug |= TYPE_3_DEBUG; break;
+    case '4': scc_debug |= SCC_ADDITIONS; break;
     }
   } while (*options != '\0');
 }
