@@ -29,6 +29,8 @@ void usage() {
   fprintf(stderr,"    -V    increase verbosity of generation code\n");
   fprintf(stderr,"    -G    add Debug calls for every function\n");
   fprintf(stderr,"    -C    SCC chunk static scheduling\n");
+  fprintf(stderr,"    -F,  --synth optimized SYNTH evaluation\n");
+  fprintf(stderr,"    -F0, --synth-original generate Farrow-style SYNTH evaluation\n");
   fprintf(stderr,"    -p path set the APSPATH (overriding env. variable)\n");
   exit(1);
 }
@@ -41,6 +43,8 @@ Implementation* impl;
 bool static_schedule = false;
 bool is_tree_only_program = false;
 bool synth_implementation = false;
+// False runs related child cycles until values reaches fixed-point and always re-runs independent child cycles.
+bool farrow_synth_improvements = true;
 
 static void* program_is_tree_only(void *scope, void *node) {
   if (ABSTRACT_APS_tnode_phylum(node) == KEYDeclaration) {
@@ -86,6 +90,11 @@ int main(int argc,char **argv) {
     } else if (streq(argv[i],"-F") || streq(argv[i],"--synth")) {
       synth_implementation = true;
       anc_analysis = true;
+      continue;
+    } else if (streq(argv[i],"-F0") || streq(argv[i],"--synth-original")) {
+      synth_implementation = true;
+      anc_analysis = true;
+      farrow_synth_improvements = false;
       continue;
     } else if (streq(argv[i],"-V") || streq(argv[i],"--verbose")) {
       ++verbose;
