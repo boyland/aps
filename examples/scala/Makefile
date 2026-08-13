@@ -52,7 +52,7 @@ all : ${OUT}/GrammarParserBase.class ${OUT}/GrammarParser.class ${OUT}/SimplePar
 all : ${OUT}/test_coll_implicit.class ${OUT}/TestCollDriver.class
 all : ${OUT}/test_cycle_implicit.class ${OUT}/TestCycleDriver.class
 all : ${OUT}/test_use_coll_implicit.class ${OUT}/TestUseCollDriver.class
-all : ${OUT}/grammar_implicit.class ${OUT}/GrammarDriver.class
+all : ${OUT}/grammar_implicit.class ${OUT}/FirstDriver.class ${OUT}/FollowDriver.class ${OUT}/NullableDriver.class
 all : ${OUT}/FarrowLv_implicit.class ${OUT}/FarrowLvDriver.class
 all : ${OUT}/FarrowUbd_implicit.class ${OUT}/FarrowUbdDriver.class
 all : ${OUT}/FarrowUbdFiber_implicit.class ${OUT}/FarrowUbdFiberDriver.class
@@ -300,8 +300,14 @@ ${OUT}/grammar_implicit.class : grammar.scala first${IMPL_SUFFIX} follow${IMPL_S
 	${SCALAC} ${SCALACFLAGS} $^
 	@touch $@
 
-${OUT}/GrammarDriver.class : ${OUT}/grammar_implicit.class ${OUT}/GrammarParser.class
-	${SCALAC} ${SCALACFLAGS} grammar-driver.scala
+${OUT}/FirstDriver.class : first-driver.scala ${OUT}/grammar_implicit.class ${OUT}/GrammarParser.class
+	${SCALAC} ${SCALACFLAGS} first-driver.scala
+
+${OUT}/FollowDriver.class : follow-driver.scala ${OUT}/grammar_implicit.class ${OUT}/GrammarParser.class
+	${SCALAC} ${SCALACFLAGS} follow-driver.scala
+
+${OUT}/NullableDriver.class : nullable-driver.scala ${OUT}/grammar_implicit.class ${OUT}/GrammarParser.class
+	${SCALAC} ${SCALACFLAGS} nullable-driver.scala
 
 ${OUT}/TinyParser.class : tiny-parser.handcode.scala ${OUT}/tiny_implicit.class
 	${SCALAC} ${SCALACFLAGS} tiny-parser.handcode.scala
