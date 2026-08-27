@@ -3,7 +3,7 @@
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
-DEFAULT_EVALUATORS="DYNAMIC,STATIC"
+EVALUATORS=(DYNAMIC STATIC)
 
 extract_results() {
   sed -n '/^Results:$/,$p'
@@ -27,9 +27,8 @@ run_with_evaluator() {
 
 run_driver() {
   local driver="$1"
-  local args="$2"
-  local -a evals
-  IFS=',' read -ra evals <<< "$3"
+  shift
+  local args="$*"
   local pass=true
   local build_failed=false
   local tmpdir
@@ -38,7 +37,7 @@ run_driver() {
   echo "--- $driver ${args:+(${args})} ---"
 
   local built_evaluators=()
-  for eval in "${evals[@]}"; do
+  for eval in "${EVALUATORS[@]}"; do
     echo "  running $eval ..."
     if ! run_with_evaluator "$eval" "$driver" "$args" "$tmpdir/$eval"; then
       echo "  FAIL: $eval build failed"
@@ -60,13 +59,9 @@ run_driver() {
 
   local n=${#built_evaluators[@]}
   if [ $n -lt 2 ]; then
-    if [ $n -eq 1 ]; then
-      echo "  OK: ${built_evaluators[0]} ran successfully"
-    else
-      echo "  FAIL: no evaluators ran successfully"
-    fi
+    echo "  FAIL: fewer than 2 evaluators built successfully"
     rm -rf "$tmpdir"
-    return $(( n == 0 ))
+    return 1
   fi
 
   for ((i=0; i<n-1; i++)); do
@@ -89,40 +84,38 @@ run_driver() {
 
 if [ $# -gt 0 ]; then
   driver="$1"
-  args="${2:-}"
-  evals="${3:-$DEFAULT_EVALUATORS}"
-  run_driver "$driver" "$args" "$evals"
+  shift
+  run_driver "$driver" "$@"
   exit $?
 fi
 
 TESTS=(
-  "BroadFiberCycleDriver|tiny.program|$DEFAULT_EVALUATORS"
-  "BelowFiberCycleDriver|tiny.program|$DEFAULT_EVALUATORS"
-  "BelowSingleFiberCycleDriver|tiny.program|$DEFAULT_EVALUATORS"
-  "LocalFiberCycleDriver|tiny.program|$DEFAULT_EVALUATORS"
-  "TestCollDriver|tiny.program|$DEFAULT_EVALUATORS"
-  "TestUseCollDriver|tiny.program|$DEFAULT_EVALUATORS"
-  "TestCycleDriver|tiny.program|$DEFAULT_EVALUATORS"
-  "UseGlobal|tiny.program|$DEFAULT_EVALUATORS"
-  "FarrowUbdDriver|farrow-ubd.program|$DEFAULT_EVALUATORS"
-  "FarrowUbdFiberDriver|farrow-ubd.program|$DEFAULT_EVALUATORS"
-  "NestedUbdDriver|nested-ubd.program|$DEFAULT_EVALUATORS"
-  "NestedUbdFiberDriver|nested-ubd.program|$DEFAULT_EVALUATORS"
-  "TestFieldsDriver|tiny.program|$DEFAULT_EVALUATORS"
-  "FirstDriver|grammar.cfg|$DEFAULT_EVALUATORS"
-  "FollowDriver|grammar.cfg|$DEFAULT_EVALUATORS"
-  "NullableDriver|grammar.cfg|$DEFAULT_EVALUATORS"
+  "BroadFiberCycleDriver|tiny.program"
+  "BelowFiberCycleDriver|tiny.program"
+  "BelowSingleFiberCycleDriver|tiny.program"
+  "LocalFiberCycleDriver|tiny.program"
+  "TestCollDriver|tiny.program"
+  "TestUseCollDriver|tiny.program"
+  "TestCycleDriver|tiny.program"
+  "UseGlobal|tiny.program"
+  "FarrowUbdDriver|farrow-ubd.program"
+  "FarrowUbdFiberDriver|farrow-ubd.program"
+  "NestedUbdDriver|nested-ubd.program"
+  "NestedUbdFiberDriver|nested-ubd.program"
+  "TestFieldsDriver|tiny.program"
+  "FirstDriver|grammar.cfg"
+  "FollowDriver|grammar.cfg"
+  "NullableDriver|grammar.cfg"
 )
 
 failures=0
 total=0
 
 for test in "${TESTS[@]}"; do
-  IFS="|" read -r driver args evals <<< "$test"
-  evals="${evals:-$DEFAULT_EVALUATORS}"
+  IFS="|" read -r driver args <<< "$test"
   total=$((total + 1))
   return_code=0
-  run_driver "$driver" "$args" "$evals" || return_code=$?
+  run_driver "$driver" "$args" || return_code=$?
   if [ $return_code -eq 1 ]; then
     failures=$((failures + 1))
   fi
