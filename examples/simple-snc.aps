@@ -15,15 +15,15 @@ module SIMPLE_SNC[T :: var SIMPLE[]] extends T begin
   pragma synthesized(s1,s2,total,block_total,stmts_total,program_total);
 
   match ?s:Stmt=assign_stmt(?e1:Expr,?e2:Expr) begin
-    e1.i1 := 1;
+    e1.i1 := 2;
     e1.i2 := e1.s1;
-    e2.i2 := 2;
+    e2.i2 := 3;
     e2.i1 := e2.s2;
     s.total := e1.s2 + e2.s1;
   end;
   
   match ?e:Expr=intconstant(?i:Integer) begin
-    e.s1 := e.i1 + i + 1;
+    e.s1 := e.i1 + i + 3;
     e.s2 := e.i2 + i + 2;
   end;
 
