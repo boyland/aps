@@ -1,7 +1,6 @@
 #include <string.h>
 
 #include <algorithm>
-#include <functional>
 #include <iostream>
 #include <numeric>
 extern "C" {
@@ -1073,13 +1072,8 @@ static void emit_loop_implicits(ostream& os, const string& flag) {
   os << indent() << "implicit val changed: AtomicBoolean = " << flag << ";\n";
 }
 
-// Emit a local while-loop. If is_independent, no isInsideFixedPoint guard
-// because independent cycles need their own loop always.
-// cycle_instance (optional): when provided for independent cycles, emits a guard
-// that skips the loop if the child has already converged (ASSIGNED).
-static void emit_local_fixed_point_loop(ostream& os,
+static void emit_fixed_point_loop_start(ostream& os,
                                         const string& flag,
-                                        const std::function<void()>& emit_body,
                                         bool is_independent = false,
                                         INSTANCE* cycle_instance = NULL) {
   if (is_independent) {
@@ -1101,7 +1095,11 @@ static void emit_local_fixed_point_loop(ostream& os,
   ++nesting_level;
   os << indent() << flag << ".set(false);\n";
   emit_loop_implicits(os, flag);
-  emit_body();
+}
+
+static void emit_fixed_point_loop_end(ostream& os,
+                                      bool is_independent = false,
+                                      INSTANCE* cycle_instance = NULL) {
   --nesting_level;
   os << indent() << "}\n";
   if (is_independent) {
@@ -1113,6 +1111,84 @@ static void emit_local_fixed_point_loop(ostream& os,
   } else if (farrow_synth_improvements) {
     --nesting_level;
     os << indent() << "}\n";
+  }
+}
+
+static vector<INSTANCE*> synthesized_component_instances(SCC_COMPONENT* component) {
+  vector<INSTANCE*> result;
+  for (int i = 0; i < component->length; i++) {
+    INSTANCE* instance = (INSTANCE*)component->array[i];
+    if (instance_is_synthesized(instance)) {
+      result.push_back(instance);
+    }
+  }
+  return result;
+}
+
+static void emit_root_evaluations(ostream& os,
+                                  Declaration start_phylum,
+                                  const vector<INSTANCE*>& instances) {
+  os << indent() << "for (root <- t_" << decl_name(start_phylum) << ".nodes) {\n";
+  ++nesting_level;
+  for (auto instance = instances.begin(); instance != instances.end(); instance++) {
+    string eval_name = instance_to_string_with_nodetype(start_phylum, *instance);
+    os << indent() << "eval_" << eval_name << "(root);\n";
+  }
+  --nesting_level;
+  os << indent() << "}\n";
+}
+
+static void emit_start_phylum_evaluations(ostream& os, STATE* state) {
+  PHY_GRAPH* start_graph = summary_graph_for(state, state->start_phylum);
+  bool needs_fixed_point = state->loop_required;
+
+  if (!needs_fixed_point) {
+    vector<INSTANCE*> synthesized_instances;
+    for (int i = 0; i < start_graph->instances.length; i++) {
+      INSTANCE* instance = &start_graph->instances.array[i];
+      if (instance_is_synthesized(instance)) {
+        synthesized_instances.push_back(instance);
+      }
+    }
+    if (include_comments) {
+      os << indent() << "// non-circular root evaluation\n";
+    }
+    emit_root_evaluations(os, state->start_phylum, synthesized_instances);
+    return;
+  }
+
+  os << indent() << "implicit val changed: AtomicBoolean = new AtomicBoolean(false);\n";
+  os << indent() << "implicit val " << LOOP_VAR << ": Boolean = false;\n";
+  
+  set_phylum_graph_components(start_graph);
+
+  // SCC components are dependency-first. Acyclic components run once; only the
+  // mutually dependent evaluations within a circular component iterate together.
+  // Child dependencies remain demand-driven inside each generated eval function.
+  for (int component_index = 0; component_index < start_graph->components->length; component_index++) {
+    SCC_COMPONENT* component = start_graph->components->array[component_index];
+    vector<INSTANCE*> synthesized_instances = synthesized_component_instances(component);
+    if (synthesized_instances.empty()) {
+      continue;
+    }
+
+    if (start_graph->component_cycle[component_index]) {
+      if (include_comments) {
+        os << indent() << "// circular root component " << component_index << "\n";
+      }
+      os << indent() << "{\n";
+      ++nesting_level;
+        emit_fixed_point_loop_start(os, "componentChanged" + std::to_string(component_index));
+        emit_root_evaluations(os, state->start_phylum, synthesized_instances);
+        emit_fixed_point_loop_end(os);
+      --nesting_level;
+      os << indent() << "}\n";
+    } else {
+      if (include_comments) {
+        os << indent() << "// non-circular root component " << component_index << "\n";
+      }
+      emit_root_evaluations(os, state->start_phylum, synthesized_instances);
+    }
   }
 }
 
@@ -1345,13 +1421,14 @@ static void dump_synth_functions(STATE* s, output_streams& oss)
           INSTANCE* cycle_instance = *it2;
           // independent = always loop, related = skip if already in outer loop
           bool independent = is_child_cycle_independent(aug_graph, cycle_instance);
-          emit_local_fixed_point_loop(os, "localChanged", [&] {
-            dumped_conditional_block_items.clear();
-            dumped_instances.clear();
-            os << indent();
-            synth_impl_ptr->dump_synth_instance(cycle_instance, os);
-            os << ";\n";
-          }, /* is_independent= */independent, /* cycle_instance= */independent ? cycle_instance : NULL);
+          INSTANCE* guarded_cycle = independent ? cycle_instance : NULL;
+          emit_fixed_point_loop_start(os, "localChanged", independent, guarded_cycle);
+          dumped_conditional_block_items.clear();
+          dumped_instances.clear();
+          os << indent();
+          synth_impl_ptr->dump_synth_instance(cycle_instance, os);
+          os << ";\n";
+          emit_fixed_point_loop_end(os, independent, guarded_cycle);
         }
         dumped_conditional_block_items.clear();
         dumped_instances.clear();
@@ -1566,27 +1643,7 @@ class SynthImpl : public SynthImplementation {
 #endif /* APS2SCALA */
     ++nesting_level;
 
-    PHY_GRAPH* start_phy_graph = summary_graph_for(s, s->start_phylum);
-
-    if (needs_fixed_point) {
-      os << indent() << "implicit val changed: AtomicBoolean = new AtomicBoolean(false);\n";
-      os << indent() << "implicit val " << LOOP_VAR << ": Boolean = false;\n";
-    }
-    os << indent() << "for (root <- t_" << decl_name(s->start_phylum) << ".nodes) {\n";
-    ++nesting_level;
-    int i;
-    for (i = 0; i < start_phy_graph->instances.length; i++) {
-      INSTANCE* in = &start_phy_graph->instances.array[i];
-
-      if (!instance_is_synthesized(in)) {
-        continue;
-      }
-
-      string eval_name = instance_to_string_with_nodetype(s->start_phylum, &start_phy_graph->instances.array[i]);
-      os << indent() << "eval_" << eval_name << "(root);\n";
-    }
-    --nesting_level;
-    os << indent() << "}\n";
+    emit_start_phylum_evaluations(os, s);
 
 #ifdef APS2SCALA
     os << indent() << "super.finish();\n";
@@ -1933,7 +1990,6 @@ void dump_rhs_instance_helper(AUG_GRAPH* aug_graph, BlockItem* item, INSTANCE* i
 
     vector<std::set<Expression> > all_assignments = make_instance_assignment();
     std::set<Expression> relevant_assignments = all_assignments[instance->index];
-    bool any_assignment_dump = false;
 
     if (!relevant_assignments.empty()) {
       // Filter out NULLs first
@@ -1945,8 +2001,6 @@ void dump_rhs_instance_helper(AUG_GRAPH* aug_graph, BlockItem* item, INSTANCE* i
       }
 
       if (!valid_rhs.empty()) {
-        any_assignment_dump = true;
-
         if (instance->fibered_attr.fiber != NULL) {
           for (auto it = valid_rhs.begin(); it != valid_rhs.end(); it++) {
             dump_assignment(instance, *it, o);
