@@ -103,6 +103,9 @@ TESTS=(
   "NestedUbdDriver|nested-ubd.program"
   "NestedUbdFiberDriver|nested-ubd.program"
   "TestFieldsDriver|tiny.program"
+  "FirstDriver|grammar.cfg"
+  "FollowDriver|grammar.cfg"
+  "NullableDriver|grammar.cfg"
 )
 
 failures=0

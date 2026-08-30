@@ -5,6 +5,9 @@
 #include <stdint.h>
 #include "hashtable.h"
 
+extern int scc_debug;
+#define SCC_ADDITIONS 4
+
 typedef struct scc_component {
   void** array;
   int length;
