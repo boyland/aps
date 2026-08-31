@@ -3,7 +3,7 @@
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
-DEFAULT_EVALUATORS="DYNAMIC,STATIC"
+EVALUATORS=(DYNAMIC STATIC SYNTH)
 
 extract_results() {
   sed -n '/^Results:$/,$p'
