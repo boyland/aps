@@ -18,3 +18,4 @@ make EVALUATOR=STATIC NestedCyclesDriver.run
 make EVALUATOR=STATIC ARGS="nested-ubd.program" NestedUbdDriver.run
 make EVALUATOR=STATIC ARGS="nested-ubd.program" NestedUbdFiberDriver.run
 make EVALUATOR=STATIC ARGS="tiny.program" TestFieldsDriver.run
+make EVALUATOR=DYNAMIC ARGS="simple.program" SimpleSncDriver.run
