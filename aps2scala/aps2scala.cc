@@ -30,7 +30,7 @@ void usage() {
   fprintf(stderr,"    -G    add Debug calls for every function\n");
   fprintf(stderr,"    -C    SCC chunk static scheduling\n");
   fprintf(stderr,"    -F,  --synth optimized SYNTH evaluation\n");
-  fprintf(stderr,"    -F0, --synth-original generate Farrow-style SYNTH evaluation\n");
+  fprintf(stderr,"    -F0, --synth-pure-farrow generate pure Farrow-style SYNTH evaluation\n");
   fprintf(stderr,"    -p path set the APSPATH (overriding env. variable)\n");
   exit(1);
 }
@@ -91,7 +91,7 @@ int main(int argc,char **argv) {
       synth_implementation = true;
       anc_analysis = true;
       continue;
-    } else if (streq(argv[i],"-F0") || streq(argv[i],"--synth-original")) {
+    } else if (streq(argv[i],"-F0") || streq(argv[i],"--synth-pure-farrow")) {
       synth_implementation = true;
       anc_analysis = true;
       farrow_synth_improvements = false;

@@ -735,6 +735,11 @@ class FiberDependencyDumper {
 public:
   static void dump(AUG_GRAPH* aug_graph, INSTANCE* sink, ostream& os) {
 
+    if (!farrow_synth_improvements) {
+      dump_pure_farrow(aug_graph, sink, os);
+      return;
+    }
+
     int i, j;
     int n = aug_graph->instances.length;
 
@@ -816,6 +821,77 @@ public:
   }
 
 private:
+  static void dump_pure_farrow_helper(AUG_GRAPH* aug_graph,
+                                      const vector<INSTANCE*>& relevant_instances,
+                                      bool* scheduled,
+                                      int& count_scheduled,
+                                      ostream& os) {
+    int n = aug_graph->instances.length;
+
+    if (count_scheduled == static_cast<int>(relevant_instances.size())) {
+      return;
+    }
+
+    for (auto it1 = relevant_instances.begin(); it1 != relevant_instances.end(); it1++) {
+      INSTANCE* in = *it1;
+      if (scheduled[in->index]) {
+        continue;
+      }
+
+      bool dependency_ready = true;
+      for (auto it2 = relevant_instances.begin(); it2 != relevant_instances.end(); it2++) {
+        INSTANCE* dependency_instance = *it2;
+        if (scheduled[dependency_instance->index] ||
+            !edgeset_kind(aug_graph->graph[dependency_instance->index * n + in->index])) {
+          continue;
+        }
+        dependency_ready = false;
+      }
+
+      if (!dependency_ready) {
+        continue;
+      }
+
+      scheduled[in->index] = true;
+      os << indent();
+      synth_impl_ptr->dump_synth_instance(in, os);
+      dumped_conditional_block_items.clear();
+      dumped_instances.clear();
+      os << "\n";
+      count_scheduled++;
+      dump_pure_farrow_helper(aug_graph, relevant_instances, scheduled, count_scheduled, os);
+    }
+
+    if (count_scheduled != static_cast<int>(relevant_instances.size())) {
+      fatal_error("failed to find next dependency to schedule count_scheduled: %d, count_relevant_instances: %d",
+                  count_scheduled, static_cast<int>(relevant_instances.size()));
+    }
+  }
+
+  static void dump_pure_farrow(AUG_GRAPH* aug_graph, INSTANCE* sink, ostream& os) {
+    int n = aug_graph->instances.length;
+    vector<INSTANCE*> relevant_instances;
+
+    for (int i = 0; i < n; i++) {
+      INSTANCE* in = &aug_graph->instances.array[i];
+      if (in->node != NULL && Declaration_KEY(in->node) == KEYpragma_call) {
+        continue;
+      }
+
+      if (edgeset_kind(aug_graph->graph[in->index * n + sink->index]) &&
+          in->fibered_attr.fiber != NULL &&
+          (instance_is_synthesized(in) || instance_is_local(in))) {
+        relevant_instances.push_back(in);
+      }
+    }
+
+    bool* scheduled = (bool*)alloca(sizeof(bool) * n);
+    memset(scheduled, 0, sizeof(bool) * n);
+
+    int count_scheduled = 0;
+    dump_pure_farrow_helper(aug_graph, relevant_instances, scheduled, count_scheduled, os);
+  }
+
   static void dump_scc_helper(AUG_GRAPH* aug_graph, SCC_COMPONENTS* components, bool* scheduled, ostream& os) {
     int component_count = components->length;
     int i;
