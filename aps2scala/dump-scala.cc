@@ -1681,7 +1681,7 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
       ++nesting_level;
 
       STATE *s = (STATE*)Declaration_info(decl)->analysis_state;
-      if ((static_scc_schedule || dynamic_cast<SynthImplementation*>(impl) != NULL) && s != NULL)
+      if ((static_scc_schedule || anc_analysis) && s != NULL)
       {
         activate_static_circular = s->loop_required;
       }
@@ -2696,7 +2696,7 @@ string operator+(string s, int i)
 string indent(int nl) { return string(indent_multiple*nl,' '); }
 
 bool check_surrounding_decl(void* node, KEYTYPE_Declaration decl_key, Declaration* result_decl) {
-  while (node != NULL) {
+  while (node != NULL && ABSTRACT_APS_tnode_phylum(node) != KEY_ABSTRACT_APS_None) {
     if (ABSTRACT_APS_tnode_phylum(node) == KEYDeclaration) {
       Declaration decl = (Declaration)node;
       if (Declaration_KEY(decl) == decl_key) {
