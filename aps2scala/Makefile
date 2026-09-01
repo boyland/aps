@@ -1,7 +1,7 @@
 CPP=g++ 
 CPPFLAGS=-Wall -g -Wno-unused-variable -DUSING_CXX -DAPS2SCALA -I../parse -I../analyze -I../codegen -I../utilities
 
-APS2SCALAOBJS = aps2scala.o dump-scala.o implement.o dyn-impl.o static-impl.o static-scc-impl.o
+APS2SCALAOBJS = aps2scala.o dump-scala.o implement.o dyn-impl.o static-impl.o static-scc-impl.o farrow-impl.o synth-util.o
 APS2SCALALIBS = ../lib/aps-lib.o ../lib/aps-ag.a ../utilities/utilities.o
 aps2scala : ${APS2SCALAOBJS} ${APS2SCALALIBS}
 	${CPP} ${CPPFLAGS} ${APS2SCALAOBJS} ${APS2SCALALIBS} -o aps2scala
@@ -15,6 +15,12 @@ static-impl.o : ../codegen/static-impl.cc
 	${CPP} -c ${CPPFLAGS} $< -o $@
 
 static-scc-impl.o : ../codegen/static-scc-impl.cc 
+	${CPP} -c ${CPPFLAGS} $< -o $@
+
+farrow-impl.o : ../codegen/farrow-impl.cc ../codegen/synth-util.h
+	${CPP} -c ${CPPFLAGS} $< -o $@
+
+synth-util.o : ../codegen/synth-util.cc ../codegen/synth-util.h
 	${CPP} -c ${CPPFLAGS} $< -o $@
 
 implement.o : ../codegen/implement.cc
