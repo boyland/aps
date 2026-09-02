@@ -3,8 +3,10 @@
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
-DEFAULT_EVALUATORS="DYNAMIC,STATIC"
+DYNAMIC_EVALUATOR="DYNAMIC"
+STATIC_EVALUATOR="STATIC"
 ORIGINAL_FARROW_EVALUATOR="SYNTH_F0"
+DEFAULT_EVALUATORS="$DYNAMIC_EVALUATOR,$STATIC_EVALUATOR"
 
 extract_results() {
   sed -n '/^Results:$/,$p'
@@ -113,7 +115,7 @@ TESTS=(
   "FirstDriver|grammar.cfg|$DEFAULT_EVALUATORS"
   "FollowDriver|grammar.cfg|$DEFAULT_EVALUATORS"
   "NullableDriver|grammar.cfg|$DEFAULT_EVALUATORS"
-  "SimpleSncDriver|simple.program|$DEFAULT_EVALUATORS,$ORIGINAL_FARROW_EVALUATOR"
+  "SimpleSncDriver|simple.program|$DYNAMIC_EVALUATOR,$ORIGINAL_FARROW_EVALUATOR"
 )
 
 failures=0
