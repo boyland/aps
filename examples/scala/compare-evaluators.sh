@@ -112,6 +112,7 @@ TESTS=(
   "FirstDriver|grammar.cfg|$DEFAULT_EVALUATORS"
   "FollowDriver|grammar.cfg|$DEFAULT_EVALUATORS"
   "NullableDriver|grammar.cfg|$DEFAULT_EVALUATORS"
+  "SimpleSncDriver|simple.program|DYNAMIC"
 )
 
 failures=0
