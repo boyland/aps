@@ -78,7 +78,6 @@ jobs:
         ../bin/aps2scala -DCOTo -G -p .:../base test-canonicals
 
     - name: Run compare-evaluators
-      if: github.event_name == 'push'
       run: |
         cd examples/scala
         ./compare-evaluators.sh
