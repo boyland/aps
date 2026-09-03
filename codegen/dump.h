@@ -134,6 +134,9 @@ inline ostream& operator<<(ostream&os, INSTANCE*i) {
 
 extern string operator+(string, int);
 
+bool check_surrounding_decl(void* node, KEYTYPE_Declaration decl_key, Declaration* result_decl);
+bool check_surrounding_node(void* node, KEYTYPE_ABSTRACT_APS_Phylum ast_key, void** result_node);
+
 #ifndef APS2SCALA
 // special C++ generation code
 // sending to oss copies to cpps, ...

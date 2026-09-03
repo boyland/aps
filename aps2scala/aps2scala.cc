@@ -29,6 +29,7 @@ void usage() {
   fprintf(stderr,"    -V    increase verbosity of generation code\n");
   fprintf(stderr,"    -G    add Debug calls for every function\n");
   fprintf(stderr,"    -C    SCC chunk static scheduling\n");
+  fprintf(stderr,"    -F0, --synth-pure-farrow generate original Farrow SYNTH evaluation\n");
   fprintf(stderr,"    -p path set the APSPATH (overriding env. variable)\n");
   exit(1);
 }
@@ -40,6 +41,7 @@ extern int aps_yyparse(void);
 Implementation* impl;
 bool static_schedule = false;
 bool is_tree_only_program = false;
+bool farrow_implementation = false;
 
 static void* program_is_tree_only(void *scope, void *node) {
   if (ABSTRACT_APS_tnode_phylum(node) == KEYDeclaration) {
@@ -82,6 +84,10 @@ int main(int argc,char **argv) {
       static_schedule = true;
       static_scc_schedule = true;
       continue;
+    } else if (streq(argv[i],"-F0") || streq(argv[i],"--synth-pure-farrow")) {
+      farrow_implementation = true;
+      anc_analysis = true;
+      continue;
     } else if (streq(argv[i],"-V") || streq(argv[i],"--verbose")) {
       ++verbose;
       continue;
@@ -110,8 +116,14 @@ int main(int argc,char **argv) {
     type_Program(p);
     traverse_Program(program_is_tree_only, p, p);
     aps_check_error("type");
-    if (static_schedule) {
-      impl = static_scc_schedule ? static_scc_impl : static_impl;
+    if (static_schedule || farrow_implementation) {
+      if (farrow_implementation) {
+		  impl = farrow_impl;
+	  } else if (static_scc_schedule) {
+		  impl = static_scc_impl;
+	  } else {
+		  impl = static_impl;
+	  }
       analyze_Program(p);
       aps_check_error("analysis");
       if (!impl) {
@@ -121,6 +133,7 @@ int main(int argc,char **argv) {
     } else {
       impl = dynamic_impl;
     }
+    impl->validate_program(p);
     char* outfilename = str2cat(argv[i],".scala");
 
     std::ofstream out(outfilename);

@@ -17,6 +17,8 @@ EVALUATOR ?= DYNAMIC
 
 ifeq (${EVALUATOR},STATIC)
 IMPL_SUFFIX = .static.scala
+else ifeq (${EVALUATOR},SYNTH_F0)
+IMPL_SUFFIX = .synth-f0.scala
 else
 IMPL_SUFFIX = .scala
 endif
@@ -74,6 +76,10 @@ phony_explicit:
 
 %.static.scala : ../%.aps ${APS2SCALA}
 	${APS2SCALA} ${APS2SCALAFLAGS} -S -C $*
+	mv $*.scala $@
+
+%.synth-f0.scala : ../%.aps ${APS2SCALA}
+	${APS2SCALA} ${APS2SCALAFLAGS} -F0 $*
 	mv $*.scala $@
 
 %.scala : ../%.aps ${APS2SCALA}
@@ -373,5 +379,5 @@ ${OUT}/SimpleSncDriver.class: ${OUT}/simple_snc_implicit.class ${OUT}/SimplePars
 
 clean:
 	rm -rf ${OUT_BASE}
-	rm -f *.class ${SCALAGEN} ${MISCGEN}
+	rm -f *.class ${SCALAGEN} ${MISCGEN} *.synth-f0.scala
 
