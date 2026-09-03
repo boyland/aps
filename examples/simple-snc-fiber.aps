@@ -1,0 +1,113 @@
+with "simple";
+
+-- Name resolution whose two expression occurrences require opposite orders.
+module SIMPLE_SNC_FIBER[T :: var SIMPLE[]] extends T begin
+  type Names := SET[String];
+
+  phylum Scope;
+  constructor contour() : Scope;
+  type Env := remote Scope;
+  attribute Scope.outer : Env;
+  collection attribute Scope.names : Names;
+
+  attribute Block.block_env : Env;
+  attribute Decl.decl_env : Env;
+  attribute Stmts.stmts_env : Env;
+  attribute Stmt.stmt_env : Env;
+  attribute Expr.expr_env1 : Env;
+  attribute Expr.expr_env2 : Env;
+
+  attribute Expr.expr_found1 : Env;
+  attribute Expr.expr_found2 : Env;
+  attribute Stmt.stmt_ok : Boolean;
+  attribute Stmts.stmts_ok : Boolean;
+  attribute Block.block_ok : Boolean;
+  attribute Program.program_ok : Boolean;
+
+  pragma inherited(block_env,decl_env,stmts_env,stmt_env,expr_env1,expr_env2);
+  pragma synthesized(expr_found1,expr_found2,stmt_ok,stmts_ok,block_ok,program_ok);
+
+  match ?p:Program=program(?b:Block) begin
+    b.block_env := Env$nil;
+    p.program_ok := b.block_ok;
+  end;
+
+  match ?b:Block=block(?ds:Decls,?ss:Stmts) begin
+    local : Scope := contour();
+    local.outer := b.block_env;
+    ds.decls_env := local;
+    ss.stmts_env := local;
+    b.block_ok := ss.stmts_ok;
+  end;
+
+  attribute Decls.decls_env : Env;
+  pragma inherited(decls_env);
+
+  match ?ds:Decls=no_decls() begin
+  end;
+
+  match ?ds0:Decls=xcons_decls(?ds1:Decls,?d:Decl) begin
+    ds1.decls_env := ds0.decls_env;
+    d.decl_env := ds0.decls_env;
+  end;
+
+  match ?d:Decl=decl(?name:String,?ty:Type) begin
+    d.decl_env.names :> {name};
+  end;
+
+  match ?t:Type=integer_type() begin
+  end;
+
+  match ?t:Type=string_type() begin
+  end;
+
+  match ?ss:Stmts=no_stmts() begin
+    ss.stmts_ok := true;
+  end;
+
+  match ?ss0:Stmts=xcons_stmts(?ss1:Stmts,?s:Stmt) begin
+    ss1.stmts_env := ss0.stmts_env;
+    s.stmt_env := ss0.stmts_env;
+    ss0.stmts_ok := ss1.stmts_ok and s.stmt_ok;
+  end;
+
+  match ?s:Stmt=block_stmt(?b:Block) begin
+    b.block_env := s.stmt_env;
+    s.stmt_ok := b.block_ok;
+  end;
+
+  match ?s:Stmt=assign_stmt(?e1:Expr,?e2:Expr) begin
+    e1.expr_env1 := s.stmt_env;
+    e1.expr_env2 := e1.expr_found1;
+    e2.expr_env2 := s.stmt_env;
+    e2.expr_env1 := e2.expr_found2;
+    s.stmt_ok := e1.expr_found2 /= Env$nil and e2.expr_found1 /= Env$nil;
+  end;
+
+  match ?e:Expr=intconstant(?:Integer) begin
+    e.expr_found1 := e.expr_env1;
+    e.expr_found2 := e.expr_env2;
+  end;
+
+  match ?e:Expr=strconstant(?:String) begin
+    e.expr_found1 := e.expr_env1;
+    e.expr_found2 := e.expr_env2;
+  end;
+
+  match ?e:Expr=variable(?name:String) begin
+    e.expr_found1 := lookup(e.expr_env1, name);
+    e.expr_found2 := lookup(e.expr_env2, name);
+  end;
+
+  var function lookup(env:Env; name:String) : Env begin
+    if env = Env$nil then
+      result := Env$nil;
+    else
+      if name in env.names then
+        result := env;
+      else
+        result := lookup(env.outer, name);
+      endif;
+    endif;
+  end;
+end;
