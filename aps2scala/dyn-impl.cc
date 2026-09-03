@@ -1,4 +1,5 @@
 #include <iostream>
+#include <stdint.h>
 #include <sstream>
 #include <stack>
 #include <vector>
@@ -39,40 +40,6 @@ static const int MAXDEPTH = 200;
 static void *attr_context[MAXDEPTH];
 static int attr_context_depth = 0;   /* current depth of attribute assigns */
 static int attr_context_started = 0; /* depth of last activation */
-
-static bool sequence_search_pattern(Pattern p, Pattern *middle)
-{
-  Symbol sequence_symbol = intern_symbol("{}");
-  if (Pattern_KEY(p) != KEYpattern_call) return false;
-
-  Pattern pf = pattern_call_func(p);
-  if (Pattern_KEY(pf) != KEYpattern_use) return false;
-  Declaration pfdecl = USE_DECL(pattern_use_use(pf));
-  if (!pfdecl || def_name(declaration_def(pfdecl)) != sequence_symbol) return false;
-
-  Pattern leading = first_PatternActual(pattern_call_actuals(p));
-  Pattern element = leading ? PAT_NEXT(leading) : 0;
-  Pattern trailing = element ? PAT_NEXT(element) : 0;
-  if (!leading || Pattern_KEY(leading) != KEYrest_pattern ||
-      Pattern_KEY(rest_pattern_constraint(leading)) != KEYno_pattern ||
-      !element || !trailing || Pattern_KEY(trailing) != KEYrest_pattern ||
-      Pattern_KEY(rest_pattern_constraint(trailing)) != KEYno_pattern ||
-      PAT_NEXT(trailing)) {
-    return false;
-  }
-
-  *middle = element;
-  return true;
-}
-
-static void dump_sequence_elements(Pattern p, Expression value, ostream& os)
-{
-  Pattern pf = pattern_call_func(p);
-  dump_Use(pattern_use_use(pf),"p_",os);
-  os << ".unapplySeq(";
-  dump_Expression(value,os);
-  os << ").get._2";
-}
 
 static bool sequence_search_matcher(Declaration decl, Match *match, Pattern *middle)
 {
@@ -350,12 +317,51 @@ void dump_local_decl(void *, Declaration local, ostream& o)
     dump_Expression(simple_value(init),o);
     break;
   default:
-    aps_error(local,"Can only handle initialized locals");
-    o << "0";
+    o << "null.asInstanceOf[" << value_decl_type(local) << "]";
   }
   o << ";\n";
 }
 
+static bool block_assigns_to(Block b, void *vdecl)
+{
+  for (Declaration d = first_Declaration(block_body(b)); d; d = DECL_NEXT(d)) {
+    switch (Declaration_KEY(d)) {
+    case KEYassign:
+      {
+	Expression lhs = assign_lhs(d);
+	if (Expression_KEY(lhs) == KEYvalue_use &&
+	    USE_DECL(value_use_use(lhs)) == vdecl) return true;
+	if (Expression_KEY(lhs) == KEYfuncall &&
+	    USE_DECL(value_use_use(funcall_f(lhs))) == vdecl) return true;
+      }
+      break;
+    case KEYblock_stmt:
+      if (block_assigns_to(block_stmt_body(d),vdecl)) return true;
+      break;
+    case KEYif_stmt:
+      if (block_assigns_to(if_stmt_if_true(d),vdecl) ||
+	  block_assigns_to(if_stmt_if_false(d),vdecl)) return true;
+      break;
+    case KEYcase_stmt:
+      for (Match m = first_Match(case_stmt_matchers(d)); m; m = MATCH_NEXT(m)) {
+	if (block_assigns_to(matcher_body(m),vdecl)) return true;
+      }
+      if (block_assigns_to(case_stmt_default(d),vdecl)) return true;
+      break;
+    case KEYfor_stmt:
+      for (Match m = first_Match(for_stmt_matchers(d)); m; m = MATCH_NEXT(m)) {
+	if (block_assigns_to(matcher_body(m),vdecl)) return true;
+      }
+      break;
+    case KEYfor_in_stmt:
+      if (block_assigns_to(for_in_stmt_body(d),vdecl)) return true;
+      break;
+    default:
+      break;
+    }
+  }
+  return false;
+}
 
 void dump_Matches(Matches ms, bool exclusive, ASSIGNFUNC f, void*arg, ostream&os)
 {
@@ -370,10 +376,11 @@ void dump_Matches(Matches ms, bool exclusive, ASSIGNFUNC f, void*arg, ostream&os
 static void dump_sequence_case(Declaration d, Match match, Pattern middle,
                                ASSIGNFUNC f, void *arg, ostream& os)
 {
+  unsigned sequence_number = (unsigned)(uintptr_t)match;
   activate_attr_context(os);
   os << indent() << "{\n";
   ++nesting_level;
-  os << indent() << "val sequenceMatch = ";
+  os << indent() << "val sequenceMatch" << sequence_number << " = ";
   dump_sequence_elements(matcher_pat(match),case_stmt_expr(d),os);
   os << ".collectFirst {\n";
   ++nesting_level;
@@ -387,7 +394,7 @@ static void dump_sequence_case(Declaration d, Match match, Pattern middle,
   os << indent() << "}\n";
   --nesting_level;
   os << indent() << "}\n";
-  os << indent() << "if (sequenceMatch.isEmpty) {\n";
+  os << indent() << "if (sequenceMatch" << sequence_number << ".isEmpty) {\n";
   ++nesting_level;
   dump_Block(case_stmt_default(d),f,arg,os);
   --nesting_level;
@@ -443,32 +450,35 @@ void dump_Block(Block b,ASSIGNFUNC f,void*arg,ostream&os)
        break;
      case KEYcase_stmt:
        {
-   Match match;
-   Pattern middle;
-   if (sequence_search_matcher(d,&match,&middle)) {
-     dump_sequence_case(d,match,middle,f,arg,os);
-   } else {
-     push_attr_context(d);
-     //!! we implement case and for!!
-     dump_Matches(case_stmt_matchers(d),true,f,arg,os);
-     push_attr_context(case_stmt_default(d));
-     dump_Block(case_stmt_default(d),f,arg,os);
-     pop_attr_context(os);
-     pop_attr_context(os);
-   }
+	 Match match;
+	 Pattern middle;
+	 if (sequence_search_matcher(d,&match,&middle) &&
+	     (block_assigns_to(matcher_body(match),arg) ||
+	      block_assigns_to(case_stmt_default(d),arg))) {
+	   dump_sequence_case(d,match,middle,f,arg,os);
+	 } else {
+	   push_attr_context(d);
+	   //!! we implement case and for!!
+	   dump_Matches(case_stmt_matchers(d),true,f,arg,os);
+	   push_attr_context(case_stmt_default(d));
+	   dump_Block(case_stmt_default(d),f,arg,os);
+	   pop_attr_context(os);
+	   pop_attr_context(os);
+	 }
        }
        break;
      case KEYfor_stmt:
        {
-   Match match;
-   Pattern middle;
-   if (sequence_search_matcher(d,&match,&middle)) {
-     dump_sequence_for(d,match,middle,f,arg,os);
-   } else {
-     push_attr_context(d);
-     dump_Matches(for_stmt_matchers(d),false,f,arg,os);
-     pop_attr_context(os);
-   }
+	 Match match;
+	 Pattern middle;
+	 if (sequence_search_matcher(d,&match,&middle) &&
+	     block_assigns_to(matcher_body(match),arg)) {
+	   dump_sequence_for(d,match,middle,f,arg,os);
+	 } else {
+	   push_attr_context(d);
+	   dump_Matches(for_stmt_matchers(d),false,f,arg,os);
+	   pop_attr_context(os);
+	 }
        }
        break;
      case KEYvalue_decl:
@@ -843,9 +853,9 @@ public:
   }
 
   void implement_function_body(Declaration f, ostream& os) {
-    Type fty = function_decl_type(f);
+    Type fty = some_function_decl_type(f);
     Declaration rdecl = first_Declaration(function_type_return_values(fty));
-    Block b = function_decl_body(f);
+    Block b = some_function_decl_body(f);
     bool is_col = direction_is_collection(value_decl_direction(rdecl));
     const char *name = decl_name(f);
     

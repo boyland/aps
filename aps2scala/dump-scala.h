@@ -54,6 +54,8 @@ void dump_debug_end(ostream& os);
 // leaves information around for the second:
 void dump_Pattern(Pattern p, ostream&);
 void dump_sequence_element_pattern(Pattern p, ostream&);
+bool sequence_search_pattern(Pattern p, Pattern *middle);
+void dump_sequence_elements(Pattern p, Expression value, ostream&);
 
 // override <<
 ostream& operator<<(ostream&o,Symbol s);

@@ -30,7 +30,8 @@ AST_TREE_SCALAGEN = simple.scala tiny.scala grammar.scala \
 EVALUATOR_EXAMPLES = classic-binding first follow nullable test-coll \
 	test-use-coll test-cycle test-fields use-global broad-fiber-cycle \
 	below-fiber-cycle below-single-fiber-cycle local-fiber-cycle nested-cycles \
-	farrow-lv farrow-ubd farrow-ubd-fiber nested-ubd nested-ubd-fiber simple-snc
+	farrow-lv farrow-ubd farrow-ubd-fiber nested-ubd nested-ubd-fiber simple-snc \
+	simple-binding simple-binding1 simple-binding2 simple-binding3 test-for
 SCALAGEN = ${AST_TREE_SCALAGEN} \
 	$(foreach example,${EVALUATOR_EXAMPLES},$(example).scala $(example).static.scala)
 
@@ -65,6 +66,9 @@ all : ${OUT}/below_single_fiber_cycle_implicit.class ${OUT}/BelowSingleFiberCycl
 all : ${OUT}/local_fiber_cycle_implicit.class ${OUT}/LocalFiberCycleDriver.class
 all : ${OUT}/test_fields_implicit.class ${OUT}/TestFieldsDriver.class
 all : ${OUT}/simple_snc_implicit.class ${OUT}/SimpleSncDriver.class
+all : ${OUT}/simple_binding_implicit.class ${OUT}/SimpleBindingDriver.class
+all : SimpleBinding1Driver.class SimpleBinding2Driver.class SimpleBinding3Driver.class
+all : ${OUT}/test_for_implicit.class ${OUT}/TestForDriver.class
 
 .PHONY: run
 
@@ -365,6 +369,54 @@ ${OUT}/simple_snc_implicit.class : ${OUT}/simple-snc.class ${OUT}/simple_implici
 
 ${OUT}/SimpleSncDriver.class: ${OUT}/simple_snc_implicit.class ${OUT}/SimpleParser.class
 	${SCALAC} ${SCALACFLAGS} simple-snc-driver.scala
+
+${OUT}/simple_binding_implicit.class : simple-binding${IMPL_SUFFIX} ${OUT}/simple_implicit.class
+	${SCALAC} ${SCALACFLAGS} $<
+	@touch $@
+
+${OUT}/SimpleBindingDriver.class : ${OUT}/simple_binding_implicit.class ${OUT}/SimpleParser.class simple-binding-driver.scala
+	${SCALAC} ${SCALACFLAGS} simple-binding-driver.scala
+
+.PHONY: SimpleBinding1Driver.class SimpleBinding2Driver.class SimpleBinding3Driver.class
+
+SimpleBinding1Driver.class : ${OUT}/simple-binding1/SimpleBindingDriver.class ;
+
+${OUT}/simple-binding1/SimpleBindingDriver.class : simple.scala simple-binding1${IMPL_SUFFIX} simple-binding-driver.scala ${OUT}/SimpleParser.class
+	rm -rf ${OUT}/simple-binding1
+	mkdir -p ${OUT}/simple-binding1
+	${SCALAC} -cp .:${OUT}/simple-binding1:${OUT}:${APSLIB} -d ${OUT}/simple-binding1 simple.scala simple-binding1${IMPL_SUFFIX} simple-binding-driver.scala
+
+SimpleBinding2Driver.class : ${OUT}/simple-binding2/SimpleBindingDriver.class ;
+
+${OUT}/simple-binding2/SimpleBindingDriver.class : simple.scala simple-binding2${IMPL_SUFFIX} simple-binding-driver.scala ${OUT}/SimpleParser.class
+	rm -rf ${OUT}/simple-binding2
+	mkdir -p ${OUT}/simple-binding2
+	${SCALAC} -cp .:${OUT}/simple-binding2:${OUT}:${APSLIB} -d ${OUT}/simple-binding2 simple.scala simple-binding2${IMPL_SUFFIX} simple-binding-driver.scala
+
+SimpleBinding3Driver.class : ${OUT}/simple-binding3/SimpleBindingDriver.class ;
+
+${OUT}/simple-binding3/SimpleBindingDriver.class : simple.scala simple-binding3${IMPL_SUFFIX} simple-binding-driver.scala ${OUT}/SimpleParser.class
+	rm -rf ${OUT}/simple-binding3
+	mkdir -p ${OUT}/simple-binding3
+	${SCALAC} -cp .:${OUT}/simple-binding3:${OUT}:${APSLIB} -d ${OUT}/simple-binding3 simple.scala simple-binding3${IMPL_SUFFIX} simple-binding-driver.scala
+
+${OUT}/test_for_implicit.class : test-for${IMPL_SUFFIX} ${OUT}/tiny_implicit.class
+	${SCALAC} ${SCALACFLAGS} $<
+	@touch $@
+
+${OUT}/TestForDriver.class : ${OUT}/test_for_implicit.class ${OUT}/TinyParser.class test-for-driver.scala
+	${SCALAC} ${SCALACFLAGS} test-for-driver.scala
+
+.PHONY: SimpleBinding1Driver.run SimpleBinding2Driver.run SimpleBinding3Driver.run
+
+SimpleBinding1Driver.run : ${OUT}/simple-binding1/SimpleBindingDriver.class
+	${SCALA} ${JVMFLAGS} -cp .:${OUT}/simple-binding1:${APSLIB} SimpleBindingDriver ${ARGS}
+
+SimpleBinding2Driver.run : ${OUT}/simple-binding2/SimpleBindingDriver.class
+	${SCALA} ${JVMFLAGS} -cp .:${OUT}/simple-binding2:${APSLIB} SimpleBindingDriver ${ARGS}
+
+SimpleBinding3Driver.run : ${OUT}/simple-binding3/SimpleBindingDriver.class
+	${SCALA} ${JVMFLAGS} -cp .:${OUT}/simple-binding3:${APSLIB} SimpleBindingDriver ${ARGS}
 
 .PHONY: %.run
 
