@@ -117,8 +117,13 @@ int main(int argc,char **argv) {
     traverse_Program(program_is_tree_only, p, p);
     aps_check_error("type");
     if (static_schedule || farrow_implementation) {
-      impl = farrow_implementation ? farrow_impl
-                                   : (static_scc_schedule ? static_scc_impl : static_impl);
+      if (farrow_implementation) {
+		  impl = farrow_impl;
+	  } else if (static_scc_schedule) {
+		  impl = static_scc_impl;
+	  } else {
+		  impl = static_impl;
+	  }
       analyze_Program(p);
       aps_check_error("analysis");
       if (!impl) {
