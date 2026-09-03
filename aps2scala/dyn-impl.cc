@@ -1,4 +1,5 @@
 #include <iostream>
+#include <stdint.h>
 #include <sstream>
 #include <stack>
 #include <vector>
@@ -39,6 +40,26 @@ static const int MAXDEPTH = 200;
 static void *attr_context[MAXDEPTH];
 static int attr_context_depth = 0;   /* current depth of attribute assigns */
 static int attr_context_started = 0; /* depth of last activation */
+
+static bool sequence_search_matcher(Declaration decl, Match *match, Pattern *middle)
+{
+  Matches matchers;
+  switch (Declaration_KEY(decl)) {
+  case KEYcase_stmt:
+    matchers = case_stmt_matchers(decl);
+    break;
+  case KEYfor_stmt:
+    matchers = for_stmt_matchers(decl);
+    break;
+  default:
+    return false;
+  }
+  Match first = first_Match(matchers);
+  if (!first || MATCH_NEXT(first)) return false;
+  if (!sequence_search_pattern(matcher_pat(first),middle)) return false;
+  if (match) *match = first;
+  return true;
+}
 
 static void push_attr_context(void *node)
 {
@@ -173,7 +194,7 @@ static void dump_context_close(void *c, ostream& os) {
       os << indent() << "}\n";
       break; 
     case KEYtop_level_match:
-      os << indent() << "case _ => {}\n";
+        os << indent() << "case _ => {}\n";
       /*FALLTHROUGH*/
     default:
       --nesting_level;
@@ -211,7 +232,7 @@ static void pop_attr_context(ostream& os)
       if (ABSTRACT_APS_tnode_phylum(p) == KEYDeclaration &&
           Declaration_KEY((Declaration)p) == KEYcase_stmt &&
           (Block)c == case_stmt_default((Declaration)p)) {
-        os << indent() << "case _ => {}\n";
+      os << indent() << "case _ => {}\n";
       }
     }
   }
@@ -296,12 +317,51 @@ void dump_local_decl(void *, Declaration local, ostream& o)
     dump_Expression(simple_value(init),o);
     break;
   default:
-    aps_error(local,"Can only handle initialized locals");
-    o << "0";
+    o << "null.asInstanceOf[" << value_decl_type(local) << "]";
   }
   o << ";\n";
 }
 
+static bool block_assigns_to(Block b, void *vdecl)
+{
+  for (Declaration d = first_Declaration(block_body(b)); d; d = DECL_NEXT(d)) {
+    switch (Declaration_KEY(d)) {
+    case KEYassign:
+      {
+	Expression lhs = assign_lhs(d);
+	if (Expression_KEY(lhs) == KEYvalue_use &&
+	    USE_DECL(value_use_use(lhs)) == vdecl) return true;
+	if (Expression_KEY(lhs) == KEYfuncall &&
+	    USE_DECL(value_use_use(funcall_f(lhs))) == vdecl) return true;
+      }
+      break;
+    case KEYblock_stmt:
+      if (block_assigns_to(block_stmt_body(d),vdecl)) return true;
+      break;
+    case KEYif_stmt:
+      if (block_assigns_to(if_stmt_if_true(d),vdecl) ||
+	  block_assigns_to(if_stmt_if_false(d),vdecl)) return true;
+      break;
+    case KEYcase_stmt:
+      for (Match m = first_Match(case_stmt_matchers(d)); m; m = MATCH_NEXT(m)) {
+	if (block_assigns_to(matcher_body(m),vdecl)) return true;
+      }
+      if (block_assigns_to(case_stmt_default(d),vdecl)) return true;
+      break;
+    case KEYfor_stmt:
+      for (Match m = first_Match(for_stmt_matchers(d)); m; m = MATCH_NEXT(m)) {
+	if (block_assigns_to(matcher_body(m),vdecl)) return true;
+      }
+      break;
+    case KEYfor_in_stmt:
+      if (block_assigns_to(for_in_stmt_body(d),vdecl)) return true;
+      break;
+    default:
+      break;
+    }
+  }
+  return false;
+}
 
 void dump_Matches(Matches ms, bool exclusive, ASSIGNFUNC f, void*arg, ostream&os)
 {
@@ -311,6 +371,60 @@ void dump_Matches(Matches ms, bool exclusive, ASSIGNFUNC f, void*arg, ostream&os
      dump_Block(matcher_body(m),f,arg,os);
      pop_attr_context(os);
      );
+}
+
+static void dump_sequence_case(Declaration d, Match match, Pattern middle,
+                               ASSIGNFUNC f, void *arg, ostream& os)
+{
+  unsigned sequence_number = (unsigned)(uintptr_t)match;
+  activate_attr_context(os);
+  os << indent() << "{\n";
+  ++nesting_level;
+  os << indent() << "val sequenceMatch" << sequence_number << " = ";
+  dump_sequence_elements(matcher_pat(match),case_stmt_expr(d),os);
+  os << ".collectFirst {\n";
+  ++nesting_level;
+  os << indent() << "case ";
+  dump_sequence_element_pattern(middle,os);
+  os << " => {\n";
+  ++nesting_level;
+  dump_Block(matcher_body(match),f,arg,os);
+  os << indent() << "()\n";
+  --nesting_level;
+  os << indent() << "}\n";
+  --nesting_level;
+  os << indent() << "}\n";
+  os << indent() << "if (sequenceMatch" << sequence_number << ".isEmpty) {\n";
+  ++nesting_level;
+  dump_Block(case_stmt_default(d),f,arg,os);
+  --nesting_level;
+  os << indent() << "}\n";
+  --nesting_level;
+  os << indent() << "}\n";
+}
+
+static void dump_sequence_for(Declaration d, Match match, Pattern middle,
+                              ASSIGNFUNC f, void *arg, ostream& os)
+{
+  activate_attr_context(os);
+  os << indent();
+  dump_sequence_elements(matcher_pat(match),for_stmt_expr(d),os);
+  os << ".foreach { v_sequence_element =>\n";
+  ++nesting_level;
+  os << indent() << "v_sequence_element match {\n";
+  ++nesting_level;
+  os << indent() << "case ";
+  dump_sequence_element_pattern(middle,os);
+  os << " => {\n";
+  ++nesting_level;
+  dump_Block(matcher_body(match),f,arg,os);
+  --nesting_level;
+  os << indent() << "}\n";
+  os << indent() << "case _ => {}\n";
+  --nesting_level;
+  os << indent() << "}\n";
+  --nesting_level;
+  os << indent() << "}\n";
 }
 
 void dump_Block(Block b,ASSIGNFUNC f,void*arg,ostream&os)
@@ -335,18 +449,37 @@ void dump_Block(Block b,ASSIGNFUNC f,void*arg,ostream&os)
        pop_attr_context(os);
        break;
      case KEYcase_stmt:
-       push_attr_context(d);
-       //!! we implement case and for!!
-       dump_Matches(case_stmt_matchers(d),true,f,arg,os);
-       push_attr_context(case_stmt_default(d));
-       dump_Block(case_stmt_default(d),f,arg,os);
-       pop_attr_context(os);
-       pop_attr_context(os);
+       {
+	 Match match;
+	 Pattern middle;
+	 if (sequence_search_matcher(d,&match,&middle) &&
+	     (block_assigns_to(matcher_body(match),arg) ||
+	      block_assigns_to(case_stmt_default(d),arg))) {
+	   dump_sequence_case(d,match,middle,f,arg,os);
+	 } else {
+	   push_attr_context(d);
+	   //!! we implement case and for!!
+	   dump_Matches(case_stmt_matchers(d),true,f,arg,os);
+	   push_attr_context(case_stmt_default(d));
+	   dump_Block(case_stmt_default(d),f,arg,os);
+	   pop_attr_context(os);
+	   pop_attr_context(os);
+	 }
+       }
        break;
      case KEYfor_stmt:
-       push_attr_context(d);
-       dump_Matches(for_stmt_matchers(d),false,f,arg,os);
-       pop_attr_context(os);
+       {
+	 Match match;
+	 Pattern middle;
+	 if (sequence_search_matcher(d,&match,&middle) &&
+	     block_assigns_to(matcher_body(match),arg)) {
+	   dump_sequence_for(d,match,middle,f,arg,os);
+	 } else {
+	   push_attr_context(d);
+	   dump_Matches(for_stmt_matchers(d),false,f,arg,os);
+	   pop_attr_context(os);
+	 }
+       }
        break;
      case KEYvalue_decl:
        if (!(Declaration_info(d)->decl_flags & LOCAL_ATTRIBUTE_FLAG) &&
@@ -720,9 +853,9 @@ public:
   }
 
   void implement_function_body(Declaration f, ostream& os) {
-    Type fty = function_decl_type(f);
+    Type fty = some_function_decl_type(f);
     Declaration rdecl = first_Declaration(function_type_return_values(fty));
-    Block b = function_decl_body(f);
+    Block b = some_function_decl_body(f);
     bool is_col = direction_is_collection(value_decl_direction(rdecl));
     const char *name = decl_name(f);
     

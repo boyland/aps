@@ -1,4 +1,5 @@
 #include <string.h>
+#include <stdint.h>
 #include <algorithm>
 #include <iostream>
 extern "C" {
@@ -12,6 +13,12 @@ extern "C" {
 #include <sstream>
 #include "dump.h"
 #include "implement.h"
+
+#ifdef APS2SCALA
+bool sequence_search_pattern(Pattern, Pattern*);
+void dump_sequence_element_pattern(Pattern, ostream&);
+void dump_sequence_elements(Pattern, Expression, ostream&);
+#endif
 
 #define LOCAL_VALUE_FLAG (1 << 28)
 
@@ -551,6 +558,87 @@ static bool implement_visit_function(
         Match m = (Match)ad;
         Pattern p = matcher_pat(m);
         Declaration header = Match_info(m)->header;
+#ifdef APS2SCALA
+        Pattern middle;
+        if (sequence_search_pattern(p, &middle)) {
+          bool is_for = Declaration_KEY(header) == KEYfor_stmt;
+          unsigned sequence_number = (unsigned)(uintptr_t)m;
+          Expression e = is_for ? for_stmt_expr(header) : case_stmt_expr(header);
+          if (is_for) {
+            ow->get_outstream() << indent();
+            dump_sequence_elements(p, e, ow->get_outstream());
+            ow->get_outstream() << ".foreach { v_sequence_element =>\n";
+            ++nesting_level;
+            ow->get_outstream() << indent() << "v_sequence_element match {\n";
+            ++nesting_level;
+            ow->get_outstream() << indent() << "case ";
+            dump_sequence_element_pattern(middle, ow->get_outstream());
+            ow->get_outstream() << " => {\n";
+            ++nesting_level;
+          } else {
+            ow->get_outstream() << indent() << "{\n";
+            ++nesting_level;
+            ow->get_outstream() << indent() << "val sequenceMatch"
+                                << sequence_number << " = ";
+            dump_sequence_elements(p, e, ow->get_outstream());
+            ow->get_outstream() << ".collectFirst {\n";
+            ++nesting_level;
+            ow->get_outstream() << indent() << "case ";
+            dump_sequence_element_pattern(middle, ow->get_outstream());
+            ow->get_outstream() << " => {\n";
+            ++nesting_level;
+          }
+
+          Block true_block = matcher_body(m);
+          vector<std::set<Expression> > true_assignment =
+              make_instance_assignment(aug_graph, true_block,
+                                       instance_assignment, false);
+          int cmask = 1 << if_rule_index(ad);
+          cond->positive |= cmask;
+          bool true_cont = implement_visit_function(
+              aug_graph, phase, cto->cto_if_true, true_assignment, nch, cond,
+              cto->chunk_index, loop_allowed, loop_id,
+              skip_previous_visit_code, ow);
+          cond->positive &= ~cmask;
+          --nesting_level;
+          ow->get_outstream() << indent() << "}\n";
+
+          if (is_for) {
+            ow->get_outstream() << indent() << "case _ => {}\n";
+            --nesting_level;
+            ow->get_outstream() << indent() << "}\n";
+            --nesting_level;
+            ow->get_outstream() << indent() << "}\n";
+          } else {
+            --nesting_level;
+            ow->get_outstream() << indent() << "}\n";
+            ow->get_outstream() << indent() << "if (sequenceMatch"
+                                << sequence_number << ".isEmpty) {\n";
+            ++nesting_level;
+          }
+
+          Block false_block = is_for || MATCH_NEXT(m)
+              ? 0 : case_stmt_default(header);
+          vector<std::set<Expression> > false_assignment = false_block
+              ? make_instance_assignment(aug_graph, false_block,
+                                         instance_assignment, false)
+              : instance_assignment;
+          cond->negative |= cmask;
+          bool false_cont = implement_visit_function(
+              aug_graph, phase, cto->cto_if_false, false_assignment, nch, cond,
+              cto->chunk_index, loop_allowed, loop_id,
+              skip_previous_visit_code, ow);
+          cond->negative &= ~cmask;
+          if (!is_for) {
+            --nesting_level;
+            ow->get_outstream() << indent() << "}\n";
+            --nesting_level;
+            ow->get_outstream() << indent() << "}\n";
+          }
+          loop_allowed = prev_loop_allowed;
+          return true_cont || false_cont;
+        }
+#endif /* APS2SCALA */
         // if first match in case, we evaluate variable:
         if (m == first_Match(case_stmt_matchers(header))) {
           Expression e = case_stmt_expr(header);
@@ -818,7 +906,8 @@ static bool implement_visit_function(
                                 << "." << decl_name(ad) << " implicit.\n";
           }
         } else if (rhs) {
-          if (Declaration_KEY(in->node) == KEYfunction_decl) {
+            if (Declaration_KEY(in->node) == KEYfunction_decl ||
+              Declaration_KEY(in->node) == KEYprocedure_decl) {
             if (direction_is_collection(value_decl_direction(ad))) {
               std::cout << "Not expecting collection here!\n";
               ow->get_outstream()
@@ -1251,7 +1340,7 @@ static void* dump_scheduled_local(void* pbs, void* node) {
 
 static void dump_scheduled_function_body(Declaration fd, STATE* s, ostream& bs) {
   const char* name = decl_name(fd);
-  Type ft = function_decl_type(fd);
+  Type ft = some_function_decl_type(fd);
 
   // dump any local values:
   traverse_Declaration(dump_scheduled_local, &bs, fd);
@@ -1278,7 +1367,7 @@ static void dump_scheduled_function_body(Declaration fd, STATE* s, ostream& bs) 
   vector<std::set<Expression> > default_instance_assignments(
       aug_graph->instances.length, std::set<Expression>());
   vector<std::set<Expression> > instance_assignment = make_instance_assignment(
-      aug_graph, function_decl_body(fd), default_instance_assignments, true /* include defaults */);
+      aug_graph, some_function_decl_body(fd), default_instance_assignments, true /* include defaults */);
 
   CONDITION cond;
   cond.positive = 0;

@@ -455,9 +455,19 @@ static void *count_if_rules(void *pint, void *node) {
       ++*count;
       break;
     case KEYcase_stmt:
+      {
       for (m = first_Match(case_stmt_matchers(decl)); m; m=MATCH_NEXT(m)) {
 	Match_info(m)->if_index = *count;
 	++*count;
+      }
+      }
+      break;
+    case KEYfor_stmt:
+      {
+        for (m = first_Match(for_stmt_matchers(decl)); m; m=MATCH_NEXT(m)) {
+          Match_info(m)->if_index = *count;
+          ++*count;
+        }
       }
       break;
     default: break;
@@ -477,7 +487,12 @@ static void *get_if_rules(void *varray, void *node) {
       array[Declaration_info(decl)->if_index] = decl;
       break;
     case KEYcase_stmt:
-      for (m = first_Match(case_stmt_matchers(decl)); m; m=MATCH_NEXT(m)) {
+	for (m = first_Match(case_stmt_matchers(decl)); m; m=MATCH_NEXT(m)) {
+	array[Match_info(m)->if_index] = m;
+      }
+      break;
+    case KEYfor_stmt:
+	for (m = first_Match(for_stmt_matchers(decl)); m; m=MATCH_NEXT(m)) {
 	array[Match_info(m)->if_index] = m;
       }
       break;
