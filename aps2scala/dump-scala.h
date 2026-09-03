@@ -53,6 +53,7 @@ void dump_debug_end(ostream& os);
 // these two must always be called in pairs: the first
 // leaves information around for the second:
 void dump_Pattern(Pattern p, ostream&);
+void dump_sequence_element_pattern(Pattern p, ostream&);
 
 // override <<
 ostream& operator<<(ostream&o,Symbol s);
