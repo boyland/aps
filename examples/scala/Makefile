@@ -375,7 +375,7 @@ ${OUT}/simple_binding_implicit.class : simple-binding${IMPL_SUFFIX} ${OUT}/simpl
 	@touch $@
 
 ${OUT}/SimpleBindingDriver.class : ${OUT}/simple_binding_implicit.class ${OUT}/SimpleParser.class simple-binding-driver.scala
-	${SCALAC} ${SCALACFLAGS} simple-binding-driver.scala
+	${SCALAC} -cp ${OUT}:.:${APSLIB} -d ${OUT} simple-binding-driver.scala
 
 .PHONY: SimpleBinding1Driver.class SimpleBinding2Driver.class SimpleBinding3Driver.class
 
@@ -384,21 +384,21 @@ SimpleBinding1Driver.class : ${OUT}/simple-binding1/SimpleBindingDriver.class ;
 ${OUT}/simple-binding1/SimpleBindingDriver.class : simple.scala simple-binding1${IMPL_SUFFIX} simple-binding-driver.scala ${OUT}/SimpleParser.class
 	rm -rf ${OUT}/simple-binding1
 	mkdir -p ${OUT}/simple-binding1
-	${SCALAC} -cp .:${OUT}/simple-binding1:${OUT}:${APSLIB} -d ${OUT}/simple-binding1 simple.scala simple-binding1${IMPL_SUFFIX} simple-binding-driver.scala
+	${SCALAC} -cp ${OUT}/simple-binding1:${OUT}:.:${APSLIB} -d ${OUT}/simple-binding1 simple.scala simple-binding1${IMPL_SUFFIX} simple-binding-driver.scala
 
 SimpleBinding2Driver.class : ${OUT}/simple-binding2/SimpleBindingDriver.class ;
 
 ${OUT}/simple-binding2/SimpleBindingDriver.class : simple.scala simple-binding2${IMPL_SUFFIX} simple-binding-driver.scala ${OUT}/SimpleParser.class
 	rm -rf ${OUT}/simple-binding2
 	mkdir -p ${OUT}/simple-binding2
-	${SCALAC} -cp .:${OUT}/simple-binding2:${OUT}:${APSLIB} -d ${OUT}/simple-binding2 simple.scala simple-binding2${IMPL_SUFFIX} simple-binding-driver.scala
+	${SCALAC} -cp ${OUT}/simple-binding2:${OUT}:.:${APSLIB} -d ${OUT}/simple-binding2 simple.scala simple-binding2${IMPL_SUFFIX} simple-binding-driver.scala
 
 SimpleBinding3Driver.class : ${OUT}/simple-binding3/SimpleBindingDriver.class ;
 
 ${OUT}/simple-binding3/SimpleBindingDriver.class : simple.scala simple-binding3${IMPL_SUFFIX} simple-binding-driver.scala ${OUT}/SimpleParser.class
 	rm -rf ${OUT}/simple-binding3
 	mkdir -p ${OUT}/simple-binding3
-	${SCALAC} -cp .:${OUT}/simple-binding3:${OUT}:${APSLIB} -d ${OUT}/simple-binding3 simple.scala simple-binding3${IMPL_SUFFIX} simple-binding-driver.scala
+	${SCALAC} -cp ${OUT}/simple-binding3:${OUT}:.:${APSLIB} -d ${OUT}/simple-binding3 simple.scala simple-binding3${IMPL_SUFFIX} simple-binding-driver.scala
 
 ${OUT}/test_for_implicit.class : test-for${IMPL_SUFFIX} ${OUT}/tiny_implicit.class
 	${SCALAC} ${SCALACFLAGS} $<
@@ -409,14 +409,17 @@ ${OUT}/TestForDriver.class : ${OUT}/test_for_implicit.class ${OUT}/TinyParser.cl
 
 .PHONY: SimpleBinding1Driver.run SimpleBinding2Driver.run SimpleBinding3Driver.run
 
+SimpleBindingDriver.run : ${OUT}/SimpleBindingDriver.class
+	${SCALA} ${JVMFLAGS} -cp ${OUT}:.:${APSLIB} SimpleBindingDriver ${ARGS}
+
 SimpleBinding1Driver.run : ${OUT}/simple-binding1/SimpleBindingDriver.class
-	${SCALA} ${JVMFLAGS} -cp .:${OUT}/simple-binding1:${APSLIB} SimpleBindingDriver ${ARGS}
+	${SCALA} ${JVMFLAGS} -cp ${OUT}/simple-binding1:${OUT}:.:${APSLIB} SimpleBindingDriver ${ARGS}
 
 SimpleBinding2Driver.run : ${OUT}/simple-binding2/SimpleBindingDriver.class
-	${SCALA} ${JVMFLAGS} -cp .:${OUT}/simple-binding2:${APSLIB} SimpleBindingDriver ${ARGS}
+	${SCALA} ${JVMFLAGS} -cp ${OUT}/simple-binding2:${OUT}:.:${APSLIB} SimpleBindingDriver ${ARGS}
 
 SimpleBinding3Driver.run : ${OUT}/simple-binding3/SimpleBindingDriver.class
-	${SCALA} ${JVMFLAGS} -cp .:${OUT}/simple-binding3:${APSLIB} SimpleBindingDriver ${ARGS}
+	${SCALA} ${JVMFLAGS} -cp ${OUT}/simple-binding3:${OUT}:.:${APSLIB} SimpleBindingDriver ${ARGS}
 
 .PHONY: %.run
 
