@@ -62,8 +62,6 @@ static void emit_start_phylum_evaluations(ostream& os, STATE* state) {
 
 static void dump_farrow_functions(STATE* s, ostream& os) {
   ostream& oss = os;
-  // first dump all visit functions for each phylum:
-
   os << "\n";
 
   synth_functions_states = synth_util::build_synth_function_states(s);
@@ -73,7 +71,6 @@ static void dump_farrow_functions(STATE* s, ostream& os) {
     synth_util::SynthFunctionState* synth_functions_state = *state_it;
     current_synth_functions_state = synth_functions_state;
 
-    // result var has instance index suffix so each function has unique name
     string result_var = synth_util::RESULT_VAR_PREFIX + std::to_string(synth_functions_state->source->index);
 
     if (include_comments) {
@@ -93,9 +90,6 @@ static void dump_farrow_functions(STATE* s, ostream& os) {
       if (synth_util::should_skip_synth_dependency(source_instance)) {
         continue;
       }
-
-      // for locals, it needs prefix in formals, not for fibers or regular
-      // attributes
 
       os << ",\n";
       os << indent(nesting_level + 1);
@@ -126,7 +120,6 @@ static void dump_farrow_functions(STATE* s, ostream& os) {
     os << " = {\n";
     nesting_level++;
 
-    // don't cache if we are in the loop.
     if (needs_fixed_point) {
       os << indent() << "if (!" << synth_util::LOOP_VAR << ") {\n";
       nesting_level++;
@@ -170,9 +163,6 @@ static void dump_farrow_functions(STATE* s, ostream& os) {
     }
     nesting_level++;
 
-    // True if this attribute is circular anywhere. Then every assignment uses
-    // the change-tracking overload so the closure-site loop can see it settle;
-    // only the closure site emits the do/while.
     bool source_circular = needs_fixed_point && synth_util::synth_function_is_circular(synth_functions_state);
 
     for (auto it = synth_functions_state->aug_graphs.begin(); it != synth_functions_state->aug_graphs.end(); it++) {
@@ -194,9 +184,6 @@ static void dump_farrow_functions(STATE* s, ostream& os) {
         aug_graph_instance = synth_functions_state->source;
       }
 
-      // Linearize the current scope block but make sure IF statements or
-      // conditional instances that have nothing to do with this instance don't
-      // appear in linearization
       current_scope_block = synth_util::linearize_block(aug_graph, aug_graph_instance);
 
       if (include_comments) {
@@ -215,8 +202,6 @@ static void dump_farrow_functions(STATE* s, ostream& os) {
         aps_warning(aug_graph_instance->node, "Instance %s depends on itself but is not declared circular", synth_util::instance_to_string(aug_graph_instance).c_str());
       }
 
-      // Non-fiber cycles are evaluated one circular dependency class at a time.
-      // converge child cycles first, so the value below sees stable results
       if (!synth_functions_state->is_side_effect_evaluation) {
         std::vector<std::vector<INSTANCE*>> child_cycle_components = synth_util::collect_child_cycle_components(aug_graph, aug_graph_instance);
         for (size_t component_index = 0; component_index < child_cycle_components.size(); ++component_index) {
@@ -246,7 +231,6 @@ static void dump_farrow_functions(STATE* s, ostream& os) {
         dumped_instances.clear();
       }
 
-      // Non-fiber instance computation
       if (!synth_functions_state->is_side_effect_evaluation) {
         os << indent();
         farrow_impl_ptr->dump_synth_instance(aug_graph_instance, os);
@@ -318,11 +302,8 @@ class FarrowImpl : public SynthImplementation {
 
       dump_farrow_functions(s, oss);
 
-      // same flag dump_farrow_functions uses to gate the implicit params, so
-      // finish() brings the matching implicit into scope for the eval calls below
       bool needs_fixed_point = s->loop_required;
 
-      // Implement finish routine:
       os << indent() << "override def finish() : Unit = {\n";
       ++nesting_level;
 
@@ -342,9 +323,7 @@ class FarrowImpl : public SynthImplementation {
     bool uses_fibers = false;
     traverse_Program(detect_program_fibers, &uses_fibers, program);
     if (uses_fibers) {
-      fatal_error(
-          "-F0 does not support fibers; Farrow's original algorithm is only "
-          "defined for non-fiber grammars");
+      fatal_error("-F0 does not support fibers");
     }
   }
 
@@ -438,7 +417,6 @@ class FarrowImpl : public SynthImplementation {
       return;
     } else if (Declaration_KEY(in->node) == KEYvalue_decl) {
       if (rhs) {
-        // assigning field of object
         o << "a_" << asym << DEREF;
         if (debug) {
           o << "assign";
@@ -475,7 +453,6 @@ class FarrowImpl : public SynthImplementation {
       std::set<Expression> relevant_assignments = all_assignments[instance->index];
 
       if (!relevant_assignments.empty()) {
-        // Filter out NULLs first
         vector<Expression> valid_rhs;
         for (auto it = relevant_assignments.begin(); it != relevant_assignments.end(); it++) {
           if (*it != NULL) {
@@ -487,15 +464,12 @@ class FarrowImpl : public SynthImplementation {
           if (valid_rhs.size() == 1) {
             dump_Expression(valid_rhs[0], o);
           } else {
-            // Multiple RHS entries only occur from collect_assign (:>)
-            // contributions. Combine them pairwise using the type's v_combine.
             Declaration attr = instance->fibered_attr.attr;
             Direction attr_dir = some_value_decl_direction(attr);
             if (!direction_is_collection(attr_dir)) {
               fatal_error("Multiple RHS for non-collection attribute %s", decl_name(attr));
             }
             Type vt = Declaration_KEY(attr) == KEYattribute_decl ? function_type_return_type(attribute_decl_type(attr)) : value_decl_type(attr);
-            // Nest v_combine calls for all contributions
             for (size_t i = 0; i < valid_rhs.size() - 1; i++) {
               o << as_val(vt) << ".v_combine(";
             }
@@ -508,18 +482,11 @@ class FarrowImpl : public SynthImplementation {
           }
           return;
         }
-        // valid_rhs is empty (all NULL defaults) -- fall through to default
-        // handling
       }
 
-      // A local collection attribute may be assigned only inside a case/match
-      // block, which make_instance_assignment() doesn't see at this level.
       Declaration attr = instance->fibered_attr.attr;
       bool is_local_collection = direction_is_collection(some_value_decl_direction(attr));
       if (is_local_collection) {
-        // Check the type is combinable: look for a "combine" declaration in any
-        // class in its canonical signature set. This covers COMBINABLE,
-        // MAKE_LATTICE, etc. without walking parent signature chains.
         Type vt = infer_some_value_decl_type(attr);
         CanonicalType* ctype = canonical_type(vt);
         CanonicalSignatureSet csig_set = infer_canonical_signatures(ctype);
@@ -535,9 +502,6 @@ class FarrowImpl : public SynthImplementation {
           }
         }
         if (is_combinable) {
-          // No direct assignment in this block (it's inside a
-          // conditional/case), so this branch contributes the type's
-          // initial/bottom value.
           o << as_val(vt) << ".v_initial";
           if (include_comments) {
             o << " /* local collection " << decl_name(attr) << ": no direct assignment, using initial */";
@@ -615,7 +579,6 @@ class FarrowImpl : public SynthImplementation {
           Match m = (Match)cond->condition;
           Pattern p = matcher_pat(m);
           Declaration header = Match_info(m)->header;
-          // if first match in case, we evaluate variable:
           if (m == first_Match(case_stmt_matchers(header))) {
             Expression e = case_stmt_expr(header);
             o << "{\n";
@@ -630,7 +593,7 @@ class FarrowImpl : public SynthImplementation {
           Block if_false;
           if_true = matcher_body(m);
           if (MATCH_NEXT(m)) {
-            if_false = 0;  //? Why not the nxt match ?
+            if_false = 0;
           } else {
             if_false = case_stmt_default(header);
           }
