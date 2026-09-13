@@ -167,12 +167,19 @@ static std::vector<INSTANCE*> collect_phylum_graph_attr_dependencies(PHY_GRAPH* 
   return result;
 }
 
-bool instance_is_function_call_result(INSTANCE* instance) {
+static bool instance_is_function_call_proxy(INSTANCE* instance) {
   if (instance->node == NULL || ABSTRACT_APS_tnode_phylum(instance->node) != KEYDeclaration || Declaration_KEY(instance->node) != KEYpragma_call) {
     return false;
   }
+  return Declaration_info(instance->node)->proxy_fdecl != NULL;
+}
+
+bool instance_is_function_call_result(INSTANCE* instance) {
+  if (!instance_is_function_call_proxy(instance)) {
+    return false;
+  }
   Declaration function = Declaration_info(instance->node)->proxy_fdecl;
-  return function != NULL && instance->fibered_attr.fiber == NULL &&
+  return instance->fibered_attr.fiber == NULL &&
          instance->fibered_attr.attr == some_function_decl_result(function);
 }
 
@@ -200,7 +207,7 @@ static std::vector<INSTANCE*> collect_aug_graph_attr_dependencies(AUG_GRAPH* aug
 
   for (int index = 0; index < instance_count; ++index) {
     INSTANCE* source_instance = &aug_graph->instances.array[index];
-    if (!instance_is_pure_shared_info(source_instance) && source_instance->index != sink_instance->index && !instance_is_function_call_result(source_instance) &&
+    if (!instance_is_pure_shared_info(source_instance) && source_instance->index != sink_instance->index && !instance_is_function_call_proxy(source_instance) &&
         edgeset_kind(aug_graph->graph[source_instance->index * instance_count + sink_instance->index])) {
       result.push_back(source_instance);
     }
