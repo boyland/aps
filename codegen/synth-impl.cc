@@ -17,6 +17,9 @@ extern "C" {
 
 #ifdef APS2SCALA
 
+void dump_sequence_element_pattern(Pattern, ostream&);
+void dump_sequence_elements(Pattern, Expression, ostream&);
+
 static AUG_GRAPH* current_aug_graph = NULL;
 static std::vector<synth_util::SynthFunctionState*> synth_functions_states;
 static synth_util::SynthFunctionState* current_synth_functions_state = NULL;
@@ -1016,6 +1019,36 @@ class SynthImpl : public SynthImplementation {
           Match m = (Match)cond->condition;
           Pattern p = matcher_pat(m);
           Declaration header = Match_info(m)->header;
+          if (Declaration_KEY(header) == KEYfor_stmt) {
+            Pattern middle;
+            if (!sequence_search_pattern(p, &middle)) {
+              fatal_error("unsupported pattern in synthesized for statement");
+            }
+            Declaration attr = instance->fibered_attr.attr;
+            Type value_type = Declaration_KEY(attr) == KEYattribute_decl
+                ? function_type_return_type(attribute_decl_type(attr))
+                : value_decl_type(attr);
+            dump_sequence_elements(p, for_stmt_expr(header), o);
+            o << ".foldLeft(" << as_val(value_type)
+              << ".v_initial) { (v_for_result, v_sequence_element) =>\n";
+            nesting_level++;
+            o << indent() << "v_sequence_element match {\n";
+            nesting_level++;
+            o << indent() << "case ";
+            dump_sequence_element_pattern(middle, o);
+            o << " => " << as_val(value_type)
+              << ".v_combine(v_for_result, ";
+            current_blocks.push_back(matcher_body(m));
+            dump_rhs_instance_helper(aug_graph, cond->next_positive, instance, o);
+            current_blocks.pop_back();
+            o << ")\n";
+            o << indent() << "case _ => v_for_result\n";
+            nesting_level--;
+            o << indent() << "}\n";
+            nesting_level--;
+            o << indent() << "}";
+            break;
+          }
           if (m == first_Match(case_stmt_matchers(header))) {
             Expression e = case_stmt_expr(header);
             o << "{\n";
@@ -1084,6 +1117,8 @@ class SynthImpl : public SynthImplementation {
 
     bool is_synthesized = synth_util::instance_is_synthesized(instance);
     bool is_inherited = synth_util::instance_is_inherited(instance);
+    bool is_function_call_result =
+      synth_util::instance_is_function_call_result(instance);
     bool is_circular = edgeset_kind(current_aug_graph->graph[instance->index * current_aug_graph->instances.length + instance->index]);
     bool is_match_formal = synth_util::is_match_formal(instance->fibered_attr.attr);
     bool is_available = is_match_formal || is_inherited;
@@ -1114,6 +1149,8 @@ class SynthImpl : public SynthImplementation {
       } else {
         dump_rhs_instance_helper(aug_graph, block, instance, o);
       }
+    } else if (is_function_call_result) {
+      dump_rhs_instance_helper(aug_graph, block, instance, o);
     } else if (is_synthesized) {
       if (is_parent_instance) {
         dump_rhs_instance_helper(aug_graph, block, instance, o);

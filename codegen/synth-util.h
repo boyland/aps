@@ -67,6 +67,8 @@ bool instance_is_inherited(INSTANCE* instance);
 
 bool instance_is_pure_shared_info(INSTANCE* instance);
 
+bool instance_is_function_call_result(INSTANCE* instance);
+
 bool instance_is_parent(INSTANCE* instance, AUG_GRAPH* graph);
 
 std::string instance_to_string(INSTANCE* instance, bool trim_node = false);

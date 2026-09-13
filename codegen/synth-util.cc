@@ -167,12 +167,13 @@ static std::vector<INSTANCE*> collect_phylum_graph_attr_dependencies(PHY_GRAPH* 
   return result;
 }
 
-static bool is_function_decl_attribute(INSTANCE* instance) {
+bool instance_is_function_call_result(INSTANCE* instance) {
   if (instance->node == NULL || ABSTRACT_APS_tnode_phylum(instance->node) != KEYDeclaration || Declaration_KEY(instance->node) != KEYpragma_call) {
     return false;
   }
   Declaration function = Declaration_info(instance->node)->proxy_fdecl;
-  return Declaration_KEY(function) == KEYfunction_decl;
+  return function != NULL && instance->fibered_attr.fiber == NULL &&
+         instance->fibered_attr.attr == some_function_decl_result(function);
 }
 
 static bool is_some_function_decl(Declaration declaration) {
@@ -199,7 +200,7 @@ static std::vector<INSTANCE*> collect_aug_graph_attr_dependencies(AUG_GRAPH* aug
 
   for (int index = 0; index < instance_count; ++index) {
     INSTANCE* source_instance = &aug_graph->instances.array[index];
-    if (!instance_is_pure_shared_info(source_instance) && source_instance->index != sink_instance->index && !is_function_decl_attribute(source_instance) &&
+    if (!instance_is_pure_shared_info(source_instance) && source_instance->index != sink_instance->index && !instance_is_function_call_result(source_instance) &&
         edgeset_kind(aug_graph->graph[source_instance->index * instance_count + sink_instance->index])) {
       result.push_back(source_instance);
     }
@@ -363,11 +364,7 @@ void implement_value_use(Declaration declaration, AUG_GRAPH* graph, const std::v
     nesting_level = saved_nesting;
     output << "\n" << indent() << ")";
   } else if (flags & ATTRIBUTE_DECL_FLAG) {
-    if (ATTR_DECL_IS_INH(declaration)) {
-      output << "v_" << decl_name(declaration);
-    } else {
-      output << "a_" << decl_name(declaration) << ".get";
-    }
+    output << "v_" << decl_name(declaration);
   } else if (flags & LOCAL_VALUE_FLAG) {
     output << "v" << LOCAL_UNIQUE_PREFIX(declaration) << "_" << decl_name(declaration);
   } else {
