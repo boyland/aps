@@ -192,8 +192,9 @@ void *make_augmented_cycles_func_calls(void *paug_graph, void *node) {
     {
       Expression e = (Expression)node;
       Declaration fdecl = 0;
-      if ((fdecl = local_call_p(e)) != NULL &&
-	  Declaration_KEY(fdecl) == KEYfunction_decl) {
+	if ((fdecl = local_call_p(e)) != NULL &&
+      (Declaration_KEY(fdecl) == KEYfunction_decl ||
+       Declaration_KEY(fdecl) == KEYprocedure_decl)) {
 	Declaration proxy = Expression_info(e)->funcall_proxy;
 	/* need to figure out constructor index */
 	int i;
