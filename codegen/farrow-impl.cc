@@ -323,7 +323,7 @@ class FarrowImpl : public SynthImplementation {
     bool uses_fibers = false;
     traverse_Program(detect_program_fibers, &uses_fibers, program);
     if (uses_fibers) {
-      fatal_error("-F0 does not support fibers");
+      fatal_error("-F does not support fibers");
     }
   }
 
