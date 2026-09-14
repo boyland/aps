@@ -810,6 +810,12 @@ void dump_local_attributes(Block b, Type at, Implementation::ModuleInfo* info,
       aps_error(d,"Cannot handle this kind of statement");
       break;
     case KEYfor_in_stmt:
+      dump_local_attributes(for_in_stmt_body(d),at,info,oss);
+      break;
+    case KEYfor_stmt:
+      FOR_SEQUENCE
+        (Match,m,Matches,for_stmt_matchers(d),
+        dump_local_attributes(matcher_body(m),at,info,oss));
       break;
     case KEYvalue_decl:
       {

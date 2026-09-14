@@ -68,19 +68,6 @@ static void dump_context_open(void *c, ostream& os) {
 	  ++nesting_level;
 	}
 	return;
-      case KEYfor_stmt:
-	{
-	  //!! Doesn't work.
-	  Type ty = infer_expr_type(for_stmt_expr(decl));
-	  os << indent() << "{ ";
-	  ++nesting_level;
-	  dump_Type(ty,os);
-	  os << " node = ";
-	  dump_Expression(for_stmt_expr(decl),os);
-	  os << ";\n";
-	  os << indent() << "Constructor* cons = node->cons;\n";
-	}
-	return;
       case KEYfor_in_stmt:
 	{
 	  os << indent() << "for (" << "v_" << decl_name(for_in_stmt_formal(decl)) << " <- ";
@@ -343,18 +330,29 @@ static void dump_sequence_case(Declaration d, Match match, Pattern middle,
   os << indent() << "}\n";
 }
 
-static void dump_sequence_for(Declaration d, Match match, Pattern middle,
-                              ASSIGNFUNC f, void *arg, ostream& os)
+static void dump_sequence_for(Declaration d, Match match, Pattern element,
+                              SequenceForPosition position, ASSIGNFUNC f,
+                              void *arg, ostream& os)
 {
   activate_attr_context(os);
   os << indent();
   dump_sequence_elements(matcher_pat(match),for_stmt_expr(d),os);
+  switch (position) {
+  case SEQUENCE_FOR_FIRST:
+    os << ".headOption";
+    break;
+  case SEQUENCE_FOR_LAST:
+    os << ".lastOption";
+    break;
+  case SEQUENCE_FOR_EACH:
+    break;
+  }
   os << ".foreach { v_sequence_element =>\n";
   ++nesting_level;
   os << indent() << "v_sequence_element match {\n";
   ++nesting_level;
   os << indent() << "case ";
-  dump_sequence_element_pattern(middle,os);
+  dump_sequence_element_pattern(element,os);
   os << " => {\n";
   ++nesting_level;
   dump_Block(matcher_body(match),f,arg,os);
@@ -363,6 +361,32 @@ static void dump_sequence_for(Declaration d, Match match, Pattern middle,
   os << indent() << "case _ => {}\n";
   --nesting_level;
   os << indent() << "}\n";
+  --nesting_level;
+  os << indent() << "}\n";
+}
+
+static void dump_for_match(Declaration d, Match match, ASSIGNFUNC f,
+                           void *arg, ostream& os)
+{
+  Pattern pattern = matcher_pat(match);
+  Pattern element;
+  SequenceForPosition position;
+  if (sequence_for_pattern(pattern,&element,&position)) {
+    dump_sequence_for(d,match,element,position,f,arg,os);
+    return;
+  }
+
+  activate_attr_context(os);
+  os << indent();
+  dump_Expression(for_stmt_expr(d),os);
+  os << " match {\n";
+  ++nesting_level;
+  os << indent() << "case " << pattern << " => {\n";
+  ++nesting_level;
+  dump_Block(matcher_body(match),f,arg,os);
+  --nesting_level;
+  os << indent() << "}\n";
+  os << indent() << "case _ => {}\n";
   --nesting_level;
   os << indent() << "}\n";
 }
@@ -409,16 +433,11 @@ void dump_Block(Block b,ASSIGNFUNC f,void*arg,ostream&os)
        break;
      case KEYfor_stmt:
        {
-	 Match match;
-	 Pattern middle;
-	 if (sequence_search_matcher(d,&match,&middle) &&
-	     block_assigns_to(matcher_body(match),arg)) {
-	   dump_sequence_for(d,match,middle,f,arg,os);
-	 } else {
-	   push_attr_context(d);
-	   dump_Matches(for_stmt_matchers(d),false,f,arg,os);
-	   pop_attr_context(os);
-	 }
+   FOR_SEQUENCE
+     (Match,m,Matches,for_stmt_matchers(d),
+      if (block_assigns_to(matcher_body(m),arg)) {
+        dump_for_match(d,m,f,arg,os);
+      });
        }
        break;
      case KEYvalue_decl:

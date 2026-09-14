@@ -93,6 +93,13 @@ extern Implementation *synth_impl;
 
 void clear_implementation_marks(Declaration d);
 
+enum SequenceForPosition {
+  SEQUENCE_FOR_FIRST,
+  SEQUENCE_FOR_EACH,
+  SEQUENCE_FOR_LAST
+};
+
+bool sequence_for_pattern(Pattern p, Pattern *element, SequenceForPosition *position);
 bool sequence_search_pattern(Pattern p, Pattern *middle);
 bool sequence_search_matcher(Declaration decl, Match *match, Pattern *middle);
 bool block_assigns_to(Block b, void *vdecl);
