@@ -558,15 +558,24 @@ static bool implement_visit_function(
         Match m = (Match)ad;
         Pattern p = matcher_pat(m);
         Declaration header = Match_info(m)->header;
+        bool is_for = Declaration_KEY(header) == KEYfor_stmt;
 #ifdef APS2SCALA
         Pattern middle;
-        if (sequence_search_pattern(p, &middle)) {
-          bool is_for = Declaration_KEY(header) == KEYfor_stmt;
+        SequenceForPosition position = SEQUENCE_FOR_EACH;
+        bool is_sequence_match = is_for
+            ? sequence_for_pattern(p, &middle, &position)
+            : sequence_search_pattern(p, &middle);
+        if (is_sequence_match) {
           unsigned sequence_number = (unsigned)(uintptr_t)m;
           Expression e = is_for ? for_stmt_expr(header) : case_stmt_expr(header);
           if (is_for) {
             ow->get_outstream() << indent();
             dump_sequence_elements(p, e, ow->get_outstream());
+            if (position == SEQUENCE_FOR_FIRST) {
+              ow->get_outstream() << ".headOption";
+            } else if (position == SEQUENCE_FOR_LAST) {
+              ow->get_outstream() << ".lastOption";
+            }
             ow->get_outstream() << ".foreach { v_sequence_element =>\n";
             ++nesting_level;
             ow->get_outstream() << indent() << "v_sequence_element match {\n";
@@ -640,8 +649,11 @@ static bool implement_visit_function(
         }
 #endif /* APS2SCALA */
         // if first match in case, we evaluate variable:
-        if (m == first_Match(case_stmt_matchers(header))) {
-          Expression e = case_stmt_expr(header);
+        Matches matchers = is_for
+            ? for_stmt_matchers(header) : case_stmt_matchers(header);
+        if (m == first_Match(matchers)) {
+          Expression e = is_for
+              ? for_stmt_expr(header) : case_stmt_expr(header);
 #ifdef APS2SCALA
           // Type ty = infer_expr_type(e);
           ow->get_outstream() << indent() << "val node = " << e << ";\n";
@@ -666,7 +678,7 @@ static bool implement_visit_function(
         if (MATCH_NEXT(m)) {
           if_false = 0;  //? Why not the nxt match ?
         } else {
-          if_false = case_stmt_default(header);
+          if_false = is_for ? 0 : case_stmt_default(header);
         }
       } else {
         // Symbol boolean_symbol = intern_symbol("Boolean");
