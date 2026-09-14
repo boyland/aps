@@ -11,6 +11,7 @@ extern "C" {
 #include <stdio.h>
 #include "string.h"
 #include "aps-ag.h"
+#include "aps-analyze.h"
 String get_code_name(Symbol);
 }
 
