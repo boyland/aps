@@ -68,6 +68,9 @@ static void dump_context_open(void *c, ostream& os) {
 	  ++nesting_level;
 	}
 	return;
+      case KEYfor_stmt:
+        fatal_error("%d: for statement was pushed as an attribute context instead of being emitted by dump_for_match", tnode_line_number(decl));
+        return;
       case KEYfor_in_stmt:
 	{
 	  os << indent() << "for (" << "v_" << decl_name(for_in_stmt_formal(decl)) << " <- ";
