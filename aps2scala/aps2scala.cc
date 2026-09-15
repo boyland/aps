@@ -145,6 +145,7 @@ int main(int argc,char **argv) {
 
     dump_scala_Program(p,out);
     out.close();
+    aps_check_error("code generation");
   }
   exit(0);
 }

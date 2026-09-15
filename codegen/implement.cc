@@ -46,29 +46,54 @@ void clear_implementation_marks(Declaration d) {
   traverse_Declaration(clear_impl_marks,&nothing,d);
 }
 
-bool sequence_search_pattern(Pattern p, Pattern *middle)
+static bool unconstrained_rest_pattern(Pattern pattern)
+{
+  return pattern && Pattern_KEY(pattern) == KEYrest_pattern &&
+      Pattern_KEY(rest_pattern_constraint(pattern)) == KEYno_pattern;
+}
+
+bool sequence_for_pattern(Pattern pattern, Pattern *element,
+                          SequenceForPosition *position)
 {
   Symbol sequence_symbol = intern_symbol("{}");
-  if (Pattern_KEY(p) != KEYpattern_call) return false;
+  if (Pattern_KEY(pattern) != KEYpattern_call) return false;
 
-  Pattern pf = pattern_call_func(p);
-  if (Pattern_KEY(pf) != KEYpattern_use) return false;
-  Declaration pfdecl = USE_DECL(pattern_use_use(pf));
-  if (!pfdecl || def_name(declaration_def(pfdecl)) != sequence_symbol) return false;
+  Pattern function = pattern_call_func(pattern);
+  if (Pattern_KEY(function) != KEYpattern_use) return false;
+  Declaration function_decl = USE_DECL(pattern_use_use(function));
+  if (!function_decl ||
+      def_name(declaration_def(function_decl)) != sequence_symbol) return false;
 
-  Pattern leading = first_PatternActual(pattern_call_actuals(p));
-  Pattern element = leading ? PAT_NEXT(leading) : 0;
-  Pattern trailing = element ? PAT_NEXT(element) : 0;
-  if (!leading || Pattern_KEY(leading) != KEYrest_pattern ||
-      Pattern_KEY(rest_pattern_constraint(leading)) != KEYno_pattern ||
-      !element || !trailing || Pattern_KEY(trailing) != KEYrest_pattern ||
-      Pattern_KEY(rest_pattern_constraint(trailing)) != KEYno_pattern ||
-      PAT_NEXT(trailing)) {
-    return false;
+  Pattern first = first_PatternActual(pattern_call_actuals(pattern));
+  Pattern second = first ? PAT_NEXT(first) : 0;
+  Pattern third = second ? PAT_NEXT(second) : 0;
+  if (!first || !second) return false;
+
+  if (!unconstrained_rest_pattern(first) &&
+      unconstrained_rest_pattern(second) && !third) {
+    *element = first;
+    *position = SEQUENCE_FOR_FIRST;
+    return true;
   }
+  if (unconstrained_rest_pattern(first) && !PAT_NEXT(second)) {
+    *element = second;
+    *position = SEQUENCE_FOR_LAST;
+    return true;
+  }
+  if (unconstrained_rest_pattern(first) && third &&
+      unconstrained_rest_pattern(third) && !PAT_NEXT(third)) {
+    *element = second;
+    *position = SEQUENCE_FOR_EACH;
+    return true;
+  }
+  return false;
+}
 
-  *middle = element;
-  return true;
+bool sequence_search_pattern(Pattern p, Pattern *middle)
+{
+  SequenceForPosition position;
+  return sequence_for_pattern(p,middle,&position) &&
+      position == SEQUENCE_FOR_EACH;
 }
 
 bool sequence_search_matcher(Declaration decl, Match *match, Pattern *middle)

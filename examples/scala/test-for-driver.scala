@@ -12,5 +12,7 @@ object TestForDriver extends App {
   test.finish()
 
   println("Results:")
+  println(test.v_first(root.asInstanceOf[test.T_Root]))
   println(test.v_answer(root.asInstanceOf[test.T_Root]))
+  println(test.v_last(root.asInstanceOf[test.T_Root]))
 }
