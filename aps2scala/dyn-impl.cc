@@ -1,5 +1,4 @@
 #include <iostream>
-#include <stdint.h>
 #include <sstream>
 #include <stack>
 #include <vector>
@@ -306,7 +305,7 @@ void dump_Matches(Matches ms, bool exclusive, ASSIGNFUNC f, void*arg, ostream&os
 static void dump_sequence_case(Declaration d, Match match, Pattern middle,
                                ASSIGNFUNC f, void *arg, ostream& os)
 {
-  unsigned sequence_number = (unsigned)(uintptr_t)match;
+  unsigned sequence_number = get_match_index(match);
   activate_attr_context(os);
   os << indent() << "{\n";
   ++nesting_level;
@@ -333,49 +332,25 @@ static void dump_sequence_case(Declaration d, Match match, Pattern middle,
   os << indent() << "}\n";
 }
 
-static void dump_sequence_for(Declaration d, Match match, Pattern element,
-                              SequenceForPosition position, ASSIGNFUNC f,
+static void dump_sequence_for(Declaration d, Match match,
+                              const SequenceForPattern& patterns, ASSIGNFUNC f,
                               void *arg, ostream& os)
 {
+  unsigned sequence_number = get_match_index(match);
   activate_attr_context(os);
-  os << indent();
-  dump_sequence_elements(matcher_pat(match),for_stmt_expr(d),os);
-  switch (position) {
-  case SEQUENCE_FOR_FIRST:
-    os << ".headOption";
-    break;
-  case SEQUENCE_FOR_LAST:
-    os << ".lastOption";
-    break;
-  case SEQUENCE_FOR_EACH:
-    break;
-  }
-  os << ".foreach { v_sequence_element =>\n";
-  ++nesting_level;
-  os << indent() << "v_sequence_element match {\n";
-  ++nesting_level;
-  os << indent() << "case ";
-  dump_sequence_element_pattern(element,os);
-  os << " => {\n";
-  ++nesting_level;
+  dump_sequence_for_open(matcher_pat(match),for_stmt_expr(d),patterns,
+                         sequence_number,os);
   dump_Block(matcher_body(match),f,arg,os);
-  --nesting_level;
-  os << indent() << "}\n";
-  os << indent() << "case _ => {}\n";
-  --nesting_level;
-  os << indent() << "}\n";
-  --nesting_level;
-  os << indent() << "}\n";
+  dump_sequence_for_close(os);
 }
 
 static void dump_for_match(Declaration d, Match match, ASSIGNFUNC f,
                            void *arg, ostream& os)
 {
   Pattern pattern = matcher_pat(match);
-  Pattern element;
-  SequenceForPosition position;
-  if (sequence_for_pattern(pattern,&element,&position)) {
-    dump_sequence_for(d,match,element,position,f,arg,os);
+  SequenceForPattern patterns;
+  if (sequence_for_pattern(pattern,&patterns)) {
+    dump_sequence_for(d,match,patterns,f,arg,os);
     return;
   }
 

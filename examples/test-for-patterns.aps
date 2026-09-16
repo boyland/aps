@@ -1,0 +1,86 @@
+with "tiny";
+-- Regression test of all sequence for patterns and their combinations.
+module TEST_FOR_PATTERNS[T :: var TINY[]] extends T begin
+
+  type Leaves := SET[Integer];
+  type Biggest := MAX_LATTICE[Integer](-1000);
+
+  var collection all_leaves : Leaves;
+
+  collection attribute Root.first : Biggest;
+  collection attribute Root.each : Biggest;
+  collection attribute Root.last : Biggest;
+  collection attribute Root.first_last : Biggest;
+  collection attribute Root.first_each : Biggest;
+  collection attribute Root.each_last : Biggest;
+  collection attribute Root.first_each_last : Biggest;
+  collection attribute Root.separated_span : Biggest;
+  collection attribute Root.adjacent_span : Biggest;
+  collection attribute Root.endpoint_middles : Biggest;
+
+  pragma synthesized(first, each, last, first_last, first_each, each_last,
+                     first_each_last, separated_span, adjacent_span,
+                     endpoint_middles);
+
+  match ?r=root(?w) begin
+    for all_leaves begin
+      match {?first_leaf,...} begin
+        r.first :> first_leaf;
+      end;
+    end;
+    for all_leaves begin
+      match {...,?leaf,...} begin
+        r.each :> leaf;
+      end;
+    end;
+    for all_leaves begin
+      match {...,?last_leaf} begin
+        r.last :> last_leaf;
+      end;
+    end;
+    for all_leaves begin
+      match {?first_leaf,...,?last_leaf} begin
+        r.first_last :> first_leaf * 100 + last_leaf;
+      end;
+    end;
+    for all_leaves begin
+      match {?first_leaf,...,?leaf,...} begin
+        r.first_each :> first_leaf * 100 + leaf;
+      end;
+    end;
+    for all_leaves begin
+      match {...,?leaf,...,?last_leaf} begin
+        r.each_last :> leaf * 100 + last_leaf;
+      end;
+    end;
+    for all_leaves begin
+      match {...,?left,...,?right,...} begin
+        r.separated_span :> right - left;
+      end;
+    end;
+    for all_leaves begin
+      match {...,?left,?right,...} begin
+        r.adjacent_span :> right - left;
+      end;
+    end;
+    for all_leaves begin
+      match {?first_leaf,...,?left,...,?right,...,?last_leaf} begin
+        r.endpoint_middles :> left * 100 + right;
+      end;
+    end;
+    for all_leaves begin
+      match {?first1,?first2,...,?last1,?last2} begin
+        r.first_each_last :> first1 * 1000000 + first2 * 10000 +
+                             last1 * 100 + last2;
+      end;
+    end;
+  end;
+
+  match ?w=branch(?x,?y) begin
+  end;
+
+  match ?l=leaf(?x) begin
+    all_leaves :> {x};
+  end;
+
+end;

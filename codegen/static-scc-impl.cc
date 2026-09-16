@@ -1,5 +1,4 @@
 #include <string.h>
-#include <stdint.h>
 #include <algorithm>
 #include <iostream>
 extern "C" {
@@ -18,6 +17,9 @@ extern "C" {
 bool sequence_search_pattern(Pattern, Pattern*);
 void dump_sequence_element_pattern(Pattern, ostream&);
 void dump_sequence_elements(Pattern, Expression, ostream&);
+void dump_sequence_for_open(Pattern, Expression, const SequenceForPattern&,
+                            unsigned, ostream&);
+void dump_sequence_for_close(ostream&);
 #endif
 
 #define LOCAL_VALUE_FLAG (1 << 28)
@@ -560,30 +562,17 @@ static bool implement_visit_function(
         Declaration header = Match_info(m)->header;
         bool is_for = Declaration_KEY(header) == KEYfor_stmt;
 #ifdef APS2SCALA
-        Pattern middle;
-        SequenceForPosition position = SEQUENCE_FOR_EACH;
+        Pattern middle = 0;
+        SequenceForPattern sequence_patterns = {};
         bool is_sequence_match = is_for
-            ? sequence_for_pattern(p, &middle, &position)
+          ? sequence_for_pattern(p, &sequence_patterns)
             : sequence_search_pattern(p, &middle);
         if (is_sequence_match) {
-          unsigned sequence_number = (unsigned)(uintptr_t)m;
+          unsigned sequence_number = get_match_index(m);
           Expression e = is_for ? for_stmt_expr(header) : case_stmt_expr(header);
           if (is_for) {
-            ow->get_outstream() << indent();
-            dump_sequence_elements(p, e, ow->get_outstream());
-            if (position == SEQUENCE_FOR_FIRST) {
-              ow->get_outstream() << ".headOption";
-            } else if (position == SEQUENCE_FOR_LAST) {
-              ow->get_outstream() << ".lastOption";
-            }
-            ow->get_outstream() << ".foreach { v_sequence_element =>\n";
-            ++nesting_level;
-            ow->get_outstream() << indent() << "v_sequence_element match {\n";
-            ++nesting_level;
-            ow->get_outstream() << indent() << "case ";
-            dump_sequence_element_pattern(middle, ow->get_outstream());
-            ow->get_outstream() << " => {\n";
-            ++nesting_level;
+            dump_sequence_for_open(p,e,sequence_patterns,sequence_number,
+                                   ow->get_outstream());
           } else {
             ow->get_outstream() << indent() << "{\n";
             ++nesting_level;
@@ -609,16 +598,12 @@ static bool implement_visit_function(
               cto->chunk_index, loop_allowed, loop_id,
               skip_previous_visit_code, ow);
           cond->positive &= ~cmask;
-          --nesting_level;
-          ow->get_outstream() << indent() << "}\n";
 
           if (is_for) {
-            ow->get_outstream() << indent() << "case _ => {}\n";
-            --nesting_level;
-            ow->get_outstream() << indent() << "}\n";
-            --nesting_level;
-            ow->get_outstream() << indent() << "}\n";
+            dump_sequence_for_close(ow->get_outstream());
           } else {
+            --nesting_level;
+            ow->get_outstream() << indent() << "}\n";
             --nesting_level;
             ow->get_outstream() << indent() << "}\n";
             ow->get_outstream() << indent() << "if (sequenceMatch"

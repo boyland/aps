@@ -6,6 +6,16 @@ extern "C" {
 #include "dump.h"
 #include "implement.h"
 
+static unsigned global_match_index = 0;
+
+unsigned get_match_index(Match match)
+{
+  if (Match_info(match)->match_index == 0) {
+    Match_info(match)->match_index = ++global_match_index;
+  }
+  return Match_info(match)->match_index;
+}
+
 Implementation::ModuleInfo::ModuleInfo(Declaration module)
   : module_decl(module) 
 {}
@@ -52,8 +62,21 @@ static bool unconstrained_rest_pattern(Pattern pattern)
       Pattern_KEY(rest_pattern_constraint(pattern)) == KEYno_pattern;
 }
 
-bool sequence_for_pattern(Pattern pattern, Pattern *element,
-                          SequenceForPosition *position)
+static bool sequence_for_pattern_recursive(Pattern pattern,
+                                           SequenceForPattern *result)
+{
+  if (!pattern) return !result->elements.empty();
+  if (Pattern_KEY(pattern) == KEYrest_pattern) {
+    if (!unconstrained_rest_pattern(pattern)) return false;
+    result->rests[result->elements.size()] = true;
+  } else {
+    result->elements.push_back(pattern);
+    result->rests.resize(result->elements.size()+1,false);
+  }
+  return sequence_for_pattern_recursive(PAT_NEXT(pattern),result);
+}
+
+bool sequence_for_pattern(Pattern pattern, SequenceForPattern *result)
 {
   Symbol sequence_symbol = intern_symbol("{}");
   if (Pattern_KEY(pattern) != KEYpattern_call) return false;
@@ -64,36 +87,37 @@ bool sequence_for_pattern(Pattern pattern, Pattern *element,
   if (!function_decl ||
       def_name(declaration_def(function_decl)) != sequence_symbol) return false;
 
-  Pattern first = first_PatternActual(pattern_call_actuals(pattern));
-  Pattern second = first ? PAT_NEXT(first) : 0;
-  Pattern third = second ? PAT_NEXT(second) : 0;
-  if (!first || !second) return false;
+  SequenceForPattern found = {};
+  found.rests.resize(1,false);
+  Pattern actual = first_PatternActual(pattern_call_actuals(pattern));
+  if (!sequence_for_pattern_recursive(actual,&found)) return false;
+  bool has_rest = false;
+  for (bool rest : found.rests) has_rest |= rest;
+  if (!has_rest) return false;
 
-  if (!unconstrained_rest_pattern(first) &&
-      unconstrained_rest_pattern(second) && !third) {
-    *element = first;
-    *position = SEQUENCE_FOR_FIRST;
-    return true;
+  unsigned endpoints = 0;
+  if (!found.rests.front()) {
+    found.positions |= SEQUENCE_FOR_FIRST;
+    ++endpoints;
   }
-  if (unconstrained_rest_pattern(first) && !PAT_NEXT(second)) {
-    *element = second;
-    *position = SEQUENCE_FOR_LAST;
-    return true;
+  if (!found.rests.back()) {
+    found.positions |= SEQUENCE_FOR_LAST;
+    ++endpoints;
   }
-  if (unconstrained_rest_pattern(first) && third &&
-      unconstrained_rest_pattern(third) && !PAT_NEXT(third)) {
-    *element = second;
-    *position = SEQUENCE_FOR_EACH;
-    return true;
-  }
-  return false;
+  if (found.elements.size() > endpoints)
+    found.positions |= SEQUENCE_FOR_EACH;
+  *result = found;
+  return true;
 }
 
 bool sequence_search_pattern(Pattern p, Pattern *middle)
 {
-  SequenceForPosition position;
-  return sequence_for_pattern(p,middle,&position) &&
-      position == SEQUENCE_FOR_EACH;
+  SequenceForPattern result;
+  if (!sequence_for_pattern(p,&result) ||
+      result.positions != SEQUENCE_FOR_EACH || result.elements.size() != 1)
+    return false;
+  *middle = result.elements.front();
+  return true;
 }
 
 bool sequence_search_matcher(Declaration decl, Match *match, Pattern *middle)

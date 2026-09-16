@@ -34,6 +34,7 @@ EVALUATOR_EXAMPLES = classic-binding first follow nullable test-coll \
 	below-fiber-cycle below-single-fiber-cycle local-fiber-cycle nested-cycles \
 	farrow-lv farrow-ubd farrow-ubd-fiber nested-ubd nested-ubd-fiber simple-snc \
 	simple-binding simple-binding1 simple-binding2 simple-binding3 test-for \
+	test-for-patterns \
 	simple-snc-fiber
 SCALAGEN = ${AST_TREE_SCALAGEN} \
 	$(foreach example,${EVALUATOR_EXAMPLES},$(example).scala $(example).static.scala)
@@ -72,6 +73,7 @@ all : ${OUT}/simple_snc_implicit.class ${OUT}/SimpleSncDriver.class
 all : ${OUT}/simple_binding_implicit.class ${OUT}/SimpleBindingDriver.class
 all : SimpleBinding1Driver.class SimpleBinding2Driver.class SimpleBinding3Driver.class
 all : ${OUT}/test_for_implicit.class ${OUT}/TestForDriver.class
+all : ${OUT}/test_for_patterns_implicit.class ${OUT}/TestForPatternsDriver.class
 all : ${OUT}/simple_snc_fiber_implicit.class ${OUT}/SimpleSncFiberDriver.class
 
 .PHONY: run
@@ -420,6 +422,13 @@ ${OUT}/test_for_implicit.class : test-for${IMPL_SUFFIX} ${OUT}/tiny_implicit.cla
 
 ${OUT}/TestForDriver.class : ${OUT}/test_for_implicit.class ${OUT}/TinyParser.class test-for-driver.scala
 	${SCALAC} ${SCALACFLAGS} test-for-driver.scala
+
+${OUT}/test_for_patterns_implicit.class : test-for-patterns${IMPL_SUFFIX} ${OUT}/tiny_implicit.class
+	${SCALAC} ${SCALACFLAGS} $<
+	@touch $@
+
+${OUT}/TestForPatternsDriver.class : ${OUT}/test_for_patterns_implicit.class ${OUT}/TinyParser.class test-for-patterns-driver.scala
+	${SCALAC} ${SCALACFLAGS} test-for-patterns-driver.scala
 
 .PHONY: SimpleBinding1Driver.run SimpleBinding2Driver.run SimpleBinding3Driver.run
 

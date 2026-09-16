@@ -94,14 +94,21 @@ extern Implementation *synth_impl;
 void clear_implementation_marks(Declaration d);
 
 enum SequenceForPosition {
-  SEQUENCE_FOR_FIRST,
-  SEQUENCE_FOR_EACH,
-  SEQUENCE_FOR_LAST
+  SEQUENCE_FOR_FIRST = 1 << 0,
+  SEQUENCE_FOR_EACH = 1 << 1,
+  SEQUENCE_FOR_LAST = 1 << 2
 };
 
-bool sequence_for_pattern(Pattern p, Pattern *element, SequenceForPosition *position);
+struct SequenceForPattern {
+  unsigned positions;       /* combination of SequenceForPosition flags */
+  vector<Pattern> elements; /* sequence elements corresponding to the positions */
+  vector<bool> rests;       /* indicates whether each corresponding element is a "rest" element */
+};
+
+bool sequence_for_pattern(Pattern p, SequenceForPattern *result);
 bool sequence_search_pattern(Pattern p, Pattern *middle);
 bool sequence_search_matcher(Declaration decl, Match *match, Pattern *middle);
+unsigned get_match_index(Match match);
 bool block_assigns_to(Block b, void *vdecl);
 
 #endif

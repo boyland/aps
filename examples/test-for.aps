@@ -9,26 +9,14 @@ module TEST_FOR[T :: var TINY[]] extends T begin
 
   var collection all_leaves : Leaves; 
 
-  collection attribute Root.first : Biggest;
   collection attribute Root.answer : Biggest;
-  collection attribute Root.last : Biggest;
   
-  pragma synthesized(first,answer,last);
+  pragma synthesized(answer);
   
   match ?r=root(?w) begin
     for all_leaves begin
-      match {?first_leaf,...} begin
-        r.first :> first_leaf;
-      end;
-    end;
-    for all_leaves begin
       match {...,?leaf,...} begin
-      	r.answer :> leaf;
-      end;
-    end;
-    for all_leaves begin
-      match {...,?last_leaf} begin
-        r.last :> last_leaf;
+        r.answer :> leaf;
       end;
     end;
   end;
