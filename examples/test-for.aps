@@ -16,7 +16,7 @@ module TEST_FOR[T :: var TINY[]] extends T begin
   match ?r=root(?w) begin
     for all_leaves begin
       match {...,?leaf,...} begin
-        r.answer :> leaf;
+	r.answer :> leaf;
       end;
     end;
   end;
