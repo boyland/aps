@@ -44,13 +44,13 @@ module TEST_FOR_PATTERNS[T :: var TINY[]] extends T begin
       end;
     end;
     for all_leaves begin
-      match {?first_leaf,...,?leaf,...} begin
-        r.first_each :> first_leaf * 100 + leaf;
+      match {?first1,?first2,...} begin
+        r.first_each :> 100000 + first1 * 100 + first2;
       end;
     end;
     for all_leaves begin
-      match {...,?leaf,...,?last_leaf} begin
-        r.each_last :> leaf * 100 + last_leaf;
+      match {...,?last1,?last2} begin
+        r.each_last :> 200000 + last1 * 100 + last2;
       end;
     end;
     for all_leaves begin
@@ -64,7 +64,7 @@ module TEST_FOR_PATTERNS[T :: var TINY[]] extends T begin
       end;
     end;
     for all_leaves begin
-      match {?first_leaf,...,?left,...,?right,...,?last_leaf} begin
+      match {?first_leaf,...,?left,?right,...,?last_leaf} begin
         r.endpoint_middles :> left * 100 + right;
       end;
     end;
@@ -80,7 +80,9 @@ module TEST_FOR_PATTERNS[T :: var TINY[]] extends T begin
   end;
 
   match ?l=leaf(?x) begin
-    all_leaves :> {x};
+    if x >= 0 then
+      all_leaves :> {x};
+    endif;
   end;
 
 end;

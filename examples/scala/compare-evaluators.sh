@@ -28,7 +28,7 @@ run_with_evaluator() {
   printf "  %s finished in %.2fs\n" "$evaluator" "$(echo "$end - $start" | bc)"
 }
 
-run_driver() {
+run_driver_once() {
   local driver="$1"
   local args="$2"
   local -a evals
@@ -90,6 +90,19 @@ run_driver() {
   $pass
 }
 
+run_driver() {
+  local driver="$1"
+  local programs="$2"
+  local evaluators="$3"
+  local -a program_list
+  local pass=true
+  IFS=',' read -ra program_list <<< "$programs"
+  for program in "${program_list[@]}"; do
+    run_driver_once "$driver" "$program" "$evaluators" || pass=false
+  done
+  $pass
+}
+
 if [ $# -gt 0 ]; then
   driver="$1"
   args="${2:-}"
@@ -120,7 +133,7 @@ TESTS=(
   "SimpleBinding2Driver|simple.program|$DEFAULT_EVALUATORS"
   "SimpleBinding3Driver|simple.program|$DEFAULT_EVALUATORS"
   "TestForDriver|tiny.program|$DEFAULT_EVALUATORS"
-  "TestForPatternsDriver|tiny.program|$DEFAULT_EVALUATORS"
+  "TestForPatternsDriver|tiny.program,tiny-singleton.program,tiny-empty.program|$DEFAULT_EVALUATORS"
   "SimpleSncDriver|simple.program|$DYNAMIC_EVALUATOR,$ORIGINAL_FARROW_EVALUATOR"
   "SimpleSncFiberDriver|simple.program|$DYNAMIC_EVALUATOR"
 )

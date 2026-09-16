@@ -68,6 +68,7 @@ static bool sequence_for_pattern_recursive(Pattern pattern,
   if (!pattern) return !result->elements.empty();
   if (Pattern_KEY(pattern) == KEYrest_pattern) {
     if (!unconstrained_rest_pattern(pattern)) return false;
+    if (result->rests[result->elements.size()]) return false;
     result->rests[result->elements.size()] = true;
   } else {
     result->elements.push_back(pattern);

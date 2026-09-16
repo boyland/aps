@@ -12,15 +12,18 @@ object TestForPatternsDriver extends App {
   test.finish()
 
   val testRoot = root.asInstanceOf[test.T_Root]
+  val results = Seq(
+    test.v_first(testRoot),
+    test.v_each(testRoot),
+    test.v_last(testRoot),
+    test.v_first_last(testRoot),
+    test.v_first_each(testRoot),
+    test.v_each_last(testRoot),
+    test.v_first_each_last(testRoot),
+    test.v_separated_span(testRoot),
+    test.v_adjacent_span(testRoot),
+    test.v_endpoint_middles(testRoot))
+
   println("Results:")
-  println(test.v_first(testRoot))
-  println(test.v_each(testRoot))
-  println(test.v_last(testRoot))
-  println(test.v_first_last(testRoot))
-  println(test.v_first_each(testRoot))
-  println(test.v_each_last(testRoot))
-  println(test.v_first_each_last(testRoot))
-  println(test.v_separated_span(testRoot))
-  println(test.v_adjacent_span(testRoot))
-  println(test.v_endpoint_middles(testRoot))
+  results.foreach(println)
 }
