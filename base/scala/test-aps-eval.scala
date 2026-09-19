@@ -18,10 +18,12 @@ object TestCircularStale {
   import Evaluation._;
 
   def main(args: Array[String]): Unit = {
+    Debug.activate();
     test1_singleCircularConvergence();
     test2_mutualCircularCycle();
     test3_nonCircularReadsConvergedCircular();
     test4_shortCircuitPreventsFullCycle();
+    test5_dependencyDiscoveredDuringRecompute();
     println("All tests passed.");
   }
 
@@ -108,5 +110,38 @@ object TestCircularStale {
     val resultB = attrB.get;
     assert(resultA == 3, s"test4: attrA expected 3, got $resultA");
     assert(resultB == 3, s"test4: attrB expected 3, got $resultB");
+  }
+
+  // A dependency reached only during recomputation must join the cycle and converge.
+  // This problem came up during dynamic evaluation of nullable.aps because of "and" operation and short-circuiting.
+  def test5_dependencyDiscoveredDuringRecompute(): Unit = {
+    var root: Evaluation[String, Int] with CircularEvaluation[String, Int] = null;
+
+    val second = new Evaluation[String, Int]("second", "second")
+      with CircularEvaluation[String, Int] {
+      val lattice = IntLatticeInstance;
+      override def compute: Int = if (root.get >= 1) 2 else 0;
+    };
+
+    val delayed = new Evaluation[String, Int]("delayed", "delayed")
+      with CircularEvaluation[String, Int] {
+      val lattice = IntLatticeInstance;
+      override def compute: Int = if (root.get >= 2) 3 else 0;
+    };
+
+    val gated = new Evaluation[String, Int]("gated", "gated")
+      with CircularEvaluation[String, Int] {
+      val lattice = IntLatticeInstance;
+      override def compute: Int = if (root.get >= 1) delayed.get else 0;
+    };
+
+    root = new Evaluation[String, Int]("root", "root")
+      with CircularEvaluation[String, Int] {
+      val lattice = IntLatticeInstance;
+      override def compute: Int = math.max(1, math.max(second.get, gated.get));
+    };
+
+    val result = root.get;
+    assert(result == 3, s"test5: root expected 3, got $result");
   }
 }
