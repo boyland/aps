@@ -18,7 +18,6 @@ object TestCircularStale {
   import Evaluation._;
 
   def main(args: Array[String]): Unit = {
-    Debug.activate();
     test1_singleCircularConvergence();
     test2_mutualCircularCycle();
     test3_nonCircularReadsConvergedCircular();
