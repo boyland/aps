@@ -19,6 +19,7 @@ extern "C" {
 
 void dump_sequence_element_pattern(Pattern, ostream&);
 void dump_sequence_elements(Pattern, Expression, ostream&);
+extern bool synth_eager;
 
 static AUG_GRAPH* current_aug_graph = NULL;
 static std::vector<synth_util::SynthFunctionState*> synth_functions_states;
@@ -266,7 +267,8 @@ static void emit_root_evaluations(ostream& os, Declaration start_phylum, const v
 
 static void emit_start_phylum_evaluations(
   ostream& os, STATE* state,
-  const vector<synth_util::SynthFunctionState*>& function_states) {
+  const vector<synth_util::SynthFunctionState*>& function_states,
+  bool emit_side_effects) {
   PHY_GRAPH* start_graph = summary_graph_for(state, state->start_phylum);
   bool needs_fixed_point = state->loop_required;
   set_phylum_graph_components(start_graph);
@@ -281,54 +283,71 @@ static void emit_start_phylum_evaluations(
   };
 
   if (!needs_fixed_point) {
-    vector<INSTANCE*> side_effect_instances;
-    vector<INSTANCE*> value_instances;
+    vector<INSTANCE*> instances;
     for (int instance_index = 0;
          instance_index < start_graph->instances.length; instance_index++) {
       INSTANCE* instance = &start_graph->instances.array[instance_index];
-      if (!synth_util::instance_is_synthesized(instance)) {
+      if (!synth_util::instance_is_synthesized(instance) ||
+          is_side_effect(instance) != emit_side_effects) {
         continue;
       }
-      if (is_side_effect(instance)) {
-        side_effect_instances.push_back(instance);
-      } else {
-        value_instances.push_back(instance);
-      }
+      instances.push_back(instance);
     }
-    emit_root_evaluations(os, state->start_phylum, side_effect_instances);
-    emit_root_evaluations(os, state->start_phylum, value_instances);
+    emit_root_evaluations(os, state->start_phylum, instances);
     return;
   }
 
-  os << indent() << "implicit val changed: AtomicBoolean = new AtomicBoolean(false);\n";
-  os << indent() << "implicit val " << synth_util::LOOP_VAR << ": Boolean = false;\n";
-
-    for (bool emit_side_effects : {true, false}) {
-      for (int component_index = start_graph->components->length - 1;
-           component_index >= 0; component_index--) {
-        SCC_COMPONENT* component = start_graph->components->array[component_index];
-        vector<INSTANCE*> synthesized_instances;
-        for (INSTANCE* instance : synthesized_component_instances(component)) {
-          if (is_side_effect(instance) == emit_side_effects) {
-            synthesized_instances.push_back(instance);
-          }
-        }
-        if (synthesized_instances.empty()) {
-          continue;
-        }
-
-        if (start_graph->component_cycle[component_index]) {
-          os << indent() << "{\n";
-          ++nesting_level;
-          emit_fixed_point_loop_start(os, "componentChanged" + std::to_string(component_index));
-          emit_root_evaluations(os, state->start_phylum, synthesized_instances);
-          emit_fixed_point_loop_end(os);
-          --nesting_level;
-          os << indent() << "}\n";
-        } else {
-          emit_root_evaluations(os, state->start_phylum, synthesized_instances);
-        }
+  for (int component_index = start_graph->components->length - 1;
+       component_index >= 0; component_index--) {
+    SCC_COMPONENT* component = start_graph->components->array[component_index];
+    vector<INSTANCE*> synthesized_instances;
+    for (INSTANCE* instance : synthesized_component_instances(component)) {
+      if (is_side_effect(instance) == emit_side_effects) {
+        synthesized_instances.push_back(instance);
+      }
     }
+    if (synthesized_instances.empty()) {
+      continue;
+    }
+
+    if (start_graph->component_cycle[component_index]) {
+      os << indent() << "{\n";
+      ++nesting_level;
+      emit_fixed_point_loop_start(os, "componentChanged" + std::to_string(component_index));
+      emit_root_evaluations(os, state->start_phylum, synthesized_instances);
+      emit_fixed_point_loop_end(os);
+      --nesting_level;
+      os << indent() << "}\n";
+    } else {
+      emit_root_evaluations(os, state->start_phylum, synthesized_instances);
+    }
+  }
+}
+
+static void emit_eager_phylum_evaluations(
+    ostream& os,
+    const vector<synth_util::SynthFunctionState*>& function_states,
+    bool emit_side_effects) {
+  for (auto function_state : function_states) {
+    bool has_explicit_dependencies = std::any_of(
+        function_state->regular_dependencies.begin(),
+        function_state->regular_dependencies.end(),
+        [](INSTANCE* source_instance) {
+          return !synth_util::should_skip_synth_dependency(source_instance);
+        });
+    if (!function_state->is_phylum_instance ||
+        function_state->is_side_effect_evaluation != emit_side_effects ||
+        has_explicit_dependencies) {
+      continue;
+    }
+
+    Declaration phylum = function_state->source_phy_graph->phylum;
+    os << indent() << "for (node <- t_" << decl_name(phylum)
+       << ".nodes if node.isRooted) {\n";
+    ++nesting_level;
+    os << indent() << "eval_" << function_state->fdecl_name << "(node);\n";
+    --nesting_level;
+    os << indent() << "}\n";
   }
 }
 
@@ -685,7 +704,18 @@ class SynthImpl : public SynthImplementation {
 
       os << indent() << "override def finish() : Unit = {\n";
       ++nesting_level;
-      emit_start_phylum_evaluations(os, s, synth_functions_states);
+      if (s->loop_required) {
+        os << indent() << "implicit val changed: AtomicBoolean = new AtomicBoolean(false);\n";
+        os << indent() << "implicit val " << synth_util::LOOP_VAR << ": Boolean = false;\n";
+      }
+      emit_start_phylum_evaluations(os, s, synth_functions_states, true);
+      if (synth_eager) {
+        emit_eager_phylum_evaluations(os, synth_functions_states, true);
+      }
+      emit_start_phylum_evaluations(os, s, synth_functions_states, false);
+      if (synth_eager) {
+        emit_eager_phylum_evaluations(os, synth_functions_states, false);
+      }
       os << indent() << "super.finish();\n";
       --nesting_level;
       os << indent() << "};\n";
