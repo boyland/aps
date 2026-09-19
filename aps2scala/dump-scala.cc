@@ -380,9 +380,9 @@ void dump_sequence_for_open(Pattern pattern, Expression value,
     os << elements << "(v_sequence_index" << number << "_" << i << ")";
   }
   if (patterns.elements.size() > 1) os << ")";
-  os << ").foreach { v_sequence_element =>\n";
+  os << ").foreach { v_sequence_element" << number << " =>\n";
   ++nesting_level;
-  os << indent() << "v_sequence_element match {\n";
+  os << indent() << "v_sequence_element" << number << " match {\n";
   ++nesting_level;
   os << indent() << "case ";
   dump_sequence_element_patterns(patterns.elements,os);
