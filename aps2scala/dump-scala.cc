@@ -271,6 +271,10 @@ void dump_debug_end(ostream& os)
 
 int formal_count = 0;
 static void dump_Pattern_impl(Pattern p, ostream& os, std::vector<Expression> *conditions);
+static void dump_sequence_element_patterns(const std::vector<Pattern>&, ostream&);
+static void dump_sequence_candidates(Pattern, Expression,
+                                     const SequenceForPattern&, unsigned,
+                                     ostream&);
 
 static void dump_pattern_call(Pattern p, Pattern result, const char* resultS, ostream& os, std::vector<Expression> *conditions = 0)
 {
@@ -303,11 +307,26 @@ static void dump_pattern_call(Pattern p, Pattern result, const char* resultS, os
 
 void dump_sequence_element_pattern(Pattern p, ostream& os)
 {
+  dump_sequence_element_patterns(std::vector<Pattern>(1,p),os);
+}
+
+static void dump_sequence_element_patterns(const std::vector<Pattern>& patterns,
+                                           ostream& os)
+{
   std::vector<Expression> conditions;
-  dump_Pattern_impl(p,os,&conditions);
+  size_t count = patterns.size();
+  if (count > 1) os << "(";
+  bool started = false;
+  for (Pattern pattern : patterns) {
+    if (!pattern) continue;
+    if (started) os << ",";
+    dump_Pattern_impl(pattern,os,&conditions);
+    started = true;
+  }
+  if (count > 1) os << ")";
   if (!conditions.empty()) {
     os << " if ";
-    bool started = false;
+    started = false;
     for (Expression condition : conditions) {
       if (started) os << " && ";
       else started = true;
@@ -323,6 +342,115 @@ void dump_sequence_elements(Pattern p, Expression value, ostream& os)
   os << ".unapplySeq(";
   dump_Expression(value,os);
   os << ").get._2";
+}
+
+void dump_sequence_for_open(Pattern pattern, Expression value,
+                            const SequenceForPattern& patterns,
+                            unsigned number, ostream& os)
+{
+  os << indent() << "{\n";
+  ++nesting_level;
+  os << indent();
+  dump_sequence_candidates(pattern,value,patterns,number,os);
+  os << ".foreach { v_sequence_element" << number << " =>\n";
+  ++nesting_level;
+  os << indent() << "v_sequence_element" << number << " match {\n";
+  ++nesting_level;
+  os << indent() << "case ";
+  dump_sequence_element_patterns(patterns.elements,os);
+  os << " => {\n";
+  ++nesting_level;
+}
+
+void dump_sequence_case_open(Pattern pattern, Expression value,
+                             const SequenceForPattern& patterns,
+                             unsigned number, ostream& os)
+{
+  os << indent() << "{\n";
+  ++nesting_level;
+  os << indent() << "val sequenceMatch" << number << " = ";
+  dump_sequence_candidates(pattern,value,patterns,number,os);
+  os << ".collectFirst {\n";
+  ++nesting_level;
+  os << indent() << "case ";
+  dump_sequence_element_patterns(patterns.elements,os);
+  os << " => {\n";
+  ++nesting_level;
+}
+
+void dump_sequence_case_else(unsigned number, ostream& os)
+{
+  os << indent() << "()\n";
+  --nesting_level;
+  os << indent() << "}\n";
+  --nesting_level;
+  os << indent() << "}\n";
+  os << indent() << "if (sequenceMatch" << number << ".isEmpty) {\n";
+  ++nesting_level;
+}
+
+void dump_sequence_case_close(ostream& os)
+{
+  --nesting_level;
+  os << indent() << "}\n";
+  --nesting_level;
+  os << indent() << "}\n";
+}
+
+static void dump_sequence_candidates(Pattern pattern, Expression value,
+                                     const SequenceForPattern& patterns,
+                                     unsigned number, ostream& os)
+{
+  string elements = "v_sequence_elements" + std::to_string(number);
+  os << "{\n";
+  ++nesting_level;
+  os << indent() << "val " << elements << " = ";
+  dump_sequence_elements(pattern,value,os);
+  os << "\n" << indent() << "(for {\n";
+  ++nesting_level;
+  for (size_t i = 0; i < patterns.elements.size(); ++i) {
+    string index = "v_sequence_index" + std::to_string(number) + "_" +
+        std::to_string(i);
+    os << indent() << index << " <- ";
+    if (i == 0) {
+      if (patterns.rests[0]) os << "(0 until " << elements << ".length).iterator";
+      else os << "Iterator.single(0).filter(_ < " << elements << ".length)";
+    } else {
+      string previous = "v_sequence_index" + std::to_string(number) + "_" +
+          std::to_string(i-1);
+      if (patterns.rests[i])
+        os << "(" << previous << "+1 until " << elements << ".length).iterator";
+      else
+        os << "Iterator.single(" << previous << "+1).filter(_ < "
+           << elements << ".length)";
+    }
+    if (i+1 == patterns.elements.size() && !patterns.rests.back())
+      os << " if " << index << " == " << elements << ".length-1";
+    os << "\n";
+  }
+  --nesting_level;
+  os << indent() << "} yield ";
+  if (patterns.elements.size() > 1) os << "(";
+  for (size_t i = 0; i < patterns.elements.size(); ++i) {
+    if (i) os << ",";
+    os << elements << "(v_sequence_index" << number << "_" << i << ")";
+  }
+  if (patterns.elements.size() > 1) os << ")";
+  os << ")\n";
+  --nesting_level;
+  os << indent() << "}";
+}
+
+void dump_sequence_for_close(ostream& os)
+{
+  --nesting_level;
+  os << indent() << "}\n" << indent() << "case _ => {}\n";
+  --nesting_level;
+  os << indent() << "}\n";
+  --nesting_level;
+  os << indent() << "}\n";
+  --nesting_level;
+  os << indent() << "}\n";
 }
 
 static void dump_Pattern_impl(Pattern p, ostream& os, std::vector<Expression> *conditions)
@@ -810,6 +938,12 @@ void dump_local_attributes(Block b, Type at, Implementation::ModuleInfo* info,
       aps_error(d,"Cannot handle this kind of statement");
       break;
     case KEYfor_in_stmt:
+      dump_local_attributes(for_in_stmt_body(d),at,info,oss);
+      break;
+    case KEYfor_stmt:
+      FOR_SEQUENCE
+        (Match,m,Matches,for_stmt_matchers(d),
+        dump_local_attributes(matcher_body(m),at,info,oss));
       break;
     case KEYvalue_decl:
       {

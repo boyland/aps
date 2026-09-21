@@ -6,6 +6,16 @@ extern "C" {
 #include "dump.h"
 #include "implement.h"
 
+static unsigned global_match_index = 0;
+
+unsigned get_match_index(Match match)
+{
+  if (Match_info(match)->match_index == 0) {
+    Match_info(match)->match_index = ++global_match_index;
+  }
+  return Match_info(match)->match_index;
+}
+
 Implementation::ModuleInfo::ModuleInfo(Declaration module)
   : module_decl(module) 
 {}
@@ -46,28 +56,68 @@ void clear_implementation_marks(Declaration d) {
   traverse_Declaration(clear_impl_marks,&nothing,d);
 }
 
-bool sequence_search_pattern(Pattern p, Pattern *middle)
+static bool unconstrained_rest_pattern(Pattern pattern)
+{
+  return pattern && Pattern_KEY(pattern) == KEYrest_pattern &&
+      Pattern_KEY(rest_pattern_constraint(pattern)) == KEYno_pattern;
+}
+
+static bool sequence_for_pattern_recursive(Pattern pattern,
+                                           SequenceForPattern *result)
+{
+  if (!pattern) return !result->elements.empty();
+  if (Pattern_KEY(pattern) == KEYrest_pattern) {
+    if (!unconstrained_rest_pattern(pattern)) return false;
+    if (result->rests[result->elements.size()]) return false;
+    result->rests[result->elements.size()] = true;
+  } else {
+    result->elements.push_back(pattern);
+    result->rests.resize(result->elements.size()+1,false);
+  }
+  return sequence_for_pattern_recursive(PAT_NEXT(pattern),result);
+}
+
+bool sequence_for_pattern(Pattern pattern, SequenceForPattern *result)
 {
   Symbol sequence_symbol = intern_symbol("{}");
-  if (Pattern_KEY(p) != KEYpattern_call) return false;
+  if (Pattern_KEY(pattern) != KEYpattern_call) return false;
 
-  Pattern pf = pattern_call_func(p);
-  if (Pattern_KEY(pf) != KEYpattern_use) return false;
-  Declaration pfdecl = USE_DECL(pattern_use_use(pf));
-  if (!pfdecl || def_name(declaration_def(pfdecl)) != sequence_symbol) return false;
+  Pattern function = pattern_call_func(pattern);
+  if (Pattern_KEY(function) != KEYpattern_use) return false;
+  Declaration function_decl = USE_DECL(pattern_use_use(function));
+  if (!function_decl ||
+      def_name(declaration_def(function_decl)) != sequence_symbol) return false;
 
-  Pattern leading = first_PatternActual(pattern_call_actuals(p));
-  Pattern element = leading ? PAT_NEXT(leading) : 0;
-  Pattern trailing = element ? PAT_NEXT(element) : 0;
-  if (!leading || Pattern_KEY(leading) != KEYrest_pattern ||
-      Pattern_KEY(rest_pattern_constraint(leading)) != KEYno_pattern ||
-      !element || !trailing || Pattern_KEY(trailing) != KEYrest_pattern ||
-      Pattern_KEY(rest_pattern_constraint(trailing)) != KEYno_pattern ||
-      PAT_NEXT(trailing)) {
-    return false;
+  SequenceForPattern found = {};
+  found.rests.resize(1,false);
+  Pattern actual = first_PatternActual(pattern_call_actuals(pattern));
+  if (!sequence_for_pattern_recursive(actual,&found)) return false;
+  bool has_rest = false;
+  for (bool rest : found.rests) has_rest |= rest;
+  if (!has_rest) return false;
+
+  unsigned endpoints = 0;
+  if (!found.rests.front()) {
+    found.positions |= SEQUENCE_FOR_FIRST;
+    ++endpoints;
   }
+  if (!found.rests.back()) {
+    found.positions |= SEQUENCE_FOR_LAST;
+    ++endpoints;
+  }
+  if (found.elements.size() > endpoints)
+    found.positions |= SEQUENCE_FOR_EACH;
+  *result = found;
+  return true;
+}
 
-  *middle = element;
+bool sequence_search_pattern(Pattern p, Pattern *middle)
+{
+  SequenceForPattern result;
+  if (!sequence_for_pattern(p,&result) ||
+      result.positions != SEQUENCE_FOR_EACH || result.elements.size() != 1)
+    return false;
+  *middle = result.elements.front();
   return true;
 }
 
