@@ -1,0 +1,188 @@
+with "tiny";
+-- Regression tests for sequence case patterns.  Each pattern is in an
+-- independent module so static scheduling cannot duplicate unrelated cases.
+
+module TEST_CASE_FIRST[T :: var TINY[]] extends T begin
+  type Leaves := SET[Integer];
+  var collection all_leaves : Leaves;
+  attribute Root.result : Integer;
+  pragma synthesized(result);
+  match ?r=root(?w) begin
+    case all_leaves begin
+      match {?first,...} begin r.result := first; end;
+    else r.result := 0;
+    end;
+  end;
+  match ?w=branch(?x,?y) begin end;
+  match ?l=leaf(?x) begin
+    if x >= 0 then all_leaves :> {x}; endif;
+  end;
+end;
+
+module TEST_CASE_EACH[T :: var TINY[]] extends T begin
+  type Leaves := SET[Integer];
+  var collection all_leaves : Leaves;
+  attribute Root.result : Integer;
+  pragma synthesized(result);
+  match ?r=root(?w) begin
+    case all_leaves begin
+      match {...,?element,...} begin r.result := element; end;
+    else r.result := 0;
+    end;
+  end;
+  match ?w=branch(?x,?y) begin end;
+  match ?l=leaf(?x) begin
+    if x >= 0 then all_leaves :> {x}; endif;
+  end;
+end;
+
+module TEST_CASE_LAST[T :: var TINY[]] extends T begin
+  type Leaves := SET[Integer];
+  var collection all_leaves : Leaves;
+  attribute Root.result : Integer;
+  pragma synthesized(result);
+  match ?r=root(?w) begin
+    case all_leaves begin
+      match {...,?last} begin r.result := last; end;
+    else r.result := 0;
+    end;
+  end;
+  match ?w=branch(?x,?y) begin end;
+  match ?l=leaf(?x) begin
+    if x >= 0 then all_leaves :> {x}; endif;
+  end;
+end;
+
+module TEST_CASE_FIRST_LAST[T :: var TINY[]] extends T begin
+  type Leaves := SET[Integer];
+  var collection all_leaves : Leaves;
+  attribute Root.result : Integer;
+  pragma synthesized(result);
+  match ?r=root(?w) begin
+    case all_leaves begin
+      match {?first,...,?last} begin
+        r.result := first * 100 + last;
+      end;
+    else r.result := 0;
+    end;
+  end;
+  match ?w=branch(?x,?y) begin end;
+  match ?l=leaf(?x) begin
+    if x >= 0 then all_leaves :> {x}; endif;
+  end;
+end;
+
+module TEST_CASE_FIRST_EACH[T :: var TINY[]] extends T begin
+  type Leaves := SET[Integer];
+  var collection all_leaves : Leaves;
+  attribute Root.result : Integer;
+  pragma synthesized(result);
+  match ?r=root(?w) begin
+    case all_leaves begin
+      match {?first,?second,...} begin
+        r.result := 100000 + first * 100 + second;
+      end;
+    else r.result := 0;
+    end;
+  end;
+  match ?w=branch(?x,?y) begin end;
+  match ?l=leaf(?x) begin
+    if x >= 0 then all_leaves :> {x}; endif;
+  end;
+end;
+
+module TEST_CASE_EACH_LAST[T :: var TINY[]] extends T begin
+  type Leaves := SET[Integer];
+  var collection all_leaves : Leaves;
+  attribute Root.result : Integer;
+  pragma synthesized(result);
+  match ?r=root(?w) begin
+    case all_leaves begin
+      match {...,?previous,?last} begin
+        r.result := 200000 + previous * 100 + last;
+      end;
+    else r.result := 0;
+    end;
+  end;
+  match ?w=branch(?x,?y) begin end;
+  match ?l=leaf(?x) begin
+    if x >= 0 then all_leaves :> {x}; endif;
+  end;
+end;
+
+module TEST_CASE_SEPARATED_SPAN[T :: var TINY[]] extends T begin
+  type Leaves := SET[Integer];
+  var collection all_leaves : Leaves;
+  attribute Root.result : Integer;
+  pragma synthesized(result);
+  match ?r=root(?w) begin
+    case all_leaves begin
+      match {...,?left,...,?right,...} begin
+        r.result := right - left;
+      end;
+    else r.result := 0;
+    end;
+  end;
+  match ?w=branch(?x,?y) begin end;
+  match ?l=leaf(?x) begin
+    if x >= 0 then all_leaves :> {x}; endif;
+  end;
+end;
+
+module TEST_CASE_ADJACENT_SPAN[T :: var TINY[]] extends T begin
+  type Leaves := SET[Integer];
+  var collection all_leaves : Leaves;
+  attribute Root.result : Integer;
+  pragma synthesized(result);
+  match ?r=root(?w) begin
+    case all_leaves begin
+      match {...,?left,?right,...} begin
+        r.result := right - left;
+      end;
+    else r.result := 0;
+    end;
+  end;
+  match ?w=branch(?x,?y) begin end;
+  match ?l=leaf(?x) begin
+    if x >= 0 then all_leaves :> {x}; endif;
+  end;
+end;
+
+module TEST_CASE_ENDPOINT_MIDDLES[T :: var TINY[]] extends T begin
+  type Leaves := SET[Integer];
+  var collection all_leaves : Leaves;
+  attribute Root.result : Integer;
+  pragma synthesized(result);
+  match ?r=root(?w) begin
+    case all_leaves begin
+      match {?first,...,?left,?right,...,?last} begin
+        r.result := left * 100 + right;
+      end;
+    else r.result := 0;
+    end;
+  end;
+  match ?w=branch(?x,?y) begin end;
+  match ?l=leaf(?x) begin
+    if x >= 0 then all_leaves :> {x}; endif;
+  end;
+end;
+
+module TEST_CASE_FIRST_EACH_LAST[T :: var TINY[]] extends T begin
+  type Leaves := SET[Integer];
+  var collection all_leaves : Leaves;
+  attribute Root.result : Integer;
+  pragma synthesized(result);
+  match ?r=root(?w) begin
+    case all_leaves begin
+      match {?first,?second,...,?previous,?last} begin
+        r.result := first * 1000000 + second * 10000 +
+                    previous * 100 + last;
+      end;
+    else r.result := 0;
+    end;
+  end;
+  match ?w=branch(?x,?y) begin end;
+  match ?l=leaf(?x) begin
+    if x >= 0 then all_leaves :> {x}; endif;
+  end;
+end;
