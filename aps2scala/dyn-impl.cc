@@ -302,34 +302,18 @@ void dump_Matches(Matches ms, bool exclusive, ASSIGNFUNC f, void*arg, ostream&os
      );
 }
 
-static void dump_sequence_case(Declaration d, Match match, Pattern middle,
+static void dump_sequence_case(Declaration d, Match match,
+                               const SequenceForPattern& patterns,
                                ASSIGNFUNC f, void *arg, ostream& os)
 {
   unsigned sequence_number = get_match_index(match);
   activate_attr_context(os);
-  os << indent() << "{\n";
-  ++nesting_level;
-  os << indent() << "val sequenceMatch" << sequence_number << " = ";
-  dump_sequence_elements(matcher_pat(match),case_stmt_expr(d),os);
-  os << ".collectFirst {\n";
-  ++nesting_level;
-  os << indent() << "case ";
-  dump_sequence_element_pattern(middle,os);
-  os << " => {\n";
-  ++nesting_level;
+  dump_sequence_case_open(matcher_pat(match),case_stmt_expr(d),patterns,
+                          sequence_number,os);
   dump_Block(matcher_body(match),f,arg,os);
-  os << indent() << "()\n";
-  --nesting_level;
-  os << indent() << "}\n";
-  --nesting_level;
-  os << indent() << "}\n";
-  os << indent() << "if (sequenceMatch" << sequence_number << ".isEmpty) {\n";
-  ++nesting_level;
+  dump_sequence_case_else(sequence_number,os);
   dump_Block(case_stmt_default(d),f,arg,os);
-  --nesting_level;
-  os << indent() << "}\n";
-  --nesting_level;
-  os << indent() << "}\n";
+  dump_sequence_case_close(os);
 }
 
 static void dump_sequence_for(Declaration d, Match match,
@@ -393,11 +377,14 @@ void dump_Block(Block b,ASSIGNFUNC f,void*arg,ostream&os)
      case KEYcase_stmt:
        {
 	 Match match;
-	 Pattern middle;
-	 if (sequence_search_matcher(d,&match,&middle) &&
-	     (block_assigns_to(matcher_body(match),arg) ||
+	 SequenceForPattern patterns;
+	 Match first = first_Match(case_stmt_matchers(d));
+	 if (first && !MATCH_NEXT(first) &&
+	     sequence_for_pattern(matcher_pat(first),&patterns) &&
+	     (block_assigns_to(matcher_body(first),arg) ||
 	      block_assigns_to(case_stmt_default(d),arg))) {
-	   dump_sequence_case(d,match,middle,f,arg,os);
+	   match = first;
+	   dump_sequence_case(d,match,patterns,f,arg,os);
 	 } else {
 	   push_attr_context(d);
 	   //!! we implement case and for!!

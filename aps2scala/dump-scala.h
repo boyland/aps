@@ -59,6 +59,10 @@ void dump_sequence_elements(Pattern p, Expression value, ostream&);
 void dump_sequence_for_open(Pattern p, Expression value,
                             const SequenceForPattern&, unsigned, ostream&);
 void dump_sequence_for_close(ostream&);
+void dump_sequence_case_open(Pattern p, Expression value,
+                             const SequenceForPattern&, unsigned, ostream&);
+void dump_sequence_case_else(unsigned, ostream&);
+void dump_sequence_case_close(ostream&);
 
 // override <<
 ostream& operator<<(ostream&o,Symbol s);

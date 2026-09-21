@@ -16,6 +16,17 @@ static Type error_type;
 
 int remote_type_p(Type ty);
 
+static int inside_for_statement(void *node)
+{
+  while ((node = tnode_parent(node)) != NULL) {
+    if (ABSTRACT_APS_tnode_phylum(node) == KEYDeclaration &&
+        Declaration_KEY((Declaration)node) == KEYfor_stmt) {
+      return TRUE;
+    }
+  }
+  return FALSE;
+}
+
 Type infer_some_value_decl_type(Declaration d) {
   if (Declaration_KEY(d) == KEYnormal_formal) {
     return infer_formal_type(d);
@@ -221,6 +232,16 @@ static void* do_typechecking(void* ignore, void*node) {
             break;
           default:
             break;
+        }
+
+        if (inside_for_statement(decl) &&
+            (Declaration_KEY(decl) != KEYcollect_assign ||
+             lhs_use_decl == NULL ||
+             Declaration_KEY(lhs_use_decl) != KEYattribute_decl ||
+             !direction_is_collection(
+                 attribute_decl_direction(lhs_use_decl)))) {
+          aps_error(decl,
+                    "For statements may only update collection attributes");
         }
         
         // Check if variable or attribute is declared as a collection to use collect_assign operator
@@ -2481,4 +2502,3 @@ void check_type_subst(void *node, Type t1, Use type_envs, Type t2)
     break;
   }
 }
-

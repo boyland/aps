@@ -134,6 +134,7 @@ TESTS=(
   "SimpleBinding3Driver|simple.program|$DEFAULT_EVALUATORS"
   "TestForDriver|tiny.program|$DEFAULT_EVALUATORS"
   "TestForPatternsDriver|tiny.program,tiny-singleton.program,tiny-empty.program|$DEFAULT_EVALUATORS"
+  "TestCasePatternsDriver|tiny.program,tiny-singleton.program,tiny-empty.program|$DEFAULT_EVALUATORS"
   "SimpleSncDriver|simple.program|$DYNAMIC_EVALUATOR,$ORIGINAL_FARROW_EVALUATOR"
   "SimpleSncFiberDriver|simple.program|$DYNAMIC_EVALUATOR"
 )
