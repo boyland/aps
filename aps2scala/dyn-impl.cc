@@ -316,7 +316,7 @@ void dump_Matches(Matches ms, bool exclusive, ASSIGNFUNC f, void*arg, ostream&os
 static void dump_sequence_case(Declaration d, Match match, Pattern middle,
                                ASSIGNFUNC f, void *arg, ostream& os)
 {
-  unsigned sequence_number = (unsigned)(uintptr_t)match;
+  auto sequence_number = Match_info(match)->match_id;
   activate_attr_context(os);
   os << indent() << "{\n";
   ++nesting_level;
