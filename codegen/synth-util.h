@@ -85,6 +85,14 @@ std::vector<SynthFunctionState*> build_synth_function_states(STATE* state);
 
 void destroy_synth_function_states(const std::vector<SynthFunctionState*>& states);
 
+void emit_eager_side_effect_phylum_evaluations(
+    std::ostream& output,
+    const std::vector<SynthFunctionState*>& states);
+
+void emit_eager_value_phylum_evaluations(
+    std::ostream& output,
+    const std::vector<SynthFunctionState*>& states);
+
 void implement_value_use(Declaration declaration, AUG_GRAPH* graph, const std::vector<SynthFunctionState*>& states, SynthImplementation* implementation, std::ostream& output);
 
 bool try_dump_funcall(Expression expression, AUG_GRAPH* graph, SynthImplementation* implementation, std::ostream& output);

@@ -154,6 +154,45 @@ bool is_match_formal(void* node) {
 
 bool should_skip_synth_dependency(INSTANCE* instance) { return instance->fibered_attr.fiber != NULL || if_rule_p(instance->fibered_attr.attr) || is_match_formal(instance->fibered_attr.attr); }
 
+static void emit_eager_phylum_evaluations(
+    std::ostream& output,
+    const std::vector<SynthFunctionState*>& states,
+    bool emit_side_effects) {
+  for (auto state : states) {
+    bool has_explicit_dependencies = std::any_of(
+        state->regular_dependencies.begin(),
+        state->regular_dependencies.end(),
+        [](INSTANCE* source_instance) {
+          return !should_skip_synth_dependency(source_instance);
+        });
+    if (!state->is_phylum_instance ||
+        state->is_side_effect_evaluation != emit_side_effects ||
+        has_explicit_dependencies) {
+      continue;
+    }
+
+    Declaration phylum = state->source_phy_graph->phylum;
+    output << indent() << "for (node <- t_" << decl_name(phylum)
+           << ".nodes if node.isRooted) {\n";
+    ++nesting_level;
+    output << indent() << "eval_" << state->fdecl_name << "(node);\n";
+    --nesting_level;
+    output << indent() << "}\n";
+  }
+}
+
+void emit_eager_side_effect_phylum_evaluations(
+    std::ostream& output,
+    const std::vector<SynthFunctionState*>& states) {
+  emit_eager_phylum_evaluations(output, states, true);
+}
+
+void emit_eager_value_phylum_evaluations(
+    std::ostream& output,
+    const std::vector<SynthFunctionState*>& states) {
+  emit_eager_phylum_evaluations(output, states, false);
+}
+
 static std::vector<INSTANCE*> collect_phylum_graph_attr_dependencies(PHY_GRAPH* phylum_graph, INSTANCE* sink_instance) {
   std::vector<INSTANCE*> result;
   int instance_count = phylum_graph->instances.length;
