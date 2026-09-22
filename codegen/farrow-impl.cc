@@ -41,23 +41,55 @@ static synth_util::BlockItem* current_scope_block;
 static vector<synth_util::BlockItem*> dumped_conditional_block_items;
 static vector<INSTANCE*> dumped_instances;
 
-static void emit_start_phylum_evaluations(ostream& os, STATE* state) {
-  PHY_GRAPH* start_graph = summary_graph_for(state, state->start_phylum);
-  if (state->loop_required) {
-    os << indent() << "implicit val " << synth_util::LOOP_VAR << ": Boolean = false;\n";
-    os << indent() << "implicit val changed: AtomicBoolean = new AtomicBoolean(false);\n";
-  }
+static void emit_start_phylum_evaluations(
+    ostream& os,
+    STATE* state,
+    const vector<INSTANCE*>& instances) {
   os << indent() << "for (root <- t_" << decl_name(state->start_phylum) << ".nodes) {\n";
   ++nesting_level;
-  for (int index = 0; index < start_graph->instances.length; ++index) {
-    INSTANCE* instance = &start_graph->instances.array[index];
-    if (!synth_util::instance_is_synthesized(instance)) {
-      continue;
-    }
+  for (auto instance : instances) {
     os << indent() << "eval_" << synth_util::instance_to_string_with_nodetype(state->start_phylum, instance) << "(root);\n";
   }
   --nesting_level;
   os << indent() << "}\n";
+}
+
+static void emit_start_phylum_evaluations(ostream& os, STATE* state) {
+  PHY_GRAPH* start_graph = summary_graph_for(state, state->start_phylum);
+  set_phylum_graph_components(start_graph);
+  if (state->loop_required) {
+    os << indent() << "implicit val " << synth_util::LOOP_VAR << ": Boolean = false;\n";
+    os << indent() << "implicit val changed: AtomicBoolean = new AtomicBoolean(false);\n";
+  }
+
+  for (int component_index = start_graph->components->length - 1;
+       component_index >= 0;
+       --component_index) {
+    SCC_COMPONENT* component = start_graph->components->array[component_index];
+    vector<INSTANCE*> synthesized_instances;
+    for (int instance_index = 0; instance_index < component->length; ++instance_index) {
+      INSTANCE* instance = static_cast<INSTANCE*>(component->array[instance_index]);
+      if (synth_util::instance_is_synthesized(instance)) {
+        synthesized_instances.push_back(instance);
+      }
+    }
+    if (synthesized_instances.empty()) {
+      continue;
+    }
+
+    if (start_graph->component_cycle[component_index]) {
+      os << indent() << "{\n";
+      ++nesting_level;
+      synth_util::emit_fixed_point_loop_start(
+          os, "componentChanged" + std::to_string(component_index));
+      emit_start_phylum_evaluations(os, state, synthesized_instances);
+      synth_util::emit_fixed_point_loop_end(os);
+      --nesting_level;
+      os << indent() << "}\n";
+    } else {
+      emit_start_phylum_evaluations(os, state, synthesized_instances);
+    }
+  }
 }
 
 static void dump_farrow_functions(STATE* s, ostream& os) {
