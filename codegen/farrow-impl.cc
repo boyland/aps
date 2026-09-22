@@ -60,6 +60,30 @@ static void emit_start_phylum_evaluations(ostream& os, STATE* state) {
   os << indent() << "}\n";
 }
 
+static void emit_eager_phylum_evaluations(ostream& os, bool emit_side_effects) {
+  for (auto function_state : synth_functions_states) {
+    bool has_explicit_dependencies = std::any_of(
+        function_state->regular_dependencies.begin(),
+        function_state->regular_dependencies.end(),
+        [](INSTANCE* source_instance) {
+          return !synth_util::should_skip_synth_dependency(source_instance);
+        });
+    if (!function_state->is_phylum_instance ||
+        function_state->is_side_effect_evaluation != emit_side_effects ||
+        has_explicit_dependencies) {
+      continue;
+    }
+
+    Declaration phylum = function_state->source_phy_graph->phylum;
+    os << indent() << "for (node <- t_" << decl_name(phylum)
+       << ".nodes if node.isRooted) {\n";
+    ++nesting_level;
+    os << indent() << "eval_" << function_state->fdecl_name << "(node);\n";
+    --nesting_level;
+    os << indent() << "}\n";
+  }
+}
+
 static void dump_farrow_functions(STATE* s, ostream& os) {
   ostream& oss = os;
   os << "\n";
@@ -271,8 +295,6 @@ static void dump_farrow_functions(STATE* s, ostream& os) {
     os << indent() << "}\n\n";
   }
 
-  synth_util::destroy_synth_function_states(synth_functions_states);
-  synth_functions_states.clear();
 }
 
 class FarrowImpl : public SynthImplementation {
@@ -308,11 +330,15 @@ class FarrowImpl : public SynthImplementation {
       ++nesting_level;
 
       emit_start_phylum_evaluations(os, s);
+      emit_eager_phylum_evaluations(os, true);
+      emit_eager_phylum_evaluations(os, false);
 
       os << indent() << "super.finish();\n";
       --nesting_level;
       os << indent() << "};\n";
 
+      synth_util::destroy_synth_function_states(synth_functions_states);
+      synth_functions_states.clear();
       clear_implementation_marks(module_decl);
     }
   };
