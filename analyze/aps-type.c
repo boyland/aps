@@ -234,12 +234,12 @@ static void* do_typechecking(void* ignore, void*node) {
             break;
         }
 
-        if (inside_for_statement(decl) &&
-            (Declaration_KEY(decl) != KEYcollect_assign ||
-             lhs_use_decl == NULL ||
-             Declaration_KEY(lhs_use_decl) != KEYattribute_decl ||
-             !direction_is_collection(
-                 attribute_decl_direction(lhs_use_decl)))) {
+        BOOL updates_collection_attribute =
+            Declaration_KEY(decl) == KEYcollect_assign &&
+            lhs_use_decl != NULL &&
+            Declaration_KEY(lhs_use_decl) == KEYattribute_decl &&
+            direction_is_collection(attribute_decl_direction(lhs_use_decl));
+        if (inside_for_statement(decl) && !updates_collection_attribute) {
           aps_error(decl, "For statements may contain only collection assignments");
         }
         
