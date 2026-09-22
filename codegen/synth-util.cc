@@ -648,10 +648,7 @@ static BlockItem* linearize_block_helper(AUG_GRAPH* graph, const std::vector<INS
     bool ready = true;
     for (int dependency_index = 0; dependency_index < instance_count && ready; ++dependency_index) {
       INSTANCE* predecessor = &graph->instances.array[dependency_index];
-      if (predecessor == instance ||
-          scheduled[dependency_index] ||
-          MERGED_CONDITION_IS_IMPOSSIBLE(instance_condition(instance), instance_condition(predecessor)) ||
-          !(edgeset_kind(graph->graph[dependency_index * instance_count + index]) & DEPENDENCY_MAYBE_DIRECT)) {
+      if (scheduled[dependency_index] || MERGED_CONDITION_IS_IMPOSSIBLE(instance_condition(instance), instance_condition(predecessor)) || !(edgeset_kind(graph->graph[dependency_index * instance_count + index]) & DEPENDENCY_MAYBE_DIRECT)) {
         continue;
       }
       ready = false;
