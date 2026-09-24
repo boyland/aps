@@ -294,7 +294,7 @@ std::vector<SynthCompletionState*> build_synth_completion_states(STATE* state) {
 
     SynthCompletionState* completion_state = new SynthCompletionState();
     completion_state->fdecl_name =
-        std::string("complete_") + decl_name(phylum_graph->phylum);
+        std::string("finish_") + decl_name(phylum_graph->phylum);
     completion_state->phylum_graph = phylum_graph;
     completion_state->aug_graphs = collect_lhs_aug_graphs(state, phylum_graph);
 
