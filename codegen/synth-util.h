@@ -35,6 +35,13 @@ struct SynthFunctionState {
   bool is_side_effect_evaluation;
 };
 
+struct SynthCompletionState {
+  std::string fdecl_name;
+  PHY_GRAPH* phylum_graph;
+  std::vector<INSTANCE*> inherited_inputs;
+  std::vector<AUG_GRAPH*> aug_graphs;
+};
+
 enum BlockItemKind { KEY_BLOCK_ITEM_CONDITION, KEY_BLOCK_ITEM_INSTANCE };
 
 struct BlockItem {
@@ -84,6 +91,20 @@ bool find_instance(AUG_GRAPH* graph, Declaration node, const FIBERED_ATTRIBUTE& 
 std::vector<SynthFunctionState*> build_synth_function_states(STATE* state);
 
 void destroy_synth_function_states(const std::vector<SynthFunctionState*>& states);
+
+std::vector<SynthCompletionState*> build_synth_completion_states(STATE* state);
+
+void destroy_synth_completion_states(
+    const std::vector<SynthCompletionState*>& states);
+
+SynthCompletionState* find_synth_completion_state(
+    const std::vector<SynthCompletionState*>& states,
+    PHY_GRAPH* phylum_graph);
+
+SynthFunctionState* find_phylum_synth_function_state(
+    const std::vector<SynthFunctionState*>& states,
+    PHY_GRAPH* phylum_graph,
+    FIBERED_ATTRIBUTE attribute);
 
 void implement_value_use(Declaration declaration, AUG_GRAPH* graph, const std::vector<SynthFunctionState*>& states, SynthImplementation* implementation, std::ostream& output);
 
