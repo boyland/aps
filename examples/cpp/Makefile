@@ -1,23 +1,30 @@
 APSTOP= ../..
 CPP = g++
-CPPFLAGS = -ftemplate-depth=63 -I ${APSTOP}/base/cpp
+CPPFLAGS = -ftemplate-depth=63 -I . -I ${APSTOP}/base/cpp
 APSCPP = ${APSTOP}/bin/apscpp
-APSCPPFLAGS = -p ..:${APSTOP}/base -G
+AST_DIRS = ../tiny ../simple ../grammar ../farrow-lv ../farrow-ubd ../nested-ubd \
+	../balanced ../bigger ../type ../conditional ../standalone
+CPP_SOURCE_DIRS = ../tiny/cpp ../simple/cpp
+APSPATH = ../tiny:../simple:../grammar:../farrow-lv:../farrow-ubd:../nested-ubd:../balanced:../bigger:../type:../conditional:../standalone:${APSTOP}/base
+APSCPPFLAGS = -p ${APSPATH} -G
 BASECPP = ${APSTOP}/lib/basecpp.a
+
+vpath %.aps ${AST_DIRS}
+vpath %.cpp ${CPP_SOURCE_DIRS}
 
 all : test-driver tiny-driver test-coll-driver \
 	classic-driver dynamic-driver simple-driver
 
 .PHONY: all clean
 
-%.h %.cpp : ../%.aps 
+%.h %.cpp: %.aps
 	${APSCPP} ${APSCPPFLAGS} $*
 
 %.o : %.cpp
-	${CPP} ${CPPFLAGS} -c $*.cpp
+	${CPP} ${CPPFLAGS} -c $< -o $@
 
 %-driver : %-driver.cpp %.o
-	${CPP} ${CPPFLAGS} $*-driver.cpp $*.o ${BASECPP} -o $*-driver
+	${CPP} ${CPPFLAGS} $^ ${BASECPP} -o $@
 
 classic-binding.o : simple.h 
 classic-driver.o : simple.h classic-binding.h
@@ -29,7 +36,7 @@ dynamic-driver.o : simple.h dynamic-binding.h
 dynamic-driver : dynamic-driver.o dynamic-binding.o simple.o
 	${CPP} ${CPPFLAGS} dynamic-driver.o dynamic-binding.o simple.o ${BASECPP} -o $@
 
-simple-binding3.h simple-binding3.cpp : ../simple-binding3.aps
+simple-binding3.h simple-binding3.cpp: simple-binding3.aps
 	${APSCPP} ${APSCPPFLAGS} -S simple-binding3
 simple-driver.o : simple.h simple-binding3.h
 simple-driver : simple-driver.o simple-binding3.o simple.o
