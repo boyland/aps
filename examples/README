@@ -1,14 +1,1 @@
-APS examples are grouped by the abstract syntax tree they extend:
-
-- `tiny/`, `simple/`, and `grammar/` contain the shared AST plus its analyses.
-- `farrow-lv/`, `farrow-ubd/`, and `nested-ubd/` contain their AST, analysis,
-  parser inputs, Scala support code, drivers, and sample programs.
-- `balanced/`, `bigger/`, `type/`, and `conditional/` contain smaller AST
-  families.
-- `standalone/` contains examples that do not share an AST with another
-  example.
-
-Language-specific driver and parser sources live in `scala/` or `cpp/`
-subdirectories under their AST family. The shared build entry points remain in
-`examples/scala/` and `examples/cpp/`, so existing make target names are
-unchanged.
+APS examples are grouped by the abstract syntax tree they extend.
