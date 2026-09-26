@@ -6,16 +6,16 @@ module TEST_FOR_PATTERNS[T :: var TINY[]] extends T begin
 
   var collection all_leaves : Leaves;
 
-  collection attribute Root.first : Integer;
-  collection attribute Root.each : Integer;
-  collection attribute Root.last : Integer;
-  collection attribute Root.first_last : Integer;
-  collection attribute Root.first_each : Integer;
-  collection attribute Root.each_last : Integer;
-  collection attribute Root.first_each_last : Integer;
-  collection attribute Root.separated_span : Integer;
-  collection attribute Root.adjacent_span : Integer;
-  collection attribute Root.endpoint_middles : Integer;
+  attribute Root.first : Integer;
+  attribute Root.each : Integer;
+  attribute Root.last : Integer;
+  attribute Root.first_last : Integer;
+  attribute Root.first_each : Integer;
+  attribute Root.each_last : Integer;
+  attribute Root.first_each_last : Integer;
+  attribute Root.separated_span : Integer;
+  attribute Root.adjacent_span : Integer;
+  attribute Root.endpoint_middles : Integer;
 
   pragma synthesized(first, each, last, first_last, first_each, each_last,
                      first_each_last, separated_span, adjacent_span,
