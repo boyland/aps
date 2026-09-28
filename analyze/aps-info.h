@@ -124,6 +124,7 @@ struct Match_info {
   CONDITION match_cond; /* condition that must be satisfied to take effect */
   Expression match_test; /* last expression that must be evaluated,
 			   expr_next points to previous, back to first */
+  int match_id; /* unique id used to generate local variable in sequence */
 };
 extern struct Match_info *Match_info(Match);
 #define MATCH_NEXT(m) Match_info(m)->next_match

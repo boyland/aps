@@ -562,7 +562,7 @@ static bool implement_visit_function(
         Pattern middle;
         if (sequence_search_pattern(p, &middle)) {
           bool is_for = Declaration_KEY(header) == KEYfor_stmt;
-          unsigned sequence_number = (unsigned)(uintptr_t)m;
+          auto sequence_number = Match_info(m)->match_id;
           Expression e = is_for ? for_stmt_expr(header) : case_stmt_expr(header);
           if (is_for) {
             ow->get_outstream() << indent();
