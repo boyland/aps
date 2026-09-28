@@ -1,6 +1,6 @@
 with "tiny";
--- Regression test of all sequence for patterns and their combinations.
-module TEST_FOR_PATTERNS[T :: var TINY[]] extends T begin
+-- Regression test of all sequence case patterns and their combinations.
+module TEST_CASE_PATTERNS[T :: var TINY[]] extends T begin
 
   type Leaves := SET[Integer];
 
@@ -27,7 +27,7 @@ module TEST_FOR_PATTERNS[T :: var TINY[]] extends T begin
         r.first := first_leaf;
       end;
     else
-        r.first := 0;
+      r.first := 0;
     end;
 
     case all_leaves begin
@@ -35,7 +35,7 @@ module TEST_FOR_PATTERNS[T :: var TINY[]] extends T begin
         r.each := leaf;
       end;
     else
-        r.each := 0;
+      r.each := 0;
     end;
 
     case all_leaves begin
@@ -43,7 +43,7 @@ module TEST_FOR_PATTERNS[T :: var TINY[]] extends T begin
         r.last := last_leaf;
       end;
     else
-        r.last := 0;
+      r.last := 0;
     end;
 
     case all_leaves begin
@@ -51,7 +51,7 @@ module TEST_FOR_PATTERNS[T :: var TINY[]] extends T begin
         r.first_last := first_leaf * 100 + last_leaf;
       end;
     else
-        r.first_last := 0;
+      r.first_last := 0;
     end;
 
     case all_leaves begin
@@ -59,7 +59,7 @@ module TEST_FOR_PATTERNS[T :: var TINY[]] extends T begin
         r.first_each := 100000 + first1 * 100 + first2;
       end;
     else
-        r.first_each := 0;
+      r.first_each := 0;
     end;
 
     case all_leaves begin
@@ -67,15 +67,15 @@ module TEST_FOR_PATTERNS[T :: var TINY[]] extends T begin
         r.each_last := 200000 + last1 * 100 + last2;
       end;
     else
-        r.each_last := 0;
+      r.each_last := 0;
     end;
 
     case all_leaves begin
       match {...,?left,...,?right,...} begin
         r.separated_span := right - left;
-    end;
+      end;
     else
-        r.separated_span := 0;
+      r.separated_span := 0;
     end;
 
     case all_leaves begin
@@ -83,7 +83,7 @@ module TEST_FOR_PATTERNS[T :: var TINY[]] extends T begin
         r.adjacent_span := right - left;
       end;
     else
-        r.adjacent_span := 0;
+      r.adjacent_span := 0;
     end;
 
     case all_leaves begin
@@ -91,7 +91,7 @@ module TEST_FOR_PATTERNS[T :: var TINY[]] extends T begin
         r.endpoint_middles := left * 100 + right;
       end;
     else
-        r.endpoint_middles := 0;
+      r.endpoint_middles := 0;
     end;
 
     case all_leaves begin
@@ -100,9 +100,8 @@ module TEST_FOR_PATTERNS[T :: var TINY[]] extends T begin
                              last1 * 100 + last2;
       end;
     else
-        r.first_each_last := 0;
+      r.first_each_last := 0;
     end;
-
   end;
 
   match ?w=branch(?x,?y) begin

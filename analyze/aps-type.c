@@ -16,7 +16,7 @@ static Type error_type;
 
 int remote_type_p(Type ty);
 
-static int inside_for_statement(void *node)
+static BOOL inside_for_statement(void *node)
 {
   while ((node = tnode_parent(node)) != NULL) {
     if (ABSTRACT_APS_tnode_phylum(node) == KEYDeclaration &&
@@ -235,13 +235,11 @@ static void* do_typechecking(void* ignore, void*node) {
         }
 
         if (inside_for_statement(decl) &&
-            (Declaration_KEY(decl) != KEYcollect_assign ||
-             lhs_use_decl == NULL ||
-             Declaration_KEY(lhs_use_decl) != KEYattribute_decl ||
-             !direction_is_collection(
-                 attribute_decl_direction(lhs_use_decl)))) {
-          aps_error(decl,
-                    "For statements may only update collection attributes");
+            !(Declaration_KEY(decl) == KEYcollect_assign &&
+              lhs_use_decl != NULL &&
+              Declaration_KEY(lhs_use_decl) == KEYattribute_decl &&
+              direction_is_collection(attribute_decl_direction(lhs_use_decl)))) {
+          aps_error(decl, "For statements may contain only collection assignments");
         }
         
         // Check if variable or attribute is declared as a collection to use collect_assign operator
