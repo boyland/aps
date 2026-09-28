@@ -1,5 +1,4 @@
 #include <string.h>
-#include <stdint.h>
 #include <algorithm>
 #include <iostream>
 extern "C" {
@@ -18,6 +17,13 @@ extern "C" {
 bool sequence_search_pattern(Pattern, Pattern*);
 void dump_sequence_element_pattern(Pattern, ostream&);
 void dump_sequence_elements(Pattern, Expression, ostream&);
+void dump_sequence_for_open(Pattern, Expression, const SequenceForPattern&,
+                            unsigned, ostream&);
+void dump_sequence_for_close(ostream&);
+void dump_sequence_case_open(Pattern, Expression, const SequenceForPattern&,
+                             unsigned, ostream&);
+void dump_sequence_case_else(unsigned, ostream&);
+void dump_sequence_case_close(ostream&);
 #endif
 
 #define LOCAL_VALUE_FLAG (1 << 28)
@@ -112,6 +118,25 @@ static Expression default_init(Default def) {
       return composite_initial(def);
     default:
       return 0;
+  }
+}
+
+static void collect_changed_instances(
+    CTO_NODE* cto,
+    const vector<std::set<Expression> >& before,
+    const vector<std::set<Expression> >& after,
+    std::vector<CTO_NODE*>* result,
+    std::set<INSTANCE*>* seen) {
+  for (; cto; cto = cto->cto_next) {
+    INSTANCE* instance = cto->cto_instance;
+    if (instance && !if_rule_p(instance->fibered_attr.attr) &&
+        before[instance->index] != after[instance->index] &&
+        seen->insert(instance).second) {
+      result->push_back(cto);
+    }
+    if (instance && if_rule_p(instance->fibered_attr.attr)) {
+      collect_changed_instances(cto->cto_if_true, before, after, result, seen);
+    }
   }
 }
 
@@ -264,11 +289,12 @@ static bool implement_visit_function(
     bool loop_allowed,
     int loop_id,
     bool skip_previous_visit_code,
-    OutputWriter* ow) {
+    OutputWriter* ow,
+    CTO_NODE* stop = NULL) {
 
   STATE* s = aug_graph->global_state;
 
-  for (; cto; cto = cto->cto_next) {
+  for (; cto && cto != stop; cto = cto->cto_next) {
     INSTANCE* in = cto->cto_instance;
     bool is_conditional = in != NULL && if_rule_p(in->fibered_attr.attr);
     bool is_circular = false;
@@ -558,35 +584,19 @@ static bool implement_visit_function(
         Match m = (Match)ad;
         Pattern p = matcher_pat(m);
         Declaration header = Match_info(m)->header;
+        bool is_for = Declaration_KEY(header) == KEYfor_stmt;
 #ifdef APS2SCALA
-        Pattern middle;
-        if (sequence_search_pattern(p, &middle)) {
-          bool is_for = Declaration_KEY(header) == KEYfor_stmt;
-          unsigned sequence_number = (unsigned)(uintptr_t)m;
+        SequenceForPattern sequence_patterns = {};
+        bool is_sequence_match = sequence_for_pattern(p, &sequence_patterns);
+        if (is_sequence_match) {
+          unsigned sequence_number = get_match_index(m);
           Expression e = is_for ? for_stmt_expr(header) : case_stmt_expr(header);
           if (is_for) {
-            ow->get_outstream() << indent();
-            dump_sequence_elements(p, e, ow->get_outstream());
-            ow->get_outstream() << ".foreach { v_sequence_element =>\n";
-            ++nesting_level;
-            ow->get_outstream() << indent() << "v_sequence_element match {\n";
-            ++nesting_level;
-            ow->get_outstream() << indent() << "case ";
-            dump_sequence_element_pattern(middle, ow->get_outstream());
-            ow->get_outstream() << " => {\n";
-            ++nesting_level;
+            dump_sequence_for_open(p,e,sequence_patterns,sequence_number,
+                                   ow->get_outstream());
           } else {
-            ow->get_outstream() << indent() << "{\n";
-            ++nesting_level;
-            ow->get_outstream() << indent() << "val sequenceMatch"
-                                << sequence_number << " = ";
-            dump_sequence_elements(p, e, ow->get_outstream());
-            ow->get_outstream() << ".collectFirst {\n";
-            ++nesting_level;
-            ow->get_outstream() << indent() << "case ";
-            dump_sequence_element_pattern(middle, ow->get_outstream());
-            ow->get_outstream() << " => {\n";
-            ++nesting_level;
+            dump_sequence_case_open(p,e,sequence_patterns,sequence_number,
+                                    ow->get_outstream());
           }
 
           Block true_block = matcher_body(m);
@@ -595,26 +605,30 @@ static bool implement_visit_function(
                                        instance_assignment, false);
           int cmask = 1 << if_rule_index(ad);
           cond->positive |= cmask;
-          bool true_cont = implement_visit_function(
-              aug_graph, phase, cto->cto_if_true, true_assignment, nch, cond,
-              cto->chunk_index, loop_allowed, loop_id,
-              skip_previous_visit_code, ow);
+          bool true_cont = false;
+          if (is_for) {
+            std::vector<CTO_NODE*> loop_instances;
+            std::set<INSTANCE*> seen;
+            collect_changed_instances(cto->cto_if_true, instance_assignment,
+                                      true_assignment, &loop_instances, &seen);
+            for (CTO_NODE* loop_instance : loop_instances) {
+              true_cont |= implement_visit_function(
+                  aug_graph, phase, loop_instance, true_assignment, nch, cond,
+                  cto->chunk_index, loop_allowed, loop_id,
+                  skip_previous_visit_code, ow, loop_instance->cto_next);
+            }
+          } else {
+            true_cont = implement_visit_function(
+                aug_graph, phase, cto->cto_if_true, true_assignment, nch, cond,
+                cto->chunk_index, loop_allowed, loop_id,
+                skip_previous_visit_code, ow);
+          }
           cond->positive &= ~cmask;
-          --nesting_level;
-          ow->get_outstream() << indent() << "}\n";
 
           if (is_for) {
-            ow->get_outstream() << indent() << "case _ => {}\n";
-            --nesting_level;
-            ow->get_outstream() << indent() << "}\n";
-            --nesting_level;
-            ow->get_outstream() << indent() << "}\n";
+            dump_sequence_for_close(ow->get_outstream());
           } else {
-            --nesting_level;
-            ow->get_outstream() << indent() << "}\n";
-            ow->get_outstream() << indent() << "if (sequenceMatch"
-                                << sequence_number << ".isEmpty) {\n";
-            ++nesting_level;
+            dump_sequence_case_else(sequence_number,ow->get_outstream());
           }
 
           Block false_block = is_for || MATCH_NEXT(m)
@@ -630,18 +644,18 @@ static bool implement_visit_function(
               skip_previous_visit_code, ow);
           cond->negative &= ~cmask;
           if (!is_for) {
-            --nesting_level;
-            ow->get_outstream() << indent() << "}\n";
-            --nesting_level;
-            ow->get_outstream() << indent() << "}\n";
+            dump_sequence_case_close(ow->get_outstream());
           }
           loop_allowed = prev_loop_allowed;
           return true_cont || false_cont;
         }
 #endif /* APS2SCALA */
         // if first match in case, we evaluate variable:
-        if (m == first_Match(case_stmt_matchers(header))) {
-          Expression e = case_stmt_expr(header);
+        Matches matchers = is_for
+            ? for_stmt_matchers(header) : case_stmt_matchers(header);
+        if (m == first_Match(matchers)) {
+          Expression e = is_for
+              ? for_stmt_expr(header) : case_stmt_expr(header);
 #ifdef APS2SCALA
           // Type ty = infer_expr_type(e);
           ow->get_outstream() << indent() << "val node = " << e << ";\n";
@@ -666,7 +680,7 @@ static bool implement_visit_function(
         if (MATCH_NEXT(m)) {
           if_false = 0;  //? Why not the nxt match ?
         } else {
-          if_false = case_stmt_default(header);
+          if_false = is_for ? 0 : case_stmt_default(header);
         }
       } else {
         // Symbol boolean_symbol = intern_symbol("Boolean");
