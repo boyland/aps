@@ -283,6 +283,69 @@ void destroy_synth_function_states(const std::vector<SynthFunctionState*>& state
   }
 }
 
+std::vector<SynthCompletionState*> build_synth_completion_states(STATE* state) {
+  std::vector<SynthCompletionState*> result;
+
+  for (int phylum_index = 0; phylum_index < state->phyla.length; ++phylum_index) {
+    PHY_GRAPH* phylum_graph = &state->phy_graphs[phylum_index];
+    if (Declaration_KEY(phylum_graph->phylum) != KEYphylum_decl) {
+      continue;
+    }
+
+    SynthCompletionState* completion_state = new SynthCompletionState();
+    completion_state->fdecl_name =
+        std::string("finish_") + decl_name(phylum_graph->phylum);
+    completion_state->phylum_graph = phylum_graph;
+    completion_state->aug_graphs = collect_lhs_aug_graphs(state, phylum_graph);
+
+    for (int instance_index = 0;
+         instance_index < phylum_graph->instances.length;
+         ++instance_index) {
+      INSTANCE* instance = &phylum_graph->instances.array[instance_index];
+      if (instance_is_inherited(instance) &&
+          !instance_is_pure_shared_info(instance) &&
+          !should_skip_synth_dependency(instance)) {
+        completion_state->inherited_inputs.push_back(instance);
+      }
+    }
+    result.push_back(completion_state);
+  }
+
+  return result;
+}
+
+void destroy_synth_completion_states(
+    const std::vector<SynthCompletionState*>& states) {
+  for (SynthCompletionState* state : states) {
+    delete state;
+  }
+}
+
+SynthCompletionState* find_synth_completion_state(
+    const std::vector<SynthCompletionState*>& states,
+    PHY_GRAPH* phylum_graph) {
+  for (SynthCompletionState* state : states) {
+    if (state->phylum_graph == phylum_graph) {
+      return state;
+    }
+  }
+  return NULL;
+}
+
+SynthFunctionState* find_phylum_synth_function_state(
+    const std::vector<SynthFunctionState*>& states,
+    PHY_GRAPH* phylum_graph,
+    FIBERED_ATTRIBUTE attribute) {
+  for (SynthFunctionState* state : states) {
+    if (state->is_phylum_instance &&
+        state->source_phy_graph == phylum_graph &&
+        fibered_attr_equal(&state->source->fibered_attr, &attribute)) {
+      return state;
+    }
+  }
+  return NULL;
+}
+
 void implement_value_use(Declaration declaration, AUG_GRAPH* graph, const std::vector<SynthFunctionState*>& states, SynthImplementation* implementation, std::ostream& output) {
   int flags = Declaration_info(declaration)->decl_flags;
   if (flags & LOCAL_ATTRIBUTE_FLAG) {
@@ -580,7 +643,51 @@ static std::vector<INSTANCE*> sort_instances(AUG_GRAPH* graph) {
   return result;
 }
 
-static BlockItem* linearize_block_helper(AUG_GRAPH* graph, const std::vector<INSTANCE*>& sorted_instances, bool* scheduled, CONDITION* condition, BlockItem* previous, int remaining, INSTANCE* sink) {
+static std::vector<std::vector<INSTANCE*>> direct_cycle_groups(
+    AUG_GRAPH* graph) {
+  int instance_count = graph->instances.length;
+  SccGraph scc_graph;
+  scc_graph_initialize(&scc_graph, instance_count);
+  for (int index = 0; index < instance_count; ++index) {
+    scc_graph_add_vertex(&scc_graph, &graph->instances.array[index]);
+  }
+  for (int source = 0; source < instance_count; ++source) {
+    for (int sink = 0; sink < instance_count; ++sink) {
+      if (source != sink &&
+          (edgeset_kind(graph->graph[source * instance_count + sink]) &
+           DEPENDENCY_MAYBE_DIRECT)) {
+        scc_graph_add_edge(
+            &scc_graph,
+            &graph->instances.array[source],
+            &graph->instances.array[sink]);
+      }
+    }
+  }
+
+  SCC_COMPONENTS* components = scc_graph_components(&scc_graph);
+  std::vector<std::vector<INSTANCE*>> groups;
+  for (int component_index = 0; component_index < components->length;
+       ++component_index) {
+    SCC_COMPONENT* component = components->array[component_index];
+    std::vector<INSTANCE*> group;
+    for (int index = 0; index < component->length; ++index) {
+      group.push_back(static_cast<INSTANCE*>(component->array[index]));
+    }
+    groups.push_back(group);
+  }
+  scc_graph_destroy(&scc_graph);
+  return groups;
+}
+
+static BlockItem* linearize_block_helper(
+    AUG_GRAPH* graph,
+    const std::vector<INSTANCE*>& sorted_instances,
+    bool* scheduled,
+    CONDITION* condition,
+    BlockItem* previous,
+    int remaining,
+    INSTANCE* sink,
+    const std::vector<int>& component_of) {
   if (CONDITION_IS_IMPOSSIBLE(*condition)) {
     return NULL;
   }
@@ -595,13 +702,13 @@ static BlockItem* linearize_block_helper(AUG_GRAPH* graph, const std::vector<INS
     }
     if (MERGED_CONDITION_IS_IMPOSSIBLE(*condition, instance_condition(instance))) {
       scheduled[index] = true;
-      BlockItem* result = linearize_block_helper(graph, sorted_instances, scheduled, condition, previous, remaining - 1, sink);
+      BlockItem* result = linearize_block_helper(graph, sorted_instances, scheduled, condition, previous, remaining - 1, sink, component_of);
       scheduled[index] = false;
       return result;
     }
     if (sink != instance && !edgeset_kind(graph->graph[index * instance_count + sink->index])) {
       scheduled[index] = true;
-      BlockItem* result = linearize_block_helper(graph, sorted_instances, scheduled, condition, previous, remaining - 1, sink);
+      BlockItem* result = linearize_block_helper(graph, sorted_instances, scheduled, condition, previous, remaining - 1, sink, component_of);
       scheduled[index] = false;
       return result;
     }
@@ -610,6 +717,9 @@ static BlockItem* linearize_block_helper(AUG_GRAPH* graph, const std::vector<INS
     for (int dependency_index = 0; dependency_index < instance_count && ready; ++dependency_index) {
       INSTANCE* predecessor = &graph->instances.array[dependency_index];
       if (scheduled[dependency_index] || MERGED_CONDITION_IS_IMPOSSIBLE(instance_condition(instance), instance_condition(predecessor)) || !(edgeset_kind(graph->graph[dependency_index * instance_count + index]) & DEPENDENCY_MAYBE_DIRECT)) {
+        continue;
+      }
+      if (component_of[dependency_index] == component_of[index]) {
         continue;
       }
       ready = false;
@@ -630,10 +740,10 @@ static BlockItem* linearize_block_helper(AUG_GRAPH* graph, const std::vector<INS
 
       int condition_mask = 1 << if_rule_index(instance->fibered_attr.attr);
       condition->positive |= condition_mask;
-      conditional->next_positive = linearize_block_helper(graph, sorted_instances, scheduled, condition, item, remaining - 1, sink);
+      conditional->next_positive = linearize_block_helper(graph, sorted_instances, scheduled, condition, item, remaining - 1, sink, component_of);
       condition->positive &= ~condition_mask;
       condition->negative |= condition_mask;
-      conditional->next_negative = linearize_block_helper(graph, sorted_instances, scheduled, condition, item, remaining - 1, sink);
+      conditional->next_negative = linearize_block_helper(graph, sorted_instances, scheduled, condition, item, remaining - 1, sink, component_of);
       condition->negative &= ~condition_mask;
     } else {
       BlockItemInstance* linear = static_cast<BlockItemInstance*>(std::malloc(sizeof(BlockItemInstance)));
@@ -641,7 +751,7 @@ static BlockItem* linearize_block_helper(AUG_GRAPH* graph, const std::vector<INS
       linear->key = KEY_BLOCK_ITEM_INSTANCE;
       linear->instance = instance;
       linear->prev = previous;
-      linear->next = linearize_block_helper(graph, sorted_instances, scheduled, condition, item, remaining - 1, sink);
+      linear->next = linearize_block_helper(graph, sorted_instances, scheduled, condition, item, remaining - 1, sink, component_of);
     }
     scheduled[index] = false;
     return item;
@@ -660,7 +770,22 @@ BlockItem* linearize_block(AUG_GRAPH* graph, INSTANCE* sink) {
 
   CONDITION condition = {0, 0};
   std::vector<INSTANCE*> sorted_instances = sort_instances(graph);
-  return linearize_block_helper(graph, sorted_instances, scheduled, &condition, NULL, instance_count, sink);
+  std::vector<std::vector<INSTANCE*>> groups = direct_cycle_groups(graph);
+  std::vector<int> component_of(instance_count, -1);
+  for (size_t group_index = 0; group_index < groups.size(); ++group_index) {
+    for (INSTANCE* instance : groups[group_index]) {
+      component_of[instance->index] = static_cast<int>(group_index);
+    }
+  }
+  return linearize_block_helper(
+      graph,
+      sorted_instances,
+      scheduled,
+      &condition,
+      NULL,
+      instance_count,
+      sink,
+      component_of);
 }
 
 void print_linearized_block(BlockItem* block, std::ostream& output) {
