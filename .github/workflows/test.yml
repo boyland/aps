@@ -75,7 +75,7 @@ jobs:
     - name: Run canonical types tests
       run: |
         cd examples
-        ../bin/aps2scala -DCOTo -G -p .:../base test-canonicals
+        ../bin/aps2scala -DCOTo -G -p .:../base standalone/test-canonicals
 
     - name: Run compare-evaluators
       run: |
