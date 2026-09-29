@@ -35,7 +35,7 @@ jobs:
         
     - name: Install Scala
       run: |
-        wget -q "https://downloads.lightbend.com/scala/${SCALA_VERSION}/scala-${SCALA_VERSION}.tgz"
+        wget -q "https://github.com/scala/scala/releases/download/v${SCALA_VERSION}/scala-${SCALA_VERSION}.tgz"
         tar xzf "scala-${SCALA_VERSION}.tgz"
         echo "$PWD/scala-${SCALA_VERSION}/bin" >> $GITHUB_PATH
 
