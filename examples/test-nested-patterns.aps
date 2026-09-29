@@ -1,0 +1,50 @@
+with "tiny";
+-- Regression test of sequence case and for statements nested in each other.
+module TEST_NESTED_PATTERNS[T :: var TINY[]] extends T begin
+
+  type Leaves := SET[Integer];
+  type Biggest := MAX_LATTICE[Integer](-1000);
+
+  var collection all_leaves : Leaves;
+
+  collection attribute Root.case_in_for : Biggest;
+  collection attribute Root.for_in_case : Biggest;
+
+  pragma synthesized(case_in_for, for_in_case);
+
+  match ?r=root(?w) begin
+    for all_leaves begin
+      match {...,?outer,...} begin
+        case all_leaves begin
+          match {?nested_first,...} begin
+            r.case_in_for :> outer * 100 + nested_first;
+          end;
+        else
+          r.case_in_for :> -1;
+        end;
+      end;
+    end;
+
+    case all_leaves begin
+      match {?nested_first,...} begin
+        for all_leaves begin
+          match {...,?inner,...} begin
+            r.for_in_case :> nested_first * 100 + inner;
+          end;
+        end;
+      end;
+    else
+      r.for_in_case :> -1;
+    end;
+  end;
+
+  match ?w=branch(?x,?y) begin
+  end;
+
+  match ?l=leaf(?x) begin
+    if x >= 0 then
+      all_leaves :> {x};
+    endif;
+  end;
+
+end;
