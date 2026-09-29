@@ -243,7 +243,7 @@ module CODE_GENERATION[T :: var BIGGER[]] extends T begin
       end;
       match shape(?name:String) begin
 	      e.expr_shape := int_shape;
-	      msgs :> {"cannot index value of type " ++ name ++ "; expected array"};
+	      msgs :> {"cannot index value of type " ++ name ++ " expected array"};
       end;
     end;
     size :> 2;
