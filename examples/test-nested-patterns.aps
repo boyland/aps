@@ -46,5 +46,4 @@ module TEST_NESTED_PATTERNS[T :: var TINY[]] extends T begin
       all_leaves :> {x};
     endif;
   end;
-
 end;
