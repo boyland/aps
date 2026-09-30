@@ -33,7 +33,7 @@ EVALUATOR_EXAMPLES = classic-binding first follow nullable test-coll \
 	test-use-coll test-cycle test-fields use-global broad-fiber-cycle \
 	below-fiber-cycle below-single-fiber-cycle local-fiber-cycle nested-cycles \
 	farrow-lv farrow-ubd farrow-ubd-fiber nested-ubd nested-ubd-fiber simple-snc \
-	simple-binding simple-binding1 simple-binding2 simple-binding3 test-for \
+	simple-binding simple-binding1 simple-binding2 simple-binding3 \
 	simple-snc-fiber
 SCALAGEN = ${AST_TREE_SCALAGEN} \
 	$(foreach example,${EVALUATOR_EXAMPLES},$(example).scala $(example).static.scala)
@@ -71,7 +71,6 @@ all : ${OUT}/test_fields_implicit.class ${OUT}/TestFieldsDriver.class
 all : ${OUT}/simple_snc_implicit.class ${OUT}/SimpleSncDriver.class
 all : ${OUT}/simple_binding_implicit.class ${OUT}/SimpleBindingDriver.class
 all : SimpleBinding1Driver.class SimpleBinding2Driver.class SimpleBinding3Driver.class
-all : ${OUT}/test_for_implicit.class ${OUT}/TestForDriver.class
 all : ${OUT}/simple_snc_fiber_implicit.class ${OUT}/SimpleSncFiberDriver.class
 
 .PHONY: run
