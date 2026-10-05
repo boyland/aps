@@ -72,7 +72,6 @@ all : ${OUT}/test_fields_implicit.class ${OUT}/TestFieldsDriver.class
 all : ${OUT}/simple_snc_implicit.class ${OUT}/SimpleSncDriver.class
 all : ${OUT}/simple_binding_implicit.class ${OUT}/SimpleBindingDriver.class
 all : SimpleBinding1Driver.class SimpleBinding2Driver.class SimpleBinding3Driver.class
-all : ${OUT}/test_for_implicit.class ${OUT}/TestForDriver.class
 all : ${OUT}/simple_snc_fiber_implicit.class ${OUT}/SimpleSncFiberDriver.class
 
 .PHONY: run
@@ -455,6 +454,27 @@ ${OUT}/test_for_implicit.class : test-for${IMPL_SUFFIX} ${OUT}/tiny_implicit.cla
 ${OUT}/TestForDriver.class : ${OUT}/test_for_implicit.class ${OUT}/TinyParser.class test-for-driver.scala
 	${SCALAC} ${SCALACFLAGS} test-for-driver.scala
 
+${OUT}/test_for_patterns_implicit.class : test-for-patterns${IMPL_SUFFIX} ${OUT}/tiny_implicit.class
+	${SCALAC} ${SCALACFLAGS} $<
+	@touch $@
+
+${OUT}/TestForPatternsDriver.class : ${OUT}/test_for_patterns_implicit.class ${OUT}/TinyParser.class test-for-patterns-driver.scala
+	${SCALAC} ${SCALACFLAGS} test-for-patterns-driver.scala
+
+${OUT}/test_case_patterns_implicit.class : test-case-patterns${IMPL_SUFFIX} ${OUT}/tiny_implicit.class
+	${SCALAC} ${SCALACFLAGS} $<
+	@touch $@
+
+${OUT}/TestCasePatternsDriver.class : ${OUT}/test_case_patterns_implicit.class ${OUT}/TinyParser.class test-case-patterns-driver.scala
+	${SCALAC} ${SCALACFLAGS} test-case-patterns-driver.scala
+
+${OUT}/test_nested_patterns_implicit.class : test-nested-patterns${IMPL_SUFFIX} ${OUT}/tiny_implicit.class
+	${SCALAC} ${SCALACFLAGS} $<
+	@touch $@
+
+${OUT}/TestNestedPatternsDriver.class : ${OUT}/test_nested_patterns_implicit.class ${OUT}/TinyParser.class test-nested-patterns-driver.scala
+	${SCALAC} ${SCALACFLAGS} test-nested-patterns-driver.scala
+
 .PHONY: SimpleBinding1Driver.run SimpleBinding2Driver.run SimpleBinding3Driver.run
 
 SimpleBindingDriver.run : ${OUT}/SimpleBindingDriver.class
@@ -480,4 +500,3 @@ ${OUT}/SimpleSncFiberDriver.class: ${OUT}/simple_snc_fiber_implicit.class ${OUT}
 clean:
 	rm -rf ${OUT_BASE}
 	rm -f *.class ${SCALAGEN} ${MISCGEN} *.synth-f0.scala
-
