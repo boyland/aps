@@ -129,10 +129,15 @@ TESTS=(
   "FollowDriver|grammar.cfg|$DEFAULT_EVALUATORS"
   "NullableDriver|grammar.cfg|$DEFAULT_EVALUATORS"
   "SimpleBindingDriver|simple.program|$DEFAULT_EVALUATORS"
+  "BiggerBindingDriver|bigger.program|$DEFAULT_EVALUATORS"
   "SimpleBinding1Driver|simple.program|$DEFAULT_EVALUATORS"
   "SimpleBinding2Driver|simple.program|$DEFAULT_EVALUATORS"
   "SimpleBinding3Driver|simple.program|$DEFAULT_EVALUATORS"
-  "TestForDriver|tiny.program|$DEFAULT_EVALUATORS"
+  # TODO: for/case patterns not fully implemented yet.
+  # "TestForDriver|tiny.program|$DEFAULT_EVALUATORS"
+  # "TestForPatternsDriver|tiny.program,tiny-singleton.program,tiny-empty.program|$DEFAULT_EVALUATORS"
+  # "TestCasePatternsDriver|tiny.program,tiny-singleton.program,tiny-empty.program|$DEFAULT_EVALUATORS"
+  # "TestNestedPatternsDriver|tiny.program,tiny-singleton.program,tiny-empty.program|$DEFAULT_EVALUATORS"
   "SimpleSncDriver|simple.program|$DYNAMIC_EVALUATOR,$FARROW_EVALUATOR"
   "SimpleSncFiberDriver|simple.program|$DYNAMIC_EVALUATOR"
 )

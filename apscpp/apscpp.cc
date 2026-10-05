@@ -104,6 +104,9 @@ int main(int argc,char **argv) {
     ofstream header(hfilename);
     ofstream body(cppfilename);
     dump_cpp_Program(p,header,body);
+    header.close();
+    body.close();
+    aps_check_error("code generation");
   }
   exit(0);
 }
