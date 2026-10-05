@@ -29,7 +29,7 @@ void usage() {
   fprintf(stderr,"    -V    increase verbosity of generation code\n");
   fprintf(stderr,"    -G    add Debug calls for every function\n");
   fprintf(stderr,"    -C    SCC chunk static scheduling\n");
-  fprintf(stderr,"    -F0, --synth-pure-farrow generate original Farrow SYNTH evaluation\n");
+  fprintf(stderr,"    -F,   --synth-pure-farrow generate original Farrow SYNTH evaluation\n");
   fprintf(stderr,"    -p path set the APSPATH (overriding env. variable)\n");
   exit(1);
 }
@@ -84,7 +84,7 @@ int main(int argc,char **argv) {
       static_schedule = true;
       static_scc_schedule = true;
       continue;
-    } else if (streq(argv[i],"-F0") || streq(argv[i],"--synth-pure-farrow")) {
+    } else if (streq(argv[i],"-F") || streq(argv[i],"--synth-pure-farrow")) {
       farrow_implementation = true;
       anc_analysis = true;
       continue;
