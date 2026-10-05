@@ -129,6 +129,7 @@ TESTS=(
   "FollowDriver|grammar.cfg|$DEFAULT_EVALUATORS"
   "NullableDriver|grammar.cfg|$DEFAULT_EVALUATORS"
   "SimpleBindingDriver|simple.program|$DEFAULT_EVALUATORS"
+  "BiggerBindingDriver|bigger.program|$DEFAULT_EVALUATORS"
   "SimpleBinding1Driver|simple.program|$DEFAULT_EVALUATORS"
   "SimpleBinding2Driver|simple.program|$DEFAULT_EVALUATORS"
   "SimpleBinding3Driver|simple.program|$DEFAULT_EVALUATORS"
