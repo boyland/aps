@@ -508,7 +508,7 @@ class FarrowImpl : public SynthImplementation {
     bool uses_fibers = false;
     traverse_Program(detect_program_fibers, &uses_fibers, program);
     if (uses_fibers) {
-      fatal_error("-F0 does not support fibers");
+      fatal_error("-F does not support fibers");
     }
   }
 
@@ -522,7 +522,7 @@ class FarrowImpl : public SynthImplementation {
     bool node_is_syntax = in->node == current_aug_graph->lhs_decl;
 
     if (in->fibered_attr.fiber != NULL) {
-      fatal_error("internal error: -F0 attempted to emit a fiber assignment");
+      fatal_error("internal error: -F attempted to emit a fiber assignment");
     }
 
     if (in->node == 0 && ad != NULL) {
