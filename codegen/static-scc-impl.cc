@@ -121,7 +121,8 @@ static Expression default_init(Default def) {
   }
 }
 
-// Collect the scheduled assignments
+// Collect the scheduled assignments.
+// Finds only the assignments that belongs inside each loop iteration.
 static void collect_condition_instances(
     CTO_NODE* cto,
     const vector<std::set<Expression> >& before,
