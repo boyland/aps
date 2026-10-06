@@ -121,21 +121,30 @@ static Expression default_init(Default def) {
   }
 }
 
-static void collect_changed_instances(
+// Collect the scheduled assignments
+static void collect_condition_instances(
     CTO_NODE* cto,
     const vector<std::set<Expression> >& before,
     const vector<std::set<Expression> >& after,
+    unsigned condition_mask,
     std::vector<CTO_NODE*>* result,
     std::set<INSTANCE*>* seen) {
   for (; cto; cto = cto->cto_next) {
     INSTANCE* instance = cto->cto_instance;
-    if (instance && !if_rule_p(instance->fibered_attr.attr) &&
-        before[instance->index] != after[instance->index] &&
-        seen->insert(instance).second) {
+    if (!instance || !seen->insert(instance).second) continue;
+
+    CONDITION condition = instance_condition(instance);
+    bool is_conditional = if_rule_p(instance->fibered_attr.attr);
+    // Assignments are detected by changes to their assignment sets
+    if ((!is_conditional &&
+         before[instance->index] != after[instance->index]) ||
+        (condition.positive & condition_mask)) {
       result->push_back(cto);
-    }
-    if (instance && if_rule_p(instance->fibered_attr.attr)) {
-      collect_changed_instances(cto->cto_if_true, before, after, result, seen);
+    } else if (is_conditional) {
+      collect_condition_instances(cto->cto_if_true, before, after,
+                                  condition_mask, result, seen);
+      collect_condition_instances(cto->cto_if_false, before, after,
+                                  condition_mask, result, seen);
     }
   }
 }
@@ -609,8 +618,9 @@ static bool implement_visit_function(
           if (is_for) {
             std::vector<CTO_NODE*> loop_instances;
             std::set<INSTANCE*> seen;
-            collect_changed_instances(cto->cto_if_true, instance_assignment,
-                                      true_assignment, &loop_instances, &seen);
+            collect_condition_instances(
+                cto->cto_if_true, instance_assignment, true_assignment, cmask,
+                &loop_instances, &seen);
             for (CTO_NODE* loop_instance : loop_instances) {
               true_cont |= implement_visit_function(
                   aug_graph, phase, loop_instance, true_assignment, nch, cond,
