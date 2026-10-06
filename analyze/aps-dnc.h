@@ -123,6 +123,7 @@ extern ATTRSET attrset_for(STATE *, Declaration);
 extern Declaration proc_call_p(Expression);
 
 extern int if_rule_p(void*);
+extern int for_rule_p(void*);
 extern int if_rule_index(void*);
 
 extern INSTANCE *get_instance(Declaration attr, FIBER fiber,
