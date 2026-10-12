@@ -52,7 +52,9 @@ static void *analyze_thing(void *ignore, void *node)
         s->loop_required = global_dependencies_have_cycle(s);
         break;
       }
-      if (!(d = (s->original_state_dependency = analysis_state_cycle(s))))
+      d = (s->original_state_dependency = analysis_state_cycle(s));
+      s->loop_required = global_dependencies_have_cycle(s);
+      if (!d)
       {
         // Do nothing; no cycle to remove
       }
@@ -71,8 +73,6 @@ static void *analyze_thing(void *ignore, void *node)
         aps_error(decl, "Unable to handle dependency (%d); Attribute grammar is not DNC", d);
         return NULL;
       }
-
-      s->loop_required = global_dependencies_have_cycle(s);
 
       // If SCC scheduling is in-progress
       if (static_scc_schedule)
