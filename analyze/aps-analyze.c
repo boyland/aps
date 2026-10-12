@@ -52,11 +52,10 @@ static void *analyze_thing(void *ignore, void *node)
         s->loop_required = global_dependencies_have_cycle(s);
         break;
       }
-      d = (s->original_state_dependency = analysis_state_cycle(s));
-      s->loop_required = global_dependencies_have_cycle(s);
-      if (!d)
+      if (!(d = (s->original_state_dependency = analysis_state_cycle(s))))
       {
         // Do nothing; no cycle to remove
+        s->loop_required = false;
       }
       else if (!(d & DEPENDENCY_MAYBE_SIMPLE) || !(d & DEPENDENCY_NOT_JUST_FIBER))
       {
@@ -66,6 +65,7 @@ static void *analyze_thing(void *ignore, void *node)
           print_cycles(s, stdout);
         }
         break_fiber_cycles(decl, s, d);
+        s->loop_required = !(d & DEPENDENCY_MAYBE_SIMPLE);
         d = no_dependency;  // clear dependency
       }
       else
