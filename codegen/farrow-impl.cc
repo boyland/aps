@@ -66,6 +66,12 @@ static void dump_farrow_functions(STATE* s, ostream& os) {
 
   synth_functions_states = synth_util::build_synth_function_states(s);
   bool needs_fixed_point = s->loop_required;
+  for (synth_util::SynthFunctionState* state : synth_functions_states) {
+    if (synth_util::synth_function_is_circular(state)) {
+      needs_fixed_point = true;
+      break;
+    }
+  }
 
   for (auto state_it = synth_functions_states.begin(); state_it != synth_functions_states.end(); state_it++) {
     synth_util::SynthFunctionState* synth_functions_state = *state_it;
