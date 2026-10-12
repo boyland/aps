@@ -19,6 +19,18 @@ Several phases:
 bool static_scc_schedule = false;
 bool anc_analysis = false;
 
+static BOOL global_dependencies_have_cycle(STATE *s)
+{
+  AUG_GRAPH *aug_graph = &s->global_dependencies;
+  int n = aug_graph->instances.length;
+  int i;
+
+  for (i = 0; i < n; ++i) {
+    if (edgeset_kind(aug_graph->graph[i*n+i]) != no_dependency) return TRUE;
+  }
+  return FALSE;
+}
+
 static void *analyze_thing(void *ignore, void *node)
 {
   STATE *s;
@@ -37,13 +49,12 @@ static void *analyze_thing(void *ignore, void *node)
           print_cycles(s, stdout);
         }
         d = (s->original_state_dependency = analysis_state_cycle(s));
-        s->loop_required = d != no_dependency && !(d & DEPENDENCY_MAYBE_SIMPLE);
+        s->loop_required = global_dependencies_have_cycle(s);
         break;
       }
       if (!(d = (s->original_state_dependency = analysis_state_cycle(s))))
       {
         // Do nothing; no cycle to remove
-        s->loop_required = false;
       }
       else if (!(d & DEPENDENCY_MAYBE_SIMPLE) || !(d & DEPENDENCY_NOT_JUST_FIBER))
       {
@@ -53,7 +64,6 @@ static void *analyze_thing(void *ignore, void *node)
           print_cycles(s, stdout);
         }
         break_fiber_cycles(decl, s, d);
-        s->loop_required = !(d & DEPENDENCY_MAYBE_SIMPLE);
         d = no_dependency;  // clear dependency
       }
       else
@@ -61,6 +71,8 @@ static void *analyze_thing(void *ignore, void *node)
         aps_error(decl, "Unable to handle dependency (%d); Attribute grammar is not DNC", d);
         return NULL;
       }
+
+      s->loop_required = global_dependencies_have_cycle(s);
 
       // If SCC scheduling is in-progress
       if (static_scc_schedule)
