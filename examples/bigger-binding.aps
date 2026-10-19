@@ -111,7 +111,7 @@ module CODE_GENERATION[T :: var BIGGER[]] extends T begin
     t.type_shape := int_shape;
   end;
   
-  match ?t:Type=string() begin
+  match ?t:Type=string_type() begin
     t.type_shape := str_shape;
   end;
   
@@ -186,7 +186,7 @@ module CODE_GENERATION[T :: var BIGGER[]] extends T begin
     size :> 1;
   end;
 
-  match ?e:Expr=equal(?e1:Expr,?e2:Expr) begin
+  match ?e:Expr=equalf(?e1:Expr,?e2:Expr) begin
     e1.expr_scope := e.expr_scope;
     e2.expr_scope := e.expr_scope;
     if e1.expr_shape /= e2.expr_shape then
@@ -241,8 +241,10 @@ module CODE_GENERATION[T :: var BIGGER[]] extends T begin
       match array_shape(?sh:Shape) begin
 	e.expr_shape := sh;
       end;
-    else
-      msgs :> {"expected array"};
+      match shape(?name:String) begin
+	      e.expr_shape := int_shape;
+	      msgs :> {"cannot index value of type " ++ name ++ " expected array"};
+      end;
     end;
     size :> 2;
   end;

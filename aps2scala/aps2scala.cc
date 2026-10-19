@@ -31,8 +31,7 @@ void usage() {
   fprintf(stderr,"    -G    add Debug calls for every function\n");
   fprintf(stderr,"    -C    SCC chunk static scheduling\n");
   fprintf(stderr,"    -A,  --synth optimized SYNTH evaluation\n");
-  fprintf(stderr,"    -AE, --synth-eager eagerly evaluate synthesized attributes for SNC grammars\n");
-  fprintf(stderr,"    -F,  --synth-pure-farrow generate original Farrow SYNTH evaluation\n");
+  fprintf(stderr,"    -F,   --synth-pure-farrow generate original Farrow SYNTH evaluation\n");
   fprintf(stderr,"    -p path set the APSPATH (overriding env. variable)\n");
   exit(1);
 }
@@ -88,11 +87,6 @@ int main(int argc,char **argv) {
     } else if (streq(argv[i],"-C") || streq(argv[i],"--static-scc")) {
       static_schedule = true;
       static_scc_schedule = true;
-      continue;
-    } else if (streq(argv[i],"-AE") || streq(argv[i],"--synth-eager")) {
-      synth_implementation = true;
-      synth_eager = true;
-      anc_analysis = true;
       continue;
     } else if (streq(argv[i],"-A") || streq(argv[i],"--synth")) {
       synth_implementation = true;
@@ -161,6 +155,7 @@ int main(int argc,char **argv) {
 
     dump_scala_Program(p,out);
     out.close();
+    aps_check_error("code generation");
   }
   exit(0);
 }
