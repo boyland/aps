@@ -1,5 +1,5 @@
 APSTOP= ../..
-SCALAC= scalac
+SCALAC= scalac -J-Xmx4g
 SCALA= scala
 SCALAV= 2.13
 JVMFLAGS= -J-Xss64m -J-Xmx16g 
