@@ -2410,8 +2410,11 @@ void check_type_signatures(void *node, Type t, Use type_envs, Signature sig)
         }
       }
       if (!is_phylum) {
-        aps_error(node,"type does not satisfy phylum signature %s",
-            decl_name(USE_DECL(class_use_use(sig_inst_class(sig)))));
+        char type_name[BUFFER_SIZE];
+        FILE *f = fmemopen(type_name,sizeof(type_name),"w");
+        print_Type(t,f);
+        fclose(f);
+        aps_error(node,"%s cannot be used where a phylum is required.", type_name);
       }
     }
     /*! Avert your eyes! */
