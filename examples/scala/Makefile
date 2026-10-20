@@ -89,11 +89,11 @@ phony_explicit:
 
 %.farrow.scala : ../%.aps ${APS2SCALA}
 	${APS2SCALA} ${APS2SCALAFLAGS} -F $*
-	mv $*.scala $@
+	cp $*.scala $@
 
 %.synth.scala : ../%.aps ${APS2SCALA}
 	${APS2SCALA} ${APS2SCALAFLAGS} -A $*
-	mv $*.scala $@
+	cp $*.scala $@
 
 %.scala : ../%.aps ${APS2SCALA}
 	${APS2SCALA} ${APS2SCALAFLAGS} $*
