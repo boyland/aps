@@ -44,7 +44,6 @@ Implementation* impl;
 bool static_schedule = false;
 bool is_tree_only_program = false;
 bool synth_implementation = false;
-bool synth_eager = false;
 bool farrow_implementation = false;
 
 static void* program_is_tree_only(void *scope, void *node) {

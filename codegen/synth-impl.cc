@@ -403,7 +403,8 @@ static std::vector<ObjectFieldAssign> collect_object_field_assignments(AUG_GRAPH
 static void dump_synth_functions(STATE* s, ostream& os) {
   os << "\n";
 
-  synth_functions_states = synth_util::build_synth_function_states(s, true);
+  synth_functions_states = synth_util::build_synth_function_states(
+      s, /* include_field_assign_dependencies */ true);
   for (auto function_state : synth_functions_states) {
     if (!function_state->is_phylum_instance) {
       continue;
