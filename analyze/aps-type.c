@@ -2354,6 +2354,38 @@ static int check_declarations_type_subst
   return 0;
 }
 
+static BOOL signature_is_phylum(Signature sig)
+{
+  switch (Signature_KEY(sig)) {
+  case KEYsig_inst:
+    {
+      Declaration decl = USE_DECL(class_use_use(sig_inst_class(sig)));
+      return decl && Declaration_KEY(decl) == KEYmodule_decl &&
+	            Declaration_KEY(module_decl_result_type(decl)) == KEYphylum_decl;
+    }
+  case KEYmult_sig:
+    return signature_is_phylum(mult_sig_sig1(sig)) || signature_is_phylum(mult_sig_sig2(sig));
+  case KEYsig_use:
+    {
+      Declaration decl = USE_DECL(sig_use_use(sig));
+      if (decl) {
+        switch (Declaration_KEY(decl)) {
+          case KEYsignature_decl:
+            return signature_is_phylum(signature_decl_sig(decl));
+          case KEYsignature_renaming:
+            return signature_is_phylum(signature_renaming_old(decl));
+          default:
+            break;
+        }
+      }
+    }
+    break;
+  default:
+    break;
+  }
+  return FALSE;
+}
+
 void check_type_signatures(void *node, Type t, Use type_envs, Signature sig)
 {
   /*! Horrible hack!  -- only used for element type signatures*/
@@ -2368,6 +2400,20 @@ void check_type_signatures(void *node, Type t, Use type_envs, Signature sig)
     check_type_signatures(node,t,type_envs,mult_sig_sig2(sig));
     break;
   case KEYsig_inst:
+    if (signature_is_phylum(sig)) {
+      Type bt = base_type(t);
+      BOOL is_phylum = type_is_phylum(bt);
+      if (!is_phylum && Type_KEY(bt) == KEYtype_use) {
+        Declaration d = USE_DECL(type_use_use(bt));
+        if (d && Declaration_KEY(d) == KEYtype_formal) {
+          is_phylum = signature_is_phylum(some_type_formal_sig(d));
+        }
+      }
+      if (!is_phylum) {
+        aps_error(node,"type does not satisfy phylum signature %s",
+            decl_name(USE_DECL(class_use_use(sig_inst_class(sig)))));
+      }
+    }
     /*! Avert your eyes! */
     if (first_TypeActual(sig_inst_actuals(sig)))
     {
