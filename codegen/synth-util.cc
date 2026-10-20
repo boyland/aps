@@ -708,6 +708,9 @@ std::vector<std::set<Expression>> make_instance_assignments(AUG_GRAPH* graph, co
   }
 
   for (auto block_iterator = blocks.begin(); block_iterator != blocks.end(); ++block_iterator) {
+    if (*block_iterator == NULL) {
+      continue;
+    }
     bool is_outermost = block_iterator == blocks.begin();
     std::vector<std::set<Expression>> scoped_assignments(assignments);
     for (int step = 1; step <= 2; ++step) {

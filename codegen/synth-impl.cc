@@ -17,8 +17,8 @@ extern "C" {
 
 #ifdef APS2SCALA
 
-void dump_sequence_element_pattern(Pattern, ostream&);
-void dump_sequence_elements(Pattern, Expression, ostream&);
+void dump_sequence_element_patterns(const std::vector<Pattern>&, ostream&);
+void dump_sequence_candidates(Pattern, Expression, const SequenceForPattern&, unsigned, ostream&);
 extern bool synth_eager;
 
 static AUG_GRAPH* current_aug_graph = NULL;
@@ -107,6 +107,8 @@ class FiberDependencyDumper {
 
   static SCC_COMPONENT* find_next_ready_component(AUG_GRAPH* aug_graph, SCC_COMPONENTS* components, bool* scheduled) {
     int n = aug_graph->instances.length;
+    SCC_COMPONENT* next_component = NULL;
+    int next_index = n;
 
     for (int i = 0; i < components->length; i++) {
       SCC_COMPONENT* component = components->array[i];
@@ -135,10 +137,20 @@ class FiberDependencyDumper {
       }
 
       if (component_ready) {
-        return component;
+        // Preserve contribution order when independent fibers build sequences.
+        for (int j = 0; j < component->length; j++) {
+          INSTANCE* in = (INSTANCE*)component->array[j];
+          if (in->index < next_index) {
+            next_component = component;
+            next_index = in->index;
+          }
+        }
       }
     }
 
+    if (next_component != NULL) {
+      return next_component;
+    }
     fatal_error("no more components to schedule");
     return NULL;
   }
@@ -392,6 +404,30 @@ static void dump_synth_functions(STATE* s, ostream& os) {
   os << "\n";
 
   synth_functions_states = synth_util::build_synth_function_states(s, true);
+  for (auto function_state : synth_functions_states) {
+    if (!function_state->is_phylum_instance) {
+      continue;
+    }
+    PHY_GRAPH* graph = function_state->source_phy_graph;
+    auto& dependencies = function_state->regular_dependencies;
+    // Fiber evaluation may construct local objects using the inherited anchor.
+    for (size_t index = 0; index <= dependencies.size(); ++index) {
+      INSTANCE* in = index == 0 ? function_state->source : dependencies[index - 1];
+      if (in->fibered_attr.fiber == NULL) {
+        continue;
+      }
+      for (int base_index = 0; base_index < graph->instances.length; ++base_index) {
+        INSTANCE* base = &graph->instances.array[base_index];
+        if (base->fibered_attr.fiber == NULL &&
+            base->fibered_attr.attr == in->fibered_attr.attr &&
+            !synth_util::instance_is_pure_shared_info(base) &&
+            synth_util::instance_is_inherited(base) &&
+            std::find(dependencies.begin(), dependencies.end(), base) == dependencies.end()) {
+          dependencies.push_back(base);
+        }
+      }
+    }
+  }
   bool needs_fixed_point = s->loop_required;
 
   for (auto state_it = synth_functions_states.begin(); state_it != synth_functions_states.end(); state_it++) {
@@ -927,6 +963,9 @@ class SynthImpl : public SynthImplementation {
         if (!valid_rhs.empty()) {
           if (instance->fibered_attr.fiber != NULL) {
             for (auto it = valid_rhs.begin(); it != valid_rhs.end(); it++) {
+              if (it != valid_rhs.begin()) {
+                o << ";\n" << indent();
+              }
               dump_assignment(instance, *it, o);
             }
           } else if (valid_rhs.size() == 1) {
@@ -982,9 +1021,8 @@ class SynthImpl : public SynthImplementation {
         }
       }
 
-      print_instance(instance, stdout);
-      printf(" is a non-fiber instance, but no assignment found in this block. %d\n", if_rule_p(instance->fibered_attr.attr));
-      fatal_error("crashed since non-fiber instance is missing an assignment");
+      o << "throw Evaluation.UndefinedAttributeException(\""
+        << synth_util::instance_to_string(instance) << "\")";
     } else if (item->key == synth_util::KEY_BLOCK_ITEM_CONDITION) {
       synth_util::BlockItemCondition* cond = reinterpret_cast<synth_util::BlockItemCondition*>(item);
       bool visited_if_stmt = std::find(dumped_conditional_block_items.begin(), dumped_conditional_block_items.end(), item) != dumped_conditional_block_items.end();
@@ -1020,9 +1058,9 @@ class SynthImpl : public SynthImplementation {
           vector<INSTANCE*> dumped_instanced_positive(dumped_instances);
           dump_rhs_instance_helper(aug_graph, cond->next_positive, instance, o);
           dumped_instances = dumped_instanced_positive;
+          current_blocks.pop_back();
 
           if (!visited_if_stmt) {
-            current_blocks.pop_back();
             o << "\n";
             nesting_level--;
             o << indent() << "} else {\n";
@@ -1049,35 +1087,62 @@ class SynthImpl : public SynthImplementation {
           Match m = (Match)cond->condition;
           Pattern p = matcher_pat(m);
           Declaration header = Match_info(m)->header;
-          if (Declaration_KEY(header) == KEYfor_stmt) {
-            Pattern middle;
-            if (!sequence_search_pattern(p, &middle)) {
-              fatal_error("unsupported pattern in synthesized for statement");
-            }
+          bool is_for = Declaration_KEY(header) == KEYfor_stmt;
+          SequenceForPattern sequence_patterns = {};
+          if (sequence_for_pattern(p, &sequence_patterns)) {
+            unsigned number = get_match_index(m);
+            Expression value = is_for
+                ? for_stmt_expr(header) : case_stmt_expr(header);
             Declaration attr = instance->fibered_attr.attr;
             Type value_type = Declaration_KEY(attr) == KEYattribute_decl
                 ? function_type_return_type(attribute_decl_type(attr))
                 : value_decl_type(attr);
-            dump_sequence_elements(p, for_stmt_expr(header), o);
-            o << ".foldLeft(" << as_val(value_type)
-              << ".v_initial) { (v_for_result, v_sequence_element) =>\n";
-            nesting_level++;
-            o << indent() << "v_sequence_element match {\n";
+            dump_sequence_candidates(p, value, sequence_patterns, number, o);
+            if (is_for) {
+              o << ".foldLeft(" << as_val(value_type)
+                << ".v_initial) { (v_for_result" << number
+                << ", v_sequence_element" << number << ") =>\n";
+              nesting_level++;
+              o << indent() << "v_sequence_element" << number << " match {\n";
+            } else {
+              o << ".collectFirst {\n";
+            }
             nesting_level++;
             o << indent() << "case ";
-            dump_sequence_element_pattern(middle, o);
-            o << " => " << as_val(value_type)
-              << ".v_combine(v_for_result, ";
+            dump_sequence_element_patterns(sequence_patterns.elements, o);
+            o << " => ";
+            if (is_for) {
+              o << as_val(value_type) << ".v_combine(v_for_result"
+                << number << ", ";
+            }
+            vector<INSTANCE*> saved_instances(dumped_instances);
             current_blocks.push_back(matcher_body(m));
             dump_rhs_instance_helper(aug_graph, cond->next_positive, instance, o);
             current_blocks.pop_back();
-            o << ")\n";
-            o << indent() << "case _ => v_for_result\n";
-            nesting_level--;
-            o << indent() << "}\n";
+            dumped_instances = saved_instances;
+            if (is_for) {
+              o << ")\n";
+              o << indent() << "case _ => v_for_result" << number << "\n";
+              nesting_level--;
+              o << indent() << "}\n";
+            } else {
+              o << "\n";
+              nesting_level--;
+              o << indent() << "}.getOrElse {\n";
+              nesting_level++;
+              current_blocks.push_back(MATCH_NEXT(m) ? 0 : case_stmt_default(header));
+              o << indent();
+              dump_rhs_instance_helper(aug_graph, cond->next_negative, instance, o);
+              current_blocks.pop_back();
+              dumped_instances = saved_instances;
+              o << "\n";
+            }
             nesting_level--;
             o << indent() << "}";
             break;
+          }
+          if (is_for) {
+            fatal_error("unsupported pattern in synthesized for statement");
           }
           if (m == first_Match(case_stmt_matchers(header))) {
             Expression e = case_stmt_expr(header);
@@ -1177,6 +1242,7 @@ class SynthImpl : public SynthImplementation {
           o << "(node)";
         }
       } else {
+        block = synth_util::linearize_block(aug_graph, instance);
         dump_rhs_instance_helper(aug_graph, block, instance, o);
       }
     } else if (is_function_call_result) {
