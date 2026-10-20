@@ -19,7 +19,6 @@ extern "C" {
 
 void dump_sequence_element_patterns(const std::vector<Pattern>&, ostream&);
 void dump_sequence_candidates(Pattern, Expression, const SequenceForPattern&, unsigned, ostream&);
-extern bool synth_eager;
 
 static AUG_GRAPH* current_aug_graph = NULL;
 static std::vector<synth_util::SynthFunctionState*> synth_functions_states;
@@ -746,13 +745,9 @@ class SynthImpl : public SynthImplementation {
         os << indent() << "implicit val " << synth_util::LOOP_VAR << ": Boolean = false;\n";
       }
       emit_start_phylum_evaluations(os, s, synth_functions_states, true);
-      if (synth_eager) {
-        emit_eager_phylum_evaluations(os, synth_functions_states, true);
-      }
+      emit_eager_phylum_evaluations(os, synth_functions_states, true);
       emit_start_phylum_evaluations(os, s, synth_functions_states, false);
-      if (synth_eager) {
-        emit_eager_phylum_evaluations(os, synth_functions_states, false);
-      }
+      emit_eager_phylum_evaluations(os, synth_functions_states, false);
       os << indent() << "super.finish();\n";
       --nesting_level;
       os << indent() << "};\n";

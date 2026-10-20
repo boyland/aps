@@ -434,7 +434,11 @@ void implement_value_use(Declaration declaration, AUG_GRAPH* graph, const std::v
     nesting_level = saved_nesting;
     output << "\n" << indent() << ")";
   } else if (flags & ATTRIBUTE_DECL_FLAG) {
-    output << "v_" << decl_name(declaration);
+    if (ATTR_DECL_IS_INH(declaration)) {
+      output << "v_" << decl_name(declaration);
+    } else {
+      output << "a_" << decl_name(declaration) << ".get";
+    }
   } else if (flags & LOCAL_VALUE_FLAG) {
     output << "v" << LOCAL_UNIQUE_PREFIX(declaration) << "_" << decl_name(declaration);
   } else {
