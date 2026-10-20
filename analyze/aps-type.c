@@ -2361,7 +2361,7 @@ static BOOL signature_is_phylum(Signature sig)
     {
       Declaration decl = USE_DECL(class_use_use(sig_inst_class(sig)));
       return decl && Declaration_KEY(decl) == KEYmodule_decl &&
-	            Declaration_KEY(module_decl_result_type(decl)) == KEYphylum_decl;
+	           Declaration_KEY(some_class_decl_result_type(decl)) == KEYphylum_decl;
     }
   case KEYmult_sig:
     return signature_is_phylum(mult_sig_sig1(sig)) || signature_is_phylum(mult_sig_sig2(sig));
