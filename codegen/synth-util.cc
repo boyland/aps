@@ -167,12 +167,20 @@ static std::vector<INSTANCE*> collect_phylum_graph_attr_dependencies(PHY_GRAPH* 
   return result;
 }
 
-static bool is_function_decl_attribute(INSTANCE* instance) {
+static bool instance_is_function_call_proxy(INSTANCE* instance) {
   if (instance->node == NULL || ABSTRACT_APS_tnode_phylum(instance->node) != KEYDeclaration || Declaration_KEY(instance->node) != KEYpragma_call) {
     return false;
   }
+  return Declaration_info(instance->node)->proxy_fdecl != NULL;
+}
+
+bool instance_is_function_call_result(INSTANCE* instance) {
+  if (!instance_is_function_call_proxy(instance)) {
+    return false;
+  }
   Declaration function = Declaration_info(instance->node)->proxy_fdecl;
-  return Declaration_KEY(function) == KEYfunction_decl;
+  return instance->fibered_attr.fiber == NULL &&
+         instance->fibered_attr.attr == some_function_decl_result(function);
 }
 
 static bool is_some_function_decl(Declaration declaration) {
@@ -199,9 +207,46 @@ static std::vector<INSTANCE*> collect_aug_graph_attr_dependencies(AUG_GRAPH* aug
 
   for (int index = 0; index < instance_count; ++index) {
     INSTANCE* source_instance = &aug_graph->instances.array[index];
-    if (!instance_is_pure_shared_info(source_instance) && source_instance->index != sink_instance->index && !is_function_decl_attribute(source_instance) &&
+    if (!instance_is_pure_shared_info(source_instance) && source_instance->index != sink_instance->index && !instance_is_function_call_proxy(source_instance) &&
         edgeset_kind(aug_graph->graph[source_instance->index * instance_count + sink_instance->index])) {
       result.push_back(source_instance);
+    }
+  }
+  return result;
+}
+
+static std::vector<INSTANCE*> collect_field_assign_dependencies(AUG_GRAPH* graph,
+                                                                INSTANCE* owner) {
+  std::vector<INSTANCE*> result;
+  Block body = matcher_body(top_level_match_m(graph->match_rule));
+  for (Declaration declaration = first_Declaration(block_body(body)); declaration;
+       declaration = DECL_NEXT(declaration)) {
+    if (Declaration_KEY(declaration) != KEYnormal_assign) {
+      continue;
+    }
+    Expression lhs = assign_lhs(declaration);
+    if (Expression_KEY(lhs) != KEYfuncall || field_ref_p(lhs) == NULL) {
+      continue;
+    }
+    Expression object = field_ref_object(lhs);
+    if (Expression_KEY(object) != KEYvalue_use ||
+        USE_DECL(value_use_use(object)) != owner->fibered_attr.attr) {
+      continue;
+    }
+    INSTANCE* field_instance = Expression_info(assign_rhs(declaration))->value_for;
+    if (field_instance == NULL) {
+      continue;
+    }
+    std::vector<INSTANCE*> dependencies =
+        collect_aug_graph_attr_dependencies(graph, field_instance);
+    for (INSTANCE* dependency_instance : dependencies) {
+      if (dependency_instance->index != owner->index &&
+          !should_skip_synth_dependency(dependency_instance) &&
+          instance_direction_for(dependency_instance) != instance_local &&
+          !(dependency_instance->node != NULL && dependency_instance->node != graph->lhs_decl) &&
+          std::find(result.begin(), result.end(), dependency_instance) == result.end()) {
+        result.push_back(dependency_instance);
+      }
     }
   }
   return result;
@@ -219,7 +264,8 @@ static std::vector<AUG_GRAPH*> collect_lhs_aug_graphs(STATE* state, PHY_GRAPH* p
   return result;
 }
 
-std::vector<SynthFunctionState*> build_synth_function_states(STATE* state) {
+std::vector<SynthFunctionState*> build_synth_function_states(
+  STATE* state, bool include_field_assign_dependencies) {
   std::vector<SynthFunctionState*> result;
 
   for (int phylum_index = 0; phylum_index < state->phyla.length; ++phylum_index) {
@@ -269,6 +315,17 @@ std::vector<SynthFunctionState*> build_synth_function_states(STATE* state) {
       function_state->is_phylum_instance = false;
       function_state->is_side_effect_evaluation = ATTR_DECL_IS_SHARED_INFO(instance->fibered_attr.attr);
       function_state->regular_dependencies = collect_aug_graph_attr_dependencies(aug_graph, instance);
+      if (include_field_assign_dependencies) {
+        std::vector<INSTANCE*> field_dependencies =
+            collect_field_assign_dependencies(aug_graph, instance);
+        for (INSTANCE* dependency_instance : field_dependencies) {
+          if (std::find(function_state->regular_dependencies.begin(),
+                        function_state->regular_dependencies.end(), dependency_instance) ==
+              function_state->regular_dependencies.end()) {
+            function_state->regular_dependencies.push_back(dependency_instance);
+          }
+        }
+      }
       function_state->aug_graphs.push_back(aug_graph);
       result.push_back(function_state);
     }
@@ -466,9 +523,85 @@ bool synth_function_is_circular(SynthFunctionState* state) {
   return false;
 }
 
+bool synth_function_has_regular_dependency(SynthFunctionState* state,
+                                           INSTANCE* instance) {
+  for (INSTANCE* dependency_instance : state->regular_dependencies) {
+    if (fibered_attr_equal(&dependency_instance->fibered_attr,
+                           &instance->fibered_attr)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 static bool instance_is_child(INSTANCE* instance, AUG_GRAPH* graph) { return instance->node != NULL && instance->node != graph->lhs_decl; }
 
 bool instance_is_parent(INSTANCE* instance, AUG_GRAPH* graph) { return instance->node != NULL && instance->node == graph->lhs_decl; }
+
+static bool is_local_cycle_candidate(INSTANCE* instance, AUG_GRAPH* graph) {
+  return instance_is_child(instance, graph) &&
+         instance->fibered_attr.fiber == NULL &&
+         !if_rule_p(instance->fibered_attr.attr) &&
+         instance_is_synthesized(instance) && instance_circular(instance);
+}
+
+static bool is_in_same_cycle(INSTANCE* inherited, INSTANCE* instance,
+                             AUG_GRAPH* graph) {
+  int instance_count = graph->instances.length;
+  bool instance_feeds_inherited =
+      edgeset_kind(graph->graph[instance->index * instance_count + inherited->index]) &
+      DEPENDENCY_MAYBE_DIRECT;
+  return inherited != instance && inherited->node == instance->node &&
+         inherited->fibered_attr.fiber == NULL &&
+         instance_is_inherited(inherited) && instance_circular(inherited) &&
+         instance_feeds_inherited;
+}
+
+std::vector<INSTANCE*> collect_child_cycle_instances(AUG_GRAPH* graph) {
+  std::vector<INSTANCE*> result;
+  int instance_count = graph->instances.length;
+  for (int index = 0; index < instance_count; ++index) {
+    INSTANCE* instance = &graph->instances.array[index];
+    if (!is_local_cycle_candidate(instance, graph)) {
+      continue;
+    }
+    for (int inherited_index = 0; inherited_index < instance_count;
+         ++inherited_index) {
+      if (is_in_same_cycle(&graph->instances.array[inherited_index], instance, graph)) {
+        result.push_back(instance);
+        break;
+      }
+    }
+  }
+  return result;
+}
+
+bool child_cycle_is_independent(AUG_GRAPH* graph, INSTANCE* cycle_instance) {
+  int instance_count = graph->instances.length;
+  std::vector<int> cycle_indices;
+  cycle_indices.push_back(cycle_instance->index);
+  for (int index = 0; index < instance_count; ++index) {
+    if (is_in_same_cycle(&graph->instances.array[index], cycle_instance, graph)) {
+      cycle_indices.push_back(index);
+    }
+  }
+
+  for (int index = 0; index < instance_count; ++index) {
+    INSTANCE* instance = &graph->instances.array[index];
+    if ((instance->fibered_attr.fiber == NULL &&
+         !ATTR_DECL_IS_SHARED_INFO(instance->fibered_attr.attr)) ||
+        !instance_circular(instance)) {
+      continue;
+    }
+    for (int cycle_index : cycle_indices) {
+      if (edgeset_kind(graph->graph[index * instance_count + cycle_index]) ||
+        edgeset_kind(graph->graph[cycle_index * instance_count + index])) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
 
 static bool component_precedes(AUG_GRAPH* graph, SCC_COMPONENT* source, SCC_COMPONENT* sink) {
   int instance_count = graph->instances.length;
@@ -579,6 +712,9 @@ std::vector<std::set<Expression>> make_instance_assignments(AUG_GRAPH* graph, co
   }
 
   for (auto block_iterator = blocks.begin(); block_iterator != blocks.end(); ++block_iterator) {
+    if (*block_iterator == NULL) {
+      continue;
+    }
     bool is_outermost = block_iterator == blocks.begin();
     std::vector<std::set<Expression>> scoped_assignments(assignments);
     for (int step = 1; step <= 2; ++step) {
@@ -623,6 +759,7 @@ std::vector<std::set<Expression>> make_instance_assignments(AUG_GRAPH* graph, co
   return assignments;
 }
 
+// We prefer to have IF statements at the beginning
 static std::vector<INSTANCE*> sort_instances(AUG_GRAPH* graph) {
   std::vector<INSTANCE*> result;
   int instance_count = graph->instances.length;
@@ -763,6 +900,8 @@ static BlockItem* linearize_block_helper(
   return NULL;
 }
 
+// Given an augmented dependency graph, it linearizes
+// the direct dependency schedule.
 BlockItem* linearize_block(AUG_GRAPH* graph, INSTANCE* sink) {
   int instance_count = graph->instances.length;
   bool* scheduled = static_cast<bool*>(alloca(sizeof(bool) * instance_count));
@@ -813,6 +952,9 @@ void print_linearized_block(BlockItem* block, std::ostream& output) {
   }
 }
 
+// Given an instance it traverses the direct dependency schedule
+// trying to find the instance and if it sees the condition
+// along the way, it returns that condition.
 BlockItem* find_surrounding_block(BlockItem* block, INSTANCE* instance) {
   while (block != NULL) {
     if (block->key == KEY_BLOCK_ITEM_CONDITION) {
