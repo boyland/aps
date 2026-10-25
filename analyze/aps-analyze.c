@@ -31,6 +31,15 @@ static BOOL global_dependencies_have_cycle(STATE *s)
   return FALSE;
 }
 
+static void *check_circular_declarations(void *context, void *node)
+{
+  STATE *s = (STATE *)context;
+  if (ABSTRACT_APS_tnode_phylum(node) == KEYDeclaration && decl_is_circular((Declaration)node)) {
+    s->requires_circular_update_support = TRUE;
+  }
+  return context;
+}
+
 static void *analyze_thing(void *ignore, void *node)
 {
   STATE *s;
@@ -49,13 +58,15 @@ static void *analyze_thing(void *ignore, void *node)
           print_cycles(s, stdout);
         }
         d = (s->original_state_dependency = analysis_state_cycle(s));
-        s->loop_required = global_dependencies_have_cycle(s);
+        s->requires_circular_update_support = d != no_dependency;
+        traverse_Declaration(check_circular_declarations, s, decl);
+        s->requires_fixed_point_loop = global_dependencies_have_cycle(s);
         break;
       }
       if (!(d = (s->original_state_dependency = analysis_state_cycle(s))))
       {
         // Do nothing; no cycle to remove
-        s->loop_required = false;
+        s->requires_fixed_point_loop = false;
       }
       else if (!(d & DEPENDENCY_MAYBE_SIMPLE) || !(d & DEPENDENCY_NOT_JUST_FIBER))
       {
@@ -65,7 +76,7 @@ static void *analyze_thing(void *ignore, void *node)
           print_cycles(s, stdout);
         }
         break_fiber_cycles(decl, s, d);
-        s->loop_required = !(d & DEPENDENCY_MAYBE_SIMPLE);
+        s->requires_fixed_point_loop = !(d & DEPENDENCY_MAYBE_SIMPLE);
         d = no_dependency;  // clear dependency
       }
       else
@@ -73,6 +84,8 @@ static void *analyze_thing(void *ignore, void *node)
         aps_error(decl, "Unable to handle dependency (%d); Attribute grammar is not DNC", d);
         return NULL;
       }
+
+      s->requires_circular_update_support = s->requires_fixed_point_loop;
 
       // If SCC scheduling is in-progress
       if (static_scc_schedule)

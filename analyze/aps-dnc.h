@@ -110,7 +110,14 @@ typedef struct analysis_state {
   AUG_GRAPH global_dependencies;
   VECTOR(FIBER) fibers;
   CYCLES cycles;
-  BOOL loop_required;
+  /* Farrow: the global dependency graph contains a cycle.
+   * Static: the generated schedule needs fixed-point iteration support.
+   */
+  BOOL requires_fixed_point_loop;
+  /* Allow circular attributes to be updated and track whether their values change
+   * during static or Farrow evaluation. This flag does not generate a loop.
+   */
+  BOOL requires_circular_update_support;
   BOOL anc_analysis;
   DEPENDENCY original_state_dependency;  // This is value of analysis_state_cycle
                                          // before removing fiber cycle or

@@ -43,7 +43,7 @@ static vector<INSTANCE*> dumped_instances;
 
 static void emit_start_phylum_evaluations(ostream& os, STATE* state) {
   PHY_GRAPH* start_graph = summary_graph_for(state, state->start_phylum);
-  if (state->loop_required) {
+  if (state->requires_circular_update_support) {
     os << indent() << "implicit val " << synth_util::LOOP_VAR << ": Boolean = false;\n";
     os << indent() << "implicit val changed: AtomicBoolean = new AtomicBoolean(false);\n";
   }
@@ -65,13 +65,7 @@ static void dump_farrow_functions(STATE* s, ostream& os) {
   os << "\n";
 
   synth_functions_states = synth_util::build_synth_function_states(s);
-  bool needs_fixed_point = s->loop_required;
-  for (synth_util::SynthFunctionState* state : synth_functions_states) {
-    if (synth_util::synth_function_is_circular(state)) {
-      needs_fixed_point = true;
-      break;
-    }
-  }
+  bool needs_fixed_point = s->requires_circular_update_support;
 
   for (auto state_it = synth_functions_states.begin(); state_it != synth_functions_states.end(); state_it++) {
     synth_util::SynthFunctionState* synth_functions_state = *state_it;
@@ -307,8 +301,6 @@ class FarrowImpl : public SynthImplementation {
       ostream& oss = os;
 
       dump_farrow_functions(s, oss);
-
-      bool needs_fixed_point = s->loop_required;
 
       os << indent() << "override def finish() : Unit = {\n";
       ++nesting_level;

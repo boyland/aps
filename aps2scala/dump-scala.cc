@@ -1716,12 +1716,9 @@ void dump_scala_Declaration(Declaration decl,ostream& oss)
       ++nesting_level;
 
       STATE *s = (STATE*)Declaration_info(decl)->analysis_state;
-      if ((static_scc_schedule || anc_analysis) && s != NULL)
-      {
-        activate_static_circular =
-          anc_analysis ? s->original_state_dependency != no_dependency
-                       : s->loop_required;
-      }
+      activate_static_circular =
+        (static_scc_schedule || anc_analysis) && s != NULL &&
+        s->requires_circular_update_support;
 
       if (result_typeval != "") {
 	oss << indent() << "type T_" << rname << " = "
