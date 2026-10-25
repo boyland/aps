@@ -3,9 +3,9 @@ CPP = g++
 CPPFLAGS = -ftemplate-depth=63 -I . -I ${APSTOP}/base/cpp
 APSCPP = ${APSTOP}/bin/apscpp
 AST_DIRS = ../tiny ../simple ../grammar ../farrow-lv ../farrow-ubd ../nested-ubd \
-	../balanced ../bigger ../type ../conditional ../standalone
+	../balanced ../bigger ../fj ../type ../conditional ../standalone
 CPP_SOURCE_DIRS = ../tiny/cpp ../simple/cpp
-APSPATH = ../tiny:../simple:../grammar:../farrow-lv:../farrow-ubd:../nested-ubd:../balanced:../bigger:../type:../conditional:../standalone:${APSTOP}/base
+APSPATH = ../tiny:../simple:../grammar:../farrow-lv:../farrow-ubd:../nested-ubd:../balanced:../bigger:../fj:../type:../conditional:../standalone:${APSTOP}/base
 APSCPPFLAGS = -p ${APSPATH} -G
 BASECPP = ${APSTOP}/lib/basecpp.a
 

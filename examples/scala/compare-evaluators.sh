@@ -5,7 +5,7 @@ cd "$SCRIPT_DIR"
 
 DYNAMIC_EVALUATOR="DYNAMIC"
 STATIC_EVALUATOR="STATIC"
-ORIGINAL_FARROW_EVALUATOR="SYNTH_F0"
+FARROW_EVALUATOR="FARROW"
 DEFAULT_EVALUATORS="$DYNAMIC_EVALUATOR,$STATIC_EVALUATOR"
 
 extract_results() {
@@ -24,11 +24,13 @@ run_with_evaluator() {
   local start end
   start=$(date +%s.%N)
   make EVALUATOR="$evaluator" ARGS="$args" "$driver.run" 2>&1 | extract_results > "$outfile"
+  local run_status=${PIPESTATUS[0]}
   end=$(date +%s.%N)
   printf "  %s finished in %.2fs\n" "$evaluator" "$(echo "$end - $start" | bc)"
+  return "$run_status"
 }
 
-run_driver() {
+run_driver_once() {
   local driver="$1"
   local args="$2"
   local -a evals
@@ -44,7 +46,7 @@ run_driver() {
   for eval in "${evals[@]}"; do
     echo "  running $eval ..."
     if ! run_with_evaluator "$eval" "$driver" "$args" "$tmpdir/$eval"; then
-      echo "  FAIL: $eval build failed"
+      echo "  FAIL: $eval failed"
       build_failed=true
       continue
     fi
@@ -63,13 +65,17 @@ run_driver() {
 
   local n=${#built_evaluators[@]}
   if [ $n -lt 2 ]; then
-    if [ $n -eq 1 ]; then
+    if [ $n -eq 1 ] && [ ${#evals[@]} -eq 1 ] && $pass; then
       echo "  OK: ${built_evaluators[0]} ran successfully"
+      rm -rf "$tmpdir"
+      return 0
+    elif [ $n -eq 1 ]; then
+      echo "  FAIL: only ${built_evaluators[0]} ran successfully"
     else
       echo "  FAIL: no evaluators ran successfully"
     fi
     rm -rf "$tmpdir"
-    return $(( n == 0 ))
+    return 1
   fi
 
   for ((i=0; i<n-1; i++)); do
@@ -90,6 +96,19 @@ run_driver() {
   $pass
 }
 
+run_driver() {
+  local driver="$1"
+  local programs="$2"
+  local evaluators="$3"
+  local -a program_list
+  local pass=true
+  IFS=',' read -ra program_list <<< "$programs"
+  for program in "${program_list[@]}"; do
+    run_driver_once "$driver" "$program" "$evaluators" || pass=false
+  done
+  $pass
+}
+
 if [ $# -gt 0 ]; then
   driver="$1"
   args="${2:-}"
@@ -107,20 +126,24 @@ TESTS=(
   "TestUseCollDriver|../tiny/scala/tiny.program|$DEFAULT_EVALUATORS"
   "TestCycleDriver|../tiny/scala/tiny.program|$DEFAULT_EVALUATORS"
   "UseGlobal|../tiny/scala/tiny.program|$DEFAULT_EVALUATORS"
-  "FarrowUbdDriver|../farrow-ubd/scala/farrow-ubd.program|$DEFAULT_EVALUATORS,$ORIGINAL_FARROW_EVALUATOR"
+  "FarrowUbdDriver|../farrow-ubd/scala/farrow-ubd.program|$DEFAULT_EVALUATORS,$FARROW_EVALUATOR"
   "FarrowUbdFiberDriver|../farrow-ubd/scala/farrow-ubd.program|$DEFAULT_EVALUATORS"
-  "NestedUbdDriver|../nested-ubd/scala/nested-ubd.program|$DEFAULT_EVALUATORS,$ORIGINAL_FARROW_EVALUATOR"
+  "NestedUbdDriver|../nested-ubd/scala/nested-ubd.program|$DEFAULT_EVALUATORS,$FARROW_EVALUATOR"
   "NestedUbdFiberDriver|../nested-ubd/scala/nested-ubd.program|$DEFAULT_EVALUATORS"
   "TestFieldsDriver|../tiny/scala/tiny.program|$DEFAULT_EVALUATORS"
   "FirstDriver|../grammar/scala/grammar.cfg|$DEFAULT_EVALUATORS"
   "FollowDriver|../grammar/scala/grammar.cfg|$DEFAULT_EVALUATORS"
   "NullableDriver|../grammar/scala/grammar.cfg|$DEFAULT_EVALUATORS"
   "SimpleBindingDriver|../simple/scala/simple.program|$DEFAULT_EVALUATORS"
+  "BiggerBindingDriver|../bigger/scala/bigger.program|$DEFAULT_EVALUATORS"
   "SimpleBinding1Driver|../simple/scala/simple.program|$DEFAULT_EVALUATORS"
   "SimpleBinding2Driver|../simple/scala/simple.program|$DEFAULT_EVALUATORS"
   "SimpleBinding3Driver|../simple/scala/simple.program|$DEFAULT_EVALUATORS"
   "TestForDriver|../tiny/scala/tiny.program|$DEFAULT_EVALUATORS"
-  "SimpleSncDriver|../simple/scala/simple.program|$DYNAMIC_EVALUATOR,$ORIGINAL_FARROW_EVALUATOR"
+  "TestForPatternsDriver|../tiny/scala/tiny.program,../tiny/scala/tiny-singleton.program,../tiny/scala/tiny-empty.program|$DEFAULT_EVALUATORS"
+  "TestCasePatternsDriver|../tiny/scala/tiny.program,../tiny/scala/tiny-singleton.program,../tiny/scala/tiny-empty.program|$DEFAULT_EVALUATORS"
+  "TestNestedPatternsDriver|../tiny/scala/tiny.program,../tiny/scala/tiny-singleton.program,../tiny/scala/tiny-empty.program|$DEFAULT_EVALUATORS"
+  "SimpleSncDriver|../simple/scala/simple.program|$DYNAMIC_EVALUATOR,$FARROW_EVALUATOR"
   "SimpleSncFiberDriver|../simple/scala/simple.program|$DYNAMIC_EVALUATOR"
 )
 
@@ -133,7 +156,7 @@ for test in "${TESTS[@]}"; do
   total=$((total + 1))
   return_code=0
   run_driver "$driver" "$args" "$evals" || return_code=$?
-  if [ $return_code -eq 1 ]; then
+  if [ $return_code -ne 0 ]; then
     failures=$((failures + 1))
   fi
   echo ""

@@ -1,7 +1,7 @@
 DEBUG_FLAGS = -DCOTo
 APSSCHED=../bin/apssched
 APS2SCALA=../bin/aps2scala
-AST_DIRS=tiny simple grammar farrow-lv farrow-ubd nested-ubd balanced bigger type conditional standalone
+AST_DIRS=tiny simple grammar farrow-lv farrow-ubd nested-ubd balanced bigger fj type conditional standalone
 BASE=$(subst $() $(),:,$(AST_DIRS)):../base
 
 vpath %.aps $(AST_DIRS)
@@ -18,7 +18,10 @@ default:
 %.scc.scala: %.aps
 	${APS2SCALA} -C ${DEBUG_FLAGS} -p ${BASE} $*
 
-%.scala: %.aps
+%.farrow.scala : %.aps
+	${APS2SCALA} -F ${DEBUG_FLAGS} -p ${BASE} $*
+
+%.scala : %.aps
 	${APS2SCALA} ${DEBUG_FLAGS} -p ${BASE} $*
 
 %.debug: %.aps

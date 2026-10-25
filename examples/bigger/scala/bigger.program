@@ -1,0 +1,26 @@
+{
+  integer x;
+  integer y;
+  string greeting;
+  boolean done;
+  array[integer] values;
+
+  x = 3;
+  y = x + 5;
+  greeting = concat("hello", " world");
+  done = y < 10 || false;
+  done = y == 8;
+  values[0] = y;
+
+  if (done) {
+    string greeting;
+    greeting = substring(greeting, 0, 5);
+    x = values[0];
+  } else {
+    x = 0;
+  }
+
+  while (x < 10) {
+    x = x + 1;
+  }
+}

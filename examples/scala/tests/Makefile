@@ -1,7 +1,7 @@
 SPECS=FirstSpec FollowSpec NullableSpec NTupleLatticeSpec TestSynthSpec
 EXAMPLES_PATH=../..
 ROOT_PATH=../${EXAMPLES_PATH}
-AST_PATHS=${EXAMPLES_PATH}/tiny:${EXAMPLES_PATH}/simple:${EXAMPLES_PATH}/grammar:${EXAMPLES_PATH}/farrow-lv:${EXAMPLES_PATH}/farrow-ubd:${EXAMPLES_PATH}/nested-ubd:${EXAMPLES_PATH}/balanced:${EXAMPLES_PATH}/bigger:${EXAMPLES_PATH}/type:${EXAMPLES_PATH}/conditional:${EXAMPLES_PATH}/standalone
+AST_PATHS=${EXAMPLES_PATH}/tiny:${EXAMPLES_PATH}/simple:${EXAMPLES_PATH}/grammar:${EXAMPLES_PATH}/farrow-lv:${EXAMPLES_PATH}/farrow-ubd:${EXAMPLES_PATH}/nested-ubd:${EXAMPLES_PATH}/balanced:${EXAMPLES_PATH}/bigger:${EXAMPLES_PATH}/fj:${EXAMPLES_PATH}/type:${EXAMPLES_PATH}/conditional:${EXAMPLES_PATH}/standalone
 TEST_SOURCE_DIRS=${EXAMPLES_PATH}/tiny/scala/tests ${EXAMPLES_PATH}/grammar/scala/tests
 SCALAV=2.13
 APSLIB=${ROOT_PATH}/lib/aps-library-${SCALAV}.jar

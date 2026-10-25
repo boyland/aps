@@ -1545,11 +1545,15 @@ static CTO_NODE* local_chunk_schedule(AUG_GRAPH* aug_graph,
               chunk, cto_node, cond, state, remaining - 1, group, parent_ph);
           cond.positive &= ~cmask;
 
-          cond.negative |= cmask;
-          cto_node->cto_if_false = local_chunk_schedule(
-              aug_graph, chunk_graph, chunk_component, chunk_component_index,
-              chunk, cto_node, cond, state, remaining - 1, group, parent_ph);
-          cond.negative &= ~cmask;
+          if (for_rule_p(instance->fibered_attr.attr)) {
+            cto_node->cto_if_false = cto_node->cto_if_true;
+          } else {
+            cond.negative |= cmask;
+            cto_node->cto_if_false = local_chunk_schedule(
+                aug_graph, chunk_graph, chunk_component, chunk_component_index,
+                chunk, cto_node, cond, state, remaining - 1, group, parent_ph);
+            cond.negative &= ~cmask;
+          }
 
         } else {
           cto_node->cto_next = local_chunk_schedule(
