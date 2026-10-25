@@ -78,9 +78,38 @@ jobs:
         ../bin/aps2scala -DCOTo -G -p standalone:../base test-canonicals
 
     - name: Run compare-evaluators
+      id: compare-evaluators
+      env:
+        JUNIT_REPORT: ${{ runner.temp }}/evaluator-results.xml
       run: |
         cd examples/scala
         ./compare-evaluators.sh
+
+    - name: Evaluator test results
+      if: ${{ !cancelled() && steps.compare-evaluators.outcome != 'skipped' }}
+      uses: ctrf-io/github-test-reporter@v1
+      with:
+        title: Scala evaluator comparisons
+        report-path: ${{ runner.temp }}/evaluator-results.xml
+        summary-report: true
+        test-report: true
+        failed-report: true
+        upload-artifact: false
+        fetch-previous-results: false
+        exit-on-no-files: true
+        exit-on-empty: true
+        exit-on-fail: true
+        integrations-config: |
+          {
+            "junit-to-ctrf": {
+              "enabled": true,
+              "action": "convert",
+              "options": {
+                "output": "${{ runner.temp }}/evaluator-results.json",
+                "toolname": "APS evaluator comparisons"
+              }
+            }
+          }
 
     - name: Clean up
       if: always()
