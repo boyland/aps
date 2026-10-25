@@ -17,6 +17,8 @@ jobs:
       SCALA_MAJOR: "2.13"
       JFLEX_URL: "https://github.com/boyland/JFlex/releases/download/v1.5+scala.1/JFlex.jar"
       SCALA_BISON_URL: "https://github.com/boyland/scala-bison/releases/download/v1.2/scala-bison-2.13.jar"
+      JUNIT_REPORT: ${{ github.workspace }}/evaluator-results.xml
+      CTRF_REPORT: ${{ github.workspace }}/evaluator-results.json
 
     steps:
     - name: Checkout code
@@ -79,8 +81,6 @@ jobs:
 
     - name: Run compare-evaluators
       id: compare-evaluators
-      env:
-        JUNIT_REPORT: ${{ runner.temp }}/evaluator-results.xml
       run: |
         cd examples/scala
         ./compare-evaluators.sh
@@ -90,7 +90,7 @@ jobs:
       uses: ctrf-io/github-test-reporter@v1
       with:
         title: Scala evaluator comparisons
-        report-path: ${{ runner.temp }}/evaluator-results.xml
+        report-path: ${{ env.JUNIT_REPORT }}
         summary-report: true
         test-report: true
         failed-report: true
@@ -105,7 +105,7 @@ jobs:
               "enabled": true,
               "action": "convert",
               "options": {
-                "output": "${{ runner.temp }}/evaluator-results.json",
+                "output": "${{ env.CTRF_REPORT }}",
                 "toolname": "APS evaluator comparisons"
               }
             }
