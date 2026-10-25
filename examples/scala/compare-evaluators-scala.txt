@@ -1,4 +1,4 @@
-# driver                    | programs                                           | evaluators
+# Driver                    | Programs                                           | Evaluators
 # Run from examples/scala. Use a file, ../tiny/programs/*, or a comma-separated list.
 
 # Tiny
