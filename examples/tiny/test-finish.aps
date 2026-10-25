@@ -1,6 +1,6 @@
 with "tiny";
 
--- The Root result does not depend on Wood.unreachable.  -F0 finish must
+-- The Root result does not depend on Wood.unreachable. Finish must
 -- nevertheless evaluate unreachable on every rooted Wood node.
 module TEST_FINISH[T :: var TINY[]] extends T begin
   attribute Root.result : Integer;
