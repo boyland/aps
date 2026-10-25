@@ -1,0 +1,41 @@
+# driver                    | programs                                           | evaluators
+# Run from examples/scala. Use a file, ../tiny/programs/*, or a comma-separated list.
+
+# Tiny
+BroadFiberCycleDriver       | ../tiny/programs/tiny.program                      | DYNAMIC, STATIC
+BelowFiberCycleDriver       | ../tiny/programs/tiny.program                      | DYNAMIC, STATIC
+BelowSingleFiberCycleDriver | ../tiny/programs/tiny.program                      | DYNAMIC, STATIC
+LocalFiberCycleDriver       | ../tiny/programs/tiny.program                      | DYNAMIC, STATIC
+TestCollDriver              | ../tiny/programs/tiny.program                      | DYNAMIC, STATIC
+TestUseCollDriver           | ../tiny/programs/tiny.program                      | DYNAMIC, STATIC
+TestCycleDriver             | ../tiny/programs/tiny.program                      | DYNAMIC, STATIC
+UseGlobal                   | ../tiny/programs/tiny.program                      | DYNAMIC, STATIC
+TestFieldsDriver            | ../tiny/programs/tiny.program                      | DYNAMIC, STATIC
+TestForDriver               | ../tiny/programs/tiny.program                      | DYNAMIC, STATIC
+TestForPatternsDriver       | ../tiny/programs/*                                 | DYNAMIC, STATIC
+TestCasePatternsDriver      | ../tiny/programs/*                                 | DYNAMIC, STATIC
+TestNestedPatternsDriver    | ../tiny/programs/*                                 | DYNAMIC, STATIC
+
+# Simple
+SimpleBindingDriver         | ../simple/programs/simple.program                  | DYNAMIC, STATIC
+SimpleBinding1Driver        | ../simple/programs/simple.program                  | DYNAMIC, STATIC
+SimpleBinding2Driver        | ../simple/programs/simple.program                  | DYNAMIC, STATIC
+SimpleBinding3Driver        | ../simple/programs/simple.program                  | DYNAMIC, STATIC
+SimpleSncDriver             | ../simple/programs/simple.program                  | DYNAMIC, FARROW
+SimpleSncFiberDriver        | ../simple/programs/simple.program                  | DYNAMIC
+
+# Bigger
+BiggerBindingDriver         | ../bigger/programs/bigger.program                  | DYNAMIC, STATIC
+
+# Grammar
+FirstDriver                 | ../grammar/programs/grammar.cfg                    | DYNAMIC, STATIC
+FollowDriver                | ../grammar/programs/grammar.cfg                    | DYNAMIC, STATIC
+NullableDriver              | ../grammar/programs/grammar.cfg                    | DYNAMIC, STATIC
+
+# Farrow use-before-declaration
+FarrowUbdDriver             | ../farrow-ubd/programs/*                           | DYNAMIC, STATIC, FARROW
+FarrowUbdFiberDriver        | ../farrow-ubd/programs/*                           | DYNAMIC, STATIC
+
+# Nested use-before-declaration
+NestedUbdDriver             | ../nested-ubd/programs/*, ../farrow-ubd/programs/* | DYNAMIC, STATIC, FARROW
+NestedUbdFiberDriver        | ../nested-ubd/programs/*, ../farrow-ubd/programs/* | DYNAMIC, STATIC

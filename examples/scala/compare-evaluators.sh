@@ -8,6 +8,13 @@ STATIC_EVALUATOR="STATIC"
 FARROW_EVALUATOR="FARROW"
 DEFAULT_EVALUATORS="$DYNAMIC_EVALUATOR,$STATIC_EVALUATOR"
 
+trim() {
+  local value="$1"
+  value="${value#"${value%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
+  printf '%s' "$value"
+}
+
 extract_results() {
   sed -n '/^Results:$/,$p'
 }
@@ -44,6 +51,7 @@ run_driver_once() {
 
   local built_evaluators=()
   for eval in "${evals[@]}"; do
+    eval=$(trim "$eval")
     echo "  running $eval ..."
     if ! run_with_evaluator "$eval" "$driver" "$args" "$tmpdir/$eval"; then
       echo "  FAIL: $eval failed"
@@ -101,10 +109,28 @@ run_driver() {
   local programs="$2"
   local evaluators="$3"
   local -a program_list
+  local -a matches
+  local program input
   local pass=true
   IFS=',' read -ra program_list <<< "$programs"
   for program in "${program_list[@]}"; do
-    run_driver_once "$driver" "$program" "$evaluators" || pass=false
+    program=$(trim "$program")
+    if [[ "$program" == *"*"* || "$program" == *"?"* || "$program" == *"["* ]]; then
+      mapfile -t matches < <(compgen -G "$program" | LC_ALL=C sort)
+    else
+      matches=("$program")
+    fi
+
+    local found_file=false
+    for input in "${matches[@]}"; do
+      [ -f "$input" ] || continue
+      found_file=true
+      run_driver_once "$driver" "$input" "$evaluators" || pass=false
+    done
+    if ! $found_file; then
+      echo "No program files found for: $program" >&2
+      pass=false
+    fi
   done
   $pass
 }
@@ -117,42 +143,37 @@ if [ $# -gt 0 ]; then
   exit $?
 fi
 
-TESTS=(
-  "BroadFiberCycleDriver|../tiny/programs/tiny.program|$DEFAULT_EVALUATORS"
-  "BelowFiberCycleDriver|../tiny/programs/tiny.program|$DEFAULT_EVALUATORS"
-  "BelowSingleFiberCycleDriver|../tiny/programs/tiny.program|$DEFAULT_EVALUATORS"
-  "LocalFiberCycleDriver|../tiny/programs/tiny.program|$DEFAULT_EVALUATORS"
-  "TestCollDriver|../tiny/programs/tiny.program|$DEFAULT_EVALUATORS"
-  "TestUseCollDriver|../tiny/programs/tiny.program|$DEFAULT_EVALUATORS"
-  "TestCycleDriver|../tiny/programs/tiny.program|$DEFAULT_EVALUATORS"
-  "UseGlobal|../tiny/programs/tiny.program|$DEFAULT_EVALUATORS"
-  "FarrowUbdDriver|../farrow-ubd/programs/farrow-ubd.program|$DEFAULT_EVALUATORS,$FARROW_EVALUATOR"
-  "FarrowUbdFiberDriver|../farrow-ubd/programs/farrow-ubd.program|$DEFAULT_EVALUATORS"
-  "NestedUbdDriver|../nested-ubd/programs/nested-ubd.program|$DEFAULT_EVALUATORS,$FARROW_EVALUATOR"
-  "NestedUbdFiberDriver|../nested-ubd/programs/nested-ubd.program|$DEFAULT_EVALUATORS"
-  "TestFieldsDriver|../tiny/programs/tiny.program|$DEFAULT_EVALUATORS"
-  "FirstDriver|../grammar/programs/grammar.cfg|$DEFAULT_EVALUATORS"
-  "FollowDriver|../grammar/programs/grammar.cfg|$DEFAULT_EVALUATORS"
-  "NullableDriver|../grammar/programs/grammar.cfg|$DEFAULT_EVALUATORS"
-  "SimpleBindingDriver|../simple/programs/simple.program|$DEFAULT_EVALUATORS"
-  "BiggerBindingDriver|../bigger/programs/bigger.program|$DEFAULT_EVALUATORS"
-  "SimpleBinding1Driver|../simple/programs/simple.program|$DEFAULT_EVALUATORS"
-  "SimpleBinding2Driver|../simple/programs/simple.program|$DEFAULT_EVALUATORS"
-  "SimpleBinding3Driver|../simple/programs/simple.program|$DEFAULT_EVALUATORS"
-  "TestForDriver|../tiny/programs/tiny.program|$DEFAULT_EVALUATORS"
-  "TestForPatternsDriver|../tiny/programs/tiny.program,../tiny/programs/tiny-singleton.program,../tiny/programs/tiny-empty.program|$DEFAULT_EVALUATORS"
-  "TestCasePatternsDriver|../tiny/programs/tiny.program,../tiny/programs/tiny-singleton.program,../tiny/programs/tiny-empty.program|$DEFAULT_EVALUATORS"
-  "TestNestedPatternsDriver|../tiny/programs/tiny.program,../tiny/programs/tiny-singleton.program,../tiny/programs/tiny-empty.program|$DEFAULT_EVALUATORS"
-  "SimpleSncDriver|../simple/programs/simple.program|$DYNAMIC_EVALUATOR,$FARROW_EVALUATOR"
-  "SimpleSncFiberDriver|../simple/programs/simple.program|$DYNAMIC_EVALUATOR"
-)
+TESTS_FILE="$SCRIPT_DIR/compare-evaluators-scala.txt"
+if [ ! -r "$TESTS_FILE" ]; then
+  echo "Cannot read test table: $TESTS_FILE" >&2
+  exit 2
+fi
 
 failures=0
 total=0
+line_number=0
 
-for test in "${TESTS[@]}"; do
-  IFS="|" read -r driver args evals <<< "$test"
-  evals="${evals:-$DEFAULT_EVALUATORS}"
+while IFS= read -r line || [ -n "$line" ]; do
+  line_number=$((line_number + 1))
+  line=$(trim "${line%%#*}")
+  [ -z "$line" ] && continue
+
+  if [[ "$line" != *"|"*"|"* || "$line" == *"|"*"|"*"|"* ]]; then
+    echo "$TESTS_FILE:$line_number: expected driver | programs | evaluators" >&2
+    exit 2
+  fi
+  IFS="|" read -r driver args evals <<< "$line"
+  driver=$(trim "$driver")
+  args=$(trim "$args")
+  evals=$(trim "$evals")
+  if [ -z "$driver" ]; then
+    echo "$TESTS_FILE:$line_number: driver is missing" >&2
+    exit 2
+  fi
+  if [ -z "$evals" ]; then
+    echo "$TESTS_FILE:$line_number: evaluators are missing" >&2
+    exit 2
+  fi
   total=$((total + 1))
   return_code=0
   run_driver "$driver" "$args" "$evals" || return_code=$?
@@ -160,7 +181,12 @@ for test in "${TESTS[@]}"; do
     failures=$((failures + 1))
   fi
   echo ""
-done
+done < "$TESTS_FILE"
+
+if [ "$total" -eq 0 ]; then
+  echo "No tests found in $TESTS_FILE" >&2
+  exit 2
+fi
 
 echo "=============================="
 echo "$((total - failures))/$total passed"
