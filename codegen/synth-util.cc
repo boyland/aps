@@ -222,19 +222,23 @@ static std::vector<INSTANCE*> collect_field_assign_dependencies(AUG_GRAPH* graph
   for (Declaration declaration = first_Declaration(block_body(body)); declaration;
        declaration = DECL_NEXT(declaration)) {
     if (Declaration_KEY(declaration) != KEYnormal_assign) {
+      // Only assignments can match the field writes collected here.
       continue;
     }
     Expression lhs = assign_lhs(declaration);
     if (Expression_KEY(lhs) != KEYfuncall || field_ref_p(lhs) == NULL) {
+      // Ignore assignments whose target is not an object field.
       continue;
     }
     Expression object = field_ref_object(lhs);
     if (Expression_KEY(object) != KEYvalue_use ||
         USE_DECL(value_use_use(object)) != owner->fibered_attr.attr) {
+      // Only collect field writes directly on the owner's declared value.
       continue;
     }
     INSTANCE* field_instance = Expression_info(assign_rhs(declaration))->value_for;
     if (field_instance == NULL) {
+      // No dependency-graph instance is associated with this field write.
       continue;
     }
     std::vector<INSTANCE*> dependencies =
@@ -586,6 +590,8 @@ bool child_cycle_is_independent(AUG_GRAPH* graph, INSTANCE* cycle_instance) {
     }
   }
 
+  // A connection to a circular fiber or shared-info instance prevents
+  // this child cycle from being handled on its own.
   for (int index = 0; index < instance_count; ++index) {
     INSTANCE* instance = &graph->instances.array[index];
     if ((instance->fibered_attr.fiber == NULL &&

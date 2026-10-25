@@ -227,6 +227,8 @@ class FiberDependencyDumper {
 };
 
 static void emit_fixed_point_loop_start(ostream& os, const string& flag, bool is_independent = false, INSTANCE* cycle_instance = NULL) {
+  // An independent cycle can finish on its own. Otherwise, let an enclosing
+  // fixed-point loop drive it instead of starting a nested loop.
   if (is_independent) {
     if (cycle_instance != NULL && cycle_instance->node != NULL) {
       os << indent() << "if (" << synth_util::instance_to_attr(cycle_instance) << ".checkNode(v_" << decl_name(cycle_instance->node) << ").status != Evaluation.ASSIGNED) {\n";
@@ -346,6 +348,8 @@ static void emit_eager_phylum_evaluations(
         [](INSTANCE* source_instance) {
           return !synth_util::should_skip_synth_dependency(source_instance);
         });
+    // This sweep has no dependency arguments to pass. Leave functions that
+    // need them to their callers, and handle side effects in a separate pass.
     if (!function_state->is_phylum_instance ||
         function_state->is_side_effect_evaluation != emit_side_effects ||
         has_explicit_dependencies) {
@@ -353,6 +357,7 @@ static void emit_eager_phylum_evaluations(
     }
 
     Declaration phylum = function_state->source_phy_graph->phylum;
+    // Detached trees are not part of the evaluation.
     os << indent() << "for (node <- t_" << decl_name(phylum)
        << ".nodes if node.isRooted) {\n";
     ++nesting_level;
