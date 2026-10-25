@@ -11,6 +11,7 @@ AST_DIRS = ../tiny ../simple ../grammar ../farrow-lv ../farrow-ubd ../nested-ubd
 	../balanced ../bigger ../fj ../type ../conditional ../standalone
 SCALA_SOURCE_DIRS = ../tiny/scala ../simple/scala ../grammar/scala \
 	../farrow-lv/scala ../farrow-ubd/scala ../nested-ubd/scala ../bigger/scala
+PROGRAM_DIRS = $(addsuffix /programs,${AST_DIRS})
 APSPATH = ../tiny:../simple:../grammar:../farrow-lv:../farrow-ubd:../nested-ubd:../balanced:../bigger:../fj:../type:../conditional:../standalone:${APSTOP}/base
 SCALAFLAGS= -cp .:${OUT}:${APSLIB}
 SCALACFLAGS= ${SCALAFLAGS} -d ${OUT}
@@ -22,7 +23,8 @@ vpath %.aps ${AST_DIRS}
 vpath %.scala ${SCALA_SOURCE_DIRS}
 vpath %.lex ${AST_DIRS}
 vpath %.y ${AST_DIRS}
-vpath %.program ${SCALA_SOURCE_DIRS}
+vpath %.program ${PROGRAM_DIRS}
+vpath %.cfg ${PROGRAM_DIRS}
 
 EVALUATOR ?= DYNAMIC
 
