@@ -581,6 +581,11 @@ int if_rule_p(void *if_rule) {
     return 0;
   }
 }
+
+int for_rule_p(void *if_rule) {
+  return ABSTRACT_APS_tnode_phylum(if_rule) == KEYMatch &&
+         Declaration_KEY(Match_info((Match)if_rule)->header) == KEYfor_stmt;
+}
  
 static void *init_decl_cond(void *vcond, void *node) {
   CONDITION *cond = (CONDITION *)vcond;
