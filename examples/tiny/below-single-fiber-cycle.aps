@@ -37,7 +37,7 @@ module BELOW_SINGLE_FIBER_CYCLE[T :: var TINY[]] extends T begin
   end;
 
   var function index_scope(sc : ContextPtr; i : Integer) : ContextPtr begin
-    if sc = nil or i = 0 then
+    if sc = nil or i <= 0 then
       result := sc;
     else
       case sc begin
