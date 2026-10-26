@@ -52,14 +52,13 @@ static void *analyze_thing(void *ignore, void *node)
     default: break;
     case KEYmodule_decl:
       s = compute_dnc(decl, anc_analysis);
+      traverse_Declaration(check_circular_declarations, s, decl);
       if (anc_analysis) {
         if (cycle_debug & PRINT_CYCLE)
         {
           print_cycles(s, stdout);
         }
-        d = (s->original_state_dependency = analysis_state_cycle(s));
-        s->requires_circular_update_support = d != no_dependency;
-        traverse_Declaration(check_circular_declarations, s, decl);
+        s->original_state_dependency = analysis_state_cycle(s);
         s->requires_fixed_point_loop = global_dependencies_have_cycle(s);
         break;
       }
@@ -84,8 +83,6 @@ static void *analyze_thing(void *ignore, void *node)
         aps_error(decl, "Unable to handle dependency (%d); Attribute grammar is not DNC", d);
         return NULL;
       }
-
-      s->requires_circular_update_support = s->requires_fixed_point_loop;
 
       // If SCC scheduling is in-progress
       if (static_scc_schedule)
