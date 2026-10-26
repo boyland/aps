@@ -2870,6 +2870,8 @@ STATE *compute_dnc(Declaration module, bool anc_analysis) {
   STATE *s=(STATE *)HALLOC(sizeof(STATE));
   Declaration_info(module)->analysis_state = s;
   s->anc_analysis = anc_analysis;
+  s->requires_fixed_point_loop = FALSE;
+  s->requires_circular_update_support = FALSE;
   init_analysis_state(s,module);
   dnc_close(s);
   if (analysis_debug & (DNC_ITERATE|DNC_FINAL)) {

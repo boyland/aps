@@ -19,6 +19,27 @@ Several phases:
 bool static_scc_schedule = false;
 bool anc_analysis = false;
 
+static BOOL global_dependencies_have_cycle(STATE *s)
+{
+  AUG_GRAPH *aug_graph = &s->global_dependencies;
+  int n = aug_graph->instances.length;
+  int i;
+
+  for (i = 0; i < n; ++i) {
+    if (edgeset_kind(aug_graph->graph[i*n+i]) != no_dependency) return TRUE;
+  }
+  return FALSE;
+}
+
+static void *check_circular_declarations(void *context, void *node)
+{
+  STATE *s = (STATE *)context;
+  if (ABSTRACT_APS_tnode_phylum(node) == KEYDeclaration && decl_is_circular((Declaration)node)) {
+    s->requires_circular_update_support = TRUE;
+  }
+  return context;
+}
+
 static void *analyze_thing(void *ignore, void *node)
 {
   STATE *s;
@@ -31,19 +52,20 @@ static void *analyze_thing(void *ignore, void *node)
     default: break;
     case KEYmodule_decl:
       s = compute_dnc(decl, anc_analysis);
+      traverse_Declaration(check_circular_declarations, s, decl);
       if (anc_analysis) {
         if (cycle_debug & PRINT_CYCLE)
         {
           print_cycles(s, stdout);
         }
-        d = (s->original_state_dependency = analysis_state_cycle(s));
-        s->loop_required = !(d & DEPENDENCY_MAYBE_SIMPLE);
+        s->original_state_dependency = analysis_state_cycle(s);
+        s->requires_fixed_point_loop = global_dependencies_have_cycle(s);
         break;
       }
       if (!(d = (s->original_state_dependency = analysis_state_cycle(s))))
       {
         // Do nothing; no cycle to remove
-        s->loop_required = false;
+        s->requires_fixed_point_loop = false;
       }
       else if (!(d & DEPENDENCY_MAYBE_SIMPLE) || !(d & DEPENDENCY_NOT_JUST_FIBER))
       {
@@ -53,7 +75,7 @@ static void *analyze_thing(void *ignore, void *node)
           print_cycles(s, stdout);
         }
         break_fiber_cycles(decl, s, d);
-        s->loop_required = !(d & DEPENDENCY_MAYBE_SIMPLE);
+        s->requires_fixed_point_loop = !(d & DEPENDENCY_MAYBE_SIMPLE);
         d = no_dependency;  // clear dependency
       }
       else
