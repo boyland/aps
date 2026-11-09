@@ -49,7 +49,7 @@ static void dump_farrow_functions(STATE* s, ostream& os) {
 
   synth_functions_states = synth_util::build_synth_function_states(s);
   synth_completion_states = synth_util::build_synth_completion_states(s);
-  bool needs_fixed_point = s->loop_required;
+  bool needs_fixed_point = s->requires_circular_update_support;
 
   for (auto state_it = synth_functions_states.begin(); state_it != synth_functions_states.end(); state_it++) {
     synth_util::SynthFunctionState* synth_functions_state = *state_it;
@@ -461,7 +461,7 @@ class FarrowImpl : public SynthImplementation {
             decl_name(s->start_phylum));
       }
 
-      if (s->loop_required) {
+      if (s->requires_fixed_point_loop) {
         os << indent()
            << "val completionChanged = new AtomicBoolean(true);\n";
         os << indent() << "while (completionChanged.get) {\n";
@@ -485,7 +485,7 @@ class FarrowImpl : public SynthImplementation {
       --nesting_level;
       os << indent() << "}\n";
 
-      if (s->loop_required) {
+      if (s->requires_fixed_point_loop) {
         --nesting_level;
         os << indent() << "}\n";
       }

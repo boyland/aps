@@ -418,7 +418,7 @@ static bool implement_visit_function(
 
         ow->get_outstream() << indent() << "visit_" << n << "_" << ph << "(";
         ow->get_outstream() << "root";
-        if (s->loop_required) {
+        if (s->requires_fixed_point_loop) {
           ow->get_outstream() << ", ";
           if (loop_id == -1) {
             ow->get_outstream() << "new AtomicBoolean(false)";
@@ -501,7 +501,7 @@ static bool implement_visit_function(
 #ifdef APS2SCALA
       ow->get_outstream() << "v_" << decl_name(cto->child_decl);
 
-      if (s->loop_required) {
+      if (s->requires_fixed_point_loop) {
         ow->get_outstream() << ", ";
         dump_changed(loop_id, ow->get_outstream());
       }
@@ -819,7 +819,7 @@ static bool implement_visit_function(
               ow->get_outstream() << "set";
             ow->get_outstream() << "(" << rhs;
             
-            if (s->loop_required && is_circular) {
+            if (s->requires_fixed_point_loop && is_circular) {
               ow->get_outstream() << ", ";
               dump_changed(loop_id, ow->get_outstream());
             }
@@ -854,7 +854,7 @@ static bool implement_visit_function(
             ow->get_outstream()
                 << "(" << field_ref_object(lhs) << "," << rhs;
             
-            if (s->loop_required && is_circular) {
+            if (s->requires_fixed_point_loop && is_circular) {
               ow->get_outstream() << ", ";
               dump_changed(loop_id, ow->get_outstream());
             }
@@ -878,7 +878,7 @@ static bool implement_visit_function(
             else
               ow->get_outstream() << "set";
             ow->get_outstream() << "(anchor," << rhs;
-            if (s->loop_required && is_circular) {
+            if (s->requires_fixed_point_loop && is_circular) {
               ow->get_outstream() << ", ";
               dump_changed(loop_id, ow->get_outstream());
             }
@@ -956,7 +956,7 @@ static bool implement_visit_function(
             ow->get_outstream()
                 << "(v_" << decl_name(in->node) << "," << rhs;
 
-            if (s->loop_required && is_circular) {
+            if (s->requires_fixed_point_loop && is_circular) {
               ow->get_outstream() << ", ";
               dump_changed(loop_id, ow->get_outstream());
             }
@@ -981,7 +981,7 @@ static bool implement_visit_function(
             ow->get_outstream() << "set";
           ow->get_outstream()
               << "(v_" << decl_name(in->node) << "," << rhs;
-          if (s->loop_required && is_circular) {
+          if (s->requires_fixed_point_loop && is_circular) {
             ow->get_outstream() << ", changed";
           }
           ow->get_outstream() << ");\n";
@@ -1057,7 +1057,7 @@ static void dump_visit_functions(PHY_GRAPH* phy_graph,
     os << indent() << "def visit_" << pgn << "_" << phase << "_" << j
        << "(anchor : T_" << decl_name(phy_graph->phylum);
 
-       if (s->loop_required) {
+       if (s->requires_fixed_point_loop) {
          os << ", changed : AtomicBoolean";
        }
 
@@ -1088,7 +1088,7 @@ static void dump_visit_functions(PHY_GRAPH* phy_graph,
 
     OutputWriter ow(os);
     implement_visit_function(aug_graph, phase, total_order, instance_assignment,
-                             nch, &cond, -1, s->loop_required, -1, true, &ow);
+                             nch, &cond, -1, s->requires_fixed_point_loop, -1, true, &ow);
 
     --nesting_level;
 #ifdef APS2SCALA
@@ -1205,7 +1205,7 @@ static void dump_visit_functions(PHY_GRAPH* pg, output_streams& oss)
     os << indent() << "def visit_" << pgn << "_" << ph << "(node : T_"
        << decl_name(pg->phylum);
        
-    if (s->loop_required) {
+    if (s->requires_fixed_point_loop) {
       os << ", changed : AtomicBoolean";
     }
 
@@ -1235,7 +1235,7 @@ static void dump_visit_functions(PHY_GRAPH* pg, output_streams& oss)
          << "visit_" << pgn << "_" << ph << "_"
          << Declaration_info(cd)->instance_index << "(node";
 
-      if (s->loop_required) {
+      if (s->requires_fixed_point_loop) {
         os << ", changed";
       }
         
@@ -1244,7 +1244,7 @@ static void dump_visit_functions(PHY_GRAPH* pg, output_streams& oss)
       os << indent() << "case " << j << ":\n";
       ++nesting_level;
       os << indent() << "visit_" << pgn << "_" << ph << "_" << j << "(node";
-      if (s->loop_required) {
+      if (s->requires_fixed_point_loop) {
         os << ", changed";
       }
       os << ");\n";
