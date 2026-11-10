@@ -1,6 +1,15 @@
 MODULE_NAME = $(firstword $(subst /, ,$*))
-MODULE_SOURCES = $(or ${SOURCES_${MODULE_NAME}},${MODULE_NAME}.aps)
-MODULE_PARSER = ${PARSER_${MODULE_NAME}}
+DRIVERS = $(patsubst DRIVER.%,%,$(filter DRIVER.%,${.VARIABLES}))
+DRIVER_CLASSES = $(addsuffix .class,${DRIVERS})
+DRIVER_NAME = $(basename $@)
+MODULE = $(word 2,${DRIVER.${DRIVER_NAME}})
+MAIN_CLASS = $(or $(word 4,${DRIVER.${DRIVER_NAME}}),${DRIVER_NAME})
+module-drivers = $(foreach driver,${DRIVERS},$(if $(filter $1,$(word 2,${DRIVER.${driver}})),${driver}))
+MODULE_DRIVERS = $(call module-drivers,${MODULE_NAME})
+MODULE_GROUP = $(word 1,${DRIVER.$(firstword ${MODULE_DRIVERS})})
+MODULE_SOURCES = $(sort ${MODULE_NAME}.aps ${AST.${MODULE_GROUP}} \
+	$(foreach driver,${MODULE_DRIVERS},$(word 3,${DRIVER.${driver}})))
+MODULE_PARSER = ${PARSER.${MODULE_GROUP}}
 MODULE_APS = $(filter %.aps,${MODULE_SOURCES})
 MODULE_HANDCODE = $(filter %.scala,${MODULE_SOURCES})
 MODULE_SCALA = $(addprefix ${OUT}/${MODULE_NAME}/,$(notdir $(patsubst %.aps,%.scala,$(filter %.aps,${MODULE_SOURCES}))))
@@ -35,11 +44,14 @@ ${OUT}/%.scala: $$(notdir $$*).aps $$(MODULE_APS) ${APS2SCALA} ${MAKEFILE_LIST}
 	cd $(@D) && $(abspath ${APS2SCALA}) ${APS2SCALAFLAGS} \
 	  $(if $(filter $(notdir $*),${TREE_MODULES}),,${EVALUATOR_FLAGS}) $(notdir $*)
 
-${OUT}/%.lex: $$(or $$(PARSER_LEXER_$$(notdir $$*)),$$(error No lexer inputs configured for $$(notdir $$*)))
+PARSER_GROUPS = $(patsubst PARSER.%,%,$(filter PARSER.%,${.VARIABLES}))
+PARSER_GROUP = $(strip $(foreach group,${PARSER_GROUPS},$(if $(filter $(notdir $*),${PARSER.${group}}),${group})))
+
+${OUT}/%.lex: $$(PARSER_GROUP).lex $$(notdir $$*).lex.scala
 	mkdir -p $(@D)
 	cat $(filter %.lex.scala,$^) $(filter %.lex,$^) > $@
 
-${OUT}/%.y: $$(or $$(PARSER_GRAMMAR_$$(notdir $$*)),$$(error No grammar inputs configured for $$(notdir $$*)))
+${OUT}/%.y: $$(PARSER_GROUP).y $$(notdir $$*).y.scala
 	mkdir -p $(@D)
 	cat $(filter %.y,$^) $(filter %.y.scala,$^) > $@
 

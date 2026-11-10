@@ -1,7 +1,4 @@
-DRIVER_CLASSES += BiggerBindingDriver.class
-PARSER_LEXER_Bigger = bigger.lex Bigger.lex.scala
-PARSER_GRAMMAR_Bigger = bigger.y Bigger.y.scala
+AST.bigger = bigger.aps
+PARSER.bigger = Bigger
 
-SOURCES_bigger-binding = bigger.aps bigger-binding.aps bigger-binding-driver.scala
-PARSER_bigger-binding = Bigger
-BiggerBindingDriver.class BiggerBindingDriver.run: MODULE = bigger-binding
+DRIVER.BiggerBindingDriver = bigger bigger-binding bigger-binding-driver.scala

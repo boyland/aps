@@ -27,12 +27,6 @@ test:
 %.scc.sched: %.aps
 	${APSSCHED} -C ${DEBUG_FLAGS} -p ${BASE} $*
 
-%.scc.scala: %.aps force-scala
-	$(MAKE) -C scala $@
-
-%.farrow.scala: %.aps force-scala
-	$(MAKE) -C scala $@
-
 %.scala: %.aps force-scala
 	$(MAKE) -C scala $@
 

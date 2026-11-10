@@ -15,12 +15,6 @@ TEST_EVALUATORS ?= $(DEFAULT_EVALUATORS)
 %.scala: %.aps
 	$(MAKE) -C .. $@
 
-%.scc.scala: %.aps
-	$(MAKE) -C .. $@
-
-%.farrow.scala: %.aps
-	$(MAKE) -C .. $@
-
 test:
 	+@status=0; \
 	$(foreach driver,$(TEST_DRIVERS), \

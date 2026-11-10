@@ -29,8 +29,6 @@ FLAGS_FARROW = -F
 FLAGS_SCC = -C
 EVALUATOR_FLAGS = ${FLAGS_${EVALUATOR}}
 TREE_MODULES = simple bigger tiny grammar farrow-lv-tree farrow-ubd-tree nested-ubd-tree
-DRIVER_CLASSES =
-MAIN_CLASS = $(basename $@)
 
 vpath %.aps ${AST_DIRS}
 vpath %.scala ${SCALA_SOURCE_DIRS}
@@ -48,15 +46,6 @@ all: ${DRIVER_CLASSES}
 run: Classic.run TestCollDriver.run TestCycleDriver.run NestedCyclesDriver.run
 test:
 	+bash ./compare-evaluators.sh
-
-%.static.scala: %.aps force-generation
-	$(MAKE) EVALUATOR=STATIC static/$*/.generated
-
-%.scc.scala: %.aps force-generation
-	$(MAKE) EVALUATOR=SCC scc/$*/.generated
-
-%.farrow.scala: %.aps force-generation
-	$(MAKE) EVALUATOR=FARROW farrow/$*/.generated
 
 %.scala: %.aps force-generation
 	$(MAKE) ${OUT}/$*/.generated
