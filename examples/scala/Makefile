@@ -30,7 +30,7 @@ endif
 OUT_BASE = obj
 OUT = ${OUT_BASE}/${EVALUATOR}
 AST_TREE_SCALAGEN = simple.scala bigger.scala tiny.scala grammar.scala \
-	farrow-lv-tree.scala farrow-ubd-tree.scala
+	farrow-lv-tree.scala farrow-ubd-tree.scala nested-ubd-tree.scala
 EVALUATOR_EXAMPLES =
 EVALUATOR_CLASSES =
 ALL_CLASSES =
