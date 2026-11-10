@@ -1,11 +1,7 @@
-PARSER_PREFIXES += Bigger
-EVALUATOR_EXAMPLES += bigger-binding
-EVALUATOR_CLASSES += ${OUT}/bigger_binding_implicit.class
-DRIVER_CLASSES += ${OUT}/BiggerBindingDriver.class
+DRIVER_CLASSES += BiggerBindingDriver.class
+PARSER_LEXER_Bigger = bigger.lex Bigger.lex.scala
+PARSER_GRAMMAR_Bigger = bigger.y Bigger.y.scala
 
-Bigger.lex: bigger.lex Bigger.lex.scala
-Bigger.y: bigger.y Bigger.y.scala
-
-${OUT}/bigger_binding_implicit.class: bigger-binding${IMPL_SUFFIX} ${OUT}/bigger_implicit.class
-${OUT}/BiggerParserBase.class: ${OUT}/bigger_implicit.class
-${OUT}/BiggerBindingDriver.class: bigger-binding-driver.scala ${OUT}/bigger_binding_implicit.class ${OUT}/BiggerParser.class
+SOURCES_bigger-binding = bigger.aps bigger-binding.aps bigger-binding-driver.scala
+PARSER_bigger-binding = Bigger
+BiggerBindingDriver.class BiggerBindingDriver.run: MODULE = bigger-binding

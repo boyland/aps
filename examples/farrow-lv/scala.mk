@@ -1,11 +1,7 @@
-PARSER_PREFIXES += FarrowLv
-EVALUATOR_EXAMPLES += farrow-lv
-EVALUATOR_CLASSES += ${OUT}/FarrowLv_implicit.class
-DRIVER_CLASSES += ${OUT}/FarrowLvDriver.class
+DRIVER_CLASSES += FarrowLvDriver.class
+PARSER_LEXER_FarrowLv = farrow-lv.lex FarrowLv.lex.scala
+PARSER_GRAMMAR_FarrowLv = farrow-lv.y FarrowLv.y.scala
 
-FarrowLv.lex: farrow-lv.lex FarrowLv.lex.scala
-FarrowLv.y: farrow-lv.y FarrowLv.y.scala
-
-${OUT}/FarrowLv_implicit.class: farrow-lv${IMPL_SUFFIX} farrow-lv-tree.scala
-${OUT}/FarrowLvParserBase.class: ${OUT}/FarrowLv_implicit.class
-${OUT}/FarrowLvDriver.class: farrow-lv-driver.scala ${OUT}/FarrowLv_implicit.class ${OUT}/FarrowLvParser.class
+SOURCES_farrow-lv = farrow-lv-tree.aps farrow-lv.aps farrow-lv-driver.scala
+PARSER_farrow-lv = FarrowLv
+FarrowLvDriver.class FarrowLvDriver.run: MODULE = farrow-lv

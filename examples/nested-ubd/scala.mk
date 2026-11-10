@@ -1,13 +1,10 @@
-PARSER_PREFIXES += NestedUbd
-EVALUATOR_EXAMPLES += nested-ubd nested-ubd-fiber
-EVALUATOR_CLASSES += ${OUT}/NestedUbd_implicit.class ${OUT}/NestedUbdFiber_implicit.class
-DRIVER_CLASSES += ${OUT}/NestedUbdDriver.class ${OUT}/NestedUbdFiberDriver.class
+DRIVER_CLASSES += NestedUbdDriver.class NestedUbdFiberDriver.class
+PARSER_LEXER_NestedUbd = nested-ubd.lex NestedUbd.lex.scala
+PARSER_GRAMMAR_NestedUbd = nested-ubd.y NestedUbd.y.scala
 
-NestedUbd.lex: nested-ubd.lex NestedUbd.lex.scala
-NestedUbd.y: nested-ubd.y NestedUbd.y.scala
-
-${OUT}/NestedUbd_implicit.class: nested-ubd${IMPL_SUFFIX} nested-ubd-tree.scala
-${OUT}/NestedUbdFiber_implicit.class: nested-ubd-fiber${IMPL_SUFFIX} nested-ubd-tree.scala
-${OUT}/NestedUbdParserBase.class: ${OUT}/NestedUbd_implicit.class
-${OUT}/NestedUbdDriver.class: nested-ubd-driver.scala ${OUT}/NestedUbd_implicit.class ${OUT}/NestedUbdParser.class
-${OUT}/NestedUbdFiberDriver.class: nested-ubd-fiber-driver.scala ${OUT}/NestedUbdFiber_implicit.class ${OUT}/NestedUbdParser.class
+SOURCES_nested-ubd = nested-ubd-tree.aps nested-ubd.aps nested-ubd-driver.scala
+SOURCES_nested-ubd-fiber = nested-ubd-tree.aps nested-ubd-fiber.aps nested-ubd-fiber-driver.scala
+PARSER_nested-ubd = NestedUbd
+PARSER_nested-ubd-fiber = NestedUbd
+NestedUbdDriver.class NestedUbdDriver.run: MODULE = nested-ubd
+NestedUbdFiberDriver.class NestedUbdFiberDriver.run: MODULE = nested-ubd-fiber

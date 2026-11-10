@@ -11,83 +11,57 @@ APS2SCALA = ${APSTOP}/bin/aps2scala
 AST_DIRS = ../tiny ../simple ../grammar ../farrow-lv ../farrow-ubd ../nested-ubd \
 	../balanced ../bigger ../fj ../type ../conditional ../standalone
 SCALA_SOURCE_DIRS = $(addsuffix /scala,${AST_DIRS})
-APSPATH = $(subst $() $(),:,${AST_DIRS}):${APSTOP}/base
-SCALAFLAGS = -cp .:${OUT}:${APSLIB}
-SCALACFLAGS = ${SCALAFLAGS} -d ${OUT}
+APSPATH = $(subst $() $(),:,$(abspath ${AST_DIRS} ${APSTOP}/base))
 APS2SCALAFLAGS = -p ${APSPATH} -G
 EVALUATOR ?= DYNAMIC
 
-ifeq (${EVALUATOR},STATIC)
-IMPL_SUFFIX = .static.scala
-else ifeq (${EVALUATOR},FARROW)
-IMPL_SUFFIX = .farrow.scala
-else ifeq (${EVALUATOR},DYNAMIC)
-IMPL_SUFFIX = .scala
-else
-$(error Unknown EVALUATOR '${EVALUATOR}'; expected DYNAMIC, STATIC or FARROW)
+OUTPUT_DYNAMIC = dynamic
+OUTPUT_STATIC = static
+OUTPUT_FARROW = farrow
+OUTPUT_SCC = scc
+ifeq (${OUTPUT_${EVALUATOR}},)
+$(error Unknown EVALUATOR '${EVALUATOR}'; expected DYNAMIC, STATIC, FARROW or SCC)
 endif
 
-OUT_BASE = obj
-OUT = ${OUT_BASE}/${EVALUATOR}
-AST_TREE_SCALAGEN = simple.scala bigger.scala tiny.scala grammar.scala \
-	farrow-lv-tree.scala farrow-ubd-tree.scala nested-ubd-tree.scala
-EVALUATOR_EXAMPLES =
-EVALUATOR_CLASSES =
+OUT = ${OUTPUT_${EVALUATOR}}
+FLAGS_STATIC = -S -C
+FLAGS_FARROW = -F
+FLAGS_SCC = -C
+EVALUATOR_FLAGS = ${FLAGS_${EVALUATOR}}
+TREE_MODULES = simple bigger tiny grammar farrow-lv-tree farrow-ubd-tree nested-ubd-tree
 DRIVER_CLASSES =
-ADDITIONAL_CLASSES =
-ALL_CLASSES = ${DRIVER_CLASSES} ${ADDITIONAL_CLASSES}
-PARSER_PREFIXES =
-MISCGEN = *.output *.lex *.y *.scala~
+MAIN_CLASS = $(basename $@)
 
 vpath %.aps ${AST_DIRS}
 vpath %.scala ${SCALA_SOURCE_DIRS}
 vpath %.lex ${AST_DIRS}
 vpath %.y ${AST_DIRS}
-vpath %.program $(addsuffix /programs,${AST_DIRS})
-vpath %.cfg $(addsuffix /programs,${AST_DIRS})
 
 include $(wildcard ../*/scala.mk)
 include rules.mk
 
-SCALAGEN = ${AST_TREE_SCALAGEN} \
-	$(foreach example,${EVALUATOR_EXAMPLES},$(example).scala $(example).static.scala $(example).scc.scala $(example).farrow.scala)
-
-.PHONY: all clean run test phony_explicit
+.PHONY: all clean run test force-generation
+.DELETE_ON_ERROR:
 .SECONDARY:
 
-all: ${ALL_CLASSES} ${BINDING_VARIANT_CLASSES}
+all: ${DRIVER_CLASSES}
 run: Classic.run TestCollDriver.run TestCycleDriver.run NestedCyclesDriver.run
 test:
 	+bash ./compare-evaluators.sh
-phony_explicit:
 
-${OUT}:
-	mkdir -p $@
+%.static.scala: %.aps force-generation
+	$(MAKE) EVALUATOR=STATIC static/$*/.generated
 
-%.static.scala: %.aps ${APS2SCALA}
-	${APS2SCALA} ${APS2SCALAFLAGS} -S -C $*
-	cp $*.scala $@
+%.scc.scala: %.aps force-generation
+	$(MAKE) EVALUATOR=SCC scc/$*/.generated
 
-%.scc.scala: %.aps ${APS2SCALA}
-	${APS2SCALA} ${APS2SCALAFLAGS} -C $*
-	cp $*.scala $@
+%.farrow.scala: %.aps force-generation
+	$(MAKE) EVALUATOR=FARROW farrow/$*/.generated
 
-%.farrow.scala: %.aps ${APS2SCALA}
-	${APS2SCALA} ${APS2SCALAFLAGS} -F $*
-	cp $*.scala $@
+%.scala: %.aps force-generation
+	$(MAKE) ${OUT}/$*/.generated
 
-%.scala: %.aps ${APS2SCALA}
-	${APS2SCALA} ${APS2SCALAFLAGS} $*
-
-${OUT}/%_implicit.class: %.scala | ${OUT}
-	${SCALAC} ${SCALACFLAGS} $<
-	@touch $@
-
-%.class: ${OUT}/%.class ;
-
-%.run: ${OUT}/%.class
-	${SCALA} ${JVMFLAGS} ${SCALAFLAGS} $* ${ARGS}
+force-generation:
 
 clean:
-	rm -rf ${OUT_BASE}
-	rm -f *.class ${SCALAGEN} ${MISCGEN}
+	rm -rf dynamic static farrow scc
