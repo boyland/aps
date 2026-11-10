@@ -8,6 +8,10 @@ STATIC_EVALUATOR="STATIC"
 FARROW_EVALUATOR="FARROW"
 DEFAULT_EVALUATORS="$DYNAMIC_EVALUATOR,$STATIC_EVALUATOR"
 
+if [ $# -eq 0 ]; then
+  exec make -C "$SCRIPT_DIR/.." test
+fi
+
 extract_results() {
   sed -n '/^Results:$/,$p'
 }
@@ -18,13 +22,18 @@ run_with_evaluator() {
   local args="$3"
   local outfile="$4"
 
-  if ! make EVALUATOR="$evaluator" "$driver.class" > /dev/null 2>&1; then
+  if ! make EVALUATOR="$evaluator" "$driver.class" > "$outfile.log" 2>&1; then
+    cat "$outfile.log"
     return 1
   fi
   local start end
   start=$(date +%s.%N)
-  make EVALUATOR="$evaluator" ARGS="$args" "$driver.run" 2>&1 | extract_results > "$outfile"
-  local run_status=${PIPESTATUS[0]}
+  make EVALUATOR="$evaluator" ARGS="$args" "$driver.run" > "$outfile.log" 2>&1
+  local run_status=$?
+  extract_results < "$outfile.log" > "$outfile"
+  if [ "$run_status" -ne 0 ]; then
+    cat "$outfile.log"
+  fi
   end=$(date +%s.%N)
   printf "  %s finished in %.2fs\n" "$evaluator" "$(echo "$end - $start" | bc)"
   return "$run_status"
@@ -101,71 +110,34 @@ run_driver() {
   local programs="$2"
   local evaluators="$3"
   local -a program_list
+  local -a matches
+  local program input
   local pass=true
   IFS=',' read -ra program_list <<< "$programs"
   for program in "${program_list[@]}"; do
-    run_driver_once "$driver" "$program" "$evaluators" || pass=false
+    if [[ "$program" == *"*"* || "$program" == *"?"* || "$program" == *"["* ]]; then
+      mapfile -t matches < <(compgen -G "$program" | LC_ALL=C sort)
+    else
+      run_driver_once "$driver" "$program" "$evaluators" || pass=false
+      continue
+    fi
+
+    local found_file=false
+    for input in "${matches[@]}"; do
+      [ -f "$input" ] || continue
+      found_file=true
+      run_driver_once "$driver" "$input" "$evaluators" || pass=false
+    done
+    if ! $found_file; then
+      echo "No program files found for: $program" >&2
+      pass=false
+    fi
   done
   $pass
 }
 
-if [ $# -gt 0 ]; then
-  driver="$1"
-  args="${2:-}"
-  evals="${3:-$DEFAULT_EVALUATORS}"
-  run_driver "$driver" "$args" "$evals"
-  exit $?
-fi
-
-TESTS=(
-  "BroadFiberCycleDriver|tiny.program|$DEFAULT_EVALUATORS"
-  "BelowFiberCycleDriver|tiny.program|$DEFAULT_EVALUATORS"
-  "BelowSingleFiberCycleDriver|tiny.program|$DEFAULT_EVALUATORS"
-  "LocalFiberCycleDriver|tiny.program|$DEFAULT_EVALUATORS"
-  "TestCollDriver|tiny.program|$DEFAULT_EVALUATORS"
-  "TestUseCollDriver|tiny.program|$DEFAULT_EVALUATORS"
-  "TestCycleDriver|tiny.program|$DEFAULT_EVALUATORS"
-  "UseGlobal|tiny.program|$DEFAULT_EVALUATORS"
-  "FarrowUbdDriver|farrow-ubd.program|$DEFAULT_EVALUATORS,$FARROW_EVALUATOR"
-  "FarrowUbdFiberDriver|farrow-ubd.program|$DEFAULT_EVALUATORS"
-  "NestedUbdDriver|nested-ubd.program|$DEFAULT_EVALUATORS,$FARROW_EVALUATOR"
-  "NestedUbdFiberDriver|nested-ubd.program|$DEFAULT_EVALUATORS"
-  "TestFieldsDriver|tiny.program|$DEFAULT_EVALUATORS"
-  "FirstDriver|grammar.cfg|$DEFAULT_EVALUATORS"
-  "FollowDriver|grammar.cfg|$DEFAULT_EVALUATORS"
-  "NullableDriver|grammar.cfg|$DEFAULT_EVALUATORS"
-  "SimpleBindingDriver|simple.program|$DEFAULT_EVALUATORS"
-  "BiggerBindingDriver|bigger.program|$DEFAULT_EVALUATORS"
-  "SimpleBinding1Driver|simple.program|$DEFAULT_EVALUATORS"
-  "SimpleBinding2Driver|simple.program|$DEFAULT_EVALUATORS"
-  "SimpleBinding3Driver|simple.program|$DEFAULT_EVALUATORS"
-  "TestForDriver|tiny.program|$DEFAULT_EVALUATORS"
-  "TestForPatternsDriver|tiny.program,tiny-singleton.program,tiny-empty.program|$DEFAULT_EVALUATORS"
-  "TestCasePatternsDriver|tiny.program,tiny-singleton.program,tiny-empty.program|$DEFAULT_EVALUATORS"
-  "TestNestedPatternsDriver|tiny.program,tiny-singleton.program,tiny-empty.program|$DEFAULT_EVALUATORS"
-  "SimpleSncDriver|simple.program|$DYNAMIC_EVALUATOR,$FARROW_EVALUATOR"
-  "SimpleSncFiberDriver|simple.program|$DYNAMIC_EVALUATOR"
-)
-
-failures=0
-total=0
-
-for test in "${TESTS[@]}"; do
-  IFS="|" read -r driver args evals <<< "$test"
-  evals="${evals:-$DEFAULT_EVALUATORS}"
-  total=$((total + 1))
-  return_code=0
-  run_driver "$driver" "$args" "$evals" || return_code=$?
-  if [ $return_code -ne 0 ]; then
-    failures=$((failures + 1))
-  fi
-  echo ""
-done
-
-echo "=============================="
-echo "$((total - failures))/$total passed"
-if [ $failures -gt 0 ]; then
-  echo "$failures FAILED"
-  exit 1
-fi
-echo "All passed!"
+driver="$1"
+args="${2:-}"
+evals="${3:-$DEFAULT_EVALUATORS}"
+run_driver "$driver" "$args" "$evals"
+exit $?
