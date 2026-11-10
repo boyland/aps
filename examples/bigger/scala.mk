@@ -1,4 +1,3 @@
-AST.bigger = bigger.aps
 PARSER.bigger = Bigger
 
-DRIVER.BiggerBindingDriver = bigger bigger-binding bigger-binding-driver.scala
+DRIVER.BiggerBindingDriver = bigger-binding.aps bigger-binding-driver.scala
