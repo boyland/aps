@@ -1,7 +1,7 @@
 PARSERS += Grammar
 EVALUATOR_EXAMPLES += first follow nullable
 EVALUATOR_CLASSES += ${OUT}/grammar_implicit.class
-ALL_CLASSES += ${OUT}/FirstDriver.class ${OUT}/FollowDriver.class ${OUT}/NullableDriver.class
+DRIVER_CLASSES += ${OUT}/FirstDriver.class ${OUT}/FollowDriver.class ${OUT}/NullableDriver.class
 
 Grammar.lex: grammar.lex Grammar.lex.scala
 Grammar.y: grammar.y Grammar.y.scala

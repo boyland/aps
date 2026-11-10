@@ -1,7 +1,7 @@
 PARSERS += FarrowLv
 EVALUATOR_EXAMPLES += farrow-lv
 EVALUATOR_CLASSES += ${OUT}/FarrowLv_implicit.class
-ALL_CLASSES += ${OUT}/FarrowLvDriver.class
+DRIVER_CLASSES += ${OUT}/FarrowLvDriver.class
 
 FarrowLv.lex: farrow-lv.lex FarrowLv.lex.scala
 FarrowLv.y: farrow-lv.y FarrowLv.y.scala

@@ -12,7 +12,8 @@ TINY_DRIVER_CLASSES = $(addprefix ${OUT}/,BroadFiberCycleDriver.class BelowFiber
 	BelowSingleFiberCycleDriver.class LocalFiberCycleDriver.class TestCollDriver.class \
 	TestUseCollDriver.class TestCycleDriver.class UseGlobal.class TestFieldsDriver.class \
 	TestForDriver.class TestForPatternsDriver.class TestCasePatternsDriver.class TestNestedPatternsDriver.class)
-ALL_CLASSES += ${TINY_DRIVER_CLASSES} ${OUT}/TinyParser.class ${OUT}/FinishDriver.class
+DRIVER_CLASSES += ${TINY_DRIVER_CLASSES} ${OUT}/FinishDriver.class
+ADDITIONAL_CLASSES += ${OUT}/TinyParser.class
 
 ${TINY_EVALUATOR_CLASSES} ${OUT}/TinyParser.class: ${OUT}/tiny_implicit.class
 ${TINY_DRIVER_CLASSES}: ${OUT}/TinyParser.class

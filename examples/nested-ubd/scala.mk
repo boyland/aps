@@ -1,7 +1,7 @@
 PARSERS += NestedUbd
 EVALUATOR_EXAMPLES += nested-ubd nested-ubd-fiber
 EVALUATOR_CLASSES += ${OUT}/NestedUbd_implicit.class ${OUT}/NestedUbdFiber_implicit.class
-ALL_CLASSES += ${OUT}/NestedUbdDriver.class ${OUT}/NestedUbdFiberDriver.class
+DRIVER_CLASSES += ${OUT}/NestedUbdDriver.class ${OUT}/NestedUbdFiberDriver.class
 
 NestedUbd.lex: nested-ubd.lex NestedUbd.lex.scala
 NestedUbd.y: nested-ubd.y NestedUbd.y.scala

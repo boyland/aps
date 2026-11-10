@@ -4,7 +4,7 @@ EVALUATOR_EXAMPLES += classic-binding nested-cycles simple-snc simple-snc-fiber 
 SIMPLE_EVALUATOR_CLASSES = ${OUT}/classic_binding_implicit.class ${OUT}/nested_cycles_implicit.class \
 	${OUT}/simple_snc_implicit.class ${OUT}/simple_snc_fiber_implicit.class ${OUT}/simple_binding_implicit.class
 EVALUATOR_CLASSES += ${SIMPLE_EVALUATOR_CLASSES}
-ALL_CLASSES += ${OUT}/Classic.class ${OUT}/NestedCyclesDriver.class ${OUT}/SimpleSncDriver.class \
+DRIVER_CLASSES += ${OUT}/Classic.class ${OUT}/NestedCyclesDriver.class ${OUT}/SimpleSncDriver.class \
 	${OUT}/SimpleSncFiberDriver.class ${OUT}/SimpleBindingDriver.class
 BINDING_VARIANT_CLASSES = SimpleBinding1Driver.class SimpleBinding2Driver.class SimpleBinding3Driver.class
 BINDING_VARIANT_RUNS = SimpleBinding1Driver.run SimpleBinding2Driver.run SimpleBinding3Driver.run

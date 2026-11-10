@@ -1,7 +1,7 @@
 PARSERS += Bigger
 EVALUATOR_EXAMPLES += bigger-binding
 EVALUATOR_CLASSES += ${OUT}/bigger_binding_implicit.class
-ALL_CLASSES += ${OUT}/BiggerBindingDriver.class
+DRIVER_CLASSES += ${OUT}/BiggerBindingDriver.class
 
 Bigger.lex: bigger.lex Bigger.lex.scala
 Bigger.y: bigger.y Bigger.y.scala

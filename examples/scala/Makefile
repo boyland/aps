@@ -33,7 +33,9 @@ AST_TREE_SCALAGEN = simple.scala bigger.scala tiny.scala grammar.scala \
 	farrow-lv-tree.scala farrow-ubd-tree.scala nested-ubd-tree.scala
 EVALUATOR_EXAMPLES =
 EVALUATOR_CLASSES =
-ALL_CLASSES =
+DRIVER_CLASSES =
+ADDITIONAL_CLASSES =
+ALL_CLASSES = ${DRIVER_CLASSES} ${ADDITIONAL_CLASSES}
 PARSERS =
 MISCGEN = *.output *.lex *.y *.scala~
 
