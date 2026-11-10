@@ -36,7 +36,7 @@ EVALUATOR_CLASSES =
 DRIVER_CLASSES =
 ADDITIONAL_CLASSES =
 ALL_CLASSES = ${DRIVER_CLASSES} ${ADDITIONAL_CLASSES}
-PARSERS =
+PARSER_PREFIXES =
 MISCGEN = *.output *.lex *.y *.scala~
 
 vpath %.aps ${AST_DIRS}
@@ -50,7 +50,7 @@ include $(wildcard ../*/scala.mk)
 include rules.mk
 
 SCALAGEN = ${AST_TREE_SCALAGEN} \
-	$(foreach example,${EVALUATOR_EXAMPLES},$(example).scala $(example).static.scala $(example).farrow.scala)
+	$(foreach example,${EVALUATOR_EXAMPLES},$(example).scala $(example).static.scala $(example).scc.scala $(example).farrow.scala)
 
 .PHONY: all clean run test phony_explicit
 .SECONDARY:
@@ -66,6 +66,10 @@ ${OUT}:
 
 %.static.scala: %.aps ${APS2SCALA}
 	${APS2SCALA} ${APS2SCALAFLAGS} -S -C $*
+	cp $*.scala $@
+
+%.scc.scala: %.aps ${APS2SCALA}
+	${APS2SCALA} ${APS2SCALAFLAGS} -C $*
 	cp $*.scala $@
 
 %.farrow.scala: %.aps ${APS2SCALA}

@@ -1,4 +1,4 @@
-PARSERS += Simple
+PARSER_PREFIXES += Simple
 EVALUATOR_EXAMPLES += classic-binding nested-cycles simple-snc simple-snc-fiber \
 	simple-binding simple-binding1 simple-binding2 simple-binding3
 SIMPLE_EVALUATOR_CLASSES = ${OUT}/classic_binding_implicit.class ${OUT}/nested_cycles_implicit.class \

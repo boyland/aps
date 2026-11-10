@@ -4,30 +4,35 @@ SCHED_MODULES ?= $(filter-out $(AST_MODULES),$(basename $(notdir $(wildcard *.ap
 SCALA_DRIVERS ?=
 TEST_DRIVERS ?=
 TEST_PROGRAMS ?= ../$(EXAMPLE)/programs/*
-TEST_EVALUATORS ?= DYNAMIC,STATIC
+DEFAULT_EVALUATORS ?= DYNAMIC,STATIC
+TEST_EVALUATORS ?= $(DEFAULT_EVALUATORS)
 
 .PHONY: all sched scala test
 
+%.sched: %.aps
+	$(MAKE) -C .. $@
+
+%.scala: %.aps
+	$(MAKE) -C .. $@
+
+%.scc.scala: %.aps
+	$(MAKE) -C .. $@
+
+%.farrow.scala: %.aps
+	$(MAKE) -C .. $@
+
 test:
-ifeq ($(strip $(TEST_DRIVERS)),)
-	@echo "No evaluator tests configured for $(EXAMPLE)" >&2; exit 2
-else
-	+bash ../scala/compare-evaluators.sh --batch \
-		$(foreach driver,$(TEST_DRIVERS),$(driver) '$(TEST_PROGRAMS)' '$(or $(TEST_EVALUATORS_$(driver)),$(TEST_EVALUATORS))')
-endif
+	+@status=0; \
+	$(foreach driver,$(TEST_DRIVERS), \
+	  bash ../scala/compare-evaluators.sh $(driver) '$(TEST_PROGRAMS)' \
+	    '$(or $(TEST_EVALUATORS_$(driver)),$(TEST_EVALUATORS))' || status=1;) \
+	exit $$status
 
 all: scala
 
-sched:
-ifeq ($(strip $(SCHED_MODULES)),)
-	@echo "No scheduler modules configured for $(EXAMPLE)" >&2; exit 2
-else
-	$(MAKE) -C .. $(addsuffix .sched,$(SCHED_MODULES))
-endif
+sched: $(addsuffix .sched,$(SCHED_MODULES))
 
 scala:
-ifeq ($(strip $(SCALA_DRIVERS)),)
-	@echo "No Scala drivers configured for $(EXAMPLE)" >&2; exit 2
-else
-	$(MAKE) -C ../scala $(addsuffix .class,$(SCALA_DRIVERS))
-endif
+	+@for driver in $(SCALA_DRIVERS); do \
+	  $(MAKE) -C ../scala $$driver.class || exit $$?; \
+	done

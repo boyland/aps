@@ -1,4 +1,4 @@
-PARSERS += NestedUbd
+PARSER_PREFIXES += NestedUbd
 EVALUATOR_EXAMPLES += nested-ubd nested-ubd-fiber
 EVALUATOR_CLASSES += ${OUT}/NestedUbd_implicit.class ${OUT}/NestedUbdFiber_implicit.class
 DRIVER_CLASSES += ${OUT}/NestedUbdDriver.class ${OUT}/NestedUbdFiberDriver.class

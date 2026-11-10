@@ -1,4 +1,4 @@
-PARSERS += Grammar
+PARSER_PREFIXES += Grammar
 EVALUATOR_EXAMPLES += first follow nullable
 EVALUATOR_CLASSES += ${OUT}/grammar_implicit.class
 DRIVER_CLASSES += ${OUT}/FirstDriver.class ${OUT}/FollowDriver.class ${OUT}/NullableDriver.class

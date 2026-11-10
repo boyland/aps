@@ -1,4 +1,4 @@
-PARSERS += FarrowLv
+PARSER_PREFIXES += FarrowLv
 EVALUATOR_EXAMPLES += farrow-lv
 EVALUATOR_CLASSES += ${OUT}/FarrowLv_implicit.class
 DRIVER_CLASSES += ${OUT}/FarrowLvDriver.class

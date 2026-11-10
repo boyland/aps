@@ -10,20 +10,7 @@ DEFAULT_EVALUATORS="$DYNAMIC_EVALUATOR,$STATIC_EVALUATOR"
 
 if [ $# -eq 0 ]; then
   exec make -C "$SCRIPT_DIR/.." test
-elif [ "$1" == "--suite" ]; then
-  if [ $# -ne 2 ] || [[ "$2" == */* ]] || [ ! -f "../$2/GNUmakefile" ]; then
-    echo "Expected one example folder containing a GNUmakefile" >&2
-    exit 2
-  fi
-  exec make -C "$SCRIPT_DIR/../$2" test
 fi
-
-trim() {
-  local value="$1"
-  value="${value#"${value%%[![:space:]]*}"}"
-  value="${value%"${value##*[![:space:]]}"}"
-  printf '%s' "$value"
-}
 
 extract_results() {
   sed -n '/^Results:$/,$p'
@@ -52,7 +39,7 @@ run_with_evaluator() {
   return "$run_status"
 }
 
-compare_driver() {
+run_driver_once() {
   local driver="$1"
   local args="$2"
   local -a evals
@@ -66,7 +53,6 @@ compare_driver() {
 
   local built_evaluators=()
   for eval in "${evals[@]}"; do
-    eval=$(trim "$eval")
     echo "  running $eval ..."
     if ! run_with_evaluator "$eval" "$driver" "$args" "$tmpdir/$eval"; then
       echo "  FAIL: $eval failed"
@@ -129,18 +115,18 @@ run_driver() {
   local pass=true
   IFS=',' read -ra program_list <<< "$programs"
   for program in "${program_list[@]}"; do
-    program=$(trim "$program")
     if [[ "$program" == *"*"* || "$program" == *"?"* || "$program" == *"["* ]]; then
       mapfile -t matches < <(compgen -G "$program" | LC_ALL=C sort)
     else
-      matches=("$program")
+      run_driver_once "$driver" "$program" "$evaluators" || pass=false
+      continue
     fi
 
     local found_file=false
     for input in "${matches[@]}"; do
       [ -f "$input" ] || continue
       found_file=true
-      compare_driver "$driver" "$input" "$evaluators" || pass=false
+      run_driver_once "$driver" "$input" "$evaluators" || pass=false
     done
     if ! $found_file; then
       echo "No program files found for: $program" >&2
@@ -150,40 +136,8 @@ run_driver() {
   $pass
 }
 
-if [ "$1" != "--batch" ]; then
-  driver="$1"
-  args="${2:-}"
-  evals="${3:-$DEFAULT_EVALUATORS}"
-  run_driver "$driver" "$args" "$evals"
-  exit $?
-fi
-
-failures=0
-total=0
-shift
-if [ $# -eq 0 ] || [ $(($# % 3)) -ne 0 ]; then
-  echo "Usage: $0 --batch <driver> <programs> <evaluators> [...]" >&2
-  exit 2
-fi
-
-while [ $# -gt 0 ]; do
-  driver="$1"
-  args="$2"
-  evals="$3"
-  shift 3
-  if [ -z "$driver" ] || [ -z "$args" ] || [ -z "$evals" ]; then
-    echo "Missing driver, programs or evaluators in comparison batch" >&2
-    exit 2
-  fi
-  total=$((total + 1))
-  run_driver "$driver" "$args" "$evals" || failures=$((failures + 1))
-  echo ""
-done
-
-echo "=============================="
-echo "$((total - failures))/$total passed"
-if [ $failures -gt 0 ]; then
-  echo "$failures FAILED"
-  exit 1
-fi
-echo "All passed!"
+driver="$1"
+args="${2:-}"
+evals="${3:-$DEFAULT_EVALUATORS}"
+run_driver "$driver" "$args" "$evals"
+exit $?

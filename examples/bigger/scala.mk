@@ -1,4 +1,4 @@
-PARSERS += Bigger
+PARSER_PREFIXES += Bigger
 EVALUATOR_EXAMPLES += bigger-binding
 EVALUATOR_CLASSES += ${OUT}/bigger_binding_implicit.class
 DRIVER_CLASSES += ${OUT}/BiggerBindingDriver.class

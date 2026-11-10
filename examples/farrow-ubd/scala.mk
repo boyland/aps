@@ -1,4 +1,4 @@
-PARSERS += FarrowUbd
+PARSER_PREFIXES += FarrowUbd
 EVALUATOR_EXAMPLES += farrow-ubd farrow-ubd-fiber
 EVALUATOR_CLASSES += ${OUT}/FarrowUbd_implicit.class ${OUT}/FarrowUbdFiber_implicit.class
 DRIVER_CLASSES += ${OUT}/FarrowUbdDriver.class ${OUT}/FarrowUbdFiberDriver.class
