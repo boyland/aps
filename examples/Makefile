@@ -6,8 +6,23 @@ BASE=$(subst $() $(),:,$(AST_DIRS)):../base
 
 vpath %.aps $(AST_DIRS)
 
-default:
-	@echo "Try 'make simple-oag.sched' to schedule AG in simple-oag"
+default: test
+
+TEST_DIRS = tiny simple bigger grammar farrow-ubd nested-ubd
+
+sched:
+	@set -e; for dir in $(AST_DIRS); do \
+	  $(MAKE) -C $$dir $@; \
+	done
+
+scala:
+	$(MAKE) -C scala all
+
+test:
+	+@status=0; for dir in $(TEST_DIRS); do \
+	  $(MAKE) -C $$dir test || status=1; \
+	done; \
+	exit $$status
 
 %.sched: %.aps
 	${APSSCHED} ${DEBUG_FLAGS} -p ${BASE} $*
@@ -27,4 +42,4 @@ default:
 %.debug: %.aps
 	gdb --args "${APSSCHED}" "${DEBUG_FLAGS}" "-p" "${BASE}" "$*"
 
-.PHONY: default %.sched
+.PHONY: default sched scala test %.sched

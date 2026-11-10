@@ -1,524 +1,86 @@
-APSTOP= ../..
-SCALAC= scalac -J-Xmx4g
-SCALA= scala
-SCALAV= 2.13
-JVMFLAGS= -J-Xss64m -J-Xmx16g 
+.DEFAULT_GOAL := all
+APSTOP = ../..
+SCALAC = scalac -J-Xmx4g
+SCALA = scala
+SCALAV = 2.13
+JVMFLAGS = -J-Xss64m -J-Xmx16g
 APSLIB = ${APSTOP}/lib/aps-library.jar
-SCALAFLEX= ${APSTOP}/lib/JFlex+scala.jar
-SCALABISON= ${APSTOP}/lib/scala-bison.jar
+SCALABISON = ${HOME}/git/scala-bison/scala-bison-2.13.jar
+SCALAFLEX = ${HOME}/Documents/Courses/sp26-cs654/etc/JFlex.jar
 APS2SCALA = ${APSTOP}/bin/aps2scala
 AST_DIRS = ../tiny ../simple ../grammar ../farrow-lv ../farrow-ubd ../nested-ubd \
 	../balanced ../bigger ../fj ../type ../conditional ../standalone
-SCALA_SOURCE_DIRS = ../tiny/scala ../simple/scala ../grammar/scala \
-	../farrow-lv/scala ../farrow-ubd/scala ../nested-ubd/scala ../bigger/scala
-PROGRAM_DIRS = $(addsuffix /programs,${AST_DIRS})
-APSPATH = ../tiny:../simple:../grammar:../farrow-lv:../farrow-ubd:../nested-ubd:../balanced:../bigger:../fj:../type:../conditional:../standalone:${APSTOP}/base
-SCALAFLAGS= -cp .:${OUT}:${APSLIB}
-SCALACFLAGS= ${SCALAFLAGS} -d ${OUT}
+SCALA_SOURCE_DIRS = $(addsuffix /scala,${AST_DIRS})
+APSPATH = $(subst $() $(),:,${AST_DIRS}):${APSTOP}/base
+SCALAFLAGS = -cp .:${OUT}:${APSLIB}
+SCALACFLAGS = ${SCALAFLAGS} -d ${OUT}
 APS2SCALAFLAGS = -p ${APSPATH} -G
-SCALABISON= ${HOME}/git/scala-bison/scala-bison-2.13.jar
-SCALAFLEX= ${HOME}/Documents/Courses/sp26-cs654/etc/JFlex.jar
-
-vpath %.aps ${AST_DIRS}
-vpath %.scala ${SCALA_SOURCE_DIRS}
-vpath %.lex ${AST_DIRS}
-vpath %.y ${AST_DIRS}
-vpath %.program ${PROGRAM_DIRS}
-vpath %.cfg ${PROGRAM_DIRS}
-
 EVALUATOR ?= DYNAMIC
 
 ifeq (${EVALUATOR},STATIC)
 IMPL_SUFFIX = .static.scala
 else ifeq (${EVALUATOR},FARROW)
 IMPL_SUFFIX = .farrow.scala
-else
+else ifeq (${EVALUATOR},DYNAMIC)
 IMPL_SUFFIX = .scala
+else
+$(error Unknown EVALUATOR '${EVALUATOR}'; expected DYNAMIC, STATIC or FARROW)
 endif
 
 OUT_BASE = obj
 OUT = ${OUT_BASE}/${EVALUATOR}
-$(shell mkdir -p ${OUT})
-
 AST_TREE_SCALAGEN = simple.scala bigger.scala tiny.scala grammar.scala \
 	farrow-lv-tree.scala farrow-ubd-tree.scala
-EVALUATOR_EXAMPLES = classic-binding first follow nullable test-coll \
-	test-use-coll test-cycle test-fields use-global broad-fiber-cycle \
-	below-fiber-cycle below-single-fiber-cycle local-fiber-cycle nested-cycles \
-	farrow-lv farrow-ubd farrow-ubd-fiber nested-ubd nested-ubd-fiber simple-snc \
-	simple-binding simple-binding1 simple-binding2 simple-binding3 bigger-binding test-for \
-	simple-snc-fiber test-finish test-for-patterns test-case-patterns test-nested-patterns
+EVALUATOR_EXAMPLES =
+EVALUATOR_CLASSES =
+ALL_CLASSES =
+PARSERS =
+MISCGEN = *.output *.lex *.y *.scala~
+
+vpath %.aps ${AST_DIRS}
+vpath %.scala ${SCALA_SOURCE_DIRS}
+vpath %.lex ${AST_DIRS}
+vpath %.y ${AST_DIRS}
+vpath %.program $(addsuffix /programs,${AST_DIRS})
+vpath %.cfg $(addsuffix /programs,${AST_DIRS})
+
+include $(wildcard ../*/scala.mk)
+include rules.mk
+
 SCALAGEN = ${AST_TREE_SCALAGEN} \
 	$(foreach example,${EVALUATOR_EXAMPLES},$(example).scala $(example).static.scala $(example).farrow.scala)
 
-MISCGEN = SimpleParser.scala SimpleScanner.scala BiggerParser.scala BiggerScanner.scala \
-	GrammarTokens.scala SimpleTokens.scala BiggerTokens.scala GrammarScanner.scala GrammarParser.scala \
-	FarrowLvTokens.scala FarrowLvScanner.scala FarrowLvParser.scala \
-	FarrowUbdTokens.scala FarrowUbdScanner.scala FarrowUbdParser.scala \
-	NestedUbdTokens.scala NestedUbdScanner.scala NestedUbdParser.scala \
-	*.output *.lex *.y *.scala~
-
-.PHONY: all clean phony_explicit
-
-# keep generated .scala
+.PHONY: all clean run test phony_explicit
 .SECONDARY:
 
-all : ${OUT}/grammar_implicit.class ${OUT}/simple_implicit.class ${OUT}/classic_binding_implicit.class ${OUT}/Classic.class
-all : ${OUT}/GrammarScanner.class ${OUT}/GrammarTokens.class ${OUT}/SimpleScanner.class ${OUT}/SimpleTokens.class
-all : ${OUT}/GrammarParserBase.class ${OUT}/GrammarParser.class ${OUT}/SimpleParserBase.class ${OUT}/SimpleParser.class
-all : ${OUT}/BiggerParserBase.class ${OUT}/BiggerParser.class ${OUT}/BiggerBindingDriver.class
-all : ${OUT}/test_coll_implicit.class ${OUT}/TestCollDriver.class
-all : ${OUT}/test_cycle_implicit.class ${OUT}/TestCycleDriver.class
-all : ${OUT}/test_use_coll_implicit.class ${OUT}/TestUseCollDriver.class
-all : ${OUT}/grammar_implicit.class ${OUT}/FirstDriver.class ${OUT}/FollowDriver.class ${OUT}/NullableDriver.class
-all : ${OUT}/FarrowLv_implicit.class ${OUT}/FarrowLvDriver.class
-all : ${OUT}/FarrowUbd_implicit.class ${OUT}/FarrowUbdDriver.class
-all : ${OUT}/FarrowUbdFiber_implicit.class ${OUT}/FarrowUbdFiberDriver.class
-all : ${OUT}/NestedUbd_implicit.class ${OUT}/NestedUbdDriver.class
-all : ${OUT}/NestedUbdFiber_implicit.class ${OUT}/NestedUbdFiberDriver.class
-all : ${OUT}/nested_cycles_implicit.class ${OUT}/NestedCyclesDriver.class
-all : ${OUT}/broad_fiber_cycle_implicit.class ${OUT}/BroadFiberCycleDriver.class
-all : ${OUT}/below_fiber_cycle_implicit.class ${OUT}/BelowFiberCycleDriver.class
-all : ${OUT}/below_single_fiber_cycle_implicit.class ${OUT}/BelowSingleFiberCycleDriver.class
-all : ${OUT}/local_fiber_cycle_implicit.class ${OUT}/LocalFiberCycleDriver.class
-all : ${OUT}/test_fields_implicit.class ${OUT}/TestFieldsDriver.class
-all : ${OUT}/simple_snc_implicit.class ${OUT}/SimpleSncDriver.class
-all : ${OUT}/simple_binding_implicit.class ${OUT}/SimpleBindingDriver.class
-all : SimpleBinding1Driver.class SimpleBinding2Driver.class SimpleBinding3Driver.class
-all : ${OUT}/test_for_implicit.class ${OUT}/TestForDriver.class
-all : ${OUT}/test_finish_implicit.class ${OUT}/FinishDriver.class
-all : ${OUT}/TestForPatternsDriver.class ${OUT}/TestCasePatternsDriver.class ${OUT}/TestNestedPatternsDriver.class
-all : ${OUT}/simple_snc_fiber_implicit.class ${OUT}/SimpleSncFiberDriver.class
-
-.PHONY: run
-
+all: ${ALL_CLASSES} ${BINDING_VARIANT_CLASSES}
 run: Classic.run TestCollDriver.run TestCycleDriver.run NestedCyclesDriver.run
-
+test:
+	+bash ./compare-evaluators.sh
 phony_explicit:
+
+${OUT}:
+	mkdir -p $@
 
 %.static.scala: %.aps ${APS2SCALA}
 	${APS2SCALA} ${APS2SCALAFLAGS} -S -C $*
 	cp $*.scala $@
 
-%.farrow.scala : %.aps ${APS2SCALA}
+%.farrow.scala: %.aps ${APS2SCALA}
 	${APS2SCALA} ${APS2SCALAFLAGS} -F $*
 	cp $*.scala $@
 
 %.scala: %.aps ${APS2SCALA}
 	${APS2SCALA} ${APS2SCALAFLAGS} $*
 
-${OUT}/%_implicit.class : %.scala
-	${SCALAC} ${SCALACFLAGS} $*.scala
-	@touch $@
-
-%.class : ${OUT}/%.class ;
-
-FarrowUbd.lex: farrow-ubd.lex FarrowUbd.lex.scala
-	cat $(word 2,$^) $(word 1,$^) > $@
-
-FarrowUbdScanner.scala : FarrowUbd.lex
-	java -jar ${SCALAFLEX} --scala $<
-
-FarrowUbd.y: farrow-ubd.y FarrowUbd.y.scala
-	cat $^ > $@
-
-FarrowUbdParser.scala FarrowUbdTokens.scala : FarrowUbd.y ${SCALABISON}
-	bison -v FarrowUbd.y
-	rm FarrowUbd.tab.c
-	${SCALA} -classpath ${SCALABISON} edu.uwm.cs.scalabison.RunGenerator FarrowUbd.y
-
-${OUT}/FarrowUbdScanner.class : FarrowUbdScanner.scala ${OUT}/FarrowUbdTokens.class
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/FarrowUbdParser.class : FarrowUbdParser.scala ${OUT}/FarrowUbdScanner.class ${OUT}/FarrowUbdParserBase.class
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/FarrowUbdParserBase.class : FarrowUbdParserBase.scala ${OUT}/FarrowUbd_implicit.class
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/FarrowUbdTokens.class : FarrowUbdTokens.scala
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/FarrowUbd_implicit.class : farrow-ubd-tree.scala farrow-ubd${IMPL_SUFFIX}
-	${SCALAC} ${SCALACFLAGS} $^
-	@touch $@
-
-${OUT}/FarrowUbdFiber_implicit.class : farrow-ubd-tree.scala farrow-ubd-fiber${IMPL_SUFFIX}
-	${SCALAC} ${SCALACFLAGS} $^
-	@touch $@
-
-${OUT}/FarrowUbdDriver.class: farrow-ubd-driver.scala ${OUT}/FarrowUbd_implicit.class ${OUT}/FarrowUbdParser.class
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/FarrowUbdFiberDriver.class: farrow-ubd-fiber-driver.scala ${OUT}/FarrowUbdFiber_implicit.class ${OUT}/FarrowUbdParser.class
-	${SCALAC} ${SCALACFLAGS} $<
-
-NestedUbd.lex: nested-ubd.lex NestedUbd.lex.scala
-	cat $(word 2,$^) $(word 1,$^) > $@
-
-NestedUbdScanner.scala : NestedUbd.lex
-	java -jar ${SCALAFLEX} --scala $<
-
-NestedUbd.y: nested-ubd.y NestedUbd.y.scala
-	cat $^ > $@
-
-NestedUbdParser.scala NestedUbdTokens.scala : NestedUbd.y ${SCALABISON}
-	bison -v NestedUbd.y
-	rm NestedUbd.tab.c
-	${SCALA} -classpath ${SCALABISON} edu.uwm.cs.scalabison.RunGenerator NestedUbd.y
-
-${OUT}/NestedUbdScanner.class : NestedUbdScanner.scala ${OUT}/NestedUbdTokens.class
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/NestedUbdParser.class : NestedUbdParser.scala ${OUT}/NestedUbdScanner.class ${OUT}/NestedUbdParserBase.class
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/NestedUbdParserBase.class : NestedUbdParserBase.scala ${OUT}/NestedUbd_implicit.class
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/NestedUbdTokens.class : NestedUbdTokens.scala
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/NestedUbd_implicit.class : nested-ubd-tree.scala nested-ubd${IMPL_SUFFIX}
-	${SCALAC} ${SCALACFLAGS} $^
-	@touch $@
-
-${OUT}/NestedUbdDriver.class: nested-ubd-driver.scala ${OUT}/NestedUbd_implicit.class ${OUT}/NestedUbdParser.class
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/NestedUbdFiber_implicit.class : nested-ubd-tree.scala nested-ubd-fiber${IMPL_SUFFIX}
-	${SCALAC} ${SCALACFLAGS} $^
-	@touch $@
-
-${OUT}/NestedUbdFiberDriver.class: nested-ubd-fiber-driver.scala ${OUT}/NestedUbdFiber_implicit.class ${OUT}/NestedUbdParser.class
-	${SCALAC} ${SCALACFLAGS} $<
-
-FarrowLv.lex: farrow-lv.lex FarrowLv.lex.scala
-	cat $(word 2,$^) $(word 1,$^) > $@
-
-FarrowLvScanner.scala : FarrowLv.lex
-	java -jar ${SCALAFLEX} --scala $<
-
-FarrowLv.y: farrow-lv.y FarrowLv.y.scala
-	cat $^ > $@
-
-FarrowLvParser.scala FarrowLvTokens.scala : FarrowLv.y ${SCALABISON}
-	bison -v FarrowLv.y
-	rm FarrowLv.tab.c
-	${SCALA} -classpath ${SCALABISON} edu.uwm.cs.scalabison.RunGenerator FarrowLv.y
-
-${OUT}/FarrowLvScanner.class : FarrowLvScanner.scala ${OUT}/FarrowLvTokens.class
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/FarrowLvParser.class : FarrowLvParser.scala ${OUT}/FarrowLvScanner.class ${OUT}/FarrowLvParserBase.class
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/FarrowLvParserBase.class : FarrowLvParserBase.scala ${OUT}/FarrowLv_implicit.class
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/FarrowLvTokens.class : FarrowLvTokens.scala
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/FarrowLv_implicit.class : farrow-lv-tree.scala farrow-lv${IMPL_SUFFIX}
-	${SCALAC} ${SCALACFLAGS} $^
-	@touch $@
-
-${OUT}/FarrowLvDriver.class: farrow-lv-driver.scala ${OUT}/FarrowLv_implicit.class ${OUT}/FarrowLvParser.class
-	${SCALAC} ${SCALACFLAGS} $<
-
-Grammar.lex: grammar.lex Grammar.lex.scala
-	cat $(word 2,$^) $(word 1,$^) > $@
-
-GrammarScanner.scala : Grammar.lex
-	java -jar ${SCALAFLEX} --scala $<
-
-Grammar.y: grammar.y Grammar.y.scala
-	cat $^ > $@
-
-GrammarParser.scala GrammarTokens.scala : Grammar.y ${SCALABISON}
-	bison -v Grammar.y
-	rm Grammar.tab.c
-	${SCALA} -classpath ${SCALABISON} edu.uwm.cs.scalabison.RunGenerator Grammar.y
-
-${OUT}/GrammarScanner.class : GrammarScanner.scala ${OUT}/GrammarTokens.class
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/GrammarParser.class : GrammarParser.scala ${OUT}/GrammarScanner.class ${OUT}/GrammarParserBase.class
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/GrammarParserBase.class : GrammarParserBase.scala ${OUT}/grammar_implicit.class
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/GrammarTokens.class : GrammarTokens.scala
-	${SCALAC} ${SCALACFLAGS} $<
-
-Simple.lex: simple.lex Simple.lex.scala
-	cat $(word 2,$^) $(word 1,$^) > $@
-
-SimpleScanner.scala : Simple.lex
-	java -jar ${SCALAFLEX} --scala $<
-
-Simple.y: simple.y Simple.y.scala
-	cat $^ > $@
-
-SimpleParser.scala SimpleTokens.scala : Simple.y ${SCALABISON}
-	bison -v Simple.y
-	rm Simple.tab.c
-	${SCALA} -classpath ${SCALABISON} edu.uwm.cs.scalabison.RunGenerator Simple.y
-
-${OUT}/SimpleScanner.class : SimpleScanner.scala ${OUT}/SimpleTokens.class
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/SimpleParser.class : SimpleParser.scala ${OUT}/SimpleParserBase.class ${OUT}/SimpleScanner.class
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/SimpleParserBase.class : SimpleParserBase.scala ${OUT}/simple_implicit.class
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/SimpleTokens.class : SimpleTokens.scala
-	${SCALAC} ${SCALACFLAGS} $<
-
-Bigger.lex : bigger.lex Bigger.lex.scala
-	cat $(word 2,$^) $(word 1,$^) > $@
-
-BiggerScanner.scala : Bigger.lex
-	java -jar ${SCALAFLEX} --scala $<
-
-Bigger.y : bigger.y Bigger.y.scala
-	cat $^ > $@
-
-BiggerParser.scala BiggerTokens.scala : Bigger.y ${SCALABISON}
-	bison -v Bigger.y
-	rm Bigger.tab.c
-	${SCALA} -classpath ${SCALABISON} edu.uwm.cs.scalabison.RunGenerator Bigger.y
-
-${OUT}/BiggerScanner.class : BiggerScanner.scala ${OUT}/BiggerTokens.class
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/BiggerParser.class : BiggerParser.scala ${OUT}/BiggerParserBase.class ${OUT}/BiggerScanner.class
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/BiggerParserBase.class : BiggerParserBase.scala ${OUT}/bigger_implicit.class
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/BiggerTokens.class : BiggerTokens.scala
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/bigger_binding_implicit.class : bigger-binding${IMPL_SUFFIX} ${OUT}/bigger_implicit.class
+${OUT}/%_implicit.class: %.scala | ${OUT}
 	${SCALAC} ${SCALACFLAGS} $<
 	@touch $@
 
-${OUT}/BiggerBindingDriver.class : bigger-binding-driver.scala ${OUT}/bigger_binding_implicit.class ${OUT}/BiggerParser.class
-	${SCALAC} ${SCALACFLAGS} $<
+%.class: ${OUT}/%.class ;
 
-${OUT}/nested-cycles.class: nested-cycles${IMPL_SUFFIX} ${OUT}/simple_implicit.class
-	${SCALAC} ${SCALACFLAGS} $<
-
-.PHONY: ${OUT}/nested_cycles_implicit.class
-${OUT}/nested_cycles_implicit.class : ${OUT}/nested-cycles.class ${OUT}/simple_implicit.class ;
-
-${OUT}/NestedCyclesDriver.class: nested-cycles-driver.scala ${OUT}/nested_cycles_implicit.class ${OUT}/SimpleParser.class
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/classic_binding_implicit.class : classic-binding${IMPL_SUFFIX}
-	${SCALAC} ${SCALACFLAGS} $<
-	@touch $@
-
-${OUT}/Classic.class : classic-driver.scala ${OUT}/SimpleParser.class
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/Classic.class   ${OUT}/classic_binding_implicit.class : ${OUT}/simple_implicit.class
-${OUT}/Classic.class : ${OUT}/classic_binding_implicit.class
-
-${OUT}/test_coll_implicit.class : test-coll${IMPL_SUFFIX} ${OUT}/tiny_implicit.class
-	${SCALAC} ${SCALACFLAGS} $<
-	@touch $@
-
-${OUT}/test_use_coll_implicit.class : test-use-coll${IMPL_SUFFIX} ${OUT}/tiny_implicit.class
-	${SCALAC} ${SCALACFLAGS} $<
-	@touch $@
-
-${OUT}/TestCollDriver.class: test-coll-driver.scala ${OUT}/test_coll_implicit.class ${OUT}/TinyParser.class
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/test_fields_implicit.class : test-fields${IMPL_SUFFIX} ${OUT}/tiny_implicit.class
-	${SCALAC} ${SCALACFLAGS} $<
-	@touch $@
-
-${OUT}/TestFieldsDriver.class: test-fields-driver.scala ${OUT}/test_fields_implicit.class ${OUT}/TinyParser.class
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/TestUseCollDriver.class: test-use-coll-driver.scala ${OUT}/test_use_coll_implicit.class ${OUT}/TinyParser.class ${OUT}/tiny_implicit.class
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/test_cycle_implicit.class : test-cycle${IMPL_SUFFIX} ${OUT}/tiny_implicit.class
-	${SCALAC} ${SCALACFLAGS} $<
-	@touch $@
-
-${OUT}/TestCycleDriver.class: test-cycle-driver.scala ${OUT}/test_cycle_implicit.class ${OUT}/TinyParser.class
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/grammar_implicit.class : grammar.scala first${IMPL_SUFFIX} follow${IMPL_SUFFIX} nullable${IMPL_SUFFIX}
-	${SCALAC} ${SCALACFLAGS} $^
-	@touch $@
-
-${OUT}/FirstDriver.class: first-driver.scala ${OUT}/grammar_implicit.class ${OUT}/GrammarParser.class
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/FollowDriver.class: follow-driver.scala ${OUT}/grammar_implicit.class ${OUT}/GrammarParser.class
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/NullableDriver.class: nullable-driver.scala ${OUT}/grammar_implicit.class ${OUT}/GrammarParser.class
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/TinyParser.class: tiny-parser.handcode.scala ${OUT}/tiny_implicit.class
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/use_global_implicit.class : use-global${IMPL_SUFFIX} ${OUT}/tiny_implicit.class
-	${SCALAC} ${SCALACFLAGS} $<
-	@touch $@
-
-${OUT}/UseGlobal.class : ${OUT}/use_global_implicit.class ${OUT}/TinyParser.class
-${OUT}/UseGlobal.class : use-global-driver.scala
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/broad_fiber_cycle_implicit.class : ${OUT}/tiny_implicit.class
-${OUT}/broad_fiber_cycle_implicit.class : broad-fiber-cycle${IMPL_SUFFIX}
-	${SCALAC} ${SCALACFLAGS} $<
-	@touch $@
-
-${OUT}/BroadFiberCycleDriver.class : ${OUT}/broad_fiber_cycle_implicit.class ${OUT}/tiny_implicit.class ${OUT}/TinyParser.class
-${OUT}/BroadFiberCycleDriver.class : broad-fiber-cycle-driver.scala
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/below_fiber_cycle_implicit.class : ${OUT}/tiny_implicit.class
-${OUT}/below_fiber_cycle_implicit.class : below-fiber-cycle${IMPL_SUFFIX}
-	${SCALAC} ${SCALACFLAGS} $<
-	@touch $@
-
-${OUT}/BelowFiberCycleDriver.class : ${OUT}/below_fiber_cycle_implicit.class ${OUT}/tiny_implicit.class ${OUT}/TinyParser.class
-${OUT}/BelowFiberCycleDriver.class : below-fiber-cycle-driver.scala
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/below_single_fiber_cycle_implicit.class : ${OUT}/tiny_implicit.class
-${OUT}/below_single_fiber_cycle_implicit.class : below-single-fiber-cycle${IMPL_SUFFIX}
-	${SCALAC} ${SCALACFLAGS} $<
-	@touch $@
-
-${OUT}/BelowSingleFiberCycleDriver.class : ${OUT}/below_single_fiber_cycle_implicit.class ${OUT}/tiny_implicit.class ${OUT}/TinyParser.class
-${OUT}/BelowSingleFiberCycleDriver.class : below-single-fiber-cycle-driver.scala
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/local_fiber_cycle_implicit.class : ${OUT}/tiny_implicit.class
-${OUT}/local_fiber_cycle_implicit.class : local-fiber-cycle${IMPL_SUFFIX}
-	${SCALAC} ${SCALACFLAGS} $<
-	@touch $@
-
-${OUT}/LocalFiberCycleDriver.class : ${OUT}/local_fiber_cycle_implicit.class ${OUT}/tiny_implicit.class ${OUT}/TinyParser.class
-${OUT}/LocalFiberCycleDriver.class : local-fiber-cycle-driver.scala
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/simple-snc.class: simple-snc${IMPL_SUFFIX} ${OUT}/simple_implicit.class
-	${SCALAC} ${SCALACFLAGS} $<
-
-.PHONY: ${OUT}/simple_snc_implicit.class
-${OUT}/simple_snc_implicit.class : ${OUT}/simple-snc.class ${OUT}/simple_implicit.class ;
-
-${OUT}/simple-snc-fiber.class: simple-snc-fiber${IMPL_SUFFIX} ${OUT}/simple_implicit.class
-	${SCALAC} ${SCALACFLAGS} $<
-
-.PHONY: ${OUT}/simple_snc_fiber_implicit.class
-${OUT}/simple_snc_fiber_implicit.class : ${OUT}/simple-snc-fiber.class ${OUT}/simple_implicit.class ;
-
-${OUT}/SimpleSncDriver.class: simple-snc-driver.scala ${OUT}/simple_snc_implicit.class ${OUT}/SimpleParser.class
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/simple_binding_implicit.class : simple-binding${IMPL_SUFFIX} ${OUT}/simple_implicit.class
-	${SCALAC} ${SCALACFLAGS} $<
-	@touch $@
-
-${OUT}/SimpleBindingDriver.class: simple-binding-driver.scala ${OUT}/simple_binding_implicit.class ${OUT}/SimpleParser.class
-	${SCALAC} -cp ${OUT}:.:${APSLIB} -d ${OUT} $<
-
-.PHONY: SimpleBinding1Driver.class SimpleBinding2Driver.class SimpleBinding3Driver.class
-
-SimpleBinding1Driver.class : ${OUT}/simple-binding1/SimpleBindingDriver.class ;
-
-${OUT}/simple-binding1/SimpleBindingDriver.class : simple.scala simple-binding1${IMPL_SUFFIX} simple-binding-driver.scala ${OUT}/SimpleParser.class
-	rm -rf ${OUT}/simple-binding1
-	mkdir -p ${OUT}/simple-binding1
-	${SCALAC} -cp ${OUT}/simple-binding1:${OUT}:.:${APSLIB} -d ${OUT}/simple-binding1 $(filter %.scala,$^)
-
-SimpleBinding2Driver.class : ${OUT}/simple-binding2/SimpleBindingDriver.class ;
-
-${OUT}/simple-binding2/SimpleBindingDriver.class : simple.scala simple-binding2${IMPL_SUFFIX} simple-binding-driver.scala ${OUT}/SimpleParser.class
-	rm -rf ${OUT}/simple-binding2
-	mkdir -p ${OUT}/simple-binding2
-	${SCALAC} -cp ${OUT}/simple-binding2:${OUT}:.:${APSLIB} -d ${OUT}/simple-binding2 $(filter %.scala,$^)
-
-SimpleBinding3Driver.class : ${OUT}/simple-binding3/SimpleBindingDriver.class ;
-
-${OUT}/simple-binding3/SimpleBindingDriver.class : simple.scala simple-binding3${IMPL_SUFFIX} simple-binding-driver.scala ${OUT}/SimpleParser.class
-	rm -rf ${OUT}/simple-binding3
-	mkdir -p ${OUT}/simple-binding3
-	${SCALAC} -cp ${OUT}/simple-binding3:${OUT}:.:${APSLIB} -d ${OUT}/simple-binding3 $(filter %.scala,$^)
-
-${OUT}/test_for_implicit.class : test-for${IMPL_SUFFIX} ${OUT}/tiny_implicit.class
-	${SCALAC} ${SCALACFLAGS} $<
-	@touch $@
-
-${OUT}/TestForDriver.class: test-for-driver.scala ${OUT}/test_for_implicit.class ${OUT}/TinyParser.class
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/test_finish_implicit.class : test-finish${IMPL_SUFFIX} ${OUT}/tiny_implicit.class
-	${SCALAC} ${SCALACFLAGS} $<
-	@touch $@
-
-${OUT}/FinishDriver.class: finish-driver.scala ${OUT}/test_finish_implicit.class
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/test_for_patterns_implicit.class : test-for-patterns${IMPL_SUFFIX} ${OUT}/tiny_implicit.class
-	${SCALAC} ${SCALACFLAGS} $<
-	@touch $@
-
-${OUT}/TestForPatternsDriver.class : test-for-patterns-driver.scala ${OUT}/test_for_patterns_implicit.class ${OUT}/TinyParser.class
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/test_case_patterns_implicit.class : test-case-patterns${IMPL_SUFFIX} ${OUT}/tiny_implicit.class
-	${SCALAC} ${SCALACFLAGS} $<
-	@touch $@
-
-${OUT}/TestCasePatternsDriver.class : test-case-patterns-driver.scala ${OUT}/test_case_patterns_implicit.class ${OUT}/TinyParser.class
-	${SCALAC} ${SCALACFLAGS} $<
-
-${OUT}/test_nested_patterns_implicit.class : test-nested-patterns${IMPL_SUFFIX} ${OUT}/tiny_implicit.class
-	${SCALAC} ${SCALACFLAGS} $<
-	@touch $@
-
-${OUT}/TestNestedPatternsDriver.class : test-nested-patterns-driver.scala ${OUT}/test_nested_patterns_implicit.class ${OUT}/TinyParser.class
-	${SCALAC} ${SCALACFLAGS} $<
-
-.PHONY: SimpleBinding1Driver.run SimpleBinding2Driver.run SimpleBinding3Driver.run
-
-SimpleBindingDriver.run : ${OUT}/SimpleBindingDriver.class
-	${SCALA} ${JVMFLAGS} -cp ${OUT}:.:${APSLIB} SimpleBindingDriver ${ARGS}
-
-SimpleBinding1Driver.run : ${OUT}/simple-binding1/SimpleBindingDriver.class
-	${SCALA} ${JVMFLAGS} -cp ${OUT}/simple-binding1:${OUT}:.:${APSLIB} SimpleBindingDriver ${ARGS}
-
-SimpleBinding2Driver.run : ${OUT}/simple-binding2/SimpleBindingDriver.class
-	${SCALA} ${JVMFLAGS} -cp ${OUT}/simple-binding2:${OUT}:.:${APSLIB} SimpleBindingDriver ${ARGS}
-
-SimpleBinding3Driver.run : ${OUT}/simple-binding3/SimpleBindingDriver.class
-	${SCALA} ${JVMFLAGS} -cp ${OUT}/simple-binding3:${OUT}:.:${APSLIB} SimpleBindingDriver ${ARGS}
-
-${OUT}/SimpleSncFiberDriver.class: simple-snc-fiber-driver.scala ${OUT}/simple_snc_fiber_implicit.class ${OUT}/SimpleParser.class
-	${SCALAC} ${SCALACFLAGS} $<
-
-.PHONY: %.run
-
-%.run : ${OUT}/%.class
-	scala ${JVMFLAGS} ${SCALAFLAGS} $* ${ARGS}
+%.run: ${OUT}/%.class
+	${SCALA} ${JVMFLAGS} ${SCALAFLAGS} $* ${ARGS}
 
 clean:
 	rm -rf ${OUT_BASE}
