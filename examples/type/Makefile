@@ -1,2 +1,2 @@
-AST_MODULES = type type-decl
+include ast.mk
 include ../common.mk

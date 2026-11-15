@@ -1,4 +1,4 @@
-AST_MODULES = simple
+include ast.mk
 SCALA_DRIVERS = Classic NestedCyclesDriver SimpleBindingDriver SimpleBinding1Driver \
 	SimpleBinding2Driver SimpleBinding3Driver SimpleSncDriver SimpleSncFiberDriver
 TEST_DRIVERS = SimpleBindingDriver SimpleBinding1Driver SimpleBinding2Driver \

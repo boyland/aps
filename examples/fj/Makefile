@@ -1,2 +1,2 @@
-AST_MODULES = FJ
+include ast.mk
 include ../common.mk

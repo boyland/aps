@@ -1,51 +1,38 @@
-SOURCES.simple = simple.aps
+include ../simple/ast.mk
+TREE_MODULES := ${TREE_MODULES} $(basename ${AST_SOURCES})
 
-SOURCES.classic-binding = simple.aps classic-binding.aps classic-driver.scala
-PARSER_BASENAME.classic-binding = Simple
-LEXER.classic-binding = simple.lex
-PARSER.classic-binding = simple.y
+SIMPLE_OUTPUTS := ${OUT}/classic-binding/% ${OUT}/nested-cycles/% \
+	${OUT}/simple-snc/% ${OUT}/simple-snc-fiber/% ${OUT}/simple-binding/% \
+	${OUT}/simple-binding1/% ${OUT}/simple-binding2/% ${OUT}/simple-binding3/%
+${SIMPLE_OUTPUTS}: SHARED_SOURCES := ${AST_SOURCES}
+${SIMPLE_OUTPUTS}: PARSER_BASENAME := Simple
+${SIMPLE_OUTPUTS}: LEXER := simple.lex
+${SIMPLE_OUTPUTS}: PARSER := simple.y
+
+SOURCES.simple := ${AST_SOURCES}
+
+SOURCES.classic-binding = classic-binding.aps classic-driver.scala
 DRIVER.Classic = classic-binding.aps classic-driver.scala
 
-SOURCES.nested-cycles = simple.aps nested-cycles.aps nested-cycles-driver.scala
-PARSER_BASENAME.nested-cycles = Simple
-LEXER.nested-cycles = simple.lex
-PARSER.nested-cycles = simple.y
+SOURCES.nested-cycles = nested-cycles.aps nested-cycles-driver.scala
 DRIVER.NestedCyclesDriver = nested-cycles.aps nested-cycles-driver.scala
 
-SOURCES.simple-snc = simple.aps simple-snc.aps simple-snc-driver.scala
-PARSER_BASENAME.simple-snc = Simple
-LEXER.simple-snc = simple.lex
-PARSER.simple-snc = simple.y
+SOURCES.simple-snc = simple-snc.aps simple-snc-driver.scala
 DRIVER.SimpleSncDriver = simple-snc.aps simple-snc-driver.scala
 
-SOURCES.simple-snc-fiber = simple.aps simple-snc-fiber.aps simple-snc-fiber-driver.scala
-PARSER_BASENAME.simple-snc-fiber = Simple
-LEXER.simple-snc-fiber = simple.lex
-PARSER.simple-snc-fiber = simple.y
+SOURCES.simple-snc-fiber = simple-snc-fiber.aps simple-snc-fiber-driver.scala
 DRIVER.SimpleSncFiberDriver = simple-snc-fiber.aps simple-snc-fiber-driver.scala
 
-SOURCES.simple-binding = simple.aps simple-binding.aps simple-binding-driver.scala
-PARSER_BASENAME.simple-binding = Simple
-LEXER.simple-binding = simple.lex
-PARSER.simple-binding = simple.y
+SOURCES.simple-binding = simple-binding.aps simple-binding-driver.scala
 DRIVER.SimpleBindingDriver = simple-binding.aps simple-binding-driver.scala
 
-SOURCES.simple-binding1 = simple.aps simple-binding1.aps simple-binding-driver.scala
-PARSER_BASENAME.simple-binding1 = Simple
-LEXER.simple-binding1 = simple.lex
-PARSER.simple-binding1 = simple.y
+SOURCES.simple-binding1 = simple-binding1.aps simple-binding-driver.scala
 DRIVER.SimpleBinding1Driver = simple-binding1.aps simple-binding-driver.scala SimpleBindingDriver
 
-SOURCES.simple-binding2 = simple.aps simple-binding2.aps simple-binding-driver.scala
-PARSER_BASENAME.simple-binding2 = Simple
-LEXER.simple-binding2 = simple.lex
-PARSER.simple-binding2 = simple.y
+SOURCES.simple-binding2 = simple-binding2.aps simple-binding-driver.scala
 DRIVER.SimpleBinding2Driver = simple-binding2.aps simple-binding-driver.scala SimpleBindingDriver
 
-SOURCES.simple-binding3 = simple.aps simple-binding3.aps simple-binding-driver.scala
-PARSER_BASENAME.simple-binding3 = Simple
-LEXER.simple-binding3 = simple.lex
-PARSER.simple-binding3 = simple.y
+SOURCES.simple-binding3 = simple-binding3.aps simple-binding-driver.scala
 DRIVER.SimpleBinding3Driver = simple-binding3.aps simple-binding-driver.scala SimpleBindingDriver
 
 DRIVERS += Classic NestedCyclesDriver SimpleSncDriver SimpleSncFiberDriver \

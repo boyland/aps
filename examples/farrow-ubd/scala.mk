@@ -1,15 +1,18 @@
-SOURCES.farrow-ubd-tree = farrow-ubd-tree.aps
+include ../farrow-ubd/ast.mk
+TREE_MODULES := ${TREE_MODULES} $(basename ${AST_SOURCES})
 
-SOURCES.farrow-ubd = farrow-ubd-tree.aps farrow-ubd.aps farrow-ubd-driver.scala
-PARSER_BASENAME.farrow-ubd = FarrowUbd
-LEXER.farrow-ubd = farrow-ubd.lex
-PARSER.farrow-ubd = farrow-ubd.y
+FARROW_UBD_OUTPUTS := ${OUT}/farrow-ubd/% ${OUT}/farrow-ubd-fiber/%
+${FARROW_UBD_OUTPUTS}: SHARED_SOURCES := ${AST_SOURCES}
+${FARROW_UBD_OUTPUTS}: PARSER_BASENAME := FarrowUbd
+${FARROW_UBD_OUTPUTS}: LEXER := farrow-ubd.lex
+${FARROW_UBD_OUTPUTS}: PARSER := farrow-ubd.y
+
+SOURCES.farrow-ubd-tree := ${AST_SOURCES}
+
+SOURCES.farrow-ubd = farrow-ubd.aps farrow-ubd-driver.scala
 DRIVER.FarrowUbdDriver = farrow-ubd.aps farrow-ubd-driver.scala
 
-SOURCES.farrow-ubd-fiber = farrow-ubd-tree.aps farrow-ubd-fiber.aps farrow-ubd-fiber-driver.scala
-PARSER_BASENAME.farrow-ubd-fiber = FarrowUbd
-LEXER.farrow-ubd-fiber = farrow-ubd.lex
-PARSER.farrow-ubd-fiber = farrow-ubd.y
+SOURCES.farrow-ubd-fiber = farrow-ubd-fiber.aps farrow-ubd-fiber-driver.scala
 DRIVER.FarrowUbdFiberDriver = farrow-ubd-fiber.aps farrow-ubd-fiber-driver.scala
 
 DRIVERS += FarrowUbdDriver FarrowUbdFiberDriver

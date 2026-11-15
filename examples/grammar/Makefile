@@ -1,4 +1,4 @@
-AST_MODULES = grammar
+include ast.mk
 SCALA_DRIVERS = FirstDriver FollowDriver NullableDriver
 TEST_DRIVERS = $(SCALA_DRIVERS)
 

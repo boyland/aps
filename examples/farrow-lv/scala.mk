@@ -1,9 +1,14 @@
-SOURCES.farrow-lv-tree = farrow-lv-tree.aps
+include ../farrow-lv/ast.mk
+TREE_MODULES := ${TREE_MODULES} $(basename ${AST_SOURCES})
 
-SOURCES.farrow-lv = farrow-lv-tree.aps farrow-lv.aps farrow-lv-driver.scala
-PARSER_BASENAME.farrow-lv = FarrowLv
-LEXER.farrow-lv = farrow-lv.lex
-PARSER.farrow-lv = farrow-lv.y
+${OUT}/farrow-lv/%: SHARED_SOURCES := ${AST_SOURCES}
+${OUT}/farrow-lv/%: PARSER_BASENAME := FarrowLv
+${OUT}/farrow-lv/%: LEXER := farrow-lv.lex
+${OUT}/farrow-lv/%: PARSER := farrow-lv.y
+
+SOURCES.farrow-lv-tree := ${AST_SOURCES}
+
+SOURCES.farrow-lv = farrow-lv.aps farrow-lv-driver.scala
 DRIVER.FarrowLvDriver = farrow-lv.aps farrow-lv-driver.scala
 
 DRIVERS += FarrowLvDriver

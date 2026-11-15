@@ -1,2 +1,2 @@
-AST_MODULES = balanced
+include ast.mk
 include ../common.mk

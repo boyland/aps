@@ -1,4 +1,4 @@
-AST_MODULES = farrow-lv-tree
+include ast.mk
 SCALA_DRIVERS = FarrowLvDriver
 
 include ../common.mk

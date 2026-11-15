@@ -28,7 +28,7 @@ FLAGS_STATIC = -S -C
 FLAGS_FARROW = -F
 FLAGS_SCC = -C
 EVALUATOR_FLAGS = ${FLAGS_${EVALUATOR}}
-TREE_MODULES = simple bigger tiny grammar farrow-lv-tree farrow-ubd-tree nested-ubd-tree
+TREE_MODULES :=
 
 vpath %.aps ${AST_DIRS}
 vpath %.scala ${SCALA_SOURCE_DIRS}
