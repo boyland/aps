@@ -1,4 +1,3 @@
-DRIVERS = $(patsubst DRIVER.%,%,$(filter DRIVER.%,${.VARIABLES}))
 DRIVER_CLASSES = $(addsuffix .class,${DRIVERS})
 DRIVER_RUNS = $(addsuffix .run,${DRIVERS})
 
@@ -11,22 +10,15 @@ MAIN_CLASS = $(or $(word 3,${DRIVER.${DRIVER_NAME}}),${DRIVER_NAME})
 
 # Output paths are <evaluator>/<module>/<file>.
 MODULE_NAME = $(firstword $(subst /, ,$*))
-MODULE_INPUT = $(wildcard $(addsuffix /${MODULE_NAME}.aps,${AST_DIRS}))
-MODULE_FOLDER = $(patsubst %/${MODULE_NAME}.aps,%,${MODULE_INPUT})
-MODULE_GROUP = $(notdir ${MODULE_FOLDER})
-MODULE_DRIVERS = $(foreach driver,${DRIVERS},\
-	$(if $(filter ${MODULE_NAME},$(call driver-module,${driver})),${driver}))
-MODULE_AST = $(or ${AST.${MODULE_GROUP}},${MODULE_GROUP}.aps)
-MODULE_SOURCES = $(sort ${MODULE_NAME}.aps ${MODULE_AST} ${SOURCES.${MODULE_GROUP}} \
-	$(foreach driver,${MODULE_DRIVERS},$(word 2,${DRIVER.${driver}})))
+MODULE_SOURCES = $(or ${SOURCES.${MODULE_NAME}},$(error Declare SOURCES.${MODULE_NAME} in scala.mk))
 MODULE_APS = $(filter %.aps,${MODULE_SOURCES})
 MODULE_HANDCODE = $(filter %.scala,${MODULE_SOURCES})
 MODULE_SCALA = $(addprefix ${OUT}/${MODULE_NAME}/,$(MODULE_APS:.aps=.scala))
 
-PARSER = ${PARSER.${MODULE_GROUP}}
-PARSER_FILES = $(addprefix ${PARSER},Scanner.scala Parser.scala Tokens.scala)
-PARSER_SCALA = $(if ${PARSER},$(addprefix ${OUT}/${MODULE_NAME}/,${PARSER_FILES}))
-PARSER_BASE = $(addsuffix ParserBase.scala,${PARSER})
+PARSER_BASENAME = ${PARSER_BASENAME.${MODULE_NAME}}
+PARSER_FILES = $(addprefix ${PARSER_BASENAME},Scanner.scala Parser.scala Tokens.scala)
+PARSER_SCALA = $(if ${PARSER_BASENAME},$(addprefix ${OUT}/${MODULE_NAME}/,${PARSER_FILES}))
+PARSER_BASE = $(addsuffix ParserBase.scala,${PARSER_BASENAME})
 
 .PHONY: ${DRIVER_CLASSES} ${DRIVER_RUNS}
 # Resolve module-specific prerequisites after Make knows the target and matched path.
@@ -56,11 +48,11 @@ ${OUT}/%.scala: $$(notdir $$*).aps $$(MODULE_APS) ${APS2SCALA} ${MAKEFILE_LIST}
 	cd $(@D) && $(abspath ${APS2SCALA}) ${APS2SCALAFLAGS} \
 	  $(if $(filter $(notdir $*),${TREE_MODULES}),,${EVALUATOR_FLAGS}) $(notdir $*)
 
-${OUT}/%.lex: $$(MODULE_GROUP).lex $$(notdir $$*).lex.scala
+${OUT}/%.lex: $$(LEXER.$$(MODULE_NAME)) $$(notdir $$*).lex.scala
 	mkdir -p $(@D)
 	cat $(filter %.lex.scala,$^) $(filter %.lex,$^) > $@
 
-${OUT}/%.y: $$(MODULE_GROUP).y $$(notdir $$*).y.scala
+${OUT}/%.y: $$(PARSER.$$(MODULE_NAME)) $$(notdir $$*).y.scala
 	mkdir -p $(@D)
 	cat $(filter %.y,$^) $(filter %.y.scala,$^) > $@
 
