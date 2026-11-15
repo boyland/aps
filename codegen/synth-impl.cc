@@ -552,7 +552,7 @@ static void dump_synth_functions(STATE* s, ostream& os) {
       }
     }
   }
-  bool needs_fixed_point = s->requires_fixed_point_loop;
+  bool needs_fixed_point = s->requires_fixed_point_loop || s->requires_circular_update_support;
 
   for (auto state_it = synth_functions_states.begin(); state_it != synth_functions_states.end(); state_it++) {
     synth_util::SynthFunctionState* function_state = *state_it;
@@ -864,23 +864,23 @@ class SynthImpl : public SynthImplementation {
 
       os << indent() << "override def finish() : Unit = {\n";
       ++nesting_level;
-      if (s->requires_fixed_point_loop) {
+      if (s->requires_fixed_point_loop || s->requires_circular_update_support) {
         os << indent() << "implicit val changed: AtomicBoolean = new AtomicBoolean(false);\n";
         os << indent() << "implicit val " << synth_util::LOOP_VAR << ": Boolean = false;\n";
       }
 
-      os << indent() << "// Starting start-phylum side-effect evaluations\n";
+      os << indent() << "// Evaluating side effects on entry-point phylum nodes\n";
       emit_start_phylum_evaluations(os, s, synth_functions_states, /* emit_side_effects */ true);
-      os << indent() << "// Finished start-phylum side-effect evaluations\n";
-      os << indent() << "// Starting eager phylum side-effect evaluations\n";
+      os << indent() << "// Finished side-effect evaluations on entry-point phylum nodes\n";
+      os << indent() << "// Evaluating remaining side effects on rooted nodes (no explicit dependency arguments)\n";
       emit_eager_phylum_evaluations(os, synth_functions_states, /* emit_side_effects */ true);
-      os << indent() << "// Finished eager phylum side-effect evaluations\n";
-      os << indent() << "// Starting start-phylum attribute-value evaluations\n";
+      os << indent() << "// Finished remaining side-effect evaluations on rooted nodes\n";
+      os << indent() << "// Evaluating synthesized attribute values on entry-point phylum nodes\n";
       emit_start_phylum_evaluations(os, s, synth_functions_states, /* emit_side_effects */ false);
-      os << indent() << "// Finished start-phylum attribute-value evaluations\n";
-      os << indent() << "// Starting eager phylum attribute-value evaluations\n";
+      os << indent() << "// Finished synthesized attribute-value evaluations on entry-point phylum nodes\n";
+      os << indent() << "// Evaluating remaining attribute values on rooted nodes (no explicit dependency arguments)\n";
       emit_eager_phylum_evaluations(os, synth_functions_states, /* emit_side_effects */ false);
-      os << indent() << "// Finished eager phylum attribute-value evaluations\n";
+      os << indent() << "// Finished remaining attribute-value evaluations on rooted nodes\n";
       os << indent() << "super.finish();\n";
       --nesting_level;
       os << indent() << "};\n";
@@ -927,7 +927,8 @@ class SynthImpl : public SynthImplementation {
           dump_Expression(rhs, o);
           if (decl_is_circular(field) &&
               (emitting_fiber_fixed_point_loop ||
-               current_aug_graph->global_state->requires_fixed_point_loop)) {
+               current_aug_graph->global_state->requires_fixed_point_loop ||
+               current_aug_graph->global_state->requires_circular_update_support)) {
             o << ", changed";
           }
           o << ")";
@@ -949,7 +950,8 @@ class SynthImpl : public SynthImplementation {
           dump_Expression(rhs, o);
           if (decl_is_circular(field) &&
               (emitting_fiber_fixed_point_loop ||
-               current_aug_graph->global_state->requires_fixed_point_loop)) {
+               current_aug_graph->global_state->requires_fixed_point_loop ||
+               current_aug_graph->global_state->requires_circular_update_support)) {
             o << ", changed";
           }
           o << ");\n";
