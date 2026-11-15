@@ -403,7 +403,7 @@ static void emit_start_phylum_evaluations(
   const vector<synth_util::SynthFunctionState*>& function_states,
   bool emit_side_effects) {
   PHY_GRAPH* start_graph = summary_graph_for(state, state->start_phylum);
-  bool needs_fixed_point = state->requires_fixed_point_loop;
+  bool needs_fixed_point = state->requires_fixed_point_loop || state->requires_circular_update_support;
   set_phylum_graph_components(start_graph);
 
   if (!needs_fixed_point) {

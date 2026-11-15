@@ -580,7 +580,9 @@ std::vector<INSTANCE*> collect_child_cycle_instances(AUG_GRAPH* graph) {
   return result;
 }
 
-// TODO: write a description for this function.
+// Returns whether the child cycle can converge in its own fixed-point loop.
+// The cycle instance and its participating inherited attributes must have no
+// dependencies to or from circular fiber or shared-info instances.
 bool child_cycle_is_independent(AUG_GRAPH* graph, INSTANCE* cycle_instance) {
   int instance_count = graph->instances.length;
   std::vector<int> cycle_indices;
