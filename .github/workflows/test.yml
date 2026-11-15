@@ -50,7 +50,7 @@ jobs:
         make SVERSION=$SCALA_MAJOR install
         make SVERSION=$SCALA_MAJOR test
 
-    - name: Run native tests
+    - name: Run utilities tests
       run: |
         make -C utilities/tests all
 
