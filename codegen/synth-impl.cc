@@ -36,16 +36,36 @@ static bool emitting_fiber_fixed_point_loop = false;
 
 static const string PREV_LOOP_VAR = "prevIsInsideFixedPoint";
 
-namespace synth_util {
-
 struct FiberScheduleChoice {
   int index;
   bool requires_fixed_point_loop;
 };
 
+static DEPENDENCY component_dependency(
+    const AUG_GRAPH* aug_graph, const SCC_COMPONENT* component, int source, int sink) {
+  const INSTANCE* source_instance = static_cast<INSTANCE*>(component->array[source]);
+  const INSTANCE* sink_instance = static_cast<INSTANCE*>(component->array[sink]);
+  return edgeset_kind(aug_graph->graph[
+      source_instance->index * aug_graph->instances.length + sink_instance->index]);
+}
+
+static const SCC_COMPONENT* find_fiber_component(
+    const SCC_COMPONENTS* components, int instance_index) {
+  for (int i = 0; i < components->length; i++) {
+    const SCC_COMPONENT* component = components->array[i];
+    for (int j = 0; j < component->length; j++) {
+      if (*static_cast<const int*>(component->array[j]) == instance_index) {
+        return component;
+      }
+    }
+  }
+  fatal_error("cannot find SCC component for fiber instance %d", instance_index);
+  return NULL;
+}
+
 static FiberScheduleChoice next_fiber_instance(
-    const vector<vector<DEPENDENCY>>& edges, const vector<bool>& scheduled) {
-  int count = static_cast<int>(scheduled.size());
+    const AUG_GRAPH* aug_graph, const SCC_COMPONENT* component, const vector<bool>& scheduled) {
+  int count = component->length;
   int remaining = 0;
   for (int i = 0; i < count; i++) {
     if (scheduled[i]) {
@@ -54,7 +74,8 @@ static FiberScheduleChoice next_fiber_instance(
     remaining++;
     bool ready = true;
     for (int j = 0; j < count; j++) {
-      if (!scheduled[j] && (edges[j][i] & DEPENDENCY_MAYBE_DIRECT)) {
+      if (!scheduled[j] &&
+          (component_dependency(aug_graph, component, j, i) & DEPENDENCY_MAYBE_DIRECT)) {
         ready = false;
         break;
       }
@@ -79,26 +100,22 @@ static FiberScheduleChoice next_fiber_instance(
   for (int i = 0; i < count; i++) {
     for (int j = 0; j < count; j++) {
       if (!scheduled[i] && !scheduled[j] &&
-          (edges[i][j] & DEPENDENCY_MAYBE_DIRECT)) {
+          (component_dependency(aug_graph, component, i, j) & DEPENDENCY_MAYBE_DIRECT)) {
         scc_graph_add_edge(&graph, &vertices[i], &vertices[j]);
       }
     }
   }
 
   SCC_COMPONENTS* components = scc_graph_components(&graph);
-  vector<int> component_index_by_instance(count, -1);
-  for (int i = 0; i < components->length; i++) {
-    SCC_COMPONENT* component = components->array[i];
-    for (int j = 0; j < component->length; j++) {
-      component_index_by_instance[*static_cast<int*>(component->array[j])] = i;
-    }
-  }
 
   FiberScheduleChoice result = {-1, false};
   for (int i = 0; i < count; i++) {
-    if (scheduled[i] ||
-        (components->array[component_index_by_instance[i]]->length < 2 &&
-         !(edges[i][i] & DEPENDENCY_MAYBE_DIRECT))) {
+    if (scheduled[i]) {
+      continue;
+    }
+    const SCC_COMPONENT* instance_component = find_fiber_component(components, i);
+    if (instance_component->length < 2 &&
+        !(component_dependency(aug_graph, component, i, i) & DEPENDENCY_MAYBE_DIRECT)) {
       continue;
     }
     bool ready = true;
@@ -108,13 +125,13 @@ static FiberScheduleChoice next_fiber_instance(
         continue;
       }
       for (int k = 0; k < count; k++) {
-        if (scheduled[k] || component_index_by_instance[k] != component_index_by_instance[i] ||
-            !(edges[j][k] & DEPENDENCY_MAYBE_DIRECT)) {
+        if (scheduled[k] || find_fiber_component(components, k) != instance_component ||
+            !(component_dependency(aug_graph, component, j, k) & DEPENDENCY_MAYBE_DIRECT)) {
           continue;
         }
-        if (component_index_by_instance[j] != component_index_by_instance[i]) {
+        if (find_fiber_component(components, j) != instance_component) {
           ready = false;
-        } else if (edges[j][k] & DEPENDENCY_NOT_JUST_FIBER) {
+        } else if (component_dependency(aug_graph, component, j, k) & DEPENDENCY_NOT_JUST_FIBER) {
           requires_fixed_point_loop = true;
         }
       }
@@ -136,14 +153,12 @@ static FiberScheduleChoice next_fiber_instance(
 }
 
 static void emit_fiber_convergence_guard(ostream& os) {
-  os << indent() << "if (!" << LOOP_VAR << ") {\n";
+  os << indent() << "if (!" << synth_util::LOOP_VAR << ") {\n";
   ++nesting_level;
   os << indent() << "throw Evaluation.CyclicAttributeException(\"value-carrying fiber cycle requires a fixed-point loop\");\n";
   --nesting_level;
   os << indent() << "}\n";
 }
-
-}  // namespace synth_util
 
 class FiberDependencyDumper {
  public:
@@ -264,22 +279,17 @@ class FiberDependencyDumper {
   }
 
   static void dump_component(AUG_GRAPH* aug_graph, SCC_COMPONENT* component, bool* scheduled, ostream& os) {
-    int graph_instance_count = aug_graph->instances.length;
     int component_instance_count = component->length;
-    vector<vector<DEPENDENCY>> edges(component_instance_count, vector<DEPENDENCY>(component_instance_count, no_dependency));
     vector<bool> component_scheduled(component_instance_count, false);
     for (int i = 0; i < component_instance_count; i++) {
       INSTANCE* source = (INSTANCE*)component->array[i];
       component_scheduled[i] = scheduled[source->index];
-      for (int j = 0; j < component_instance_count; j++) {
-        INSTANCE* sink = (INSTANCE*)component->array[j];
-        edges[i][j] = edgeset_kind(aug_graph->graph[source->index * graph_instance_count + sink->index]);
-      }
     }
 
     bool needs_caller_fixed_point_check = true;
     while (!already_scheduled(component, scheduled)) {
-      synth_util::FiberScheduleChoice choice = synth_util::next_fiber_instance(edges, component_scheduled);
+      FiberScheduleChoice choice =
+          next_fiber_instance(aug_graph, component, component_scheduled);
       if (choice.index < 0) {
         fatal_error("cannot find a ready fiber dependency cycle in %s", aug_graph_name(aug_graph));
       }
@@ -295,7 +305,7 @@ class FiberDependencyDumper {
         // only if its caller repeats evaluation until values stop changing.
         // The caller signals that guarantee with isInsideFixedPoint=true.
         if (needs_caller_fixed_point_check) {
-          synth_util::emit_fiber_convergence_guard(os);
+          emit_fiber_convergence_guard(os);
           needs_caller_fixed_point_check = false;
         }
       }
@@ -859,18 +869,18 @@ class SynthImpl : public SynthImplementation {
         os << indent() << "implicit val " << synth_util::LOOP_VAR << ": Boolean = false;\n";
       }
 
-      os << indent() << "// Starting phylum evaluations\n";
-      emit_start_phylum_evaluations(os, s, synth_functions_states, true);
-      os << indent() << "// Finished phylum evaluations\n";
-      os << indent() << "// Starting eager phylum evaluations\n";
-      emit_eager_phylum_evaluations(os, synth_functions_states, true);
-      os << indent() << "// Finished eager phylum evaluations\n";
-      os << indent() << "// Starting phylum evaluations\n";
-      emit_start_phylum_evaluations(os, s, synth_functions_states, false);
-      os << indent() << "// Finished phylum evaluations\n";
-      os << indent() << "// Starting eager phylum evaluations\n";
-      emit_eager_phylum_evaluations(os, synth_functions_states, false);
-      os << indent() << "// Finished eager phylum evaluations\n";
+      os << indent() << "// Starting start-phylum side-effect evaluations\n";
+      emit_start_phylum_evaluations(os, s, synth_functions_states, /* emit_side_effects */ true);
+      os << indent() << "// Finished start-phylum side-effect evaluations\n";
+      os << indent() << "// Starting eager phylum side-effect evaluations\n";
+      emit_eager_phylum_evaluations(os, synth_functions_states, /* emit_side_effects */ true);
+      os << indent() << "// Finished eager phylum side-effect evaluations\n";
+      os << indent() << "// Starting start-phylum attribute-value evaluations\n";
+      emit_start_phylum_evaluations(os, s, synth_functions_states, /* emit_side_effects */ false);
+      os << indent() << "// Finished start-phylum attribute-value evaluations\n";
+      os << indent() << "// Starting eager phylum attribute-value evaluations\n";
+      emit_eager_phylum_evaluations(os, synth_functions_states, /* emit_side_effects */ false);
+      os << indent() << "// Finished eager phylum attribute-value evaluations\n";
       os << indent() << "super.finish();\n";
       --nesting_level;
       os << indent() << "};\n";
