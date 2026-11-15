@@ -40,7 +40,7 @@ namespace synth_util {
 
 struct FiberScheduleChoice {
   int index;
-  bool requires_convergence;
+  bool requires_fixed_point_loop;
 };
 
 static FiberScheduleChoice next_fiber_instance(
@@ -54,7 +54,7 @@ static FiberScheduleChoice next_fiber_instance(
     remaining++;
     bool ready = true;
     for (int j = 0; j < count; j++) {
-      if (j != i && !scheduled[j] && (edges[j][i] & DEPENDENCY_MAYBE_DIRECT)) {
+      if (!scheduled[j] && (edges[j][i] & DEPENDENCY_MAYBE_DIRECT)) {
         ready = false;
         break;
       }
@@ -78,7 +78,7 @@ static FiberScheduleChoice next_fiber_instance(
   }
   for (int i = 0; i < count; i++) {
     for (int j = 0; j < count; j++) {
-      if (i != j && !scheduled[i] && !scheduled[j] &&
+      if (!scheduled[i] && !scheduled[j] &&
           (edges[i][j] & DEPENDENCY_MAYBE_DIRECT)) {
         scc_graph_add_edge(&graph, &vertices[i], &vertices[j]);
       }
@@ -86,39 +86,41 @@ static FiberScheduleChoice next_fiber_instance(
   }
 
   SCC_COMPONENTS* components = scc_graph_components(&graph);
-  vector<int> component_of(count, -1);
+  vector<int> component_index_by_instance(count, -1);
   for (int i = 0; i < components->length; i++) {
     SCC_COMPONENT* component = components->array[i];
     for (int j = 0; j < component->length; j++) {
-      component_of[*static_cast<int*>(component->array[j])] = i;
+      component_index_by_instance[*static_cast<int*>(component->array[j])] = i;
     }
   }
 
   FiberScheduleChoice result = {-1, false};
   for (int i = 0; i < count; i++) {
-    if (scheduled[i] || components->array[component_of[i]]->length < 2) {
+    if (scheduled[i] ||
+        (components->array[component_index_by_instance[i]]->length < 2 &&
+         !(edges[i][i] & DEPENDENCY_MAYBE_DIRECT))) {
       continue;
     }
     bool ready = true;
-    bool requires_convergence = false;
+    bool requires_fixed_point_loop = false;
     for (int j = 0; j < count; j++) {
       if (scheduled[j]) {
         continue;
       }
       for (int k = 0; k < count; k++) {
-        if (scheduled[k] || j == k || component_of[k] != component_of[i] ||
+        if (scheduled[k] || component_index_by_instance[k] != component_index_by_instance[i] ||
             !(edges[j][k] & DEPENDENCY_MAYBE_DIRECT)) {
           continue;
         }
-        if (component_of[j] != component_of[i]) {
+        if (component_index_by_instance[j] != component_index_by_instance[i]) {
           ready = false;
         } else if (edges[j][k] & DEPENDENCY_NOT_JUST_FIBER) {
-          requires_convergence = true;
+          requires_fixed_point_loop = true;
         }
       }
     }
     if (ready) {
-      result = {i, requires_convergence};
+      result = {i, requires_fixed_point_loop};
       break;
     }
   }
@@ -131,6 +133,14 @@ static FiberScheduleChoice next_fiber_instance(
   free(components);
   scc_graph_destroy(&graph);
   return result;
+}
+
+static void emit_fiber_convergence_guard(ostream& os) {
+  os << indent() << "if (!" << LOOP_VAR << ") {\n";
+  ++nesting_level;
+  os << indent() << "throw Evaluation.CyclicAttributeException(\"value-carrying fiber cycle requires a fixed-point loop\");\n";
+  --nesting_level;
+  os << indent() << "}\n";
 }
 
 }  // namespace synth_util
@@ -206,7 +216,7 @@ class FiberDependencyDumper {
   static SCC_COMPONENT* find_next_ready_component(AUG_GRAPH* aug_graph, SCC_COMPONENTS* components, bool* scheduled) {
     int n = aug_graph->instances.length;
     SCC_COMPONENT* next_component = NULL;
-    int next_index = n;
+    int lowest_instance_index = n;
 
     for (int i = 0; i < components->length; i++) {
       SCC_COMPONENT* component = components->array[i];
@@ -238,9 +248,9 @@ class FiberDependencyDumper {
         // Preserve contribution order when independent fibers build sequences.
         for (int j = 0; j < component->length; j++) {
           INSTANCE* in = (INSTANCE*)component->array[j];
-          if (in->index < next_index) {
+          if (in->index < lowest_instance_index) {
             next_component = component;
-            next_index = in->index;
+            lowest_instance_index = in->index;
           }
         }
       }
@@ -254,19 +264,20 @@ class FiberDependencyDumper {
   }
 
   static void dump_component(AUG_GRAPH* aug_graph, SCC_COMPONENT* component, bool* scheduled, ostream& os) {
-    int n = aug_graph->instances.length;
-    int count = component->length;
-    vector<vector<DEPENDENCY>> edges(count, vector<DEPENDENCY>(count, no_dependency));
-    vector<bool> component_scheduled(count, false);
-    for (int i = 0; i < count; i++) {
+    int graph_instance_count = aug_graph->instances.length;
+    int component_instance_count = component->length;
+    vector<vector<DEPENDENCY>> edges(component_instance_count, vector<DEPENDENCY>(component_instance_count, no_dependency));
+    vector<bool> component_scheduled(component_instance_count, false);
+    for (int i = 0; i < component_instance_count; i++) {
       INSTANCE* source = (INSTANCE*)component->array[i];
       component_scheduled[i] = scheduled[source->index];
-      for (int j = 0; j < count; j++) {
+      for (int j = 0; j < component_instance_count; j++) {
         INSTANCE* sink = (INSTANCE*)component->array[j];
-        edges[i][j] = edgeset_kind(aug_graph->graph[source->index * n + sink->index]);
+        edges[i][j] = edgeset_kind(aug_graph->graph[source->index * graph_instance_count + sink->index]);
       }
     }
 
+    bool needs_caller_fixed_point_check = true;
     while (!already_scheduled(component, scheduled)) {
       synth_util::FiberScheduleChoice choice = synth_util::next_fiber_instance(edges, component_scheduled);
       if (choice.index < 0) {
@@ -274,10 +285,19 @@ class FiberDependencyDumper {
       }
       INSTANCE* next = (INSTANCE*)component->array[choice.index];
       // Fiber-only cycles are propagated reference dependencies.
-      if (choice.requires_convergence && !emitting_fiber_fixed_point_loop) {
-        fatal_error("cannot schedule value-carrying fiber cycle in %s at instance %s (index %d) without a fixed-point loop",
-                    aug_graph_name(aug_graph),
-                    synth_util::instance_to_string(next).c_str(), next->index);
+      if (choice.requires_fixed_point_loop && !emitting_fiber_fixed_point_loop) {
+        if (!aug_graph->global_state->requires_fixed_point_loop) {
+          fatal_error("cannot schedule value-carrying fiber cycle in %s at instance %s (index %d) without a fixed-point loop",
+                      aug_graph_name(aug_graph),
+                      synth_util::instance_to_string(next).c_str(), next->index);
+        }
+        // This function does not emit its own loop. It can evaluate the cycle
+        // only if its caller repeats evaluation until values stop changing.
+        // The caller signals that guarantee with isInsideFixedPoint=true.
+        if (needs_caller_fixed_point_check) {
+          synth_util::emit_fiber_convergence_guard(os);
+          needs_caller_fixed_point_check = false;
+        }
       }
       component_scheduled[choice.index] = true;
       scheduled[next->index] = true;
@@ -525,27 +545,27 @@ static void dump_synth_functions(STATE* s, ostream& os) {
   bool needs_fixed_point = s->requires_fixed_point_loop;
 
   for (auto state_it = synth_functions_states.begin(); state_it != synth_functions_states.end(); state_it++) {
-    synth_util::SynthFunctionState* synth_functions_state = *state_it;
-    current_synth_functions_state = synth_functions_state;
-    string result_var = synth_util::RESULT_VAR_PREFIX + std::to_string(synth_functions_state->source->index);
+    synth_util::SynthFunctionState* function_state = *state_it;
+    current_synth_functions_state = function_state;
+    string result_var = synth_util::RESULT_VAR_PREFIX + std::to_string(function_state->source->index);
 
     if (include_comments) {
-      os << indent() << "// " << synth_functions_state->source << " (" << (synth_functions_state->is_phylum_instance ? "phylum" : "aug-graph") << ")\n";
+      os << indent() << "// " << function_state->source << " (" << (function_state->is_phylum_instance ? "phylum" : "aug-graph") << ")\n";
     }
-    if (synth_functions_state->is_side_effect_evaluation) {
-      os << indent() << "val evaluated_map_" << synth_functions_state->fdecl_name << " = scala.collection.mutable.Map[Int, Boolean]()\n\n";
+    if (function_state->is_side_effect_evaluation) {
+      os << indent() << "val evaluated_map_" << function_state->fdecl_name << " = scala.collection.mutable.Map[Int, Boolean]()\n\n";
     }
 
-    os << indent() << "def eval_" << synth_functions_state->fdecl_name << "(";
-    os << "node: T_" << decl_name(synth_functions_state->source_phy_graph->phylum);
+    os << indent() << "def eval_" << function_state->fdecl_name << "(";
+    os << "node: T_" << decl_name(function_state->source_phy_graph->phylum);
 
-    for (auto it = synth_functions_state->regular_dependencies.begin(); it != synth_functions_state->regular_dependencies.end(); it++) {
+    for (auto it = function_state->regular_dependencies.begin(); it != function_state->regular_dependencies.end(); it++) {
       INSTANCE* source_instance = *it;
       if (synth_util::should_skip_synth_dependency(source_instance)) {
         continue;
       }
       os << ",\n" << indent(nesting_level + 1) << "v_";
-      if (!synth_functions_state->is_phylum_instance) {
+      if (!function_state->is_phylum_instance) {
         os << synth_util::instance_to_string(source_instance) << ": ";
       } else {
         os << synth_util::instance_to_string(source_instance, true) << ": ";
@@ -559,10 +579,10 @@ static void dump_synth_functions(STATE* s, ostream& os) {
     }
 
     os << ": ";
-    if (synth_functions_state->is_side_effect_evaluation) {
+    if (function_state->is_side_effect_evaluation) {
       os << "Unit";
     } else {
-      synth_util::dump_attribute_type(synth_functions_state->source, os);
+      synth_util::dump_attribute_type(function_state->source, os);
     }
     os << " = {\n";
     nesting_level++;
@@ -572,19 +592,19 @@ static void dump_synth_functions(STATE* s, ostream& os) {
       nesting_level++;
     }
 
-    if (synth_functions_state->is_side_effect_evaluation) {
-      os << indent() << "evaluated_map_" << synth_functions_state->fdecl_name << ".getOrElse(node.nodeNumber, false) match {\n";
+    if (function_state->is_side_effect_evaluation) {
+      os << indent() << "evaluated_map_" << function_state->fdecl_name << ".getOrElse(node.nodeNumber, false) match {\n";
       os << indent(nesting_level + 1) << "case true => return ()\n";
     } else {
-      os << indent() << synth_util::instance_to_attr(synth_functions_state->source) << ".checkNode(node).status match {\n";
+      os << indent() << synth_util::instance_to_attr(function_state->source) << ".checkNode(node).status match {\n";
       os << indent(nesting_level + 1) << "case Evaluation.ASSIGNED => ";
       if (include_comments) {
         os << "{\n";
         nesting_level++;
-        os << indent(nesting_level + 1) << "Debug.out(\"cache hit for \" + node + \" with value \" + " << synth_util::instance_to_attr(synth_functions_state->source) << ".get(node));\n";
+        os << indent(nesting_level + 1) << "Debug.out(\"cache hit for \" + node + \" with value \" + " << synth_util::instance_to_attr(function_state->source) << ".get(node));\n";
         os << indent(nesting_level + 1);
       }
-      os << "return " << synth_util::instance_to_attr(synth_functions_state->source) << ".get(node)\n";
+      os << "return " << synth_util::instance_to_attr(function_state->source) << ".get(node)\n";
       if (include_comments) {
         nesting_level--;
         os << indent(nesting_level + 1) << "}\n";
@@ -599,16 +619,16 @@ static void dump_synth_functions(STATE* s, ostream& os) {
       os << indent() << "}\n";
     }
 
-    if (synth_functions_state->is_side_effect_evaluation) {
+    if (function_state->is_side_effect_evaluation) {
       os << indent() << "node match {\n";
     } else {
       os << indent() << "val " << result_var << " = node match {\n";
     }
     nesting_level++;
 
-    bool source_circular = needs_fixed_point && synth_util::synth_function_is_circular(synth_functions_state);
+    bool source_circular = needs_fixed_point && synth_util::synth_function_is_circular(function_state);
 
-    for (auto it = synth_functions_state->aug_graphs.begin(); it != synth_functions_state->aug_graphs.end(); it++) {
+    for (auto it = function_state->aug_graphs.begin(); it != function_state->aug_graphs.end(); it++) {
       AUG_GRAPH* aug_graph = *it;
       int n = aug_graph->instances.length;
 
@@ -619,12 +639,12 @@ static void dump_synth_functions(STATE* s, ostream& os) {
       nesting_level++;
 
       INSTANCE* aug_graph_instance = NULL;
-      if (synth_functions_state->is_phylum_instance) {
-        if (!synth_util::find_instance(aug_graph, aug_graph->lhs_decl, synth_functions_state->source->fibered_attr, &aug_graph_instance)) {
+      if (function_state->is_phylum_instance) {
+        if (!synth_util::find_instance(aug_graph, aug_graph->lhs_decl, function_state->source->fibered_attr, &aug_graph_instance)) {
           fatal_error("something is wrong with instances in aug graph %s", aug_graph_name(aug_graph));
         }
       } else {
-        aug_graph_instance = synth_functions_state->source;
+        aug_graph_instance = function_state->source;
       }
 
       current_scope_block = synth_util::linearize_block(aug_graph, aug_graph_instance);
@@ -637,20 +657,20 @@ static void dump_synth_functions(STATE* s, ostream& os) {
         os << indent() << "*/\n";
       }
 
-      int src_idx = synth_functions_state->source->index;
-      string src_attr = synth_util::instance_to_attr(synth_functions_state->source);
+      int source_instance_index = function_state->source->index;
+      string src_attr = synth_util::instance_to_attr(function_state->source);
 
       bool declared_is_circular = instance_circular(aug_graph_instance);
-      bool depends_on_itself = edgeset_kind(aug_graph->graph[src_idx * n + src_idx]) != 0;
+      bool depends_on_itself = edgeset_kind(aug_graph->graph[source_instance_index * n + source_instance_index]) != 0;
       if (!declared_is_circular && depends_on_itself) {
         aps_warning(aug_graph_instance->node, "Instance %s depends on itself but is not declared circular", synth_util::instance_to_string(aug_graph_instance).c_str());
       }
 
-      bool dump_fixed_point_loop = synth_functions_state->is_side_effect_evaluation && declared_is_circular && !synth_util::instance_is_pure_shared_info(synth_functions_state->source);
-      string node_get = ATTR_DECL_IS_SHARED_INFO(synth_functions_state->source->fibered_attr.attr) ? "" : "node";
-      string node_assign = ATTR_DECL_IS_SHARED_INFO(synth_functions_state->source->fibered_attr.attr) ? "" : "node, ";
+      bool needs_local_fixed_point_loop = function_state->is_side_effect_evaluation && declared_is_circular && !synth_util::instance_is_pure_shared_info(function_state->source);
+      string node_get = ATTR_DECL_IS_SHARED_INFO(function_state->source->fibered_attr.attr) ? "" : "node";
+      string node_assign = ATTR_DECL_IS_SHARED_INFO(function_state->source->fibered_attr.attr) ? "" : "node, ";
 
-      if (!synth_functions_state->is_side_effect_evaluation) {
+      if (!function_state->is_side_effect_evaluation) {
         std::vector<INSTANCE*> child_cycle_instances = synth_util::collect_child_cycle_instances(aug_graph);
         for (auto it2 = child_cycle_instances.begin(); it2 != child_cycle_instances.end(); it2++) {
           INSTANCE* cycle_instance = *it2;
@@ -668,28 +688,28 @@ static void dump_synth_functions(STATE* s, ostream& os) {
         dumped_instances.clear();
       }
 
-      if (dump_fixed_point_loop) {
+      if (needs_local_fixed_point_loop) {
         os << indent() << "{\n";
         nesting_level++;
-        os << indent() << "val " << PREV_LOOP_VAR << src_idx << " = " << synth_util::LOOP_VAR << ";\n";
-        os << indent() << "val prevChanged" << src_idx << " = changed;\n";
-        os << indent() << "val newChanged" << src_idx << " = new AtomicBoolean(false);\n";
+        os << indent() << "val " << PREV_LOOP_VAR << source_instance_index << " = " << synth_util::LOOP_VAR << ";\n";
+        os << indent() << "val prevChanged" << source_instance_index << " = changed;\n";
+        os << indent() << "val newChanged" << source_instance_index << " = new AtomicBoolean(false);\n";
         if (include_comments) {
-          os << indent() << "var iterCount" << src_idx << " = 0;\n";
+          os << indent() << "var iterCount" << source_instance_index << " = 0;\n";
         }
         os << indent() << "do {\n";
         nesting_level++;
-        os << indent() << "newChanged" << src_idx << ".set(false);\n";
+        os << indent() << "newChanged" << source_instance_index << ".set(false);\n";
         emitting_fiber_fixed_point_loop = true;
-        synth_util::emit_loop_implicits(os, "newChanged" + std::to_string(src_idx));
+        synth_util::emit_loop_implicits(os, "newChanged" + std::to_string(source_instance_index));
       }
 
-      if (include_comments && synth_functions_state->is_side_effect_evaluation && !dump_fixed_point_loop) {
+      if (include_comments && function_state->is_side_effect_evaluation && !needs_local_fixed_point_loop) {
         os << "\n";
       }
       FiberDependencyDumper::dump(aug_graph, aug_graph_instance, os);
 
-      if (synth_functions_state->is_side_effect_evaluation) {
+      if (function_state->is_side_effect_evaluation) {
         os << indent();
         synth_impl_ptr->dump_synth_instance(aug_graph_instance, os);
         os << "\n";
@@ -697,8 +717,8 @@ static void dump_synth_functions(STATE* s, ostream& os) {
         dumped_instances.clear();
       }
 
-      if (!synth_functions_state->is_side_effect_evaluation) {
-        if (dump_fixed_point_loop) {
+      if (!function_state->is_side_effect_evaluation) {
+        if (needs_local_fixed_point_loop) {
           os << indent() << src_attr << ".assign(" << node_assign;
           synth_impl_ptr->dump_synth_instance(aug_graph_instance, os);
           os << ", changed);\n";
@@ -709,16 +729,16 @@ static void dump_synth_functions(STATE* s, ostream& os) {
         }
       }
 
-      if (dump_fixed_point_loop) {
+      if (needs_local_fixed_point_loop) {
         emitting_fiber_fixed_point_loop = false;
         if (include_comments) {
-          os << indent() << "iterCount" << src_idx << " += 1;\n";
-          os << indent() << "Debug.out(\"fixed-point " << synth_functions_state->fdecl_name << " node=\" + node + \" iteration=\" + iterCount" << src_idx << ");\n";
+          os << indent() << "iterCount" << source_instance_index << " += 1;\n";
+          os << indent() << "Debug.out(\"fixed-point " << function_state->fdecl_name << " node=\" + node + \" iteration=\" + iterCount" << source_instance_index << ");\n";
         }
         nesting_level--;
-        os << indent() << "} while (newChanged" << src_idx << ".get && !" << PREV_LOOP_VAR << src_idx << ")\n";
-        os << indent() << "prevChanged" << src_idx << ".compareAndSet(false, newChanged" << src_idx << ".get);\n";
-        if (!synth_functions_state->is_side_effect_evaluation) {
+        os << indent() << "} while (newChanged" << source_instance_index << ".get && !" << PREV_LOOP_VAR << source_instance_index << ")\n";
+        os << indent() << "prevChanged" << source_instance_index << ".compareAndSet(false, newChanged" << source_instance_index << ".get);\n";
+        if (!function_state->is_side_effect_evaluation) {
           os << indent() << src_attr << ".get(" << node_get << ")\n";
         }
         nesting_level--;
@@ -738,20 +758,20 @@ static void dump_synth_functions(STATE* s, ostream& os) {
     nesting_level--;
     os << indent() << "};\n";
 
-    if (synth_functions_state->is_side_effect_evaluation) {
-      os << indent() << "evaluated_map_" << synth_functions_state->fdecl_name << ".update(node.nodeNumber, true);\n";
+    if (function_state->is_side_effect_evaluation) {
+      os << indent() << "evaluated_map_" << function_state->fdecl_name << ".update(node.nodeNumber, true);\n";
     } else {
       if (source_circular) {
-        os << indent() << synth_util::instance_to_attr(synth_functions_state->source) << ".assign(node, " << result_var << ", changed);\n";
+        os << indent() << synth_util::instance_to_attr(function_state->source) << ".assign(node, " << result_var << ", changed);\n";
       } else {
-        os << indent() << synth_util::instance_to_attr(synth_functions_state->source) << ".assign(node, " << result_var << ");\n";
+        os << indent() << synth_util::instance_to_attr(function_state->source) << ".assign(node, " << result_var << ");\n";
       }
-      os << indent() << synth_util::instance_to_attr(synth_functions_state->source) << ".get(node);\n";
+      os << indent() << synth_util::instance_to_attr(function_state->source) << ".get(node);\n";
     }
 
-    if (!synth_functions_state->is_side_effect_evaluation && !synth_functions_state->is_phylum_instance) {
-      Declaration obj_decl = synth_functions_state->source->fibered_attr.attr;
-      for (auto ag_it = synth_functions_state->aug_graphs.begin(); ag_it != synth_functions_state->aug_graphs.end(); ag_it++) {
+    if (!function_state->is_side_effect_evaluation && !function_state->is_phylum_instance) {
+      Declaration obj_decl = function_state->source->fibered_attr.attr;
+      for (auto ag_it = function_state->aug_graphs.begin(); ag_it != function_state->aug_graphs.end(); ag_it++) {
         AUG_GRAPH* aug_graph = *ag_it;
         std::vector<ObjectFieldAssign> field_assigns = collect_object_field_assignments(aug_graph, obj_decl);
         if (field_assigns.empty()) {
@@ -797,7 +817,7 @@ static void dump_synth_functions(STATE* s, ostream& os) {
       }
     }
 
-    if (!synth_functions_state->is_side_effect_evaluation) {
+    if (!function_state->is_side_effect_evaluation) {
       os << indent() << result_var << "\n";
     }
 
@@ -895,7 +915,9 @@ class SynthImpl : public SynthImplementation {
           }
           o << "(";
           dump_Expression(rhs, o);
-          if (emitting_fiber_fixed_point_loop) {
+          if (decl_is_circular(field) &&
+              (emitting_fiber_fixed_point_loop ||
+               current_aug_graph->global_state->requires_fixed_point_loop)) {
             o << ", changed";
           }
           o << ")";
@@ -915,7 +937,9 @@ class SynthImpl : public SynthImplementation {
           dump_Expression(field_ref_object(lhs), o);
           o << ", ";
           dump_Expression(rhs, o);
-          if (emitting_fiber_fixed_point_loop) {
+          if (decl_is_circular(field) &&
+              (emitting_fiber_fixed_point_loop ||
+               current_aug_graph->global_state->requires_fixed_point_loop)) {
             o << ", changed";
           }
           o << ");\n";
@@ -1154,9 +1178,9 @@ class SynthImpl : public SynthImplementation {
             o << indent();
           }
 
-          vector<INSTANCE*> dumped_instanced_positive(dumped_instances);
+          vector<INSTANCE*> saved_instances_before_true_branch(dumped_instances);
           dump_rhs_instance_helper(aug_graph, cond->next_positive, instance, o);
-          dumped_instances = dumped_instanced_positive;
+          dumped_instances = saved_instances_before_true_branch;
           current_blocks.pop_back();
 
           if (!visited_if_stmt) {
@@ -1170,9 +1194,9 @@ class SynthImpl : public SynthImplementation {
             o << indent();
           }
 
-          vector<INSTANCE*> dumped_instanced_negative(dumped_instances);
+          vector<INSTANCE*> saved_instances_before_false_branch(dumped_instances);
           dump_rhs_instance_helper(aug_graph, cond->next_negative, instance, o);
-          dumped_instances = dumped_instanced_negative;
+          dumped_instances = saved_instances_before_false_branch;
 
           current_blocks.pop_back();
           if (!visited_if_stmt) {
@@ -1313,11 +1337,11 @@ class SynthImpl : public SynthImplementation {
     bool is_inherited = synth_util::instance_is_inherited(instance);
     bool is_function_call_result =
       synth_util::instance_is_function_call_result(instance);
-    bool is_circular = edgeset_kind(current_aug_graph->graph[instance->index * current_aug_graph->instances.length + instance->index]);
+    bool has_dependency_cycle = edgeset_kind(current_aug_graph->graph[instance->index * current_aug_graph->instances.length + instance->index]);
     bool is_match_formal = synth_util::is_match_formal(instance->fibered_attr.attr);
     bool is_available = is_match_formal || is_inherited;
 
-    if (is_circular && already_dumped && !is_available) {
+    if (has_dependency_cycle && already_dumped && !is_available) {
       o << "/* circular dependency detected for " << instance << ", dumping as attribute access */ ";
       o << synth_util::instance_to_attr(instance) << ".get(";
       if (instance->node == NULL) {
