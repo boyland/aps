@@ -32,9 +32,108 @@ static vector<Block> current_blocks;
 static synth_util::BlockItem* current_scope_block;
 static vector<synth_util::BlockItem*> dumped_conditional_block_items;
 static vector<INSTANCE*> dumped_instances;
-static bool tracking_fiber_convergence = false;
+static bool emitting_fiber_fixed_point_loop = false;
 
 static const string PREV_LOOP_VAR = "prevIsInsideFixedPoint";
+
+namespace synth_util {
+
+struct FiberScheduleChoice {
+  int index;
+  bool requires_convergence;
+};
+
+static FiberScheduleChoice next_fiber_instance(
+    const vector<vector<DEPENDENCY>>& edges, const vector<bool>& scheduled) {
+  int count = static_cast<int>(scheduled.size());
+  int remaining = 0;
+  for (int i = 0; i < count; i++) {
+    if (scheduled[i]) {
+      continue;
+    }
+    remaining++;
+    bool ready = true;
+    for (int j = 0; j < count; j++) {
+      if (j != i && !scheduled[j] && (edges[j][i] & DEPENDENCY_MAYBE_DIRECT)) {
+        ready = false;
+        break;
+      }
+    }
+    if (ready) {
+      return {i, false};
+    }
+  }
+  if (remaining == 0) {
+    return {-1, false};
+  }
+
+  vector<int> vertices(count);
+  SccGraph graph;
+  scc_graph_initialize(&graph, remaining);
+  for (int i = 0; i < count; i++) {
+    if (!scheduled[i]) {
+      vertices[i] = i;
+      scc_graph_add_vertex(&graph, &vertices[i]);
+    }
+  }
+  for (int i = 0; i < count; i++) {
+    for (int j = 0; j < count; j++) {
+      if (i != j && !scheduled[i] && !scheduled[j] &&
+          (edges[i][j] & DEPENDENCY_MAYBE_DIRECT)) {
+        scc_graph_add_edge(&graph, &vertices[i], &vertices[j]);
+      }
+    }
+  }
+
+  SCC_COMPONENTS* components = scc_graph_components(&graph);
+  vector<int> component_of(count, -1);
+  for (int i = 0; i < components->length; i++) {
+    SCC_COMPONENT* component = components->array[i];
+    for (int j = 0; j < component->length; j++) {
+      component_of[*static_cast<int*>(component->array[j])] = i;
+    }
+  }
+
+  FiberScheduleChoice result = {-1, false};
+  for (int i = 0; i < count; i++) {
+    if (scheduled[i] || components->array[component_of[i]]->length < 2) {
+      continue;
+    }
+    bool ready = true;
+    bool requires_convergence = false;
+    for (int j = 0; j < count; j++) {
+      if (scheduled[j]) {
+        continue;
+      }
+      for (int k = 0; k < count; k++) {
+        if (scheduled[k] || j == k || component_of[k] != component_of[i] ||
+            !(edges[j][k] & DEPENDENCY_MAYBE_DIRECT)) {
+          continue;
+        }
+        if (component_of[j] != component_of[i]) {
+          ready = false;
+        } else if (edges[j][k] & DEPENDENCY_NOT_JUST_FIBER) {
+          requires_convergence = true;
+        }
+      }
+    }
+    if (ready) {
+      result = {i, requires_convergence};
+      break;
+    }
+  }
+
+  for (int i = 0; i < components->length; i++) {
+    free(components->array[i]->array);
+    free(components->array[i]);
+  }
+  free(components->array);
+  free(components);
+  scc_graph_destroy(&graph);
+  return result;
+}
+
+}  // namespace synth_util
 
 class FiberDependencyDumper {
  public:
@@ -156,58 +255,37 @@ class FiberDependencyDumper {
 
   static void dump_component(AUG_GRAPH* aug_graph, SCC_COMPONENT* component, bool* scheduled, ostream& os) {
     int n = aug_graph->instances.length;
-
-    if (component->length == 0 || already_scheduled(component, scheduled)) {
-      return;
+    int count = component->length;
+    vector<vector<DEPENDENCY>> edges(count, vector<DEPENDENCY>(count, no_dependency));
+    vector<bool> component_scheduled(count, false);
+    for (int i = 0; i < count; i++) {
+      INSTANCE* source = (INSTANCE*)component->array[i];
+      component_scheduled[i] = scheduled[source->index];
+      for (int j = 0; j < count; j++) {
+        INSTANCE* sink = (INSTANCE*)component->array[j];
+        edges[i][j] = edgeset_kind(aug_graph->graph[source->index * n + sink->index]);
+      }
     }
 
-    bool made_progress = false;
-    for (int i = 0; i < component->length; i++) {
-      INSTANCE* in = (INSTANCE*)component->array[i];
-      if (scheduled[in->index]) {
-        continue;
+    while (!already_scheduled(component, scheduled)) {
+      synth_util::FiberScheduleChoice choice = synth_util::next_fiber_instance(edges, component_scheduled);
+      if (choice.index < 0) {
+        fatal_error("cannot find a ready fiber dependency cycle in %s", aug_graph_name(aug_graph));
       }
-
-      bool dependency_ready = true;
-      for (int j = 0; j < component->length && dependency_ready; j++) {
-        INSTANCE* dependency_instance = (INSTANCE*)component->array[j];
-        if (dependency_instance == in) {
-          continue;
-        }
-        if (!scheduled[dependency_instance->index] && (edgeset_kind(aug_graph->graph[dependency_instance->index * n + in->index]) & DEPENDENCY_MAYBE_DIRECT)) {
-          dependency_ready = false;
-        }
+      INSTANCE* next = (INSTANCE*)component->array[choice.index];
+      // Fiber-only cycles are propagated reference dependencies.
+      if (choice.requires_convergence && !emitting_fiber_fixed_point_loop) {
+        fatal_error("cannot schedule value-carrying fiber cycle in %s at instance %s (index %d) without a fixed-point loop",
+                    aug_graph_name(aug_graph),
+                    synth_util::instance_to_string(next).c_str(), next->index);
       }
-      if (!dependency_ready) {
-        continue;
-      }
-
-      scheduled[in->index] = true;
-      made_progress = true;
+      component_scheduled[choice.index] = true;
+      scheduled[next->index] = true;
       os << indent();
-      synth_impl_ptr->dump_synth_instance(in, os);
+      synth_impl_ptr->dump_synth_instance(next, os);
       dumped_conditional_block_items.clear();
       dumped_instances.clear();
       os << ";\n";
-
-      dump_component(aug_graph, component, scheduled, os);
-    }
-
-    // TODO: what are you doing here??
-    if (!made_progress) {
-      for (int i = 0; i < component->length; i++) {
-        INSTANCE* in = (INSTANCE*)component->array[i];
-        if (!scheduled[in->index]) {
-          scheduled[in->index] = true;
-          os << indent();
-          synth_impl_ptr->dump_synth_instance(in, os);
-          dumped_conditional_block_items.clear();
-          dumped_instances.clear();
-          os << ";\n";
-          dump_component(aug_graph, component, scheduled, os);
-          break;
-        }
-      }
     }
   }
 
@@ -279,6 +357,17 @@ static void emit_root_evaluations(ostream& os, Declaration start_phylum, const v
   os << indent() << "}\n";
 }
 
+static bool is_side_effect(
+    INSTANCE* instance,
+    const vector<synth_util::SynthFunctionState*>& function_states) {
+  for (const auto* function_state : function_states) {
+    if (function_state->source == instance) {
+      return function_state->is_side_effect_evaluation;
+    }
+  }
+  return false;
+}
+
 static void emit_start_phylum_evaluations(
   ostream& os, STATE* state,
   const vector<synth_util::SynthFunctionState*>& function_states,
@@ -287,24 +376,13 @@ static void emit_start_phylum_evaluations(
   bool needs_fixed_point = state->requires_fixed_point_loop;
   set_phylum_graph_components(start_graph);
 
-  // TODO: don't use lambda, simplify
-  auto is_side_effect = [&function_states](INSTANCE* instance) {
-    auto function_state = std::find_if(
-        function_states.begin(), function_states.end(),
-        [instance](synth_util::SynthFunctionState* candidate) {
-          return candidate->source == instance;
-        });
-    return function_state != function_states.end() &&
-           (*function_state)->is_side_effect_evaluation;
-  };
-
   if (!needs_fixed_point) {
     vector<INSTANCE*> instances;
     for (int instance_index = 0;
          instance_index < start_graph->instances.length; instance_index++) {
       INSTANCE* instance = &start_graph->instances.array[instance_index];
       if (!synth_util::instance_is_synthesized(instance) ||
-          is_side_effect(instance) != emit_side_effects) {
+          is_side_effect(instance, function_states) != emit_side_effects) {
         continue;
       }
       instances.push_back(instance);
@@ -318,7 +396,7 @@ static void emit_start_phylum_evaluations(
     SCC_COMPONENT* component = start_graph->components->array[component_index];
     vector<INSTANCE*> synthesized_instances;
     for (INSTANCE* instance : synthesized_component_instances(component)) {
-      if (is_side_effect(instance) == emit_side_effects) {
+      if (is_side_effect(instance, function_states) == emit_side_effects) {
         synthesized_instances.push_back(instance);
       }
     }
@@ -361,9 +439,16 @@ static void emit_eager_phylum_evaluations(
     }
 
     Declaration phylum = function_state->source_phy_graph->phylum;
-    // Detached trees are not part of the evaluation.
     os << indent() << "for (node <- t_" << decl_name(phylum)
-       << ".nodes if node.isRooted) {\n";
+       << ".nodes if node.isRooted && ";
+    if (function_state->is_side_effect_evaluation) {
+      os << "!evaluated_map_" << function_state->fdecl_name
+         << ".getOrElse(node.nodeNumber, false)";
+    } else {
+      os << synth_util::instance_to_attr(function_state->source)
+         << ".checkNode(node).status != Evaluation.ASSIGNED";
+    }
+    os << ") {\n";
     ++nesting_level;
     os << indent() << "eval_" << function_state->fdecl_name << "(node);\n";
     --nesting_level;
@@ -595,7 +680,7 @@ static void dump_synth_functions(STATE* s, ostream& os) {
         os << indent() << "do {\n";
         nesting_level++;
         os << indent() << "newChanged" << src_idx << ".set(false);\n";
-        tracking_fiber_convergence = true;
+        emitting_fiber_fixed_point_loop = true;
         synth_util::emit_loop_implicits(os, "newChanged" + std::to_string(src_idx));
       }
 
@@ -625,7 +710,7 @@ static void dump_synth_functions(STATE* s, ostream& os) {
       }
 
       if (dump_fixed_point_loop) {
-        tracking_fiber_convergence = false;
+        emitting_fiber_fixed_point_loop = false;
         if (include_comments) {
           os << indent() << "iterCount" << src_idx << " += 1;\n";
           os << indent() << "Debug.out(\"fixed-point " << synth_functions_state->fdecl_name << " node=\" + node + \" iteration=\" + iterCount" << src_idx << ");\n";
@@ -754,8 +839,6 @@ class SynthImpl : public SynthImplementation {
         os << indent() << "implicit val " << synth_util::LOOP_VAR << ": Boolean = false;\n";
       }
 
-      // TODO: complete junk. You are doing things twice.
-      // IT's doing things twice.
       os << indent() << "// Starting phylum evaluations\n";
       emit_start_phylum_evaluations(os, s, synth_functions_states, true);
       os << indent() << "// Finished phylum evaluations\n";
@@ -812,7 +895,7 @@ class SynthImpl : public SynthImplementation {
           }
           o << "(";
           dump_Expression(rhs, o);
-          if (tracking_fiber_convergence) {
+          if (emitting_fiber_fixed_point_loop) {
             o << ", changed";
           }
           o << ")";
@@ -832,7 +915,7 @@ class SynthImpl : public SynthImplementation {
           dump_Expression(field_ref_object(lhs), o);
           o << ", ";
           dump_Expression(rhs, o);
-          if (tracking_fiber_convergence) {
+          if (emitting_fiber_fixed_point_loop) {
             o << ", changed";
           }
           o << ");\n";
@@ -1308,6 +1391,8 @@ class SynthImpl : public SynthImplementation {
   }
 };
 
+#ifndef APS_FIBER_SCHEDULE_TEST
 Implementation* synth_impl = synth_impl_ptr = new SynthImpl();
+#endif
 
 #endif  // APS2SCALA
