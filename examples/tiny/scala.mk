@@ -6,7 +6,6 @@ TINY_OUTPUTS := ${OUT}/tiny/% ${OUT}/broad-fiber-cycle/% ${OUT}/below-fiber-cycl
 	${OUT}/test-use-coll/% ${OUT}/test-cycle/% ${OUT}/use-global/% ${OUT}/test-fields/% \
 	${OUT}/test-for/% ${OUT}/test-for-patterns/% ${OUT}/test-case-patterns/% \
 	${OUT}/test-nested-patterns/% ${OUT}/test-finish/%
-${TINY_OUTPUTS}: MODULE_CONFIG := ../tiny/scala.mk ../tiny/ast.mk
 ${TINY_OUTPUTS}: SHARED_SOURCES := ${AST} tiny-parser.handcode.scala
 
 SOURCES.tiny := ${AST}

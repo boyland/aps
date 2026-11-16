@@ -1,7 +1,6 @@
 include ../farrow-lv/ast.mk
 TREE_MODULES := ${TREE_MODULES} $(basename ${AST})
 
-${OUT}/farrow-lv/% ${OUT}/farrow-lv-tree/%: MODULE_CONFIG := ../farrow-lv/scala.mk ../farrow-lv/ast.mk
 ${OUT}/farrow-lv/%: SHARED_SOURCES := ${AST}
 ${OUT}/farrow-lv/%: PARSER_BASENAME := FarrowLv
 ${OUT}/farrow-lv/%: LEXER := farrow-lv.lex

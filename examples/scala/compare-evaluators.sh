@@ -110,28 +110,10 @@ run_driver() {
   local programs="$2"
   local evaluators="$3"
   local -a program_list
-  local -a matches
-  local program input
   local pass=true
   IFS=',' read -ra program_list <<< "$programs"
   for program in "${program_list[@]}"; do
-    if [[ "$program" == *"*"* || "$program" == *"?"* || "$program" == *"["* ]]; then
-      mapfile -t matches < <(compgen -G "$program" | LC_ALL=C sort)
-    else
-      run_driver_once "$driver" "$program" "$evaluators" || pass=false
-      continue
-    fi
-
-    local found_file=false
-    for input in "${matches[@]}"; do
-      [ -f "$input" ] || continue
-      found_file=true
-      run_driver_once "$driver" "$input" "$evaluators" || pass=false
-    done
-    if ! $found_file; then
-      echo "No program files found for: $program" >&2
-      pass=false
-    fi
+    run_driver_once "$driver" "$program" "$evaluators" || pass=false
   done
   $pass
 }

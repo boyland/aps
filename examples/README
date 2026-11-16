@@ -1,0 +1,47 @@
+Example builds
+==============
+
+From the repository root
+```bash
+make -C examples/grammar                          # Run grammar tests
+make -C examples/farrow-lv sched                  # Schedule APS modules
+make -C examples/bigger bigger-binding.sched      # or using .sched alias
+make -C examples/farrow-lv scala EVALUATOR=STATIC
+make -C examples scala                            # Build all Scala drivers
+make -C examples test                             # Run configured tests
+```
+
+Each folder contains one AST and its build configuration.
+
+- `ast.mk`: names the folder's single AST source:
+
+```Makefile
+AST = tiny.aps
+```
+
+- `Makefile`: sets the folder's build and test options
+
+```Makefile
+include ast.mk
+SCALA_DRIVERS             Drivers to build
+TEST_DRIVERS              Drivers to test
+TEST_PROGRAMS             Space-separated input globs, relative to examples/scala
+TEST_EVALUATORS           Evaluators to compare (default: DYNAMIC,STATIC)
+TEST_EVALUATORS_<Driver>  Optional per-driver override
+SCHED_MODULES             Modules to schedule (default: all .aps except AST)
+include ../common.mk
+```
+
+- `scala.mk`: Describes the Scala build:
+
+```Makefile
+include ../<module>/ast.mk
+SOURCES.<module>          APS and handwritten Scala inputs for one output module
+SHARED_SOURCES            Source files shared by output modules
+DRIVERS                   Driver names; append with +=
+DRIVER.<name>             APS module file, optionally followed by name of main Scala object
+TREE_MODULES              AST module names, generated without evaluator flags
+MODULE_CONFIG             Rebuild dependencies (default: source folder's scala.mk and ast.mk)
+PARSER_BASENAME           Prefix for generated scanner, parser, and token classes
+LEXER / PARSER            .lex and .y input files, if the example has a parser
+```

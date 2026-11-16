@@ -3,6 +3,7 @@ SCHED_MODULES ?= $(filter-out $(basename $(notdir $(AST))),$(basename $(notdir $
 SCALA_DRIVERS ?=
 TEST_DRIVERS ?=
 TEST_PROGRAMS ?= ../$(EXAMPLE)/programs/*
+TEST_INPUTS = $(foreach pattern,$(TEST_PROGRAMS),$(or $(wildcard $(pattern)),$(error No program files found for: $(pattern))))
 DEFAULT_EVALUATORS ?= DYNAMIC,STATIC
 TEST_EVALUATORS ?= $(DEFAULT_EVALUATORS)
 
@@ -17,8 +18,9 @@ TEST_EVALUATORS ?= $(DEFAULT_EVALUATORS)
 test:
 	+@status=0; \
 	$(foreach driver,$(TEST_DRIVERS), \
-	  bash ../scala/compare-evaluators.sh $(driver) '$(TEST_PROGRAMS)' \
-	    '$(or $(TEST_EVALUATORS_$(driver)),$(TEST_EVALUATORS))' || status=1;) \
+	  $(foreach program,$(TEST_INPUTS), \
+	    bash ../scala/compare-evaluators.sh $(driver) '$(program)' \
+	      '$(or $(TEST_EVALUATORS_$(driver)),$(TEST_EVALUATORS))' || status=1;)) \
 	exit $$status
 
 all: scala

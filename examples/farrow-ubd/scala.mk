@@ -2,7 +2,6 @@ include ../farrow-ubd/ast.mk
 TREE_MODULES := ${TREE_MODULES} $(basename ${AST})
 
 FARROW_UBD_OUTPUTS := ${OUT}/farrow-ubd/% ${OUT}/farrow-ubd-fiber/%
-${FARROW_UBD_OUTPUTS} ${OUT}/farrow-ubd-tree/%: MODULE_CONFIG := ../farrow-ubd/scala.mk ../farrow-ubd/ast.mk
 ${FARROW_UBD_OUTPUTS}: SHARED_SOURCES := ${AST}
 ${FARROW_UBD_OUTPUTS}: PARSER_BASENAME := FarrowUbd
 ${FARROW_UBD_OUTPUTS}: LEXER := farrow-ubd.lex

@@ -9,6 +9,7 @@ MAIN_CLASS = $(or $(word 2,${DRIVER.${DRIVER_NAME}}),${DRIVER_NAME})
 
 # Output paths are <evaluator>/<module>/<file>.
 TARGET_MODULE = $(firstword $(subst /, ,$*))
+MODULE_CONFIG ?= $(foreach dir,${AST_DIRS},$(if $(wildcard ${dir}/${TARGET_MODULE}.aps),$(wildcard ${dir}/scala.mk ${dir}/ast.mk)))
 MODULE_SOURCES = $(sort ${SHARED_SOURCES} $(or ${SOURCES.${TARGET_MODULE}},$(error Declare SOURCES.${TARGET_MODULE} in scala.mk)))
 MODULE_APS = $(filter %.aps,${MODULE_SOURCES})
 MODULE_HANDCODE = $(filter %.scala,${MODULE_SOURCES})

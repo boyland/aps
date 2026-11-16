@@ -1,7 +1,6 @@
 include ../bigger/ast.mk
 TREE_MODULES := ${TREE_MODULES} $(basename ${AST})
 
-${OUT}/bigger-binding/% ${OUT}/bigger/%: MODULE_CONFIG := ../bigger/scala.mk ../bigger/ast.mk
 ${OUT}/bigger-binding/%: SHARED_SOURCES := ${AST}
 ${OUT}/bigger-binding/%: PARSER_BASENAME := Bigger
 ${OUT}/bigger-binding/%: LEXER := bigger.lex

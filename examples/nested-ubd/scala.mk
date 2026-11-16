@@ -2,7 +2,6 @@ include ../nested-ubd/ast.mk
 TREE_MODULES := ${TREE_MODULES} $(basename ${AST})
 
 NESTED_UBD_OUTPUTS := ${OUT}/nested-ubd/% ${OUT}/nested-ubd-fiber/%
-${NESTED_UBD_OUTPUTS} ${OUT}/nested-ubd-tree/%: MODULE_CONFIG := ../nested-ubd/scala.mk ../nested-ubd/ast.mk
 ${NESTED_UBD_OUTPUTS}: SHARED_SOURCES := ${AST}
 ${NESTED_UBD_OUTPUTS}: PARSER_BASENAME := NestedUbd
 ${NESTED_UBD_OUTPUTS}: LEXER := nested-ubd.lex
