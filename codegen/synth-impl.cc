@@ -540,7 +540,14 @@ static void dump_synth_functions(STATE* s, ostream& os) {
     if (function_state->is_side_effect_evaluation) {
       os << indent() << "node match {\n";
     } else {
-      os << indent() << "val " << result_var << " = node match {\n";
+      os << indent() << "val " << result_var << " = ";
+      if (needs_fixed_point &&
+          DECL_IS_OBJECT(function_state->source->fibered_attr.attr)) {
+        string object_attr = synth_util::instance_to_attr(function_state->source);
+        os << "if (" << object_attr << ".checkNode(node).status == Evaluation.ASSIGNED) "
+           << object_attr << ".get(node) else ";
+      }
+      os << "node match {\n";
     }
     nesting_level++;
 
