@@ -407,6 +407,145 @@ SynthFunctionState* find_phylum_synth_function_state(
   return NULL;
 }
 
+void dump_synth_completion_functions(
+    const std::vector<SynthCompletionState*>& completion_states,
+    const std::vector<SynthFunctionState*>& function_states,
+    std::ostream& output,
+    const std::function<void(AUG_GRAPH*)>& begin_graph,
+    const std::function<void()>& end_graph,
+    const std::function<void(AUG_GRAPH*, INSTANCE*, std::ostream&)>& dump_argument) {
+  for (SynthCompletionState* completion : completion_states) {
+    output << indent() << "def " << completion->fdecl_name << "("
+           << "node: T_" << decl_name(completion->phylum_graph->phylum);
+    for (INSTANCE* inherited : completion->inherited_inputs) {
+      output << ",\n" << indent(nesting_level + 1) << "v_"
+             << instance_to_string(inherited, true) << ": ";
+      dump_attribute_type(inherited, output);
+    }
+    output << ")(implicit " << LOOP_VAR
+           << ": Boolean, changed: AtomicBoolean): Unit = {\n";
+    ++nesting_level;
+    output << indent() << "node match {\n";
+    ++nesting_level;
+
+    for (AUG_GRAPH* graph : completion->aug_graphs) {
+      begin_graph(graph);
+      output << indent() << "case "
+             << matcher_pat(top_level_match_m(graph->match_rule)) << " => {\n";
+      ++nesting_level;
+
+      for (int index = 0; index < graph->instances.length; ++index) {
+        INSTANCE* instance = &graph->instances.array[index];
+        if (instance->node != graph->lhs_decl ||
+            !instance_is_synthesized(instance) ||
+            instance_is_pure_shared_info(instance)) {
+          continue;
+        }
+        SynthFunctionState* function = find_phylum_synth_function_state(
+            function_states, completion->phylum_graph, instance->fibered_attr);
+        if (function == NULL) {
+          continue;
+        }
+        output << indent() << "eval_" << function->fdecl_name << "(\n";
+        int saved_nesting = nesting_level;
+        nesting_level = std::max(nesting_level + 2, 2);
+        output << indent() << "node";
+        for (INSTANCE* source : function->regular_dependencies) {
+          if (should_skip_synth_dependency(source)) {
+            continue;
+          }
+          INSTANCE* dependency_instance = NULL;
+          if (!find_instance(graph, graph->lhs_decl,
+                             source->fibered_attr, &dependency_instance)) {
+            fatal_error("failed to find completion dependency for %s in %s",
+                        function->fdecl_name.c_str(), aug_graph_name(graph));
+          }
+          output << ",\n" << indent();
+          dump_argument(graph, dependency_instance, output);
+        }
+        nesting_level = saved_nesting;
+        output << "\n" << indent() << ");\n";
+      }
+
+      std::vector<Declaration> children;
+      for (int index = 0; index < graph->instances.length; ++index) {
+        Declaration child = graph->instances.array[index].node;
+        if (child == NULL || !DECL_IS_RHS(child) ||
+            std::find(children.begin(), children.end(), child) != children.end()) {
+          continue;
+        }
+        children.push_back(child);
+      }
+      for (Declaration child : children) {
+        SynthCompletionState* child_state = find_synth_completion_state(
+            completion_states, Declaration_info(child)->node_phy_graph);
+        if (child_state == NULL) {
+          continue;
+        }
+        output << indent() << child_state->fdecl_name << "(\n";
+        int saved_nesting = nesting_level;
+        nesting_level = std::max(nesting_level + 2, 2);
+        output << indent() << "v_" << decl_name(child);
+        for (INSTANCE* inherited : child_state->inherited_inputs) {
+          INSTANCE* input = NULL;
+          if (!find_instance(graph, child, inherited->fibered_attr, &input)) {
+            fatal_error("failed to find inherited completion input for %s in %s",
+                        child_state->fdecl_name.c_str(), aug_graph_name(graph));
+          }
+          output << ",\n" << indent();
+          dump_argument(graph, input, output);
+        }
+        nesting_level = saved_nesting;
+        output << "\n" << indent() << ");\n";
+      }
+
+      --nesting_level;
+      output << indent() << "}\n";
+      end_graph();
+    }
+
+    output << indent()
+           << "case _ => throw new RuntimeException(\"failed pattern matching: \" + node)\n";
+    --nesting_level;
+    output << indent() << "}\n";
+    --nesting_level;
+    output << indent() << "}\n\n";
+  }
+}
+
+void dump_synth_finish(
+    STATE* state,
+    const std::vector<SynthCompletionState*>& completion_states,
+    std::ostream& output) {
+  SynthCompletionState* start = find_synth_completion_state(
+      completion_states, summary_graph_for(state, state->start_phylum));
+  if (start == NULL) {
+    fatal_error("failed to find completion state for start phylum %s",
+                decl_name(state->start_phylum));
+  }
+  output << indent() << "override def finish() : Unit = {\n";
+  ++nesting_level;
+  if (state->requires_fixed_point_loop) {
+    emit_fixed_point_loop_start(output, "completionChanged");
+  } else {
+    output << indent() << "implicit val " << LOOP_VAR << ": Boolean = false;\n";
+    output << indent()
+           << "implicit val changed: AtomicBoolean = new AtomicBoolean(false);\n";
+  }
+  output << indent() << "for (root <- t_" << decl_name(state->start_phylum)
+         << ".nodes if root.isRooted) {\n";
+  ++nesting_level;
+  output << indent() << start->fdecl_name << "(root);\n";
+  --nesting_level;
+  output << indent() << "}\n";
+  if (state->requires_fixed_point_loop) {
+    emit_fixed_point_loop_end(output);
+  }
+  output << indent() << "super.finish();\n";
+  --nesting_level;
+  output << indent() << "};\n";
+}
+
 void implement_value_use(Declaration declaration, AUG_GRAPH* graph, const std::vector<SynthFunctionState*>& states, SynthImplementation* implementation, std::ostream& output) {
   int flags = Declaration_info(declaration)->decl_flags;
   if (flags & LOCAL_ATTRIBUTE_FLAG) {

@@ -1,6 +1,7 @@
 #ifndef SYNTH_UTIL_H
 #define SYNTH_UTIL_H
 
+#include <functional>
 #include <ostream>
 #include <set>
 #include <string>
@@ -108,6 +109,19 @@ SynthFunctionState* find_phylum_synth_function_state(
     const std::vector<SynthFunctionState*>& states,
     PHY_GRAPH* phylum_graph,
     FIBERED_ATTRIBUTE attribute);
+
+void dump_synth_completion_functions(
+    const std::vector<SynthCompletionState*>& completion_states,
+    const std::vector<SynthFunctionState*>& function_states,
+    std::ostream& output,
+    const std::function<void(AUG_GRAPH*)>& begin_graph,
+    const std::function<void()>& end_graph,
+    const std::function<void(AUG_GRAPH*, INSTANCE*, std::ostream&)>& dump_argument);
+
+void dump_synth_finish(
+    STATE* state,
+    const std::vector<SynthCompletionState*>& completion_states,
+    std::ostream& output);
 
 void implement_value_use(Declaration declaration, AUG_GRAPH* graph, const std::vector<SynthFunctionState*>& states, SynthImplementation* implementation, std::ostream& output);
 

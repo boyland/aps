@@ -22,7 +22,9 @@ void dump_sequence_candidates(Pattern, Expression, const SequenceForPattern&, un
 
 static AUG_GRAPH* current_aug_graph = NULL;
 static std::vector<synth_util::SynthFunctionState*> synth_functions_states;
+static std::vector<synth_util::SynthCompletionState*> synth_completion_states;
 static synth_util::SynthFunctionState* current_synth_functions_state = NULL;
+static bool emitting_completion = false;
 
 #define DEREF "."
 
@@ -365,125 +367,28 @@ static void emit_fixed_point_loop_end(ostream& os, bool is_independent = false, 
   }
 }
 
-static vector<INSTANCE*> synthesized_component_instances(SCC_COMPONENT* component) {
-  vector<INSTANCE*> result;
-  for (int i = 0; i < component->length; i++) {
-    INSTANCE* instance = (INSTANCE*)component->array[i];
-    if (synth_util::instance_is_synthesized(instance)) {
-      result.push_back(instance);
-    }
-  }
-  return result;
-}
-
-static void emit_root_evaluations(ostream& os, Declaration start_phylum, const vector<INSTANCE*>& instances) {
-  os << indent() << "for (root <- t_" << decl_name(start_phylum) << ".nodes) {\n";
-  ++nesting_level;
-  for (auto instance = instances.begin(); instance != instances.end(); instance++) {
-    string eval_name = synth_util::instance_to_string_with_nodetype(start_phylum, *instance);
-    os << indent() << "eval_" << eval_name << "(root);\n";
-  }
-  --nesting_level;
-  os << indent() << "}\n";
-}
-
-static bool is_side_effect(
-    INSTANCE* instance,
-    const vector<synth_util::SynthFunctionState*>& function_states) {
-  for (const auto* function_state : function_states) {
-    if (function_state->source == instance) {
-      return function_state->is_side_effect_evaluation;
-    }
-  }
-  return false;
-}
-
-static void emit_start_phylum_evaluations(
-  ostream& os, STATE* state,
-  const vector<synth_util::SynthFunctionState*>& function_states,
-  bool emit_side_effects) {
-  PHY_GRAPH* start_graph = summary_graph_for(state, state->start_phylum);
-  bool needs_fixed_point = state->requires_fixed_point_loop || state->requires_circular_update_support;
-  set_phylum_graph_components(start_graph);
-
-  if (!needs_fixed_point) {
-    vector<INSTANCE*> instances;
-    for (int instance_index = 0;
-         instance_index < start_graph->instances.length; instance_index++) {
-      INSTANCE* instance = &start_graph->instances.array[instance_index];
-      if (!synth_util::instance_is_synthesized(instance) ||
-          is_side_effect(instance, function_states) != emit_side_effects) {
-        continue;
-      }
-      instances.push_back(instance);
-    }
-    emit_root_evaluations(os, state->start_phylum, instances);
-    return;
-  }
-
-  for (int component_index = start_graph->components->length - 1;
-       component_index >= 0; component_index--) {
-    SCC_COMPONENT* component = start_graph->components->array[component_index];
-    vector<INSTANCE*> synthesized_instances;
-    for (INSTANCE* instance : synthesized_component_instances(component)) {
-      if (is_side_effect(instance, function_states) == emit_side_effects) {
-        synthesized_instances.push_back(instance);
-      }
-    }
-    if (synthesized_instances.empty()) {
-      continue;
-    }
-
-    if (start_graph->component_cycle[component_index]) {
-      os << indent() << "{\n";
-      ++nesting_level;
-      emit_fixed_point_loop_start(os, "componentChanged" + std::to_string(component_index));
-      emit_root_evaluations(os, state->start_phylum, synthesized_instances);
-      emit_fixed_point_loop_end(os);
-      --nesting_level;
-      os << indent() << "}\n";
-    } else {
-      emit_root_evaluations(os, state->start_phylum, synthesized_instances);
-    }
-  }
-}
-
-static void emit_eager_phylum_evaluations(
-    ostream& os,
-    const vector<synth_util::SynthFunctionState*>& function_states,
-    bool emit_side_effects) {
-  for (auto function_state : function_states) {
-    bool has_explicit_dependencies = std::any_of(
-        function_state->regular_dependencies.begin(),
-        function_state->regular_dependencies.end(),
-        [](INSTANCE* source_instance) {
-          return !synth_util::should_skip_synth_dependency(source_instance);
-        });
-
-    // This sweep has no dependency arguments to pass. Leave functions that
-    // need them to their callers, and handle side effects in a separate pass.
-    if (!function_state->is_phylum_instance ||
-        function_state->is_side_effect_evaluation != emit_side_effects ||
-        has_explicit_dependencies) {
-      continue;
-    }
-
-    Declaration phylum = function_state->source_phy_graph->phylum;
-    os << indent() << "for (node <- t_" << decl_name(phylum)
-       << ".nodes if node.isRooted && ";
-    if (function_state->is_side_effect_evaluation) {
-      os << "!evaluated_map_" << function_state->fdecl_name
-         << ".getOrElse(node.nodeNumber, false)";
-    } else {
-      os << synth_util::instance_to_attr(function_state->source)
-         << ".checkNode(node).status != Evaluation.ASSIGNED";
-    }
-    os << ") {\n";
-    ++nesting_level;
-    os << indent() << "eval_" << function_state->fdecl_name << "(node);\n";
-    --nesting_level;
-    os << indent() << "}\n";
-  }
+static void dump_synth_completion_functions(ostream& os) {
+  synth_util::dump_synth_completion_functions(
+      synth_completion_states, synth_functions_states, os,
+      [](AUG_GRAPH* graph) {
+        current_aug_graph = graph;
+        current_synth_functions_state = NULL;
+        emitting_completion = true;
+        current_blocks.push_back(
+            matcher_body(top_level_match_m(graph->match_rule)));
+      },
+      []() {
+        current_blocks.clear();
+        dumped_conditional_block_items.clear();
+        dumped_instances.clear();
+        emitting_completion = false;
+      },
+      [](AUG_GRAPH* graph, INSTANCE* instance, ostream& output) {
+        current_scope_block = synth_util::linearize_block(graph, instance);
+        dumped_conditional_block_items.clear();
+        dumped_instances.clear();
+        synth_impl_ptr->dump_synth_instance(instance, output);
+      });
 }
 
 struct ObjectFieldAssign {
@@ -597,7 +502,10 @@ static void dump_synth_functions(STATE* s, ostream& os) {
     os << " = {\n";
     nesting_level++;
 
-    if (needs_fixed_point) {
+    bool bypass_cache_in_fixed_point = needs_fixed_point &&
+        (!function_state->is_side_effect_evaluation ||
+         instance_circular(function_state->source));
+    if (bypass_cache_in_fixed_point) {
       os << indent() << "if (!" << synth_util::LOOP_VAR << ") {\n";
       nesting_level++;
     }
@@ -624,7 +532,7 @@ static void dump_synth_functions(STATE* s, ostream& os) {
     os << indent(nesting_level + 1) << "case _ => ()\n";
     os << indent() << "};\n";
 
-    if (needs_fixed_point) {
+    if (bypass_cache_in_fixed_point) {
       nesting_level--;
       os << indent() << "}\n";
     }
@@ -861,32 +769,14 @@ class SynthImpl : public SynthImplementation {
     void implement(ostream& os) {
       STATE* s = (STATE*)Declaration_info(module_decl)->analysis_state;
       dump_synth_functions(s, os);
-
-      os << indent() << "override def finish() : Unit = {\n";
-      ++nesting_level;
-      if (s->requires_fixed_point_loop || s->requires_circular_update_support) {
-        os << indent() << "implicit val changed: AtomicBoolean = new AtomicBoolean(false);\n";
-        os << indent() << "implicit val " << synth_util::LOOP_VAR << ": Boolean = false;\n";
-      }
-
-      os << indent() << "// Evaluating side effects on entry-point phylum nodes\n";
-      emit_start_phylum_evaluations(os, s, synth_functions_states, /* emit_side_effects */ true);
-      os << indent() << "// Finished side-effect evaluations on entry-point phylum nodes\n";
-      os << indent() << "// Evaluating remaining side effects on rooted nodes (no explicit dependency arguments)\n";
-      emit_eager_phylum_evaluations(os, synth_functions_states, /* emit_side_effects */ true);
-      os << indent() << "// Finished remaining side-effect evaluations on rooted nodes\n";
-      os << indent() << "// Evaluating synthesized attribute values on entry-point phylum nodes\n";
-      emit_start_phylum_evaluations(os, s, synth_functions_states, /* emit_side_effects */ false);
-      os << indent() << "// Finished synthesized attribute-value evaluations on entry-point phylum nodes\n";
-      os << indent() << "// Evaluating remaining attribute values on rooted nodes (no explicit dependency arguments)\n";
-      emit_eager_phylum_evaluations(os, synth_functions_states, /* emit_side_effects */ false);
-      os << indent() << "// Finished remaining attribute-value evaluations on rooted nodes\n";
-      os << indent() << "super.finish();\n";
-      --nesting_level;
-      os << indent() << "};\n";
+      synth_completion_states = synth_util::build_synth_completion_states(s);
+      dump_synth_completion_functions(os);
+      synth_util::dump_synth_finish(s, synth_completion_states, os);
 
       synth_util::destroy_synth_function_states(synth_functions_states);
       synth_functions_states.clear();
+      synth_util::destroy_synth_completion_states(synth_completion_states);
+      synth_completion_states.clear();
 
       clear_implementation_marks(module_decl);
     }
@@ -1364,14 +1254,16 @@ class SynthImpl : public SynthImplementation {
       o << ")";
       return;
     } else if (is_match_formal) {
-      o << "v_" << synth_util::instance_to_string(instance, current_synth_functions_state->is_phylum_instance);
+      o << "v_" << synth_util::instance_to_string(
+          instance, emitting_completion || current_synth_functions_state->is_phylum_instance);
     } else if (is_inherited) {
       if (instance->fibered_attr.fiber != NULL &&
           fiber_is_reverse(instance->fibered_attr.fiber)) {
         dump_rhs_instance_helper(aug_graph, block, instance, o);
       } else if (is_parent_instance) {
-        o << "v_" << synth_util::instance_to_string(instance, current_synth_functions_state->is_phylum_instance);
-        if (current_synth_functions_state->is_phylum_instance &&
+        o << "v_" << synth_util::instance_to_string(
+            instance, emitting_completion || current_synth_functions_state->is_phylum_instance);
+        if (!emitting_completion && current_synth_functions_state->is_phylum_instance &&
             !synth_util::synth_function_has_regular_dependency(
                 current_synth_functions_state, instance)) {
           o << "(node)";
