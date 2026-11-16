@@ -6,7 +6,8 @@ cd "$SCRIPT_DIR"
 DYNAMIC_EVALUATOR="DYNAMIC"
 STATIC_EVALUATOR="STATIC"
 FARROW_EVALUATOR="FARROW"
-DEFAULT_EVALUATORS="$DYNAMIC_EVALUATOR,$STATIC_EVALUATOR"
+SYNTH_EVALUATOR="SYNTH"
+DEFAULT_EVALUATORS="$DYNAMIC_EVALUATOR,$STATIC_EVALUATOR,$SYNTH_EVALUATOR"
 
 extract_results() {
   sed -n '/^Results:$/,$p'
@@ -143,8 +144,8 @@ TESTS=(
   "TestForPatternsDriver|tiny.program,tiny-singleton.program,tiny-empty.program|$DEFAULT_EVALUATORS"
   "TestCasePatternsDriver|tiny.program,tiny-singleton.program,tiny-empty.program|$DEFAULT_EVALUATORS"
   "TestNestedPatternsDriver|tiny.program,tiny-singleton.program,tiny-empty.program|$DEFAULT_EVALUATORS"
-  "SimpleSncDriver|simple.program|$DYNAMIC_EVALUATOR,$FARROW_EVALUATOR"
-  "SimpleSncFiberDriver|simple.program|$DYNAMIC_EVALUATOR"
+  "SimpleSncDriver|simple.program|$DYNAMIC_EVALUATOR,$FARROW_EVALUATOR,$SYNTH_EVALUATOR"
+  "SimpleSncFiberDriver|simple.program|$DYNAMIC_EVALUATOR,$SYNTH_EVALUATOR"
 )
 
 failures=0

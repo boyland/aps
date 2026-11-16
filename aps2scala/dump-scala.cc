@@ -271,8 +271,8 @@ void dump_debug_end(ostream& os)
 
 int formal_count = 0;
 static void dump_Pattern_impl(Pattern p, ostream& os, std::vector<Expression> *conditions);
-static void dump_sequence_element_patterns(const std::vector<Pattern>&, ostream&);
-static void dump_sequence_candidates(Pattern, Expression,
+void dump_sequence_element_patterns(const std::vector<Pattern>&, ostream&);
+void dump_sequence_candidates(Pattern, Expression,
                                      const SequenceForPattern&, unsigned,
                                      ostream&);
 
@@ -310,7 +310,7 @@ void dump_sequence_element_pattern(Pattern p, ostream& os)
   dump_sequence_element_patterns(std::vector<Pattern>(1,p),os);
 }
 
-static void dump_sequence_element_patterns(const std::vector<Pattern>& patterns,
+void dump_sequence_element_patterns(const std::vector<Pattern>& patterns,
                                            ostream& os)
 {
   std::vector<Expression> conditions;
@@ -397,7 +397,7 @@ void dump_sequence_case_close(ostream& os)
   os << indent() << "}\n";
 }
 
-static void dump_sequence_candidates(Pattern pattern, Expression value,
+void dump_sequence_candidates(Pattern pattern, Expression value,
                                      const SequenceForPattern& patterns,
                                      unsigned number, ostream& os)
 {

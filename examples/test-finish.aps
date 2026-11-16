@@ -1,0 +1,29 @@
+with "tiny";
+
+-- The Root result does not depend on Wood.unreachable. Finish must
+-- evaluate unreachable attributes on every rooted node.
+module TEST_FINISH[T :: var TINY[]] extends T begin
+  attribute Root.result : Integer;
+  attribute Wood.unreachable : Integer;
+  attribute Wood.bias : Integer;
+  attribute Wood.answer : Integer;
+  pragma inherited(bias);
+  pragma synthesized(result, unreachable, answer);
+
+  match ?r=root(?w) begin
+    r.result := 1;
+    w.bias := 10;
+  end;
+
+  match ?w=branch(?x,?y) begin
+    w.unreachable := 10;
+    x.bias := w.bias + 1;
+    y.bias := w.bias + 2;
+    w.answer := 0;
+  end;
+
+  match ?w=leaf(?n) begin
+    w.unreachable := 20;
+    w.answer := w.bias + n;
+  end;
+end;

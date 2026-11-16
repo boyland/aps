@@ -52,8 +52,7 @@ jobs:
 
     - name: Run utilities tests
       run: |
-        cd utilities/tests
-        make all
+        make -C utilities/tests all
 
     - name: Download JFlex and scala-bison
       run: |

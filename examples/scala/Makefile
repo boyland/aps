@@ -17,6 +17,8 @@ EVALUATOR ?= DYNAMIC
 
 ifeq (${EVALUATOR},STATIC)
 IMPL_SUFFIX = .static.scala
+else ifeq (${EVALUATOR},SYNTH)
+IMPL_SUFFIX = .synth.scala
 else ifeq (${EVALUATOR},FARROW)
 IMPL_SUFFIX = .farrow.scala
 else
@@ -36,7 +38,8 @@ EVALUATOR_EXAMPLES = classic-binding first follow nullable test-coll \
 	simple-binding simple-binding1 simple-binding2 simple-binding3 bigger-binding test-for \
 	simple-snc-fiber
 SCALAGEN = ${AST_TREE_SCALAGEN} \
-	$(foreach example,${EVALUATOR_EXAMPLES},$(example).scala $(example).static.scala $(example).farrow.scala)
+	$(foreach example,${EVALUATOR_EXAMPLES},$(example).scala $(example).static.scala $(example).synth.scala $(example).farrow.scala)
+
 
 MISCGEN = SimpleParser.scala SimpleScanner.scala BiggerParser.scala BiggerScanner.scala \
 	GrammarTokens.scala SimpleTokens.scala BiggerTokens.scala GrammarScanner.scala GrammarParser.scala \
@@ -86,6 +89,10 @@ phony_explicit:
 
 %.farrow.scala : ../%.aps ${APS2SCALA}
 	${APS2SCALA} ${APS2SCALAFLAGS} -F $*
+	cp $*.scala $@
+
+%.synth.scala : ../%.aps ${APS2SCALA}
+	${APS2SCALA} ${APS2SCALAFLAGS} -A $*
 	cp $*.scala $@
 
 %.scala : ../%.aps ${APS2SCALA}

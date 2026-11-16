@@ -47,7 +47,8 @@ static void dump_farrow_functions(STATE* s, ostream& os) {
   ostream& oss = os;
   os << "\n";
 
-  synth_functions_states = synth_util::build_synth_function_states(s);
+  synth_functions_states = synth_util::build_synth_function_states(
+      s, /* include_field_assign_dependencies */ false);
   synth_completion_states = synth_util::build_synth_completion_states(s);
   bool needs_fixed_point = s->requires_circular_update_support;
 
@@ -267,157 +268,25 @@ static void emit_completion_argument(
   farrow_impl_ptr->dump_synth_instance(instance, os);
 }
 
-static void emit_synth_function_call(
-    ostream& os,
-    AUG_GRAPH* aug_graph,
-    INSTANCE* instance,
-    synth_util::SynthFunctionState* function_state) {
-  current_scope_block = synth_util::linearize_block(aug_graph, instance);
-  dumped_conditional_block_items.clear();
-  dumped_instances.clear();
-
-  os << indent() << "eval_" << function_state->fdecl_name << "(\n";
-  int saved_nesting = nesting_level;
-  nesting_level = std::max(nesting_level + 2, 2);
-  os << indent() << "node";
-
-  for (INSTANCE* source_instance : function_state->regular_dependencies) {
-    if (synth_util::should_skip_synth_dependency(source_instance)) {
-      continue;
-    }
-
-    INSTANCE* dependency_instance = NULL;
-    if (!synth_util::find_instance(
-            aug_graph,
-            aug_graph->lhs_decl,
-            source_instance->fibered_attr,
-            &dependency_instance)) {
-      fatal_error(
-          "failed to find completion dependency for %s in %s",
-          function_state->fdecl_name.c_str(),
-          aug_graph_name(aug_graph));
-    }
-    os << ",\n" << indent();
-    emit_completion_argument(os, aug_graph, dependency_instance);
-  }
-
-  nesting_level = saved_nesting;
-  os << "\n" << indent() << ");\n";
-}
-
-static void emit_completion_children(ostream& os, AUG_GRAPH* aug_graph) {
-  std::vector<Declaration> children;
-  for (int index = 0; index < aug_graph->instances.length; ++index) {
-    Declaration child = aug_graph->instances.array[index].node;
-    if (child == NULL || !DECL_IS_RHS(child) ||
-        std::find(children.begin(), children.end(), child) != children.end()) {
-      continue;
-    }
-    children.push_back(child);
-  }
-
-  for (Declaration child : children) {
-    PHY_GRAPH* child_graph = Declaration_info(child)->node_phy_graph;
-    synth_util::SynthCompletionState* child_state =
-        synth_util::find_synth_completion_state(
-            synth_completion_states, child_graph);
-    if (child_state == NULL) {
-      continue;
-    }
-
-    os << indent() << child_state->fdecl_name << "(\n";
-    int saved_nesting = nesting_level;
-    nesting_level = std::max(nesting_level + 2, 2);
-    os << indent() << "v_" << decl_name(child);
-
-    for (INSTANCE* inherited : child_state->inherited_inputs) {
-      INSTANCE* inherited_instance = NULL;
-      if (!synth_util::find_instance(
-              aug_graph, child, inherited->fibered_attr, &inherited_instance)) {
-        fatal_error(
-            "failed to find inherited completion input for %s in %s",
-            child_state->fdecl_name.c_str(),
-            aug_graph_name(aug_graph));
-      }
-      os << ",\n" << indent();
-      emit_completion_argument(os, aug_graph, inherited_instance);
-    }
-
-    nesting_level = saved_nesting;
-    os << "\n" << indent() << ");\n";
-  }
-}
-
-static void emit_completion_node_evaluations(
-    ostream& os,
-    AUG_GRAPH* aug_graph,
-    PHY_GRAPH* phylum_graph) {
-  for (int index = 0; index < aug_graph->instances.length; ++index) {
-    INSTANCE* instance = &aug_graph->instances.array[index];
-    if (instance->node != aug_graph->lhs_decl ||
-        !synth_util::instance_is_synthesized(instance) ||
-        synth_util::instance_is_pure_shared_info(instance)) {
-      continue;
-    }
-
-    synth_util::SynthFunctionState* function_state =
-        synth_util::find_phylum_synth_function_state(
-            synth_functions_states, phylum_graph, instance->fibered_attr);
-    if (function_state != NULL) {
-      emit_synth_function_call(os, aug_graph, instance, function_state);
-    }
-  }
-}
-
 static void dump_farrow_completion_functions(ostream& os) {
-  for (synth_util::SynthCompletionState* completion_state :
-       synth_completion_states) {
-    os << indent() << "def " << completion_state->fdecl_name << "("
-       << "node: T_" << decl_name(completion_state->phylum_graph->phylum);
-    for (INSTANCE* inherited : completion_state->inherited_inputs) {
-      os << ",\n" << indent(nesting_level + 1) << "v_"
-         << synth_util::instance_to_string(inherited, true) << ": ";
-      synth_util::dump_attribute_type(inherited, os);
-    }
-    os << ")";
-    os << "(implicit " << synth_util::LOOP_VAR
-       << ": Boolean, changed: AtomicBoolean): Unit = {\n";
-    ++nesting_level;
-    os << indent() << "node match {\n";
-    ++nesting_level;
-
-    for (AUG_GRAPH* aug_graph : completion_state->aug_graphs) {
-      current_aug_graph = aug_graph;
-      current_synth_functions_state = NULL;
-      emitting_completion = true;
-      current_blocks.push_back(
-          matcher_body(top_level_match_m(aug_graph->match_rule)));
-
-      os << indent() << "case "
-         << matcher_pat(top_level_match_m(aug_graph->match_rule))
-         << " => {\n";
-      ++nesting_level;
-
-      emit_completion_node_evaluations(
-          os, aug_graph, completion_state->phylum_graph);
-      emit_completion_children(os, aug_graph);
-
-      --nesting_level;
-      os << indent() << "}\n";
-      current_blocks.clear();
-      dumped_conditional_block_items.clear();
-      dumped_instances.clear();
-      emitting_completion = false;
-    }
-
-    os << indent()
-       << "case _ => throw new RuntimeException(\"failed pattern matching: \" "
-          "+ node)\n";
-    --nesting_level;
-    os << indent() << "}\n";
-    --nesting_level;
-    os << indent() << "}\n\n";
-  }
+  synth_util::dump_synth_completion_functions(
+      synth_completion_states, synth_functions_states, os,
+      [](AUG_GRAPH* aug_graph) {
+        current_aug_graph = aug_graph;
+        current_synth_functions_state = NULL;
+        emitting_completion = true;
+        current_blocks.push_back(
+            matcher_body(top_level_match_m(aug_graph->match_rule)));
+      },
+      []() {
+        current_blocks.clear();
+        dumped_conditional_block_items.clear();
+        dumped_instances.clear();
+        emitting_completion = false;
+      },
+      [](AUG_GRAPH* graph, INSTANCE* instance, ostream& output) {
+        emit_completion_argument(output, graph, instance);
+      });
 }
 
 class FarrowImpl : public SynthImplementation {
@@ -448,51 +317,7 @@ class FarrowImpl : public SynthImplementation {
       dump_farrow_functions(s, oss);
       dump_farrow_completion_functions(oss);
 
-      os << indent() << "override def finish() : Unit = {\n";
-      ++nesting_level;
-
-      synth_util::SynthCompletionState* start_completion =
-          synth_util::find_synth_completion_state(
-              synth_completion_states,
-              summary_graph_for(s, s->start_phylum));
-      if (start_completion == NULL) {
-        fatal_error(
-            "failed to find completion state for start phylum %s",
-            decl_name(s->start_phylum));
-      }
-
-      if (s->requires_fixed_point_loop) {
-        os << indent()
-           << "val completionChanged = new AtomicBoolean(true);\n";
-        os << indent() << "while (completionChanged.get) {\n";
-        ++nesting_level;
-        os << indent() << "completionChanged.set(false);\n";
-        os << indent() << "implicit val " << synth_util::LOOP_VAR
-           << ": Boolean = true;\n";
-        os << indent()
-           << "implicit val changed: AtomicBoolean = completionChanged;\n";
-      } else {
-        os << indent() << "implicit val " << synth_util::LOOP_VAR
-           << ": Boolean = false;\n";
-        os << indent()
-           << "implicit val changed: AtomicBoolean = new AtomicBoolean(false);\n";
-      }
-
-      os << indent() << "for (root <- t_" << decl_name(s->start_phylum)
-         << ".nodes if root.isRooted) {\n";
-      ++nesting_level;
-      os << indent() << start_completion->fdecl_name << "(root);\n";
-      --nesting_level;
-      os << indent() << "}\n";
-
-      if (s->requires_fixed_point_loop) {
-        --nesting_level;
-        os << indent() << "}\n";
-      }
-
-      os << indent() << "super.finish();\n";
-      --nesting_level;
-      os << indent() << "};\n";
+      synth_util::dump_synth_finish(s, synth_completion_states, os);
 
       synth_util::destroy_synth_function_states(synth_functions_states);
       synth_functions_states.clear();

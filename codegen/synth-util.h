@@ -1,6 +1,7 @@
 #ifndef SYNTH_UTIL_H
 #define SYNTH_UTIL_H
 
+#include <functional>
 #include <ostream>
 #include <set>
 #include <string>
@@ -74,6 +75,8 @@ bool instance_is_inherited(INSTANCE* instance);
 
 bool instance_is_pure_shared_info(INSTANCE* instance);
 
+bool instance_is_function_call_result(INSTANCE* instance);
+
 bool instance_is_parent(INSTANCE* instance, AUG_GRAPH* graph);
 
 std::string instance_to_string(INSTANCE* instance, bool trim_node = false);
@@ -88,7 +91,8 @@ bool should_skip_synth_dependency(INSTANCE* instance);
 
 bool find_instance(AUG_GRAPH* graph, Declaration node, const FIBERED_ATTRIBUTE& attribute, INSTANCE** result);
 
-std::vector<SynthFunctionState*> build_synth_function_states(STATE* state);
+std::vector<SynthFunctionState*> build_synth_function_states(
+  STATE* state, bool include_field_assign_dependencies);
 
 void destroy_synth_function_states(const std::vector<SynthFunctionState*>& states);
 
@@ -106,6 +110,19 @@ SynthFunctionState* find_phylum_synth_function_state(
     PHY_GRAPH* phylum_graph,
     FIBERED_ATTRIBUTE attribute);
 
+void dump_synth_completion_functions(
+    const std::vector<SynthCompletionState*>& completion_states,
+    const std::vector<SynthFunctionState*>& function_states,
+    std::ostream& output,
+    const std::function<void(AUG_GRAPH*)>& begin_graph,
+    const std::function<void()>& end_graph,
+    const std::function<void(AUG_GRAPH*, INSTANCE*, std::ostream&)>& dump_argument);
+
+void dump_synth_finish(
+    STATE* state,
+    const std::vector<SynthCompletionState*>& completion_states,
+    std::ostream& output);
+
 void implement_value_use(Declaration declaration, AUG_GRAPH* graph, const std::vector<SynthFunctionState*>& states, SynthImplementation* implementation, std::ostream& output);
 
 bool try_dump_funcall(Expression expression, AUG_GRAPH* graph, SynthImplementation* implementation, std::ostream& output);
@@ -113,6 +130,13 @@ bool try_dump_funcall(Expression expression, AUG_GRAPH* graph, SynthImplementati
 void dump_attribute_type(INSTANCE* instance, std::ostream& output);
 
 bool synth_function_is_circular(SynthFunctionState* state);
+
+bool synth_function_has_regular_dependency(SynthFunctionState* state,
+                                           INSTANCE* instance);
+
+std::vector<INSTANCE*> collect_child_cycle_instances(AUG_GRAPH* graph);
+
+bool child_cycle_is_independent(AUG_GRAPH* graph, INSTANCE* cycle_instance);
 
 std::vector<std::vector<INSTANCE*>> collect_child_cycle_components(AUG_GRAPH* graph, INSTANCE* sink);
 
