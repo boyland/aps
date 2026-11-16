@@ -64,8 +64,7 @@ jobs:
 
     - name: Sanity check
       run: |
-        cd examples/scala
-        make
+        make -C examples scala
 
     - name: Run examples Scala tests
       run: |
