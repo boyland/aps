@@ -1,5 +1,7 @@
 DRIVER_CLASSES = $(addsuffix .class,${DRIVERS})
 DRIVER_RUNS = $(addsuffix .run,${DRIVERS})
+MODULES = $(patsubst SOURCES.%,%,$(filter SOURCES.%,$(.VARIABLES)))
+GENERATE_TARGETS = $(addprefix ${OUT}/,$(addsuffix /generate,${MODULES}))
 
 driver-module = $(basename $(or $(filter %.aps,$(firstword ${DRIVER.$1})),$(error DRIVER.$1 must start with an .aps input)))
 
@@ -19,7 +21,7 @@ PARSER_FILES = $(addprefix ${PARSER_BASENAME},Scanner.scala Parser.scala Tokens.
 PARSER_SCALA = $(if ${PARSER_BASENAME},$(addprefix ${OUT}/${TARGET_MODULE}/,${PARSER_FILES}))
 PARSER_BASE = $(addsuffix ParserBase.scala,${PARSER_BASENAME})
 
-.PHONY: ${DRIVER_CLASSES} ${DRIVER_RUNS}
+.PHONY: ${DRIVER_CLASSES} ${DRIVER_RUNS} ${GENERATE_TARGETS}
 # Resolve module-specific prerequisites after Make knows the target and matched path.
 .SECONDEXPANSION:
 
@@ -32,8 +34,7 @@ ${DRIVER_CLASSES}:
 ${DRIVER_RUNS}:
 	${SCALA} ${JVMFLAGS} -cp ${OUT}/${DRIVER_MODULE}:$(abspath ${APSLIB}) ${MAIN_CLASS} ${ARGS}
 
-${OUT}/%/.generated: $$(MODULE_SCALA)
-	@touch $@
+${GENERATE_TARGETS}: ${OUT}/%/generate: $$(MODULE_SCALA)
 
 ${OUT}/%/.compiled: $$(MODULE_SCALA) $$(MODULE_HANDCODE) \
 	$$(PARSER_SCALA) $$(PARSER_BASE) ${APSLIB} Makefile rules.mk $$(MODULE_CONFIG)

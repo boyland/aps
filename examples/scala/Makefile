@@ -37,7 +37,7 @@ vpath %.y ${AST_DIRS}
 include $(wildcard ../*/scala.mk)
 include rules.mk
 
-.PHONY: all clean run test force-generation
+.PHONY: all clean run test
 .DELETE_ON_ERROR:
 .SECONDARY:
 
@@ -46,10 +46,8 @@ run: Classic.run TestCollDriver.run TestCycleDriver.run NestedCyclesDriver.run
 test:
 	+bash ./compare-evaluators.sh
 
-%.scala: %.aps force-generation
-	$(MAKE) ${OUT}/$*/.generated
-
-force-generation:
+%.scala: %.aps
+	$(MAKE) ${OUT}/$*/generate
 
 clean:
 	rm -rf dynamic static farrow scc
