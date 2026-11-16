@@ -6,7 +6,7 @@ From the repository root
 make -C examples/grammar                          # Run grammar tests
 make -C examples/farrow-lv sched                  # Schedule APS modules
 make -C examples/bigger bigger-binding.sched      # or using .sched alias
-make -C examples/farrow-lv scala EVALUATOR=STATIC
+make -C examples/farrow-lv scala EVALUATOR=STATIC # or manually specify evaluator
 make -C examples scala                            # Build all Scala drivers
 make -C examples test                             # Run configured tests
 make -C examples/bigger BiggerBindingDriver.class # Build one driver
@@ -34,10 +34,6 @@ TEST_PROGRAMS             Input globs, relative to the example folder (default: 
 include ../common.mk
 ```
 
-The shared targets pass AST, LEXER, and PARSER to the Scala backend explicitly.
-The backend runs in the example folder and reads only its scala/scala.mk.
-Examples without that file have no Scala build or test jobs.
-
 - `scala/scala.mk`: describes the example's Scala build:
 
 ```Makefile
@@ -47,15 +43,7 @@ SHARED_SOURCES            Additional APS or Scala inputs shared by the example's
 MODULE_CONFIG             Rebuild dependencies (default: source folder's Makefile, scala/scala.mk, and ast.mk)
 PARSER_BASENAME           Prefix for generated scanner, parser, and token classes
 ```
-
-Each driver declares its main APS input, a comma-separated evaluator list
-(DYNAMIC, STATIC, FARROW, or SCC), zero or more handwritten Scala files, and an
-optional final main object name (default: the driver name). The AST is included
-automatically. Additional APS dependencies belong in SHARED_SOURCES.
-
-Generated files remain under examples/scala/<evaluator>/<module>. Use the
-example Makefile for individual driver commands, rather than running them from
-examples/scala. The top-level Scala build delegates to each example in turn.
+Example:
 
 ```Makefile
 DRIVER.BiggerBindingDriver = bigger-binding.aps DYNAMIC,STATIC bigger-binding-driver.scala
