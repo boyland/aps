@@ -1,1 +1,1 @@
-AST_SOURCES = grammar.aps
+AST = grammar.aps

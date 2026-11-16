@@ -1,1 +1,1 @@
-AST_SOURCES = bigger.aps
+AST = bigger.aps

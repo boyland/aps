@@ -1,1 +1,1 @@
-AST_SOURCES = tiny.aps
+AST = tiny.aps

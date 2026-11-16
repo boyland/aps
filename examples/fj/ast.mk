@@ -1,1 +1,1 @@
-AST_SOURCES = FJ.aps
+AST = FJ.aps

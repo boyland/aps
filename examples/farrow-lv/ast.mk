@@ -1,1 +1,1 @@
-AST_SOURCES = farrow-lv-tree.aps
+AST = farrow-lv-tree.aps

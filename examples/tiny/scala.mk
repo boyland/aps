@@ -1,5 +1,5 @@
 include ../tiny/ast.mk
-TREE_MODULES := ${TREE_MODULES} $(basename ${AST_SOURCES})
+TREE_MODULES := ${TREE_MODULES} $(basename ${AST})
 
 TINY_OUTPUTS := ${OUT}/tiny/% ${OUT}/broad-fiber-cycle/% ${OUT}/below-fiber-cycle/% \
 	${OUT}/below-single-fiber-cycle/% ${OUT}/local-fiber-cycle/% ${OUT}/test-coll/% \
@@ -7,9 +7,9 @@ TINY_OUTPUTS := ${OUT}/tiny/% ${OUT}/broad-fiber-cycle/% ${OUT}/below-fiber-cycl
 	${OUT}/test-for/% ${OUT}/test-for-patterns/% ${OUT}/test-case-patterns/% \
 	${OUT}/test-nested-patterns/% ${OUT}/test-finish/%
 ${TINY_OUTPUTS}: MODULE_CONFIG := ../tiny/scala.mk ../tiny/ast.mk
-${TINY_OUTPUTS}: SHARED_SOURCES := ${AST_SOURCES} tiny-parser.handcode.scala
+${TINY_OUTPUTS}: SHARED_SOURCES := ${AST} tiny-parser.handcode.scala
 
-SOURCES.tiny := ${AST_SOURCES}
+SOURCES.tiny := ${AST}
 
 SOURCES.broad-fiber-cycle = broad-fiber-cycle.aps broad-fiber-cycle-driver.scala
 DRIVER.BroadFiberCycleDriver = broad-fiber-cycle.aps

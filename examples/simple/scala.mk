@@ -1,16 +1,16 @@
 include ../simple/ast.mk
-TREE_MODULES := ${TREE_MODULES} $(basename ${AST_SOURCES})
+TREE_MODULES := ${TREE_MODULES} $(basename ${AST})
 
 SIMPLE_OUTPUTS := ${OUT}/classic-binding/% ${OUT}/nested-cycles/% \
 	${OUT}/simple-snc/% ${OUT}/simple-snc-fiber/% ${OUT}/simple-binding/% \
 	${OUT}/simple-binding1/% ${OUT}/simple-binding2/% ${OUT}/simple-binding3/%
 ${SIMPLE_OUTPUTS} ${OUT}/simple/%: MODULE_CONFIG := ../simple/scala.mk ../simple/ast.mk
-${SIMPLE_OUTPUTS}: SHARED_SOURCES := ${AST_SOURCES}
+${SIMPLE_OUTPUTS}: SHARED_SOURCES := ${AST}
 ${SIMPLE_OUTPUTS}: PARSER_BASENAME := Simple
 ${SIMPLE_OUTPUTS}: LEXER := simple.lex
 ${SIMPLE_OUTPUTS}: PARSER := simple.y
 
-SOURCES.simple := ${AST_SOURCES}
+SOURCES.simple := ${AST}
 
 SOURCES.classic-binding = classic-binding.aps classic-driver.scala
 DRIVER.Classic = classic-binding.aps

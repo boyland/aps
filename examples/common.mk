@@ -1,6 +1,5 @@
 EXAMPLE := $(notdir $(CURDIR))
-AST_MODULES ?= $(basename $(notdir ${AST_SOURCES}))
-SCHED_MODULES ?= $(filter-out $(AST_MODULES),$(basename $(notdir $(wildcard *.aps))))
+SCHED_MODULES ?= $(filter-out $(basename $(notdir $(AST))),$(basename $(notdir $(wildcard *.aps))))
 SCALA_DRIVERS ?=
 TEST_DRIVERS ?=
 TEST_PROGRAMS ?= ../$(EXAMPLE)/programs/*

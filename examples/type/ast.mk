@@ -1,1 +1,1 @@
-AST_SOURCES = type.aps type-decl.aps
+AST = type.aps

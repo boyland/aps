@@ -1,6 +1,6 @@
 DEBUG_FLAGS = -DCOTo
 APSSCHED=../bin/apssched
-AST_DIRS=tiny simple grammar farrow-lv farrow-ubd nested-ubd balanced bigger fj type conditional standalone
+AST_DIRS=tiny simple grammar farrow-lv farrow-ubd nested-ubd balanced bigger fj type type-decl ntuple-lattice conditional standalone
 BASE=$(subst $() $(),:,$(AST_DIRS)):../base
 
 vpath %.aps $(AST_DIRS)

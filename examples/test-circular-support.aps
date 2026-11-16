@@ -1,0 +1,48 @@
+with "tiny";
+
+module TEST_LOCAL_CIRCULAR[T :: var TINY[]] extends T begin
+  type Integers := SET[Integer];
+  type IntegerLattice := UNION_LATTICE[Integer,Integers];
+
+  attribute Root.value : IntegerLattice;
+  circular attribute Wood.incoming : IntegerLattice;
+  circular attribute Wood.outgoing : IntegerLattice;
+  pragma inherited(incoming);
+  pragma synthesized(value,outgoing);
+
+  match ?r=root(?w) begin
+    w.incoming := w.outgoing;
+    r.value := w.outgoing;
+  end;
+
+  match ?l=leaf(?x) begin
+    l.outgoing := l.incoming \/ {x};
+  end;
+
+  match ?b=branch(?x,?y) begin
+    x.incoming := b.incoming;
+    y.incoming := b.incoming;
+    b.outgoing := x.outgoing \/ y.outgoing;
+  end;
+end;
+
+module TEST_ACYCLIC[T :: var TINY[]] extends T begin
+  attribute Root.value : Integer;
+  pragma synthesized(value);
+
+  match ?r=root(?:Wood) begin
+    r.value := 1;
+  end;
+end;
+
+module TEST_DECLARED_CIRCULAR[T :: var TINY[]] extends T begin
+  type Integers := SET[Integer];
+  type IntegerLattice := UNION_LATTICE[Integer,Integers];
+
+  circular attribute Root.value : IntegerLattice;
+  pragma synthesized(value);
+
+  match ?r=root(?:Wood) begin
+    r.value := {1};
+  end;
+end;

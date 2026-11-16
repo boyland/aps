@@ -1,1 +1,1 @@
-AST_SOURCES = balanced.aps
+AST = balanced.aps

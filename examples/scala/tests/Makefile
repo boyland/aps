@@ -1,7 +1,7 @@
 SPECS=FirstSpec FollowSpec NullableSpec NTupleLatticeSpec TestSynthSpec
 EXAMPLES_PATH=../..
 ROOT_PATH=../${EXAMPLES_PATH}
-AST_DIRS=tiny simple grammar farrow-lv farrow-ubd nested-ubd balanced bigger fj type conditional standalone
+AST_DIRS=tiny simple grammar farrow-lv farrow-ubd nested-ubd balanced bigger fj type type-decl ntuple-lattice conditional standalone
 AST_PATHS=$(subst $() $(),:,$(addprefix ${EXAMPLES_PATH}/,${AST_DIRS}))
 TEST_SOURCE_DIRS=$(wildcard ${EXAMPLES_PATH}/*/scala/tests)
 SCALAV=2.13
@@ -24,7 +24,7 @@ clean:
 first.scala: ${EXAMPLES_PATH}/grammar/first.aps
 follow.scala: ${EXAMPLES_PATH}/grammar/follow.aps
 nullable.scala: ${EXAMPLES_PATH}/grammar/nullable.aps
-ntuple-lattice.scala: ${EXAMPLES_PATH}/tiny/ntuple-lattice.aps
+ntuple-lattice.scala: ${EXAMPLES_PATH}/ntuple-lattice/ntuple-lattice.aps
 first.scala follow.scala nullable.scala ntuple-lattice.scala:
 	${APS2SCALA} -DCOT -C -p ${AST_PATHS}:${ROOT_PATH}/base -S $(basename $(@F))
 

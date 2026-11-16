@@ -1,1 +1,1 @@
-AST_SOURCES = farrow-ubd-tree.aps
+AST = farrow-ubd-tree.aps

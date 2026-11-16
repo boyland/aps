@@ -1,1 +1,1 @@
-AST_SOURCES = nested-ubd-tree.aps
+AST = nested-ubd-tree.aps

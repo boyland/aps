@@ -1,1 +1,1 @@
-AST_SOURCES = simple.aps
+AST = simple.aps
