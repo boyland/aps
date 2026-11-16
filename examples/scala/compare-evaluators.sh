@@ -155,10 +155,8 @@ run_driver_once() {
     for ((j=i+1; j<n; j++)); do
       local e1="${built_evaluators[$i]}"
       local e2="${built_evaluators[$j]}"
-      start=$(date +%s.%N)
       diff "$tmpdir/$e1" "$tmpdir/$e2" > "$tmpdir/comparison.log" 2>&1
       status=$?
-      end=$(date +%s.%N)
       if [ "$status" -eq 0 ]; then
         echo "  PASS ($e1 == $e2)"
       else
@@ -166,7 +164,7 @@ run_driver_once() {
         sed 's/^/    /' "$tmpdir/comparison.log"
         pass=false
       fi
-      record_test "$driver" "$driver: $args ($e1 vs $e2)" "$(echo "$end - $start" | bc)" "$status" \
+      record_test "$driver" "$driver: $args ($e1 vs $e2)" 0 "$status" \
         < "$tmpdir/comparison.log" || { rm -rf "$tmpdir"; return 2; }
     done
   done
