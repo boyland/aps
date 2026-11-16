@@ -1,7 +1,6 @@
 #!/bin/bash
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-cd "$SCRIPT_DIR"
 
 DYNAMIC_EVALUATOR="DYNAMIC"
 STATIC_EVALUATOR="STATIC"

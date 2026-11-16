@@ -9,6 +9,8 @@ make -C examples/bigger bigger-binding.sched      # or using .sched alias
 make -C examples/farrow-lv scala EVALUATOR=STATIC
 make -C examples scala                            # Build all Scala drivers
 make -C examples test                             # Run configured tests
+make -C examples/bigger BiggerBindingDriver.class # Build one driver
+make -C examples/bigger BiggerBindingDriver.run ARGS=programs/bigger.program
 ```
 
 Each folder contains one AST and its build configuration.
@@ -19,29 +21,43 @@ Each folder contains one AST and its build configuration.
 AST = tiny.aps
 ```
 
-- `Makefile`: sets the folder's build and test options
+- `Makefile`: sets platform-independent parser inputs, scheduling, and test policy:
 
 ```Makefile
 include ast.mk
-SCALA_DRIVERS             Drivers to build
-TEST_DRIVERS              Drivers to test
-TEST_PROGRAMS             Space-separated input globs, relative to examples/scala
-TEST_EVALUATORS           Evaluators to compare (default: DYNAMIC,STATIC)
-TEST_EVALUATORS_<Driver>  Optional per-driver override
+
+LEXER / PARSER            .lex and .y input files, if the example has a parser
 SCHED_MODULES             Modules to schedule (default: all .aps except AST)
+TEST_DRIVERS              Drivers to test (default: all of the example's drivers)
+TEST_PROGRAMS             Input globs, relative to the example folder (default: programs/*)
+
 include ../common.mk
 ```
 
-- `scala.mk`: Describes the Scala build:
+The shared targets pass AST, LEXER, and PARSER to the Scala backend explicitly.
+The backend runs in the example folder and reads only its scala/scala.mk.
+Examples without that file have no Scala build or test jobs.
+
+- `scala/scala.mk`: describes the example's Scala build:
 
 ```Makefile
-include ../<module>/ast.mk
-SOURCES.<module>          APS and handwritten Scala inputs for one output module
-SHARED_SOURCES            Source files shared by output modules
-DRIVERS                   Driver names; append with +=
-DRIVER.<name>             APS module file, optionally followed by name of main Scala object
-TREE_MODULES              AST module names, generated without evaluator flags
-MODULE_CONFIG             Rebuild dependencies (default: source folder's scala.mk and ast.mk)
+DRIVERS                   Driver names, local to this example
+DRIVER.<name>             <module>.aps <evaluators> <files.scala...> [MainObject]
+SHARED_SOURCES            Additional APS or Scala inputs shared by the example's modules
+MODULE_CONFIG             Rebuild dependencies (default: source folder's Makefile, scala/scala.mk, and ast.mk)
 PARSER_BASENAME           Prefix for generated scanner, parser, and token classes
-LEXER / PARSER            .lex and .y input files, if the example has a parser
+```
+
+Each driver declares its main APS input, a comma-separated evaluator list
+(DYNAMIC, STATIC, FARROW, or SCC), zero or more handwritten Scala files, and an
+optional final main object name (default: the driver name). The AST is included
+automatically. Additional APS dependencies belong in SHARED_SOURCES.
+
+Generated files remain under examples/scala/<evaluator>/<module>. Use the
+example Makefile for individual driver commands, rather than running them from
+examples/scala. The top-level Scala build delegates to each example in turn.
+
+```Makefile
+DRIVER.BiggerBindingDriver = bigger-binding.aps DYNAMIC,STATIC bigger-binding-driver.scala
+DRIVER.SimpleBinding1Driver = simple-binding1.aps DYNAMIC,STATIC simple-binding-driver.scala SimpleBindingDriver
 ```

@@ -1,5 +1,6 @@
 include ast.mk
-SCALA_DRIVERS = FirstDriver FollowDriver NullableDriver
-TEST_DRIVERS = $(SCALA_DRIVERS)
+
+LEXER = grammar.lex
+PARSER = grammar.y
 
 include ../common.mk

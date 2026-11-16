@@ -1,5 +1,6 @@
 include ast.mk
-SCALA_DRIVERS = BiggerBindingDriver
-TEST_DRIVERS = $(SCALA_DRIVERS)
+
+LEXER = bigger.lex
+PARSER = bigger.y
 
 include ../common.mk

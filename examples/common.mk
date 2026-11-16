@@ -1,11 +1,7 @@
-EXAMPLE := $(notdir $(CURDIR))
 SCHED_MODULES ?= $(filter-out $(basename $(notdir $(AST))),$(basename $(notdir $(wildcard *.aps))))
-SCALA_DRIVERS ?=
-TEST_DRIVERS ?=
-TEST_PROGRAMS ?= ../$(EXAMPLE)/programs/*
-TEST_INPUTS = $(foreach pattern,$(TEST_PROGRAMS),$(or $(wildcard $(pattern)),$(error No program files found for: $(pattern))))
-DEFAULT_EVALUATORS ?= DYNAMIC,STATIC
-TEST_EVALUATORS ?= $(DEFAULT_EVALUATORS)
+SCALA_MAKE = $(MAKE) -f ../scala/Makefile AST='$(AST)' LEXER='$(LEXER)' PARSER='$(PARSER)'
+
+export $(filter TEST_DRIVERS TEST_PROGRAMS,$(.VARIABLES))
 
 .PHONY: all sched scala test
 
@@ -13,21 +9,19 @@ TEST_EVALUATORS ?= $(DEFAULT_EVALUATORS)
 	$(MAKE) -C .. $@
 
 %.scala: %.aps
-	$(MAKE) -C .. $@
+	+$(SCALA_MAKE) $@
 
+%.class %.run:
+	+$(SCALA_MAKE) $@
+
+ifneq ($(wildcard scala/scala.mk),)
 test:
-	+@status=0; \
-	$(foreach driver,$(TEST_DRIVERS), \
-	  $(foreach program,$(TEST_INPUTS), \
-	    bash ../scala/compare-evaluators.sh $(driver) '$(program)' \
-	      '$(or $(TEST_EVALUATORS_$(driver)),$(TEST_EVALUATORS))' || status=1;)) \
-	exit $$status
+	+$(SCALA_MAKE) test
+
+scala:
+	+$(SCALA_MAKE) all
+endif
 
 all: scala
 
 sched: $(addsuffix .sched,$(SCHED_MODULES))
-
-scala:
-	+@for driver in $(SCALA_DRIVERS); do \
-	  $(MAKE) -C ../scala $$driver.class || exit $$?; \
-	done

@@ -7,13 +7,10 @@ vpath %.aps $(AST_DIRS)
 
 default: test
 
-sched:
+sched scala:
 	@set -e; for dir in $(AST_DIRS); do \
 	  $(MAKE) -C $$dir $@; \
 	done
-
-scala:
-	$(MAKE) -C scala all
 
 test:
 	+@status=0; for dir in $(AST_DIRS); do \
@@ -25,7 +22,7 @@ test:
 	${APSSCHED} -C ${DEBUG_FLAGS} -p ${BASE} $*
 
 %.scala: %.aps force-scala
-	$(MAKE) -C scala $@
+	$(MAKE) -C $(dir $<) $(notdir $@)
 
 %.debug: %.aps
 	gdb --args "${APSSCHED}" "${DEBUG_FLAGS}" "-p" "${BASE}" "$*"
