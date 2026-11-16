@@ -18,6 +18,10 @@ xml_escape() {
 }
 
 record_test() {
+  if [ -z "${JUNIT_REPORT:-}" ]; then
+    return 0
+  fi
+
   local driver="$1" name="$2" duration="$3" status="$4"
   report_tests=$((report_tests + 1))
   if ! {
@@ -26,7 +30,7 @@ record_test() {
       "$(printf '%s' "$name" | xml_escape)" "$duration" &&
     if [ "$status" -ne 0 ]; then
       report_failures=$((report_failures + 1))
-      printf '      <failure message="Evaluator comparison failed">\n' &&
+      printf '      <failure message="Evaluator check failed">\n' &&
       xml_escape &&
       printf '\n      </failure>\n'
     fi &&
@@ -101,24 +105,30 @@ run_driver_once() {
   local pass=true
   local build_failed=false
   local tmpdir
-  tmpdir=$(mktemp -d)
+  tmpdir=$(mktemp -d) || return 2
+  local start end status
 
   echo "--- $driver ${args:+(${args})} ---"
 
   local built_evaluators=()
   for eval in "${evals[@]}"; do
     echo "  running $eval ..."
+    start=$(date +%s.%N)
+    status=0
     if ! run_with_evaluator "$eval" "$driver" "$args" "$tmpdir/$eval"; then
       echo "  FAIL: $eval failed"
       build_failed=true
-      continue
-    fi
-    if [ ! -s "$tmpdir/$eval" ]; then
-      echo "  WARNING: $eval produced no Results: output"
+      status=1
+    elif [ ! -s "$tmpdir/$eval" ]; then
+      echo "  WARNING: $eval produced no Results: output" | tee -a "$tmpdir/$eval.log"
       pass=false
-      continue
+      status=1
+    else
+      built_evaluators+=("$eval")
     fi
-    built_evaluators+=("$eval")
+    end=$(date +%s.%N)
+    record_test "$driver" "$driver: $args ($eval)" "$(echo "$end - $start" | bc)" "$status" \
+      < "$tmpdir/$eval.log" || { rm -rf "$tmpdir"; return 2; }
   done
 
   if $build_failed; then
@@ -145,41 +155,24 @@ run_driver_once() {
     for ((j=i+1; j<n; j++)); do
       local e1="${built_evaluators[$i]}"
       local e2="${built_evaluators[$j]}"
-      if diff -q "$tmpdir/$e1" "$tmpdir/$e2" > /dev/null 2>&1; then
+      start=$(date +%s.%N)
+      diff "$tmpdir/$e1" "$tmpdir/$e2" > "$tmpdir/comparison.log" 2>&1
+      status=$?
+      end=$(date +%s.%N)
+      if [ "$status" -eq 0 ]; then
         echo "  PASS ($e1 == $e2)"
       else
         echo "  FAIL ($e1 != $e2)"
-        diff "$tmpdir/$e1" "$tmpdir/$e2" | sed 's/^/    /'
+        sed 's/^/    /' "$tmpdir/comparison.log"
         pass=false
       fi
+      record_test "$driver" "$driver: $args ($e1 vs $e2)" "$(echo "$end - $start" | bc)" "$status" \
+        < "$tmpdir/comparison.log" || { rm -rf "$tmpdir"; return 2; }
     done
   done
 
   rm -rf "$tmpdir"
   $pass
-}
-
-run_reported_driver() {
-  if [ -z "${JUNIT_REPORT:-}" ]; then
-    run_driver_once "$@"
-    return $?
-  fi
-
-  local log start end status
-  log=$(mktemp) || return 2
-  start=$(date +%s.%N)
-  run_driver_once "$@" 2>&1 | tee "$log"
-  local -a run_statuses=("${PIPESTATUS[@]}")
-  status=${run_statuses[0]}
-  if [ "${run_statuses[1]}" -ne 0 ]; then
-    echo "Cannot capture test output for: $1 $2" >&2
-    status=2
-  fi
-  end=$(date +%s.%N)
-  record_test "$1" "$1: $2 ($3)" "$(echo "$end - $start" | bc)" "$status" \
-    < "$log" || status=2
-  rm -f "$log" || status=2
-  return "$status"
 }
 
 run_driver() {
@@ -190,7 +183,7 @@ run_driver() {
   local pass=true
   IFS=',' read -ra program_list <<< "$programs"
   for program in "${program_list[@]}"; do
-    run_reported_driver "$driver" "$program" "$evaluators" || pass=false
+    run_driver_once "$driver" "$program" "$evaluators" || pass=false
   done
   $pass
 }
