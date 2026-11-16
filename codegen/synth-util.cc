@@ -523,9 +523,11 @@ void dump_synth_finish(
     fatal_error("failed to find completion state for start phylum %s",
                 decl_name(state->start_phylum));
   }
+  bool needs_fixed_point = state->requires_fixed_point_loop ||
+      state->requires_circular_update_support;
   output << indent() << "override def finish() : Unit = {\n";
   ++nesting_level;
-  if (state->requires_fixed_point_loop) {
+  if (needs_fixed_point) {
     emit_fixed_point_loop_start(output, "completionChanged");
   } else {
     output << indent() << "implicit val " << LOOP_VAR << ": Boolean = false;\n";
@@ -538,7 +540,7 @@ void dump_synth_finish(
   output << indent() << start->fdecl_name << "(root);\n";
   --nesting_level;
   output << indent() << "}\n";
-  if (state->requires_fixed_point_loop) {
+  if (needs_fixed_point) {
     emit_fixed_point_loop_end(output);
   }
   output << indent() << "super.finish();\n";
