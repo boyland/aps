@@ -17,12 +17,18 @@ module TEST_FOR_PATTERNS[T :: var TINY[]] extends T begin
   collection attribute Root.separated_span : Biggest;
   collection attribute Root.adjacent_span : Biggest;
   collection attribute Root.endpoint_middles : Biggest;
+  collection attribute Root.guarded : Biggest;
 
   pragma synthesized(first, each, last, first_last, first_each, each_last,
                      first_each_last, separated_span, adjacent_span,
-                     endpoint_middles);
+                     endpoint_middles, guarded);
 
   match ?r=root(?w) begin
+    for all_leaves begin
+      match {...,?leaf:Integer if leaf >= 5,...} begin
+        r.guarded :> leaf;
+      end;
+    end;
     for all_leaves begin
       match {?first_leaf,...} begin
         r.first :> first_leaf;

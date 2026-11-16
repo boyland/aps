@@ -325,7 +325,7 @@ static void dump_sequence_for(Declaration d, Match match,
   dump_sequence_for_open(matcher_pat(match),for_stmt_expr(d),patterns,
                          sequence_number,os);
   dump_Block(matcher_body(match),f,arg,os);
-  dump_sequence_for_close(os);
+  dump_sequence_for_close(patterns,os);
 }
 
 static void dump_for_match(Declaration d, Match match, ASSIGNFUNC f,
@@ -756,7 +756,7 @@ public:
 	default:
 	  break;
 	case KEYattribute_decl:
-	  oss << indent() << "a_" << decl_name(d) << ".finish;\n";
+	  oss << indent() << "a_" << decl_name(d) << ".finish();\n";
 	  break;
 	case KEYvalue_decl:
 	  if (!def_is_constant(value_decl_def(d))) {

@@ -441,10 +441,14 @@ static void dump_sequence_candidates(Pattern pattern, Expression value,
   os << indent() << "}";
 }
 
-void dump_sequence_for_close(ostream& os)
+void dump_sequence_for_close(const SequenceForPattern& patterns, ostream& os)
 {
   --nesting_level;
-  os << indent() << "}\n" << indent() << "case _ => {}\n";
+  os << indent() << "}\n";
+  if (patterns.elements.size() != 1 ||
+      Pattern_KEY(patterns.elements.front()) != KEYpattern_var) {
+    os << indent() << "case _ => {}\n";
+  }
   --nesting_level;
   os << indent() << "}\n";
   --nesting_level;
