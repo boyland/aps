@@ -1,0 +1,51 @@
+Example builds
+==============
+
+From the repository root
+```bash
+make -C examples/grammar                          # Run grammar tests
+make -C examples/farrow-lv sched                  # Schedule APS modules
+make -C examples/bigger bigger-binding.sched      # or using .sched alias
+make -C examples/farrow-lv scala EVALUATOR=STATIC # or manually specify evaluator
+make -C examples scala                            # Build all Scala drivers
+make -C examples test                             # Run configured tests
+make -C examples/bigger BiggerBindingDriver.class # Build one driver
+make -C examples/bigger BiggerBindingDriver.run ARGS=programs/bigger.program
+```
+
+Each folder contains one AST and its build configuration.
+
+- `ast.mk`: names the folder's single AST source:
+
+```Makefile
+AST = tiny.aps
+```
+
+- `Makefile`: sets platform-independent parser inputs, scheduling, and test policy:
+
+```Makefile
+include ast.mk
+
+LEXER / PARSER            .lex and .y input files, if the example has a parser
+SCHED_MODULES             Modules to schedule (default: all .aps except AST)
+TEST_DRIVERS              Drivers to test (default: all of the example's drivers)
+TEST_PROGRAMS             Input globs, relative to the example folder (default: programs/*)
+
+include ../common.mk
+```
+
+- `scala/scala.mk`: describes the example's Scala build:
+
+```Makefile
+DRIVERS                   Driver names, local to this example
+DRIVER.<name>             <module>.aps <evaluators> <files.scala...> [MainObject]
+SHARED_SOURCES            Additional APS or Scala inputs shared by the example's modules
+MODULE_CONFIG             Rebuild dependencies (default: source folder's Makefile, scala/scala.mk, and ast.mk)
+PARSER_BASENAME           Prefix for generated scanner, parser, and token classes
+```
+Example:
+
+```Makefile
+DRIVER.BiggerBindingDriver = bigger-binding.aps DYNAMIC,STATIC bigger-binding-driver.scala
+DRIVER.SimpleBinding1Driver = simple-binding1.aps DYNAMIC,STATIC simple-binding-driver.scala SimpleBindingDriver
+```

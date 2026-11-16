@@ -64,8 +64,7 @@ jobs:
 
     - name: Sanity check
       run: |
-        cd examples/scala
-        make
+        make -C examples scala
 
     - name: Run examples Scala tests
       run: |
@@ -75,12 +74,11 @@ jobs:
     - name: Run canonical types tests
       run: |
         cd examples
-        ../bin/aps2scala -DCOTo -G -p .:../base test-canonicals
+        ../bin/aps2scala -DCOTo -G -p standalone:../base test-canonicals
 
     - name: Run compare-evaluators
       run: |
-        cd examples/scala
-        ./compare-evaluators.sh
+        make -C examples test
 
     - name: Clean up
       if: always()

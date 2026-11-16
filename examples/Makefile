@@ -1,27 +1,32 @@
 DEBUG_FLAGS = -DCOTo
 APSSCHED=../bin/apssched
-APS2SCALA=../bin/aps2scala
-BASE=.:../base
+AST_DIRS=tiny simple grammar farrow-lv farrow-ubd nested-ubd balanced bigger fj type type-decl ntuple-lattice conditional standalone
+BASE=$(subst $() $(),:,$(AST_DIRS)):../base
 
-default:
-	@echo "Try 'make simple-oag.sched' to schedule AG in simple-oag"
+vpath %.aps $(AST_DIRS)
 
-%.sched : %.aps
-	${APSSCHED} ${DEBUG_FLAGS} -p ${BASE} $*
+default: test
 
-%.scc.sched : %.aps
+sched scala:
+	@set -e; for dir in $(AST_DIRS); do \
+	  $(MAKE) -C $$dir $@; \
+	done
+
+test:
+	+@status=0; for dir in $(AST_DIRS); do \
+	  $(MAKE) -C $$dir test || status=1; \
+	done; \
+	exit $$status
+
+%.sched: %.aps
 	${APSSCHED} -C ${DEBUG_FLAGS} -p ${BASE} $*
 
-%.scc.scala : %.aps
-	${APS2SCALA} -C ${DEBUG_FLAGS} -p ${BASE} $*
-
-%.farrow.scala : %.aps
-	${APS2SCALA} -F ${DEBUG_FLAGS} -p ${BASE} $*
-
-%.scala : %.aps
-	${APS2SCALA} ${DEBUG_FLAGS} -p ${BASE} $*
+%.scala: %.aps force-scala
+	$(MAKE) -C $(dir $<) $(notdir $@)
 
 %.debug: %.aps
 	gdb --args "${APSSCHED}" "${DEBUG_FLAGS}" "-p" "${BASE}" "$*"
 
-.PHONY: default %.sched
+force-scala:
+
+.PHONY: default sched scala test %.sched force-scala

@@ -10,3 +10,7 @@
 !*Base.scala
 *.scala~
 obj
+/dynamic/
+/static/
+/farrow/
+/scc/
