@@ -8,8 +8,7 @@ APSLIB = ${APSTOP}/lib/aps-library.jar
 SCALABISON = ${HOME}/git/scala-bison/scala-bison-2.13.jar
 SCALAFLEX = ${HOME}/Documents/Courses/sp26-cs654/etc/JFlex.jar
 APS2SCALA = ${APSTOP}/bin/aps2scala
-AST_DIRS = ../tiny ../simple ../grammar ../farrow-lv ../farrow-ubd ../nested-ubd \
-	../balanced ../bigger ../fj ../type ../conditional ../standalone
+AST_DIRS := $(sort $(patsubst %/,%,$(dir $(wildcard ../*/*.aps))))
 SCALA_SOURCE_DIRS = $(addsuffix /scala,${AST_DIRS})
 APSPATH = $(subst $() $(),:,$(abspath ${AST_DIRS} ${APSTOP}/base))
 APS2SCALAFLAGS = -p ${APSPATH} -G

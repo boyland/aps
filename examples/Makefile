@@ -22,9 +22,6 @@ test:
 	exit $$status
 
 %.sched: %.aps
-	${APSSCHED} ${DEBUG_FLAGS} -p ${BASE} $*
-
-%.scc.sched: %.aps
 	${APSSCHED} -C ${DEBUG_FLAGS} -p ${BASE} $*
 
 %.scala: %.aps force-scala
