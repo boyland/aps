@@ -103,7 +103,6 @@ static void* get_vertex_ptr_from_int(SccGraph* graph, int index) {
  */
 void scc_graph_initialize(SccGraph* graph, int num_vertices) {
   graph->num_vertices = num_vertices;
-  graph->neighbors = NULL;
   graph->adjacency_matrix =
       (bool*)calloc(num_vertices * num_vertices, sizeof(bool));
 
@@ -163,16 +162,12 @@ static void graph_destroy_vertex(Vertex* vertex) {
  */
 void scc_graph_destroy(SccGraph* graph) {
   int i;
-  if (graph->neighbors != NULL) {
-    for (i = 0; i < graph->num_vertices; i++) {
-      graph_destroy_vertex(graph->neighbors[i]);
-    }
+  for (i = 0; i < graph->num_vertices; i++) {
+    graph_destroy_vertex(graph->neighbors[i]);
   }
 
   hash_table_clear(graph->vertices_ptr_to_index_map);
 
-  free(graph->adjacency_matrix);
-  free(graph->neighbors);
   free(graph->vertices_ptr_to_index_map);
   free(graph->vertices_index_to_ptr_map);
 }

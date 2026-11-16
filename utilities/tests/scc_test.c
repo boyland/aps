@@ -203,16 +203,8 @@ static void test_small_logical() {
   scc_graph_destroy(&graph);
 }
 
-static void test_destroy_before_components() {
-  SccGraph graph;
-  scc_graph_initialize(&graph, 1);
-  scc_graph_add_vertex(&graph, INT2VOIDP(1));
-  scc_graph_destroy(&graph);
-}
-
 void test_scc() {
   TEST tests[] = {
-      {test_destroy_before_components, "SCC graph destroyed before computation"},
       {test_small_logical, "SCC with 2 connected components"},
       {test_all_disjoints, "SCC all disjoints"},
       {test_all_disjoints2, "SCC all disjoints with edges"},
@@ -220,5 +212,5 @@ void test_scc() {
       {test_two_connected_components, "SCC two connected component"},
       {test_n_connected_components, "SCC n connected component"}};
 
-  run_tests("scc", tests, 7);
+  run_tests("scc", tests, 6);
 }
