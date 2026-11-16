@@ -85,13 +85,19 @@ jobs:
         cd examples/scala
         ./compare-evaluators.sh
 
-    - name: Upload evaluator test results
+    - name: Show evaluator test results
       if: ${{ !cancelled() && steps.compare-evaluators.outcome != 'skipped' }}
-      uses: actions/upload-artifact@v4
+      uses: mikepenz/action-junit-report@v5
       with:
-        name: evaluator-test-results
-        path: ${{ runner.temp }}/evaluator-results.xml
-        if-no-files-found: error
+        report_paths: ${{ runner.temp }}/evaluator-results.xml
+        check_name: Scala evaluator comparisons
+        skip_annotations: true
+        job_summary: true
+        detailed_summary: true
+        include_passed: true
+        include_time_in_summary: true
+        require_tests: true
+        fail_on_parse_error: true
 
     - name: Clean up
       if: always()
