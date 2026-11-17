@@ -12,19 +12,86 @@ extract_results() {
   sed -n '/^Results:$/,$p'
 }
 
+xml_escape() {
+  LC_ALL=C tr -d '\000-\010\013\014\016-\037' |
+    sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'"'"'/\&apos;/g'
+}
+
+record_test() {
+  if [ -z "${JUNIT_REPORT:-}" ]; then
+    return 0
+  fi
+
+  local driver="$1" name="$2" duration="$3" status="$4"
+  report_tests=$((report_tests + 1))
+  if ! {
+    printf '    <testcase classname="%s" name="%s" time="%s">\n' \
+      "$(printf '%s' "$driver" | xml_escape)" \
+      "$(printf '%s' "$name" | xml_escape)" "$duration" &&
+    if [ "$status" -ne 0 ]; then
+      report_failures=$((report_failures + 1))
+      printf '      <failure message="Evaluator check failed">\n' &&
+      xml_escape &&
+      printf '\n      </failure>\n'
+    fi &&
+    printf '    </testcase>\n'
+  } >> "$report_cases"; then
+    echo "Cannot record test result for: $driver $name" >&2
+    return 2
+  fi
+}
+
+finish_report() {
+  local status=$?
+  trap - EXIT
+  if [ "$status" -ne 0 ] && [ "$report_failures" -eq 0 ]; then
+    record_test "Test configuration" "Comparison runner" 0 "$status" \
+      <<< "Comparison runner exited with status $status. See the job log for details." || status=2
+  fi
+  if ! {
+    printf '<?xml version="1.0" encoding="UTF-8"?>\n<testsuites>\n' &&
+    printf '  <testsuite name="Scala evaluator comparisons" tests="%s" failures="%s" errors="0" skipped="0" time="%s">\n' \
+      "$report_tests" "$report_failures" "$((SECONDS - report_start))" &&
+    cat "$report_cases" &&
+    printf '  </testsuite>\n</testsuites>\n'
+  } > "$JUNIT_REPORT"; then
+    echo "Cannot write test report: $JUNIT_REPORT" >&2
+    status=2
+  fi
+  rm -f "$report_cases" || status=2
+  exit "$status"
+}
+
+if [ -n "${JUNIT_REPORT:-}" ]; then
+  if ! mkdir -p "$(dirname "$JUNIT_REPORT")" || ! : > "$JUNIT_REPORT"; then
+    echo "Cannot write test report: $JUNIT_REPORT" >&2
+    exit 2
+  fi
+  report_cases=$(mktemp) || exit 2
+  report_tests=0
+  report_failures=0
+  report_start=$SECONDS
+  trap finish_report EXIT
+fi
+
 run_with_evaluator() {
   local evaluator="$1"
   local driver="$2"
   local args="$3"
   local outfile="$4"
 
-  if ! make EVALUATOR="$evaluator" "$driver.class" > /dev/null 2>&1; then
+  if ! make EVALUATOR="$evaluator" "$driver.class" > "$outfile.log" 2>&1; then
+    cat "$outfile.log"
     return 1
   fi
   local start end
   start=$(date +%s.%N)
-  make EVALUATOR="$evaluator" ARGS="$args" "$driver.run" 2>&1 | extract_results > "$outfile"
-  local run_status=${PIPESTATUS[0]}
+  make EVALUATOR="$evaluator" ARGS="$args" "$driver.run" > "$outfile.log" 2>&1
+  local run_status=$?
+  extract_results < "$outfile.log" > "$outfile"
+  if [ "$run_status" -ne 0 ]; then
+    cat "$outfile.log"
+  fi
   end=$(date +%s.%N)
   printf "  %s finished in %.2fs\n" "$evaluator" "$(echo "$end - $start" | bc)"
   return "$run_status"
@@ -38,24 +105,30 @@ run_driver_once() {
   local pass=true
   local build_failed=false
   local tmpdir
-  tmpdir=$(mktemp -d)
+  tmpdir=$(mktemp -d) || return 2
+  local start end status
 
   echo "--- $driver ${args:+(${args})} ---"
 
   local built_evaluators=()
   for eval in "${evals[@]}"; do
     echo "  running $eval ..."
+    start=$(date +%s.%N)
+    status=0
     if ! run_with_evaluator "$eval" "$driver" "$args" "$tmpdir/$eval"; then
       echo "  FAIL: $eval failed"
       build_failed=true
-      continue
-    fi
-    if [ ! -s "$tmpdir/$eval" ]; then
-      echo "  WARNING: $eval produced no Results: output"
+      status=1
+    elif [ ! -s "$tmpdir/$eval" ]; then
+      echo "  WARNING: $eval produced no Results: output" | tee -a "$tmpdir/$eval.log"
       pass=false
-      continue
+      status=1
+    else
+      built_evaluators+=("$eval")
     fi
-    built_evaluators+=("$eval")
+    end=$(date +%s.%N)
+    record_test "$driver" "$driver: $args ($eval)" "$(echo "$end - $start" | bc)" "$status" \
+      < "$tmpdir/$eval.log" || { rm -rf "$tmpdir"; return 2; }
   done
 
   if $build_failed; then
@@ -82,13 +155,17 @@ run_driver_once() {
     for ((j=i+1; j<n; j++)); do
       local e1="${built_evaluators[$i]}"
       local e2="${built_evaluators[$j]}"
-      if diff -q "$tmpdir/$e1" "$tmpdir/$e2" > /dev/null 2>&1; then
+      diff "$tmpdir/$e1" "$tmpdir/$e2" > "$tmpdir/comparison.log" 2>&1
+      status=$?
+      if [ "$status" -eq 0 ]; then
         echo "  PASS ($e1 == $e2)"
       else
         echo "  FAIL ($e1 != $e2)"
-        diff "$tmpdir/$e1" "$tmpdir/$e2" | sed 's/^/    /'
+        sed 's/^/    /' "$tmpdir/comparison.log"
         pass=false
       fi
+      record_test "$driver" "$driver: $args ($e1 vs $e2)" 0 "$status" \
+        < "$tmpdir/comparison.log" || { rm -rf "$tmpdir"; return 2; }
     done
   done
 

@@ -78,9 +78,34 @@ jobs:
         ../bin/aps2scala -DCOTo -G -p .:../base test-canonicals
 
     - name: Run compare-evaluators
+      id: compare-evaluators
+      env:
+        JUNIT_REPORT: ${{ runner.temp }}/evaluator-results.xml
       run: |
         cd examples/scala
         ./compare-evaluators.sh
+
+    - name: Show evaluator test results
+      if: ${{ !cancelled() && steps.compare-evaluators.outcome != 'skipped' }}
+      uses: mikepenz/action-junit-report@v5
+      with:
+        report_paths: ${{ runner.temp }}/evaluator-results.xml
+        check_name: Scala evaluator comparisons
+        skip_annotations: true
+        job_summary: true
+        detailed_summary: true
+        include_passed: true
+        include_time_in_summary: true
+        require_tests: true
+        fail_on_parse_error: true
+
+    - name: Upload evaluator test results
+      if: ${{ !cancelled() && steps.compare-evaluators.outcome != 'skipped' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: evaluator-test-results
+        path: ${{ runner.temp }}/evaluator-results.xml
+        if-no-files-found: error
 
     - name: Clean up
       if: always()
