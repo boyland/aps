@@ -19,7 +19,7 @@ void dump_sequence_element_pattern(Pattern, ostream&);
 void dump_sequence_elements(Pattern, Expression, ostream&);
 void dump_sequence_for_open(Pattern, Expression, const SequenceForPattern&,
                             unsigned, ostream&);
-void dump_sequence_for_close(ostream&);
+void dump_sequence_for_close(const SequenceForPattern&, ostream&);
 void dump_sequence_case_open(Pattern, Expression, const SequenceForPattern&,
                              unsigned, ostream&);
 void dump_sequence_case_else(unsigned, ostream&);
@@ -637,7 +637,7 @@ static bool implement_visit_function(
           cond->positive &= ~cmask;
 
           if (is_for) {
-            dump_sequence_for_close(ow->get_outstream());
+            dump_sequence_for_close(sequence_patterns,ow->get_outstream());
           } else {
             dump_sequence_case_else(sequence_number,ow->get_outstream());
           }

@@ -58,7 +58,7 @@ void dump_sequence_element_pattern(Pattern p, ostream&);
 void dump_sequence_elements(Pattern p, Expression value, ostream&);
 void dump_sequence_for_open(Pattern p, Expression value,
                             const SequenceForPattern&, unsigned, ostream&);
-void dump_sequence_for_close(ostream&);
+void dump_sequence_for_close(const SequenceForPattern&, ostream&);
 void dump_sequence_case_open(Pattern p, Expression value,
                              const SequenceForPattern&, unsigned, ostream&);
 void dump_sequence_case_else(unsigned, ostream&);

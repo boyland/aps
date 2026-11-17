@@ -16,12 +16,21 @@ module TEST_CASE_PATTERNS[T :: var TINY[]] extends T begin
   attribute Root.separated_span : Integer;
   attribute Root.adjacent_span : Integer;
   attribute Root.endpoint_middles : Integer;
+  attribute Root.guarded : Integer;
 
   pragma synthesized(first, each, last, first_last, first_each, each_last,
                      first_each_last, separated_span, adjacent_span,
-                     endpoint_middles);
+                     endpoint_middles, guarded);
 
   match ?r=root(?w) begin
+    case all_leaves begin
+      match {...,?leaf:Integer if leaf >= 5,...} begin
+        r.guarded := leaf;
+      end;
+    else
+      r.guarded := 0;
+    end;
+
     case all_leaves begin
       match {?first_leaf,...} begin
         r.first := first_leaf;

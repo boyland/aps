@@ -22,7 +22,8 @@ object TestForPatternsDriver extends App {
     test.v_first_each_last(testRoot),
     test.v_separated_span(testRoot),
     test.v_adjacent_span(testRoot),
-    test.v_endpoint_middles(testRoot))
+    test.v_endpoint_middles(testRoot),
+    test.v_guarded(testRoot))
 
   println("Results:")
   results.foreach(println)
